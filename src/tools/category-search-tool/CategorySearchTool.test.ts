@@ -98,6 +98,18 @@ describe('CategorySearchTool', () => {
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942964');
   });
 
+  it('handles JSON-stringified object format proximity', async () => {
+    const mockFetch = setupFetch();
+
+    await new CategorySearchTool().run({
+      category: 'taco_shop',
+      proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
+    });
+
+    const calledUrl = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain('proximity=-82.458107%2C27.937259');
+  });
+
   it('uses default limit when not specified', async () => {
     const mockFetch = setupFetch();
 

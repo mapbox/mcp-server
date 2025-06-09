@@ -517,6 +517,22 @@ const CategorySearchInputSchema = z.object({
         if (val === 'ip') {
           return 'ip' as const;
         }
+        // Handle JSON-stringified object: "{\"longitude\": -82.458107, \"latitude\": 27.937259}"
+        if (val.startsWith('{') && val.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(val);
+            if (
+              typeof parsed === 'object' &&
+              parsed !== null &&
+              typeof parsed.longitude === 'number' &&
+              typeof parsed.latitude === 'number'
+            ) {
+              return { longitude: parsed.longitude, latitude: parsed.latitude };
+            }
+          } catch {
+            // Fall back to other formats
+          }
+        }
         // Handle string that looks like an array: "[-82.451668, 27.942964]"
         if (val.startsWith('[') && val.endsWith(']')) {
           const coords = val
