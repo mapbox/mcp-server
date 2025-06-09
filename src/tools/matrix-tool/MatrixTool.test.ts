@@ -70,8 +70,8 @@ describe('MatrixTool', () => {
 
     await new MatrixTool().run({
       coordinates: [
-        [-74.102094, 40.692815],
-        [-74.1022094, 40.792815]
+        { longitude: -74.102094, latitude: 40.692815 },
+        { longitude: -74.1022094, latitude: 40.792815 }
       ],
       profile: 'walking'
     });
@@ -87,9 +87,9 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     const result = await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91],
-        [-122.48, 37.73]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 },
+        { longitude: -122.48, latitude: 37.73 }
       ],
       profile: 'driving'
     });
@@ -115,8 +115,8 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 }
       ],
       profile: 'driving',
       annotations: 'duration,distance'
@@ -134,9 +134,9 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91],
-        [-122.48, 37.73]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 },
+        { longitude: -122.48, latitude: 37.73 }
       ],
       profile: 'driving',
       approaches: 'curb;unrestricted;curb'
@@ -154,8 +154,8 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 }
       ],
       profile: 'driving',
       bearings: '45,90;120,45'
@@ -173,9 +173,9 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91],
-        [-122.48, 37.73]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 },
+        { longitude: -122.48, latitude: 37.73 }
       ],
       profile: 'cycling',
       destinations: '0;2'
@@ -193,9 +193,9 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91],
-        [-122.48, 37.73]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 },
+        { longitude: -122.48, latitude: 37.73 }
       ],
       profile: 'walking',
       sources: '1'
@@ -213,9 +213,9 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     const result = await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91],
-        [-122.48, 37.73]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 },
+        { longitude: -122.48, latitude: 37.73 }
       ],
       profile: 'driving',
       annotations: 'distance,duration',
@@ -244,8 +244,8 @@ describe('MatrixTool', () => {
     const tool = new MatrixTool();
     const result = await tool.run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.45, 37.91]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.45, latitude: 37.91 }
       ],
       profile: 'walking'
     });
@@ -263,7 +263,7 @@ describe('MatrixTool', () => {
     const mockFetch = setupFetch();
 
     const tool = new MatrixTool();
-    const coordinates = Array(11).fill([-122.42, 37.78]);
+    const coordinates = Array(11).fill({ longitude: -122.42, latitude: 37.78 });
 
     const result = await tool.run({
       coordinates,
@@ -295,7 +295,7 @@ describe('MatrixTool', () => {
 
     it('validates coordinates - minimum count', async () => {
       const result = await tool.run({
-        coordinates: [[-122.42, 37.78]],
+        coordinates: [{ longitude: -122.42, latitude: 37.78 }],
         profile: 'driving'
       });
 
@@ -304,14 +304,17 @@ describe('MatrixTool', () => {
       // Test direct error message using Zod validation from schema
       await expect(async () => {
         await tool['inputSchema'].parseAsync({
-          coordinates: [[-122.42, 37.78]],
+          coordinates: [{ longitude: -122.42, latitude: 37.78 }],
           profile: 'driving'
         });
       }).rejects.toThrow('At least two coordinate pairs are required.');
     });
 
     it('validates coordinates - maximum count for regular profiles', async () => {
-      const coordinates = Array(26).fill([-122.42, 37.78]);
+      const coordinates = Array(26).fill({
+        longitude: -122.42,
+        latitude: 37.78
+      });
       const result = await tool.run({
         coordinates,
         profile: 'driving'
@@ -333,8 +336,8 @@ describe('MatrixTool', () => {
     it('validates coordinate bounds', async () => {
       const invalidLongitude = await tool.run({
         coordinates: [
-          [-190, 37.78],
-          [-122.45, 37.91]
+          { longitude: -190, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving'
       });
@@ -344,8 +347,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['inputSchema'].parseAsync({
           coordinates: [
-            [-190, 37.78],
-            [-122.45, 37.91]
+            { longitude: -190, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving'
         });
@@ -353,8 +356,8 @@ describe('MatrixTool', () => {
 
       const invalidLatitude = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 95]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 95 }
         ],
         profile: 'driving'
       });
@@ -364,8 +367,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['inputSchema'].parseAsync({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 95]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 95 }
           ],
           profile: 'driving'
         });
@@ -375,9 +378,9 @@ describe('MatrixTool', () => {
     it('validates approaches parameter length', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91],
-          [-122.48, 37.73]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -122.48, latitude: 37.73 }
         ],
         profile: 'driving',
         approaches: 'curb;unrestricted' // Only 2 for 3 coordinates
@@ -389,9 +392,9 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91],
-            [-122.48, 37.73]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 },
+            { longitude: -122.48, latitude: 37.73 }
           ],
           profile: 'driving',
           approaches: 'curb;unrestricted'
@@ -404,8 +407,8 @@ describe('MatrixTool', () => {
     it('validates approaches parameter values', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         approaches: 'curb;invalid' // 'invalid' is not allowed
@@ -417,8 +420,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving',
           approaches: 'curb;invalid'
@@ -431,9 +434,9 @@ describe('MatrixTool', () => {
     it('validates bearings parameter length', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91],
-          [-122.48, 37.73]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -122.48, latitude: 37.73 }
         ],
         profile: 'driving',
         bearings: '45,90;120,45' // Only 2 for 3 coordinates
@@ -445,9 +448,9 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91],
-            [-122.48, 37.73]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 },
+            { longitude: -122.48, latitude: 37.73 }
           ],
           profile: 'driving',
           bearings: '45,90;120,45'
@@ -460,8 +463,8 @@ describe('MatrixTool', () => {
     it('validates bearings parameter format', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         bearings: '45,90;invalid'
@@ -473,8 +476,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving',
           bearings: '45,90;invalid'
@@ -485,8 +488,8 @@ describe('MatrixTool', () => {
     it('validates bearings parameter angle range', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         bearings: '400,90;120,45' // 400 is > 360
@@ -498,8 +501,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving',
           bearings: '400,90;120,45'
@@ -510,8 +513,8 @@ describe('MatrixTool', () => {
     it('validates bearings parameter degrees range', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         bearings: '45,200;120,45' // 200 is > 180
@@ -523,8 +526,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving',
           bearings: '45,200;120,45'
@@ -535,8 +538,8 @@ describe('MatrixTool', () => {
     it('validates sources parameter indices', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         sources: '0;2' // 2 is out of bounds
@@ -548,8 +551,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving',
           sources: '0;2'
@@ -562,8 +565,8 @@ describe('MatrixTool', () => {
     it('validates destinations parameter indices', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         destinations: '3' // 3 is out of bounds
@@ -575,8 +578,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving',
           destinations: '3'
@@ -589,8 +592,8 @@ describe('MatrixTool', () => {
     it('validates destinations parameter index negative', async () => {
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         destinations: '-1'
@@ -602,8 +605,8 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
           ],
           profile: 'driving',
           destinations: '-1'
@@ -620,8 +623,8 @@ describe('MatrixTool', () => {
 
       await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         sources: 'all'
@@ -638,8 +641,8 @@ describe('MatrixTool', () => {
 
       await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         destinations: 'all'
@@ -663,9 +666,9 @@ describe('MatrixTool', () => {
       });
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.46, 37.9],
-          [-122.48, 37.73]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.46, latitude: 37.9 },
+          { longitude: -122.48, latitude: 37.73 }
         ],
         profile: 'driving',
         approaches: 'curb;;unrestricted'
@@ -683,9 +686,9 @@ describe('MatrixTool', () => {
 
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.46, 37.9],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.46, latitude: 37.9 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         bearings: '45,90;;120,45'
@@ -703,9 +706,9 @@ describe('MatrixTool', () => {
 
       const resultWithSuccess1 = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91],
-          [-122.48, 37.73]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -122.48, latitude: 37.73 }
         ],
         profile: 'driving',
         approaches: 'curb;;unrestricted'
@@ -715,8 +718,8 @@ describe('MatrixTool', () => {
 
       const resultWithSuccess2 = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         approaches: 'curb;'
@@ -731,9 +734,9 @@ describe('MatrixTool', () => {
       });
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91],
-          [-122.48, 37.73]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -122.48, latitude: 37.73 }
         ],
         profile: 'driving',
         sources: '1',
@@ -746,9 +749,9 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['execute']({
           coordinates: [
-            [-122.42, 37.78],
-            [-122.45, 37.91],
-            [-122.48, 37.73]
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 },
+            { longitude: -122.48, latitude: 37.73 }
           ],
           profile: 'driving',
           sources: '1',
@@ -765,8 +768,8 @@ describe('MatrixTool', () => {
       });
       await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         sources: '0',
@@ -783,8 +786,8 @@ describe('MatrixTool', () => {
       });
       await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         annotations: 'duration,distance'
@@ -797,8 +800,8 @@ describe('MatrixTool', () => {
       });
       await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving',
         annotations: 'distance,duration'
@@ -819,9 +822,12 @@ describe('MatrixTool', () => {
       const mockFetch = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const coordinates: [number, number][] = Array.from(
+      const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 25 },
-        (_, i) => [-122.42 + i * 0.01, 37.78 + i * 0.01]
+        (_, i) => ({
+          longitude: -122.42 + i * 0.01,
+          latitude: 37.78 + i * 0.01
+        })
       );
       const result = await tool.run({
         coordinates,
@@ -835,9 +841,12 @@ describe('MatrixTool', () => {
       const mockFetch = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const coordinates: [number, number][] = Array.from(
+      const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 10 },
-        (_, i) => [-122.42 + i * 0.01, 37.78 + i * 0.01]
+        (_, i) => ({
+          longitude: -122.42 + i * 0.01,
+          latitude: 37.78 + i * 0.01
+        })
       );
       const result = await tool.run({
         coordinates,
@@ -849,9 +858,12 @@ describe('MatrixTool', () => {
 
     it('rejects 11 coordinates for driving-traffic profile', async () => {
       const mockFetch = setupFetch();
-      const coordinates: [number, number][] = Array.from(
+      const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 11 },
-        (_, i) => [-122.42 + i * 0.01, 37.78 + i * 0.01]
+        (_, i) => ({
+          longitude: -122.42 + i * 0.01,
+          latitude: 37.78 + i * 0.01
+        })
       );
       const result = await tool.run({
         coordinates,
@@ -887,8 +899,8 @@ describe('MatrixTool', () => {
 
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving-traffic'
       });
@@ -905,8 +917,8 @@ describe('MatrixTool', () => {
 
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'driving'
       });
@@ -923,8 +935,8 @@ describe('MatrixTool', () => {
 
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'walking'
       });
@@ -941,8 +953,8 @@ describe('MatrixTool', () => {
 
       const result = await tool.run({
         coordinates: [
-          [-122.42, 37.78],
-          [-122.45, 37.91]
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
         ],
         profile: 'cycling'
       });

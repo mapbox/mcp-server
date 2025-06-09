@@ -21,7 +21,10 @@ const PoiSearchInputSchema = z.object({
     .describe('Maximum number of results to return (1-10)'),
   proximity: z
     .union([
-      z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]),
+      z.object({
+        longitude: z.number().min(-180).max(180),
+        latitude: z.number().min(-90).max(90)
+      }),
       z.string().transform((val) => {
         // Handle special case of 'ip'
         if (val === 'ip') {
@@ -34,34 +37,32 @@ const PoiSearchInputSchema = z.object({
             .split(',')
             .map((s) => Number(s.trim()));
           if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-            return coords as [number, number];
+            return { longitude: coords[0], latitude: coords[1] };
           }
         }
         // Handle comma-separated string: "-82.451668,27.942964"
         const parts = val.split(',').map((s) => Number(s.trim()));
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-          return parts as [number, number];
+          return { longitude: parts[0], latitude: parts[1] };
         }
         throw new Error(
-          'Invalid proximity format. Expected [longitude, latitude], "longitude,latitude", or "ip"'
+          'Invalid proximity format. Expected {longitude, latitude}, "longitude,latitude", or "ip"'
         );
       })
     ])
     .optional()
     .describe(
-      'Location to bias results towards. Either [longitude, latitude] or "ip" for IP-based location. STRONGLY ENCOURAGED for relevant results.'
+      'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location. STRONGLY ENCOURAGED for relevant results.'
     ),
   bbox: z
-    .tuple([
-      z.number().min(-180).max(180),
-      z.number().min(-90).max(90),
-      z.number().min(-180).max(180),
-      z.number().min(-90).max(90)
-    ])
+    .object({
+      minLongitude: z.number().min(-180).max(180),
+      minLatitude: z.number().min(-90).max(90),
+      maxLongitude: z.number().min(-180).max(180),
+      maxLatitude: z.number().min(-90).max(90)
+    })
     .optional()
-    .describe(
-      'Bounding box to limit results within [minLon, minLat, maxLon, maxLat]'
-    ),
+    .describe('Bounding box to limit results within specified bounds'),
   country: z
     .array(z.string().length(2))
     .optional()
@@ -91,9 +92,14 @@ const PoiSearchInputSchema = z.object({
     .optional()
     .describe('Routing profile for ETA calculations'),
   origin: z
-    .tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)])
+    .object({
+      longitude: z.number().min(-180).max(180),
+      latitude: z.number().min(-90).max(90)
+    })
     .optional()
-    .describe('Starting point for ETA calculations as [longitude, latitude]')
+    .describe(
+      'Starting point for ETA calculations as coordinate object with longitude and latitude'
+    )
 });
 
 export class PoiSearchTool extends MapboxApiBasedTool<
@@ -193,16 +199,17 @@ export class PoiSearchTool extends MapboxApiBasedTool<
       if (input.proximity === 'ip') {
         url.searchParams.append('proximity', 'ip');
       } else {
-        const [lng, lat] = input.proximity;
-        url.searchParams.append('proximity', `${lng},${lat}`);
+        const { longitude, latitude } = input.proximity;
+        url.searchParams.append('proximity', `${longitude},${latitude}`);
       }
     }
 
     if (input.bbox) {
-      const [minLon, minLat, maxLon, maxLat] = input.bbox;
+      const { minLongitude, minLatitude, maxLongitude, maxLatitude } =
+        input.bbox;
       url.searchParams.append(
         'bbox',
-        `${minLon},${minLat},${maxLon},${maxLat}`
+        `${minLongitude},${minLatitude},${maxLongitude},${maxLatitude}`
       );
     }
 
@@ -231,8 +238,8 @@ export class PoiSearchTool extends MapboxApiBasedTool<
     }
 
     if (input.origin) {
-      const [lng, lat] = input.origin;
-      url.searchParams.append('origin', `${lng},${lat}`);
+      const { longitude, latitude } = input.origin;
+      url.searchParams.append('origin', `${longitude},${latitude}`);
     }
 
     this.log(

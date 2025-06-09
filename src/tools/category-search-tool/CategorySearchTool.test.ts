@@ -41,8 +41,13 @@ describe('CategorySearchTool', () => {
       category: 'hotel',
       language: 'es',
       limit: 15,
-      proximity: [-74.006, 40.7128],
-      bbox: [-74.1, 40.6, -73.9, 40.8],
+      proximity: { longitude: -74.006, latitude: 40.7128 },
+      bbox: {
+        minLongitude: -74.1,
+        minLatitude: 40.6,
+        maxLongitude: -73.9,
+        maxLatitude: 40.8
+      },
       country: ['US', 'CA'],
       poi_category_exclusions: ['motel', 'hostel']
     });
@@ -153,7 +158,7 @@ describe('CategorySearchTool', () => {
     await expect(
       tool.run({
         category: 'parking',
-        proximity: [-181, 40]
+        proximity: { longitude: -181, latitude: 40 }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -163,7 +168,12 @@ describe('CategorySearchTool', () => {
     await expect(
       tool.run({
         category: 'parking',
-        bbox: [-74, -91, -73, 40]
+        bbox: {
+          minLongitude: -74,
+          minLatitude: -91,
+          maxLongitude: -73,
+          maxLatitude: 40
+        }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -212,7 +222,8 @@ describe('CategorySearchTool', () => {
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Local Coffee Shop');
     expect(textContent).toContain('Address: 456 Oak St, Portland, OR 97205');
     expect(textContent).toContain('Coordinates: 45.515, -122.676');
@@ -249,7 +260,8 @@ describe('CategorySearchTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain("1. McDonalds (McDonald's)");
     expect(textContent).toContain('Address: 123 Main St, Boston, MA');
     expect(textContent).toContain('Coordinates: 42.3601, -71.0589');
@@ -280,7 +292,7 @@ describe('CategorySearchTool', () => {
           },
           geometry: {
             type: 'Point',
-            coordinates: [-122.340, 47.610]
+            coordinates: [-122.34, 47.61]
           }
         }
       ]
@@ -297,7 +309,8 @@ describe('CategorySearchTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Target');
     expect(textContent).toContain('2. Walmart');
     expect(textContent).toContain('100 Store St, Seattle, WA 98101');
@@ -320,7 +333,9 @@ describe('CategorySearchTool', () => {
 
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
-    expect((result.content[0] as { type: 'text'; text: string }).text).toBe('No results found.');
+    expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
+      'No results found.'
+    );
   });
 
   it('handles results with minimal properties', async () => {
@@ -350,7 +365,8 @@ describe('CategorySearchTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Some Gas Station');
     expect(textContent).toContain('Coordinates: 40.7128, -74.006');
     expect(textContent).not.toContain('Address:');

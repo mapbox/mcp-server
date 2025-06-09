@@ -313,12 +313,12 @@ const OverlaySchema = z.discriminatedUnion('type', [
 
 const StaticMapImageInputSchema = z.object({
   center: z
-    .tuple([
-      z.number().min(-180).max(180),
-      z.number().min(-85.0511).max(85.0511)
-    ])
+    .object({
+      longitude: z.number().min(-180).max(180),
+      latitude: z.number().min(-85.0511).max(85.0511)
+    })
     .describe(
-      'Center point of the map as [longitude, latitude]. Longitude: -180 to 180, Latitude: -85.0511 to 85.0511'
+      'Center point of the map as coordinate object with longitude and latitude properties. Longitude: -180 to 180, Latitude: -85.0511 to 85.0511'
     ),
   zoom: z
     .number()
@@ -328,9 +328,12 @@ const StaticMapImageInputSchema = z.object({
       'Zoom level (0-22). Fractional zoom levels are rounded to two decimal places'
     ),
   size: z
-    .tuple([z.number().min(1).max(1280), z.number().min(1).max(1280)])
+    .object({
+      width: z.number().min(1).max(1280),
+      height: z.number().min(1).max(1280)
+    })
     .describe(
-      'Image size as [width, height] in pixels. Each dimension must be between 1 and 1280 pixels'
+      'Image size as object with width and height properties in pixels. Each dimension must be between 1 and 1280 pixels'
     ),
   style: z
     .string()
@@ -416,8 +419,8 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof StaticMapImageInputSchema>
   ): Promise<any> {
-    const [lng, lat] = input.center;
-    const [width, height] = input.size;
+    const { longitude: lng, latitude: lat } = input.center;
+    const { width, height } = input.size;
 
     // Build overlay string
     let overlayString = '';

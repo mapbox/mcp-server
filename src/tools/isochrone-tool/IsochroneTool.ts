@@ -12,9 +12,12 @@ const IsochroneInputSchema = z.object({
     .default('mapbox/driving-traffic')
     .describe('Mode of travel.'),
   coordinates: z
-    .tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)])
+    .object({
+      longitude: z.number().min(-180).max(180),
+      latitude: z.number().min(-90).max(90)
+    })
     .describe(
-      'A coordinate [longitude, latitude] pair around which to center the isochrone lines. Longitude: -180 to 180, Latitude: -85.0511 to 85.0511'
+      'A coordinate object with longitude and latitude properties around which to center the isochrone lines. Longitude: -180 to 180, Latitude: -85.0511 to 85.0511'
     ),
 
   contours_minutes: z
@@ -98,7 +101,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
     input: z.infer<typeof IsochroneInputSchema>
   ): Promise<any> {
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}isochrone/v1/${input.profile}/${input.coordinates[0]}%2C${input.coordinates[1]}`
+      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
     );
     url.searchParams.append(
       'access_token',

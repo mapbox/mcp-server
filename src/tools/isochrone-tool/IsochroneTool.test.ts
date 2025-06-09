@@ -18,7 +18,7 @@ describe('IsochroneTool', () => {
     const mockFetch = setupFetch();
 
     await new IsochroneTool().run({
-      coordinates: [-74.006, 40.7128],
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/driving',
       contours_minutes: [10],
       generalize: 1000
@@ -33,7 +33,7 @@ describe('IsochroneTool', () => {
       json: async () => ({ type: 'FeatureCollection', features: [] })
     });
     await new IsochroneTool().run({
-      coordinates: [27.534527, 53.9353451],
+      coordinates: { longitude: 27.534527, latitude: 53.9353451 },
       profile: 'mapbox/driving',
       contours_minutes: [10, 20],
       contours_colors: ['ff0000', '00ff00'],
@@ -63,7 +63,7 @@ describe('IsochroneTool', () => {
       json: async () => ({ type: 'FeatureCollection', features: [] })
     });
     await new IsochroneTool().run({
-      coordinates: [27.534527, 53.9353451],
+      coordinates: { longitude: 27.534527, latitude: 53.9353451 },
       profile: 'mapbox/driving',
       contours_minutes: [10, 20],
       generalize: 1000
@@ -88,7 +88,7 @@ describe('IsochroneTool', () => {
     });
 
     const result = await new IsochroneTool().run({
-      coordinates: [-74.006, 40.7128],
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/walking',
       contours_minutes: [5],
       generalize: 1000
@@ -104,7 +104,7 @@ describe('IsochroneTool', () => {
   it('throws on invalid input', async () => {
     const tool = new IsochroneTool();
     const result = await tool.run({
-      coordinates: [0, 0],
+      coordinates: { longitude: 0, latitude: 0 },
       profile: 'invalid',
       contours_minutes: [5]
     });
@@ -117,7 +117,7 @@ describe('IsochroneTool', () => {
 
   it('throws if neither contours_minutes nor contours_meters is specified', async () => {
     const result = await new IsochroneTool().run({
-      coordinates: [-74.006, 40.7128],
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/driving',
       generalize: 1000
     });
