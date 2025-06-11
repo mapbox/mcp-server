@@ -16,6 +16,8 @@ Whether you're building an AI travel assistant, logistics optimizer, location-ba
 
 ![Mapbox MCP Server Demo](./assets/mapbox_mcp_server.gif)
 
+# Usage
+
 **A Mapbox access token is required to use this MCP server.**
 
 To get a Mapbox access token:
