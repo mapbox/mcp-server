@@ -10,7 +10,8 @@ The Mapbox MCP Server transforms any AI agent or application into a geospatially
 - **Points of interest (POI) search** across millions of businesses, landmarks, and places worldwide
 - **Multi-modal routing** for driving, walking, and cycling with real-time traffic
 - **Travel time matrices** to analyze accessibility and optimize logistics
-- **Rich location context** including place details, categories, and geographic boundaries
+- **Isochrone generation** to visualize areas reachable within specific time or distance constraints
+- **Static map images** to create visual representations of locations, routes, and geographic data
 
 Whether you're building an AI travel assistant, logistics optimizer, location-based recommender, or any application that needs to understand "where", the Mapbox MCP Server provides the spatial intelligence to make it possible. You can also enable it on popular clients like Claude Desktop and VS Code. See below for details
 
