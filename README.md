@@ -2,6 +2,20 @@
 
 Node.js server implementing Model Context Protocol (MCP) for Mapbox APIs.
 
+## Unlock Geospatial Intelligence for Your AI Applications
+
+The Mapbox MCP Server transforms any AI agent or application into a geospatially-aware system by providing seamless access to Mapbox's comprehensive location intelligence platform. With this server, your AI can understand and reason about places, navigate the physical world, and access rich geospatial data including:
+
+- **Global geocoding** to convert addresses and place names to coordinates and vice versa
+- **Points of interest (POI) search** across millions of businesses, landmarks, and places worldwide
+- **Multi-modal routing** for driving, walking, and cycling with real-time traffic
+- **Travel time matrices** to analyze accessibility and optimize logistics
+- **Rich location context** including place details, categories, and geographic boundaries
+
+Whether you're building an AI travel assistant, logistics optimizer, location-based recommender, or any application that needs to understand "where", the Mapbox MCP Server provides the spatial intelligence to make it possible. You can also enable it on popular clients like Claude Desktop and VS Code. See below for details
+
+![Mapbox MCP Server Demo](./assets/mapbox_mcp_server.gif)
+
 **A Mapbox access token is required to use this MCP server.**
 
 To get a Mapbox access token:
