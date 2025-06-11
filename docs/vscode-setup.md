@@ -13,6 +13,9 @@ This guide explains how to configure VS Code for use with the Mapbox MCP Server.
 npm run build
 
 # note your absolute path to node, you will need it for MCP config
+# For Mac/Linux
+which node
+# For Windows
 where node
 
 # or alternatively, using docker

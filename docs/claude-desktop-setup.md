@@ -13,6 +13,9 @@ This guide explains how to set up and configure Claude Desktop for use with the 
 npm run build
 
 # note your absolute path to node, you will need it for MCP config
+# For Mac/Linux
+which node
+# For Windows
 where node
 
 # or alternatively, using docker

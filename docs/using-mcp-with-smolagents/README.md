@@ -24,6 +24,9 @@ The `smolagents_example.py` script shows a simple but powerful implementation of
 npm run build
 
 # note your absolute path to node, you will need it for MCP config
+# For Mac/Linux
+which node
+# For Windows
 where node
 
 # Alternatively, build docker
