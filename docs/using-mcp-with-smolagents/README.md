@@ -1,6 +1,6 @@
-# Using SmolaGents with Mapbox MCP
+# Using Smolagents with Mapbox MCP
 
-This example demonstrates how to integrate Mapbox's Model Context Protocol (MCP) server with SmolaGents, allowing AI agents to access Mapbox's location-based tools.
+This example demonstrates how to integrate Mapbox's Model Context Protocol (MCP) server with Smolagents, allowing AI agents to access Mapbox's location-based tools.
 
 ## Overview
 
@@ -22,6 +22,9 @@ The `smolagents_example.py` script shows a simple but powerful implementation of
 ```sh
 # Build node (from repository root)
 npm run build
+
+# note your absolute path to node, you will need it for MCP config
+where node
 
 # Alternatively, build docker
 docker build -t mapbox-mcp-server .
@@ -47,10 +50,11 @@ It connects to the Mapbox MCP server, which exposes Mapbox's functionality as to
    export MAPBOX_ACCESS_TOKEN=your_token_here
    ```
 
-2. Update the path to the MCP server in the script:
+2. Update the path to your node and the MCP server in the script:
 
    ```python
-   args=["/path/to/your/repository/dist/index.js"]
+   command="/Users/username/.nvm/versions/node/v22.3.0/bin/node",
+   args=["/YOUR_PATH_TO_REPOSITORY/dist/index.js"],
    ```
 
 3. Choose your preferred model by setting the `chosen_inference` variable
@@ -77,7 +81,7 @@ agent.run("Your location-based question here")
 
 For more information about:
 
-- SmolaGents: [SmolaGents Documentation](https://github.com/smol-ai/smolagents)
+- Smolagents: [Smolagents Documentation](https://github.com/smol-ai/smolagents)
 - Mapbox MCP: See the [main repository documentation](../../README.md)
 - Additional setup guides:
   - [Claude Desktop Setup](../claude-desktop-setup.md)

@@ -12,6 +12,9 @@ This guide explains how to set up and configure Claude Desktop for use with the 
 # using node
 npm run build
 
+# note your absolute path to node, you will need it for MCP config
+where node
+
 # or alternatively, using docker
 docker build -t mapbox-mcp-server .
 ```
@@ -34,7 +37,7 @@ docker build -t mapbox-mcp-server .
 {
   "mcpServers": {
     "MapboxServer": {
-      "command": "node",
+      "command": "/Users/username/.nvm/versions/node/v22.3.0/bin/node",
       "args": ["YOUR_PATH_TO_GIT_REPOSITORY/dist/index.js"],
       "env": {
         "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
