@@ -1,4 +1,5 @@
-process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import { cleanup } from '../../utils/requestUtils.js';
 import {
@@ -102,7 +103,9 @@ describe('MatrixTool', () => {
     expect(url).toContain(
       'directions-matrix/v1/mapbox/driving/-122.42,37.78;-122.45,37.91;-122.48,37.73'
     );
-    expect(url).toContain('access_token=test-token');
+    expect(url).toContain(
+      'access_token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
 
     assertHeadersSent(mockFetch);
   });

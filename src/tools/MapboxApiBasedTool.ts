@@ -37,12 +37,32 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
   }
 
   /**
+   * Validates if a string has the format of a JWT token (header.payload.signature)
+   * Docs: https://docs.mapbox.com/api/accounts/tokens/#token-format
+   * @param token The token string to validate
+   * @returns boolean indicating if the token has valid JWT format
+   */
+  private isValidJwtFormat(token: string): boolean {
+    // JWT consists of three parts separated by dots: header.payload.signature
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+
+    // Check that all parts are non-empty
+    return parts.every((part) => part.length > 0);
+  }
+
+  /**
    * Validates and runs the tool logic.
    */
   async run(rawInput: unknown): Promise<z.infer<typeof OutputSchema>> {
     try {
       if (!MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN) {
         throw new Error('MAPBOX_ACCESS_TOKEN is not set');
+      }
+
+      // Validate that the token has the correct JWT format
+      if (!this.isValidJwtFormat(MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN)) {
+        throw new Error('MAPBOX_ACCESS_TOKEN is not in valid JWT format');
       }
 
       const input = this.inputSchema.parse(rawInput);

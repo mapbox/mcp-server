@@ -1,4 +1,5 @@
-process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import { cleanup } from '../../utils/requestUtils.js';
 import {
