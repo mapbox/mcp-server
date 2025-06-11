@@ -23,6 +23,9 @@ The `smolagents_example.py` script shows a simple but powerful implementation of
 # Build node (from repository root)
 npm run build
 
+# note your absolute path to node, you will need it for MCP config
+where node
+
 # Alternatively, build docker
 docker build -t mapbox-mcp-server .
 ```
@@ -47,10 +50,11 @@ It connects to the Mapbox MCP server, which exposes Mapbox's functionality as to
    export MAPBOX_ACCESS_TOKEN=your_token_here
    ```
 
-2. Update the path to the MCP server in the script:
+2. Update the path to your node and the MCP server in the script:
 
    ```python
-   args=["/path/to/your/repository/dist/index.js"]
+   command="/Users/username/.nvm/versions/node/v22.3.0/bin/node",
+   args=["/YOUR_PATH_TO_REPOSITORY/dist/index.js"],
    ```
 
 3. Choose your preferred model by setting the `chosen_inference` variable
