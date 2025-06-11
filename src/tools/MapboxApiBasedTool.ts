@@ -66,15 +66,23 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
         is_error: false
       };
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
       this.log(
         'error',
-        `${this.name}: Error during execution: ${error instanceof Error ? error.message : String(error)}`
+        `${this.name}: Error during execution: ${errorMessage}`
       );
+
+      const isVerboseErrors = process.env.VERBOSE_ERRORS === 'true';
+
       return {
         content: [
           {
             type: 'text',
-            text: 'Internal error has occurred.'
+            text: isVerboseErrors
+              ? errorMessage
+              : 'Internal error has occurred.'
           }
         ],
         is_error: true
