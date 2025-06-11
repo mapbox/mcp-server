@@ -18,7 +18,7 @@ For detailed setup instructions for different integrations, refer to the followi
 
 - [Claude Desktop Setup](./docs/claude-desktop-setup.md) - Instructions for configuring Claude Desktop to work with this MCP server
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
-- [SmolaGents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect SmolaGents AI agents to Mapbox's tools
+- [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
 
 ## Tools
 
