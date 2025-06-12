@@ -5,6 +5,9 @@ This guide explains how to set up and configure Claude Desktop for use with the 
 ## Requirements
 
 - Claude Desktop application installed on your system
+
+If you want to use locally, you need also do:
+
 - Mapbox MCP Server built locally
 
 ```sh
@@ -30,39 +33,55 @@ docker build -t mapbox-mcp-server .
    ![Navigate to MCP section](images/claude-mcp-section.png)
 1. Modify claude_desktop_config.json to add new server, for example:
 
-```json
-{
-  "mcpServers": {
-    "MapboxServer": {
-      "command": "node",
-      "args": ["YOUR_PATH_TO_GIT_REPOSITORY/dist/index.js"],
-      "env": {
-        "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
-      }
-    }
-  }
-}
-```
+   - Using NPM package
+     ```json
+     {
+       "mcpServers": {
+         "MapboxServer": {
+           "command": <PATH_TO_YOUR_NPX>,
+           "args": [ "-y", "@mapbox/mcp-server"],
+           "env": {
+             "MAPBOX_ACCESS_TOKEN": <YOUR_TOKEN>
+           }
+         }
+       }
+     }
+     ```
+   - If you want to use local Node.js version (Need to clone and build from this repo)
 
-Alternatively, using docker:
+     ```json
+     {
+       "mcpServers": {
+         "MapboxServer": {
+           "command": "node",
+           "args": ["YOUR_PATH_TO_GIT_REPOSITORY/dist/index.js"],
+           "env": {
+             "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
+           }
+         }
+       }
+     }
+     ```
 
-```json
-{
-  "mcpServers": {
-    "MapboxServer": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "MAPBOX_ACCESS_TOKEN=YOUR_TOKEN",
-        "mapbox-mcp-server"
-      ]
-    }
-  }
-}
-```
+   - Alternatively, using docker:
+
+     ```json
+     {
+       "mcpServers": {
+         "MapboxServer": {
+           "command": "docker",
+           "args": [
+             "run",
+             "-i",
+             "--rm",
+             "-e",
+             "MAPBOX_ACCESS_TOKEN=YOUR_TOKEN",
+             "mapbox-mcp-server"
+           ]
+         }
+       }
+     }
+     ```
 
 ### Using Mapbox Tools in Claude
 

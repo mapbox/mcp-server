@@ -22,38 +22,57 @@ docker build -t mapbox-mcp-server .
 
 1. Go to your `settings.json`
 1. At the top level add MCP config, for example:
-
-```json
-    "mcp": {
-        "servers": {
-            "mapbox-docker": {
-                "type": "stdio",
-                "command": "docker",
-                "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "mapbox-mcp-server"
-                ],
-                "env": {
-                    "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
-                }
-            },
-
-            "mapbox-node": {
-                "type": "stdio",
-                "command": "node",
-                "args": [
-                    "/YOUR_PATH_TO_GIT_REPOSITORY/dist/index.js"
-                ],
-                "env": {
-                    "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
-                }
-            }
-        },
-    },
-```
-
-Note, either docker or node is sufficient, above contains both just for example.
+   - NPM version
+     ```json
+         "mcp": {
+             "servers": {
+                 "MapboxServer": {
+                     "type": "stdio",
+                     "command": "npx",
+                     "args": ["-y", "@mapbox/mcp-server"],
+                     "env": {
+                         "MAPBOX_ACCESS_TOKEN": <YOUR_TOKEN>
+                     }
+                 }
+             },
+         },
+     ```
+   - Docker version
+     ```json
+         "mcp": {
+             "servers": {
+                 "MapboxServer": {
+                     "type": "stdio",
+                     "command": "docker",
+                     "args": [
+                         "run",
+                         "-i",
+                         "--rm",
+                         "mapbox-mcp-server"
+                     ],
+                     "env": {
+                         "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
+                     }
+                 }
+             },
+         },
+     ```
+   - Node version
+     ```json
+         "mcp": {
+             "servers": {
+                 "MapboxServer": {
+                     "type": "stdio",
+                     "command": "node",
+                     "args": [
+                         "/YOUR_PATH_TO_GIT_REPOSITORY/dist/index.js"
+                     ],
+                     "env": {
+                         "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
+                     }
+                 }
+             },
+         },
+     ```
 
 You might need to restart VS Code. You should see Mapbox Server appear in tools menu.

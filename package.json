@@ -1,20 +1,22 @@
 {
-  "name": "mapbox-mcp-server",
-  "private": true,
-  "version": "0.0.1",
+  "name": "@mapbox/mcp-server",
+  "version": "0.1.0",
   "description": "Mapbox MCP server.",
   "main": "dist/index.js",
   "module": "dist/index-esm.js",
   "typings": "dist/index.d.ts",
   "type": "module",
+  "bin": {
+    "mcp-server": "dist/index.js"
+  },
   "scripts": {
-   "lint": "eslint \"./src/**/*.{ts,tsx}\"",
+    "lint": "eslint \"./src/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" --fix",
     "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\"",
     "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\"",
     "prepare": "husky && node .husky/setup-hooks.js",
     "test": "jest",
-    "build": "npm run prepare && npm run build:esm && npm run build:cjs && npm run generate-version",
+    "build": "npm run prepare && npm run build:esm && npm run build:cjs && npm run generate-version && node scripts/add-shebang.cjs",
     "build:esm": "node scripts/build-helpers.cjs esm-package && tsc -p tsconfig.json",
     "build:cjs": "node scripts/build-helpers.cjs cjs-package && tsc -p tsconfig.json",
     "generate-version": "node scripts/build-helpers.cjs generate-version"
@@ -23,7 +25,7 @@
     "*.{js,jsx,ts,tsx}": "eslint --fix",
     "*.{js,jsx,ts,tsx,md,html,css}": "prettier --write"
   },
-  "license": "No License",
+  "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://github.com/mapbox/mcp-server#readme",
   "devDependencies": {
     "@eslint/js": "^9.27.0",
@@ -49,6 +51,24 @@
   "engines": {
     "node": ">=18"
   },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index-esm.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mapbox/mcp-server.git"
+  },
+  "keywords": [
+    "mapbox",
+    "mcp"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^3.25.42"
