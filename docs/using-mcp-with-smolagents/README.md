@@ -19,6 +19,8 @@ The `smolagents_example.py` script shows a simple but powerful implementation of
 - A Mapbox access token (set as an environment variable)
 - Node.js or docker (to run the MCP server)
 
+With NPM package, you don't need to clone this repository, and build it. But If you want to use the local codes, you need to clone and build it:
+
 ```sh
 # Build node (from repository root)
 npm run build
@@ -55,10 +57,24 @@ It connects to the Mapbox MCP server, which exposes Mapbox's functionality as to
 
 2. Update the path to your node and the MCP server in the script:
 
-   ```python
-   command="/Users/username/.nvm/versions/node/v22.3.0/bin/node",
-   args=["/YOUR_PATH_TO_REPOSITORY/dist/index.js"],
-   ```
+   - If you want to use NPM version:
+
+     ```python
+     server_parameters = StdioServerParameters(
+        command=<YOUR_NPX_PATH>,
+        args=["-y", "@mapbox/mcp-server"],
+        env={"MAPBOX_ACCESS_TOKEN": os.environ["MAPBOX_ACCESS_TOKEN"]},
+     )
+     ```
+
+   - If you want to use the local code version from this repository:
+     ```python
+     server_parameters = StdioServerParameters(
+        command=<YOUR_NODE_PATH>,
+        args=["/YOUR_PATH_TO_REPOSITORY/dist/index.js"],
+        env={"MAPBOX_ACCESS_TOKEN": os.environ["MAPBOX_ACCESS_TOKEN"]},
+     )
+     ```
 
 3. Choose your preferred model by setting the `chosen_inference` variable
 
