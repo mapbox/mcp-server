@@ -1,4 +1,4 @@
-## v0.0.2 (2025-06-12)
+## v0.1.0 (2025-06-12)
 
 - **Support-NPM-Package**: Introduce the NPM package of this mcp-server
 
