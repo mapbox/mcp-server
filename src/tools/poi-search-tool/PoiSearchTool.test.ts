@@ -1,5 +1,6 @@
 // Set the token before importing the tool
-process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import {
   setupFetch,
@@ -42,15 +43,20 @@ describe('PoiSearchTool', () => {
       q: 'restaurant',
       language: 'es',
       limit: 5,
-      proximity: [-74.006, 40.7128],
-      bbox: [-74.1, 40.6, -73.9, 40.8],
+      proximity: { longitude: -74.006, latitude: 40.7128 },
+      bbox: {
+        minLongitude: -74.1,
+        minLatitude: 40.6,
+        maxLongitude: -73.9,
+        maxLatitude: 40.8
+      },
       country: ['US', 'CA'],
       types: ['poi', 'address'],
       poi_category: ['restaurant', 'cafe'],
       auto_complete: true,
       eta_type: 'navigation',
       navigation_profile: 'driving',
-      origin: [-74.0, 40.7]
+      origin: { longitude: -74.0, latitude: 40.7 }
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
@@ -102,6 +108,18 @@ describe('PoiSearchTool', () => {
 
     const calledUrl = mockFetch.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942964');
+  });
+
+  it('handles JSON-stringified object format proximity', async () => {
+    const mockFetch = setupFetch();
+
+    await new PoiSearchTool().run({
+      q: 'restaurant',
+      proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
+    });
+
+    const calledUrl = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain('proximity=-82.458107%2C27.937259');
   });
 
   it('uses default limit when not specified', async () => {
@@ -177,7 +195,7 @@ describe('PoiSearchTool', () => {
     await expect(
       tool.run({
         q: 'test',
-        proximity: [-181, 40]
+        proximity: { longitude: -181, latitude: 40 }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -187,7 +205,12 @@ describe('PoiSearchTool', () => {
     await expect(
       tool.run({
         q: 'test',
-        bbox: [-74, -91, -73, 40]
+        bbox: {
+          minLongitude: -74,
+          minLatitude: -91,
+          maxLongitude: -73,
+          maxLatitude: 40
+        }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -271,7 +294,8 @@ describe('PoiSearchTool', () => {
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Starbucks Coffee');
     expect(textContent).toContain('Address: 123 Main St, New York, NY 10001');
     expect(textContent).toContain('Coordinates: 40.7128, -74.006');
@@ -308,7 +332,8 @@ describe('PoiSearchTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Central Park (The Central Park)');
     expect(textContent).toContain('Address: Central Park, New York, NY');
     expect(textContent).toContain('Coordinates: 40.782, -73.965');
@@ -356,7 +381,8 @@ describe('PoiSearchTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Starbucks #1');
     expect(textContent).toContain('2. Starbucks #2');
     expect(textContent).toContain('123 Main St, New York, NY 10001');
@@ -379,7 +405,9 @@ describe('PoiSearchTool', () => {
 
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
-    expect((result.content[0] as { type: 'text'; text: string }).text).toBe('No results found.');
+    expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
+      'No results found.'
+    );
   });
 
   it('handles results with minimal properties', async () => {
@@ -409,7 +437,8 @@ describe('PoiSearchTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Some Location');
     expect(textContent).toContain('Coordinates: 40.7128, -74.006');
     expect(textContent).not.toContain('Address:');

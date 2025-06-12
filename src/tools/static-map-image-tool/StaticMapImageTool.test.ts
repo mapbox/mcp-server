@@ -1,4 +1,5 @@
-process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import {
   setupFetch,
@@ -15,9 +16,9 @@ describe('StaticMapImageTool', () => {
     const mockFetch = setupFetch();
 
     await new StaticMapImageTool().run({
-      center: [-74.006, 40.7128],
+      center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
-      size: [600, 400],
+      size: { width: 600, height: 400 },
       style: 'mapbox/streets-v12'
     });
 
@@ -37,9 +38,9 @@ describe('StaticMapImageTool', () => {
     });
 
     const result = await new StaticMapImageTool().run({
-      center: [-74.006, 40.7128],
+      center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 10,
-      size: [800, 600],
+      size: { width: 800, height: 600 },
       style: 'mapbox/satellite-v9'
     });
 
@@ -56,9 +57,9 @@ describe('StaticMapImageTool', () => {
     const mockFetch = setupFetch();
 
     await new StaticMapImageTool().run({
-      center: [-122.4194, 37.7749],
+      center: { longitude: -122.4194, latitude: 37.7749 },
       zoom: 15,
-      size: [1024, 768],
+      size: { width: 1024, height: 768 },
       style: 'mapbox/dark-v10'
     });
 
@@ -73,9 +74,9 @@ describe('StaticMapImageTool', () => {
     const mockFetch = setupFetch();
 
     await new StaticMapImageTool().run({
-      center: [0, 0],
+      center: { longitude: 0, latitude: 0 },
       zoom: 1,
-      size: [300, 200]
+      size: { width: 300, height: 200 }
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
@@ -90,9 +91,9 @@ describe('StaticMapImageTool', () => {
     });
 
     const result = await new StaticMapImageTool().run({
-      center: [-74.006, 40.7128],
+      center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
-      size: [600, 400]
+      size: { width: 600, height: 400 }
     });
 
     expect(result.is_error).toBe(true);
@@ -108,9 +109,9 @@ describe('StaticMapImageTool', () => {
     // Test invalid longitude
     await expect(
       tool.run({
-        center: [-181, 40],
+        center: { longitude: -181, latitude: 40 },
         zoom: 10,
-        size: [600, 400]
+        size: { width: 600, height: 400 }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -119,9 +120,9 @@ describe('StaticMapImageTool', () => {
     // Test invalid latitude
     await expect(
       tool.run({
-        center: [-74, 90],
+        center: { longitude: -74, latitude: 90 },
         zoom: 10,
-        size: [600, 400]
+        size: { width: 600, height: 400 }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -134,9 +135,9 @@ describe('StaticMapImageTool', () => {
     // Test size too large
     await expect(
       tool.run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 10,
-        size: [1281, 600]
+        size: { width: 1281, height: 600 }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -145,9 +146,9 @@ describe('StaticMapImageTool', () => {
     // Test size too small
     await expect(
       tool.run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 10,
-        size: [0, 600]
+        size: { width: 0, height: 600 }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -158,9 +159,9 @@ describe('StaticMapImageTool', () => {
     const mockFetch = setupFetch();
 
     await new StaticMapImageTool().run({
-      center: [-74.006, 40.7128],
+      center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
-      size: [600, 400],
+      size: { width: 600, height: 400 },
       highDensity: true
     });
 
@@ -173,9 +174,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',
@@ -196,9 +197,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'custom-marker',
@@ -219,9 +220,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'path',
@@ -250,9 +251,9 @@ describe('StaticMapImageTool', () => {
       };
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'geojson',
@@ -271,9 +272,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',
@@ -303,9 +304,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400]
+        size: { width: 600, height: 400 }
       });
 
       const calledUrl = mockFetch.mock.calls[0][0];
@@ -317,9 +318,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',
@@ -341,9 +342,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',
@@ -364,9 +365,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',
@@ -388,9 +389,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',
@@ -411,9 +412,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-80.278, 25.796],
+        center: { longitude: -80.278, latitude: 25.796 },
         zoom: 15,
-        size: [800, 600],
+        size: { width: 800, height: 600 },
         style: 'mapbox/streets-v12',
         overlays: [
           {
@@ -460,9 +461,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',
@@ -493,9 +494,9 @@ describe('StaticMapImageTool', () => {
       const mockFetch = setupFetch();
 
       await new StaticMapImageTool().run({
-        center: [-74.006, 40.7128],
+        center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
-        size: [600, 400],
+        size: { width: 600, height: 400 },
         overlays: [
           {
             type: 'marker',

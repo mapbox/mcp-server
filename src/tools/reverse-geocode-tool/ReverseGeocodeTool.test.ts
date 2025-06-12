@@ -1,5 +1,6 @@
 // Set the token before importing the tool
-process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import {
   setupFetch,
@@ -268,9 +269,12 @@ describe('ReverseGeocodeTool', () => {
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. 123 Main Street');
-    expect(textContent).toContain('Address: 123 Main Street, New York, NY 10001, United States');
+    expect(textContent).toContain(
+      'Address: 123 Main Street, New York, NY 10001, United States'
+    );
     expect(textContent).toContain('Coordinates: 40.733, -73.989');
     expect(textContent).toContain('Type: address');
   });
@@ -305,9 +309,12 @@ describe('ReverseGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Manhattan (Manhattan Borough)');
-    expect(textContent).toContain('Address: Manhattan, New York, NY, United States');
+    expect(textContent).toContain(
+      'Address: Manhattan, New York, NY, United States'
+    );
     expect(textContent).toContain('Coordinates: 40.776, -73.971');
   });
 
@@ -324,7 +331,7 @@ describe('ReverseGeocodeTool', () => {
           },
           geometry: {
             type: 'Point',
-            coordinates: [-73.990, 40.694]
+            coordinates: [-73.99, 40.694]
           }
         },
         {
@@ -347,7 +354,7 @@ describe('ReverseGeocodeTool', () => {
     });
 
     const result = await new ReverseGeocodeTool().run({
-      longitude: -73.990,
+      longitude: -73.99,
       latitude: 40.694,
       limit: 2,
       types: ['address']
@@ -355,11 +362,16 @@ describe('ReverseGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. 456 Oak Street');
     expect(textContent).toContain('2. 458 Oak Street');
-    expect(textContent).toContain('456 Oak Street, Brooklyn, NY 11201, United States');
-    expect(textContent).toContain('458 Oak Street, Brooklyn, NY 11201, United States');
+    expect(textContent).toContain(
+      '456 Oak Street, Brooklyn, NY 11201, United States'
+    );
+    expect(textContent).toContain(
+      '458 Oak Street, Brooklyn, NY 11201, United States'
+    );
   });
 
   it('handles empty results gracefully', async () => {
@@ -379,7 +391,9 @@ describe('ReverseGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
-    expect((result.content[0] as { type: 'text'; text: string }).text).toBe('No results found.');
+    expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
+      'No results found.'
+    );
   });
 
   it('handles results with minimal properties', async () => {
@@ -410,7 +424,8 @@ describe('ReverseGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Some Location');
     expect(textContent).toContain('Coordinates: 35.456, -100.123');
     expect(textContent).not.toContain('Address:');

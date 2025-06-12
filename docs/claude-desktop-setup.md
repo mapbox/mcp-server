@@ -15,6 +15,12 @@ If you want to use locally, you need also do:
 # using node
 npm run build
 
+# note your absolute path to node, you will need it for MCP config
+# For Mac/Linux
+which node
+# For Windows
+where node
+
 # or alternatively, using docker
 docker build -t mapbox-mcp-server .
 ```
@@ -53,7 +59,7 @@ docker build -t mapbox-mcp-server .
      {
        "mcpServers": {
          "MapboxServer": {
-           "command": "node",
+           "command": <PATH_TO_YOUR_NODE>,
            "args": ["YOUR_PATH_TO_GIT_REPOSITORY/dist/index.js"],
            "env": {
              "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"

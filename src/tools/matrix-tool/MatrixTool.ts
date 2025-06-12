@@ -7,16 +7,16 @@ import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 const MatrixInputSchema = z.object({
   coordinates: z
     .array(
-      z.tuple([
-        z
+      z.object({
+        longitude: z
           .number()
           .min(-180, 'Longitude must be between -180 and 180 degrees')
           .max(180, 'Longitude must be between -180 and 180 degrees'),
-        z
+        latitude: z
           .number()
           .min(-90, 'Latitude must be between -90 and 90 degrees')
           .max(90, 'Latitude must be between -90 and 90 degrees')
-      ])
+      })
     )
     .min(2, 'At least two coordinate pairs are required.')
     .max(
@@ -24,7 +24,7 @@ const MatrixInputSchema = z.object({
       'Up to 25 coordinate pairs are supported for most profiles (10 for driving-traffic).'
     )
     .describe(
-      'Array of [longitude, latitude] coordinate pairs. ' +
+      'Array of coordinate objects with longitude and latitude properties. ' +
         'Must include at least 2 coordinate pairs. ' +
         'Up to 25 coordinates total are supported for most profiles (10 for driving-traffic).'
     ),
@@ -229,7 +229,7 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
 
     // Format coordinates for API request
     const joined = input.coordinates
-      .map(([lng, lat]) => `${lng},${lat}`)
+      .map(({ longitude, latitude }) => `${longitude},${latitude}`)
       .join(';');
 
     // Build query parameters

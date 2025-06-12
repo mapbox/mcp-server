@@ -1,5 +1,6 @@
 // Set the token before importing the tool
-process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import {
   setupFetch,
@@ -44,12 +45,17 @@ describe('ForwardGeocodeTool', () => {
       q: 'restaurant',
       permanent: true,
       autocomplete: false,
-      bbox: [-74.1, 40.6, -73.9, 40.8],
+      bbox: {
+        minLongitude: -74.1,
+        minLatitude: 40.6,
+        maxLongitude: -73.9,
+        maxLatitude: 40.8
+      },
       country: ['US', 'CA'],
       format: 'geojson',
       language: 'es',
       limit: 3,
-      proximity: [-74.006, 40.7128],
+      proximity: { longitude: -74.006, latitude: 40.7128 },
       types: ['address', 'place'],
       worldview: 'cn'
     });
@@ -106,6 +112,18 @@ describe('ForwardGeocodeTool', () => {
 
     const calledUrl = mockFetch.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942964');
+  });
+
+  it('handles JSON-stringified object format proximity', async () => {
+    const mockFetch = setupFetch();
+
+    await new ForwardGeocodeTool().run({
+      q: 'office',
+      proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
+    });
+
+    const calledUrl = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain('proximity=-82.458107%2C27.937259');
   });
 
   it('handles fetch errors gracefully', async () => {
@@ -195,7 +213,7 @@ describe('ForwardGeocodeTool', () => {
     await expect(
       tool.run({
         q: 'test',
-        proximity: [-181, 40]
+        proximity: { longitude: -181, latitude: 40 }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -205,7 +223,12 @@ describe('ForwardGeocodeTool', () => {
     await expect(
       tool.run({
         q: 'test',
-        bbox: [-74, -91, -73, 40]
+        bbox: {
+          minLongitude: -74,
+          minLatitude: -91,
+          maxLongitude: -73,
+          maxLatitude: 40
+        }
       })
     ).resolves.toMatchObject({
       is_error: true
@@ -273,9 +296,12 @@ describe('ForwardGeocodeTool', () => {
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Seattle');
-    expect(textContent).toContain('Address: Seattle, Washington, United States');
+    expect(textContent).toContain(
+      'Address: Seattle, Washington, United States'
+    );
     expect(textContent).toContain('Coordinates: 47.608013, -122.335167');
     expect(textContent).toContain('Type: place');
   });
@@ -309,7 +335,8 @@ describe('ForwardGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. NYC (New York City)');
     expect(textContent).toContain('Address: New York, NY, United States');
     expect(textContent).toContain('Coordinates: 40.7128, -74.0059');
@@ -357,7 +384,8 @@ describe('ForwardGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Springfield');
     expect(textContent).toContain('2. Springfield');
     expect(textContent).toContain('Springfield, Illinois, United States');
@@ -380,7 +408,9 @@ describe('ForwardGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
     expect(result.content[0].type).toBe('text');
-    expect((result.content[0] as { type: 'text'; text: string }).text).toBe('No results found.');
+    expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
+      'No results found.'
+    );
   });
 
   it('handles results with minimal properties', async () => {
@@ -410,7 +440,8 @@ describe('ForwardGeocodeTool', () => {
 
     expect(result.is_error).toBe(false);
 
-    const textContent = (result.content[0] as { type: 'text'; text: string }).text;
+    const textContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
     expect(textContent).toContain('1. Some Place');
     expect(textContent).toContain('Coordinates: 35.456, -100.123');
     expect(textContent).not.toContain('Address:');

@@ -2,6 +2,23 @@
 
 Node.js server implementing Model Context Protocol (MCP) for Mapbox APIs.
 
+## Unlock Geospatial Intelligence for Your AI Applications
+
+The Mapbox MCP Server transforms any AI agent or application into a geospatially-aware system by providing seamless access to Mapbox's comprehensive location intelligence platform. With this server, your AI can understand and reason about places, navigate the physical world, and access rich geospatial data including:
+
+- **Global geocoding** to convert addresses and place names to coordinates and vice versa
+- **Points of interest (POI) search** across millions of businesses, landmarks, and places worldwide
+- **Multi-modal routing** for driving, walking, and cycling with real-time traffic
+- **Travel time matrices** to analyze accessibility and optimize logistics
+- **Isochrone generation** to visualize areas reachable within specific time or distance constraints
+- **Static map images** to create visual representations of locations, routes, and geographic data
+
+Whether you're building an AI travel assistant, logistics optimizer, location-based recommender, or any application that needs to understand "where", the Mapbox MCP Server provides the spatial intelligence to make it possible. You can also enable it on popular clients like Claude Desktop and VS Code. See below for details
+
+![Mapbox MCP Server Demo](./assets/mapbox_mcp_server.gif)
+
+# Usage
+
 **A Mapbox access token is required to use this MCP server.**
 
 To get a Mapbox access token:
@@ -18,7 +35,7 @@ For detailed setup instructions for different integrations, refer to the followi
 
 - [Claude Desktop Setup](./docs/claude-desktop-setup.md) - Instructions for configuring Claude Desktop to work with this MCP server
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
-- [SmolaGents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect SmolaGents AI agents to Mapbox's tools
+- [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
 
 ## Tools
 
@@ -143,6 +160,14 @@ npx @modelcontextprotocol/inspector docker run -i --rm --env MAPBOX_ACCESS_TOKEN
 npx plop create-tool
 # provide tool name without suffix (e.g. Search)
 ```
+
+## Environment Variables
+
+### VERBOSE_ERRORS
+
+Set `VERBOSE_ERRORS=true` to get detailed error messages from the MCP server. This is useful for debugging issues when integrating with MCP clients.
+
+By default, the server returns generic error messages. With verbose errors enabled, you'll receive the actual error details, which can help diagnose API connection issues, invalid parameters, or other problems.
 
 ---
 
