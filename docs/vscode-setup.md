@@ -24,7 +24,7 @@ docker build -t mapbox-mcp-server .
 
 ## Setup Instructions
 
-### Configure Claude to use Mapbox MCP Server
+### Configure VS Code to use Mapbox MCP Server
 
 1. Go to your `settings.json`
 1. At the top level add MCP config, for example:
