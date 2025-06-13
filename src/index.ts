@@ -1,6 +1,4 @@
-import {
-  McpServer
-} from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CategorySearchTool } from './tools/category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './tools/directions-tool/DirectionsTool.js';
