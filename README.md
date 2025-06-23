@@ -169,6 +169,10 @@ Set `VERBOSE_ERRORS=true` to get detailed error messages from the MCP server. Th
 
 By default, the server returns generic error messages. With verbose errors enabled, you'll receive the actual error details, which can help diagnose API connection issues, invalid parameters, or other problems.
 
+## Feedback
+
+For feedback and questions about this MCP server, email mcp-feedback@mapbox.com.
+
 ---
 
 [License](LICENSE.md)
