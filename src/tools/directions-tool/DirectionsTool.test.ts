@@ -1,4 +1,4 @@
-process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+process.env.MAPBOX_ACCESS_TOKEN = 'test.token.signature';
 
 import { cleanup } from '../../utils/requestUtils.js';
 import {
@@ -15,6 +15,9 @@ describe('DirectionsTool', () => {
     jest
       .spyOn(cleanResponseModule, 'cleanResponseData')
       .mockImplementation((_, data) => data);
+
+    // Enable verbose errors for testing
+    process.env.VERBOSE_ERRORS = 'true';
   });
 
   afterEach(() => {
@@ -158,7 +161,7 @@ describe('DirectionsTool', () => {
     expect(result.is_error).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Internal error has occurred.'
+      text: 'Request failed with status 404: Not Found'
     });
     assertHeadersSent(mockFetch);
   });
