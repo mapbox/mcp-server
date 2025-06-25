@@ -112,13 +112,12 @@ Fetches routing directions using the [Mapbox Directions API](https://docs.mapbox
   - Future departure time (`depart_at`) for driving and driving-traffic profiles
   - Desired arrival time (`arrive_by`) for driving profile only
 - Profile-specific optimizations:
-  - Walking: customizable walking speed and bias for/against walkways
   - Driving: vehicle dimension constraints (height, width, weight)
 - Exclusion options for routing:
   - Common exclusions: ferry routes, cash-only tolls
   - Driving-specific exclusions: tolls, motorways, unpaved roads, tunnels, country borders, state borders
   - Custom point exclusions (up to 50 geographic points to avoid)
-- Multiple geometry output formats (GeoJSON, polyline)
+- GeoJSON geometry output format
 
 #### Isochrone tool
 
