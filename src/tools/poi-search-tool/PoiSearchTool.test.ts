@@ -443,4 +443,71 @@ describe('PoiSearchTool', () => {
     expect(textContent).toContain('Coordinates: 40.7128, -74.006');
     expect(textContent).not.toContain('Address:');
   });
+
+  it('returns JSON string format when requested', async () => {
+    const mockResponse = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            name: 'Test POI',
+            full_address: '123 Test St, Test City, TC 12345'
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [-122.676, 45.515]
+          }
+        }
+      ]
+    };
+
+    const mockFetch = setupFetch({
+      json: async () => mockResponse
+    });
+
+    const result = await new PoiSearchTool().run({
+      q: 'Test POI',
+      format: 'json_string'
+    });
+
+    expect(result.is_error).toBe(false);
+    expect(result.content[0].type).toBe('text');
+
+    const jsonContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
+    expect(JSON.parse(jsonContent)).toEqual(mockResponse);
+  });
+
+  it('defaults to formatted_text format when format not specified', async () => {
+    const mockResponse = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            name: 'Test Place'
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [-122.676, 45.515]
+          }
+        }
+      ]
+    };
+
+    const mockFetch = setupFetch({
+      json: async () => mockResponse
+    });
+
+    const result = await new PoiSearchTool().run({
+      q: 'Test Place'
+    });
+
+    expect(result.is_error).toBe(false);
+    expect(result.content[0].type).toBe('text');
+    expect(
+      (result.content[0] as { type: 'text'; text: string }).text
+    ).toContain('1. Test Place');
+  });
 });

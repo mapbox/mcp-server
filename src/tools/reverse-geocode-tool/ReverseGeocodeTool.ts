@@ -55,7 +55,14 @@ const ReverseGeocodeInputSchema = z.object({
     .enum(['us', 'cn', 'jp', 'in'])
     .optional()
     .default('us')
-    .describe('Returns features from a specific regional perspective')
+    .describe('Returns features from a specific regional perspective'),
+  format: z
+    .enum(['json_string', 'formatted_text'])
+    .optional()
+    .default('formatted_text')
+    .describe(
+      'Output format: "json_string" returns raw GeoJSON data as a JSON string that can be parsed; "formatted_text" returns human-readable text with place names, addresses, and coordinates. Both return as text content but json_string contains parseable JSON data while formatted_text is for display.'
+    )
 });
 
 export class ReverseGeocodeTool extends MapboxApiBasedTool<
@@ -63,7 +70,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
 > {
   name = 'ReverseGeocodeTool';
   description =
-    'Find addresses, cities, towns, neighborhoods, postcodes, districts, regions, and countries around a specified geographic coordinate pair. Converts geographic coordinates (longitude, latitude) into human-readable addresses or place names. Use limit=1 for best results. This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest that are not of the types mentioned.';
+    'Find addresses, cities, towns, neighborhoods, postcodes, districts, regions, and countries around a specified geographic coordinate pair. Converts geographic coordinates (longitude, latitude) into human-readable addresses or place names. Use limit=1 for best results. This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest that are not of the types mentioned. Supports both JSON and text output formats.';
 
   constructor() {
     super({ inputSchema: ReverseGeocodeInputSchema });
@@ -174,6 +181,10 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
       return { type: 'text', text: 'No results found.' };
     }
 
-    return { type: 'text', text: this.formatGeoJsonToText(data) };
+    if (input.format === 'json_string') {
+      return { type: 'text', text: JSON.stringify(data, null, 2) };
+    } else {
+      return { type: 'text', text: this.formatGeoJsonToText(data) };
+    }
   }
 }

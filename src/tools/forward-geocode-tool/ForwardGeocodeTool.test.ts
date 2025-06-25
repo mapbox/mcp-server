@@ -52,7 +52,7 @@ describe('ForwardGeocodeTool', () => {
         maxLatitude: 40.8
       },
       country: ['US', 'CA'],
-      format: 'geojson',
+      format: 'formatted_text',
       language: 'es',
       limit: 3,
       proximity: { longitude: -74.006, latitude: 40.7128 },
@@ -445,5 +445,72 @@ describe('ForwardGeocodeTool', () => {
     expect(textContent).toContain('1. Some Place');
     expect(textContent).toContain('Coordinates: 35.456, -100.123');
     expect(textContent).not.toContain('Address:');
+  });
+
+  it('returns JSON string format when requested', async () => {
+    const mockResponse = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            name: 'Test Location',
+            full_address: '123 Test St, Test City, TC 12345'
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [-122.676, 45.515]
+          }
+        }
+      ]
+    };
+
+    const mockFetch = setupFetch({
+      json: async () => mockResponse
+    });
+
+    const result = await new ForwardGeocodeTool().run({
+      q: 'Test Location',
+      format: 'json_string'
+    });
+
+    expect(result.is_error).toBe(false);
+    expect(result.content[0].type).toBe('text');
+
+    const jsonContent = (result.content[0] as { type: 'text'; text: string })
+      .text;
+    expect(JSON.parse(jsonContent)).toEqual(mockResponse);
+  });
+
+  it('defaults to formatted_text format when format not specified', async () => {
+    const mockResponse = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            name: 'Test City'
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [-122.676, 45.515]
+          }
+        }
+      ]
+    };
+
+    const mockFetch = setupFetch({
+      json: async () => mockResponse
+    });
+
+    const result = await new ForwardGeocodeTool().run({
+      q: 'Test City'
+    });
+
+    expect(result.is_error).toBe(false);
+    expect(result.content[0].type).toBe('text');
+    expect(
+      (result.content[0] as { type: 'text'; text: string }).text
+    ).toContain('1. Test City');
   });
 });
