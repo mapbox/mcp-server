@@ -1,6 +1,4 @@
-import {
-  McpServer
-} from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CategorySearchTool } from './tools/category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './tools/directions-tool/DirectionsTool.js';
@@ -43,4 +41,7 @@ new DirectionsTool().installTo(server);
 
 // Start receiving messages on stdin and sending messages on stdout
 const transport = new StdioServerTransport();
+console.log(
+  `Starting ${serverVersionInfo.name} v${serverVersionInfo.version}...`
+);
 await server.connect(transport);

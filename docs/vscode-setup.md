@@ -10,6 +10,7 @@ This guide explains how to configure VS Code for use with the Mapbox MCP Server.
 ```sh
 # from repository root:
 # using node
+npm install
 npm run build
 
 # note your absolute path to node, you will need it for MCP config
@@ -29,6 +30,10 @@ docker build -t mapbox-mcp-server .
 1. Go to your `settings.json`
 1. At the top level add MCP config, for example:
    - NPM version
+     ```sh
+     # Note: make sure the package is installed first
+     npm install @mapbox/mcp-server
+     ```
      ```json
          "mcp": {
              "servers": {
