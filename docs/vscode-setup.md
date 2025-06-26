@@ -87,3 +87,11 @@ docker build -t mapbox-mcp-server .
      ```
 
 You might need to restart VS Code. You should see Mapbox Server appear in tools menu.
+
+![Mapbox Server appears in tools menu](images/vscode-tools-menu.png)
+
+#### Example of working tools
+
+![Example prompt](images/vscode-tool-example-usage.png)
+
+Note, the results can vary based on current traffic conditions and exact values of parameters used.
