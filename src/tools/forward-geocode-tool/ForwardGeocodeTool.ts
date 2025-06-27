@@ -40,10 +40,12 @@ const ForwardGeocodeInputSchema = z.object({
     .optional()
     .describe('Array of ISO 3166 alpha 2 country codes to limit results'),
   format: z
-    .enum(['geojson'])
+    .enum(['json_string', 'formatted_text'])
     .optional()
-    .default('geojson')
-    .describe('Response format (currently only geojson is supported)'),
+    .default('formatted_text')
+    .describe(
+      'Output format: "json_string" returns raw GeoJSON data as a JSON string that can be parsed; "formatted_text" returns human-readable text with place names, addresses, and coordinates. Both return as text content but json_string contains parseable JSON data while formatted_text is for display.'
+    ),
   language: z
     .string()
     .optional()
@@ -135,7 +137,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
 > {
   name = 'ForwardGeocodeTool';
   description =
-    'Forward geocode addresses, cities, towns, neighborhoods, districts, postcodes, regions, and countries using Mapbox Geocoding API v6. Converts location name into geographic coordinates. Setting a proximity point helps to bias results towards a specific area for more relevant results. Do not use this tool for geocoding points of interest like businesses, landmarks, historic sites, museums, etc.';
+    'Forward geocode addresses, cities, towns, neighborhoods, districts, postcodes, regions, and countries using Mapbox Geocoding API v6. Converts location name into geographic coordinates. Setting a proximity point helps to bias results towards a specific area for more relevant results. Do not use this tool for geocoding points of interest like businesses, landmarks, historic sites, museums, etc. Supports both JSON and text output formats.';
 
   constructor() {
     super({ inputSchema: ForwardGeocodeInputSchema });
@@ -205,7 +207,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
     // Optional parameters
     url.searchParams.append('permanent', input.permanent.toString());
     url.searchParams.append('autocomplete', input.autocomplete.toString());
-    url.searchParams.append('format', input.format);
+    url.searchParams.append('format', 'geojson');
     url.searchParams.append('limit', input.limit.toString());
     url.searchParams.append('worldview', input.worldview);
 
@@ -254,6 +256,10 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
       return { type: 'text', text: 'No results found.' };
     }
 
-    return { type: 'text', text: this.formatGeoJsonToText(data) };
+    if (input.format === 'json_string') {
+      return { type: 'text', text: JSON.stringify(data, null, 2) };
+    } else {
+      return { type: 'text', text: this.formatGeoJsonToText(data) };
+    }
   }
 }

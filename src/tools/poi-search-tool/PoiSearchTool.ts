@@ -115,6 +115,13 @@ const PoiSearchInputSchema = z.object({
     .optional()
     .describe(
       'Starting point for ETA calculations as coordinate object with longitude and latitude'
+    ),
+  format: z
+    .enum(['json_string', 'formatted_text'])
+    .optional()
+    .default('formatted_text')
+    .describe(
+      'Output format: "json_string" returns raw GeoJSON data as a JSON string that can be parsed; "formatted_text" returns human-readable text with place names, addresses, and coordinates. Both return as text content but json_string contains parseable JSON data while formatted_text is for display.'
     )
 });
 
@@ -123,7 +130,7 @@ export class PoiSearchTool extends MapboxApiBasedTool<
 > {
   name = 'PoiSearchTool';
   description =
-    "Find one specific place or brand location by its proper name or unique brand. Use only when the user's query includes a distinct title (e.g., \"The Met\", \"Starbucks Reserve Roastery\") or a brand they want all nearby branches of (e.g., \"Macy's stores near me\"). Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc. Setting a proximity point is strongly encouraged for more relevant results. Always try to use a limit of at least 3 in case the user's intended result is not the first result.";
+    "Find one specific place or brand location by its proper name or unique brand. Use only when the user's query includes a distinct title (e.g., \"The Met\", \"Starbucks Reserve Roastery\") or a brand they want all nearby branches of (e.g., \"Macy's stores near me\"). Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc. Setting a proximity point is strongly encouraged for more relevant results. Always try to use a limit of at least 3 in case the user's intended result is not the first result. Supports both JSON and text output formats.";
 
   constructor() {
     super({ inputSchema: PoiSearchInputSchema });
@@ -282,6 +289,10 @@ export class PoiSearchTool extends MapboxApiBasedTool<
       `PoiSearchTool: Successfully completed search, found ${(data as any).features?.length || 0} results`
     );
 
-    return { type: 'text', text: this.formatGeoJsonToText(data) };
+    if (input.format === 'json_string') {
+      return { type: 'text', text: JSON.stringify(data, null, 2) };
+    } else {
+      return { type: 'text', text: this.formatGeoJsonToText(data) };
+    }
   }
 }

@@ -1,6 +1,8 @@
 import { URLSearchParams } from 'url';
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { cleanResponseData } from './cleanResponseData.js';
+import { formatIsoDateTime } from './formatIsoDateTime.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -14,18 +16,19 @@ const validateIsoDateTime = (
 ): void => {
   if (!val) return; // Optional, so empty is fine
 
-  // ISO 8601 regex patterns for the three formats mentioned in the docs
+  // ISO 8601 regex patterns for the valid formats mentioned in the docs
   // 1. YYYY-MM-DDThh:mm:ssZ (exactly one Z at the end)
   // 2. YYYY-MM-DDThh:mm:ss±hh:mm (timezone offset with colon)
   // 3. YYYY-MM-DDThh:mm (no seconds, no timezone)
+  // 4. YYYY-MM-DDThh:mm:ss (with seconds but no timezone) - will be converted to format 3
   const iso8601Pattern =
-    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$)|(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$)|(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$)/;
+    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$)|(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$)|(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$)|(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$)/;
 
   if (!iso8601Pattern.test(val)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message:
-        'Invalid date-time format. Must be in ISO 8601 format: YYYY-MM-DDThh:mm:ssZ, YYYY-MM-DDThh:mmss±hh:mm, or YYYY-MM-DDThh:mm',
+        'Invalid date-time format. Must be in ISO 8601 format: YYYY-MM-DDThh:mm:ssZ, YYYY-MM-DDThh:mmss±hh:mm, YYYY-MM-DDThh:mm, or YYYY-MM-DDThh:mm:ss',
       path: []
     });
     return; // Stop further validation if format is invalid
@@ -118,24 +121,24 @@ const validateIsoDateTime = (
   }
 };
 
-const DirectionsInputSchema = z.object({
+export const DirectionsInputSchema = z.object({
   coordinates: z
     .array(
-      z.object({
-        longitude: z
+      z.tuple([
+        z
           .number()
           .min(-180, 'Longitude must be between -180 and 180 degrees')
           .max(180, 'Longitude must be between -180 and 180 degrees'),
-        latitude: z
+        z
           .number()
           .min(-90, 'Latitude must be between -90 and 90 degrees')
           .max(90, 'Latitude must be between -90 and 90 degrees')
-      })
+      ])
     )
     .min(2, 'At least two coordinate pairs are required.')
     .max(25, 'Up to 25 coordinate pairs are supported.')
     .describe(
-      'Array of coordinate objects with longitude and latitude properties to visit in order. ' +
+      'Array of [longitude, latitude] coordinate pairs to visit in order. ' +
         'Must include at least 2 coordinate pairs (starting and ending points). ' +
         'Up to 25 coordinates total are supported.'
     ),
@@ -150,33 +153,14 @@ const DirectionsInputSchema = z.object({
         '- walking: pedestrian/hiking\n' +
         '- cycling: bicycle'
     ),
-  walking_speed: z
-    .number()
-    .min(0.14, 'Walking speed must be between 0.14 and 6.94 meters per second')
-    .max(6.94, 'Walking speed must be between 0.14 and 6.94 meters per second')
-    .optional()
-    .describe(
-      'The walking speed, in meters per second. Must be between 0.14 m/s (0.5 km/h) and ' +
-        '6.94 m/s (25 km/h). Defaults to 1.42 m/s (5.1 km/h). Only available for walking profile.'
-    ),
-  walkway_bias: z
-    .number()
-    .min(-1, 'Walkway bias must be between -1 and 1')
-    .max(1, 'Walkway bias must be between -1 and 1')
-    .optional()
-    .describe(
-      'A scale from -1 to 1, where -1 biases the route against walkways and 1 biases the ' +
-        'route toward walkways. The default is 0, which is neutral. Only available for walking profile.'
-    ),
   geometries: z
-    .enum(['geojson', 'polyline', 'polyline6'])
+    .enum(['none', 'geojson'])
     .optional()
-    .default('polyline')
+    .default('none')
     .describe(
       'The format of the returned geometry. Options: \n' +
-        '- geojson: as GeoJSON LineString\n' +
-        '- polyline (default): a polyline with a precision of five decimal places\n' +
-        '- polyline6: a polyline with a precision of six decimal places'
+        '- none (default): no geometry object is returned at all, use this if you do not need all of the intermediate coordinates.\n' +
+        '- geojson: as GeoJSON LineString (might be very long as there could be a lot of points)'
     ),
   max_height: z
     .number()
@@ -218,19 +202,6 @@ const DirectionsInputSchema = z.object({
     .describe(
       'Whether to try to return alternative routes (true) or not (false, default). ' +
         'Up to two alternatives may be returned.'
-    ),
-  annotations: z
-    .array(
-      // Note: more options are available in the Directions API documentation, not added here for simplicity
-      z.enum(['distance', 'duration', 'speed', 'congestion'])
-    )
-    .optional()
-    .describe(
-      'Return additional details about the route leg. Options: \n' +
-        '- distance: distance in meters between each coordinate pair\n' +
-        '- duration: estimated travel time in seconds between points\n' +
-        '- speed: average speed in m/s for each coordinate pair\n' +
-        '- congestion: traffic congestion level ("severe", "heavy", "moderate", "low")\n'
     ),
   depart_at: z
     .string()
@@ -425,18 +396,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
       );
     }
 
-    // Validate walking-specific parameters are only used with walking profile
-    if (
-      (input.walking_speed !== undefined || input.walkway_bias !== undefined) &&
-      input.routing_profile !== 'walking'
-    ) {
-      throw new Error(
-        `Walking parameters (walking_speed, walkway_bias) are only available for the 'walking' profile`
-      );
-    }
-
     const joined = input.coordinates
-      .map(({ longitude, latitude }) => `${longitude},${latitude}`)
+      .map(([lng, lat]) => `${lng},${lat}`)
       .join(';');
     const encodedCoords = encodeURIComponent(joined);
 
@@ -446,21 +407,29 @@ export class DirectionsTool extends MapboxApiBasedTool<
       'access_token',
       MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN as string
     );
-    queryParams.append('geometries', input.geometries);
+    // Only add geometries parameter if not 'none'
+    if (input.geometries !== 'none') {
+      queryParams.append('geometries', input.geometries);
+    }
     queryParams.append('alternatives', input.alternatives.toString());
 
-    // Add annotations parameter if provided
-    if (input.annotations && input.annotations.length > 0) {
-      queryParams.append('annotations', input.annotations.join(','));
-      // For annotations to work, overview must be set to 'full'
-      queryParams.append('overview', 'full');
+    // Add annotations parameter
+    if (input.routing_profile === 'driving-traffic') {
+      // congestion is available only when driving
+      queryParams.append('annotations', 'distance,congestion,speed');
+    } else {
+      queryParams.append('annotations', 'distance,speed');
     }
+    // For annotations to work, overview must be set to 'full'
+    queryParams.append('overview', 'full');
 
-    // Add depart_at or arrive_by parameter if provided
+    // Add depart_at or arrive_by parameter if provided, converting format if needed
     if (input.depart_at) {
-      queryParams.append('depart_at', input.depart_at);
+      const formattedDateTime = formatIsoDateTime(input.depart_at);
+      queryParams.append('depart_at', formattedDateTime);
     } else if (input.arrive_by) {
-      queryParams.append('arrive_by', input.arrive_by);
+      const formattedDateTime = formatIsoDateTime(input.arrive_by);
+      queryParams.append('arrive_by', formattedDateTime);
     }
 
     // Add vehicle dimension parameters if provided
@@ -476,15 +445,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
       queryParams.append('max_weight', input.max_weight.toString());
     }
 
-    // Add walking-specific parameters if provided
-    if (input.walking_speed !== undefined) {
-      queryParams.append('walking_speed', input.walking_speed.toString());
-    }
-
-    if (input.walkway_bias !== undefined) {
-      queryParams.append('walkway_bias', input.walkway_bias.toString());
-    }
-
+    queryParams.append('steps', 'true');
     let queryString = queryParams.toString();
 
     // Add exclude parameter if provided (ensuring proper encoding of special characters)
@@ -512,6 +473,6 @@ export class DirectionsTool extends MapboxApiBasedTool<
     }
 
     const data = await response.json();
-    return data;
+    return cleanResponseData(input, data);
   }
 }

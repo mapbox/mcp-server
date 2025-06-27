@@ -573,7 +573,14 @@ const CategorySearchInputSchema = z.object({
   poi_category_exclusions: z
     .array(z.string())
     .optional()
-    .describe('Array of POI categories to exclude from results')
+    .describe('Array of POI categories to exclude from results'),
+  format: z
+    .enum(['json_string', 'formatted_text'])
+    .optional()
+    .default('formatted_text')
+    .describe(
+      'Output format: "json_string" returns raw GeoJSON data as a JSON string that can be parsed; "formatted_text" returns human-readable text with place names, addresses, and coordinates. Both return as text content but json_string contains parseable JSON data while formatted_text is for display.'
+    )
 });
 
 export class CategorySearchTool extends MapboxApiBasedTool<
@@ -581,7 +588,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
 > {
   name = 'CategorySearchTool';
   description =
-    "Return all places that match a category (industry, amenity, or NAICS‑style code). Use when the user asks for a type of place, plural or generic terms like 'museums', 'coffee shops', 'electric‑vehicle chargers', or when the query includes is‑a phrases such as 'any', 'all', 'nearby'. Do not use when a unique name or brand is provided.";
+    "Return all places that match a category (industry, amenity, or NAICS‑style code). Use when the user asks for a type of place, plural or generic terms like 'museums', 'coffee shops', 'electric‑vehicle chargers', or when the query includes is‑a phrases such as 'any', 'all', 'nearby'. Do not use when a unique name or brand is provided. Supports both JSON and text output formats.";
 
   constructor() {
     super({ inputSchema: CategorySearchInputSchema });
@@ -706,6 +713,11 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     }
 
     const data = await response.json();
-    return { type: 'text', text: this.formatGeoJsonToText(data) };
+
+    if (input.format === 'json_string') {
+      return { type: 'text', text: JSON.stringify(data, null, 2) };
+    } else {
+      return { type: 'text', text: this.formatGeoJsonToText(data) };
+    }
   }
 }
