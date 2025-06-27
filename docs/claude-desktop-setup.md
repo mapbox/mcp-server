@@ -40,10 +40,6 @@ docker build -t mapbox-mcp-server .
 1. Modify claude_desktop_config.json to add new server, for example:
 
    - Using NPM package
-     ```sh
-     # Note: make sure the package is installed first
-     npm install @mapbox/mcp-server
-     ```
      ```json
      {
        "mcpServers": {

@@ -30,10 +30,6 @@ docker build -t mapbox-mcp-server .
 1. Go to your `settings.json`
 1. At the top level add MCP config, for example:
    - NPM version
-     ```sh
-     # Note: make sure the package is installed first
-     npm install @mapbox/mcp-server
-     ```
      ```json
          "mcp": {
              "servers": {
