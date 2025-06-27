@@ -51,19 +51,19 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 
 - "Get driving directions from LAX to Hollywood with current traffic"
 - "How long would it take to walk from Central Park to Times Square?"
-- "Calculate travel time from my hotel to JFK Airport by taxi during rush hour"
+- "Calculate travel time from my hotel (Four Seasons) to JFK Airport by taxi during rush hour"
 
 ### Visualization & Maps
 
 - "Create a map image showing the route from Golden Gate Bridge to Fisherman's Wharf with markers at both locations"
 - "Show me a satellite view of Manhattan with key landmarks marked"
-- "Generate a map highlighting all Starbucks locations within 2 miles of downtown Seattle"
+- "Generate a map highlighting all Starbucks locations within a mile of downtown Seattle"
 
 ### Analysis & Planning
 
 - "Show me areas reachable within 30 minutes of downtown Portland by car"
-- "Calculate a travel time matrix between these 5 hotel locations and the convention center"
-- "Find the optimal route visiting these 4 tourist attractions in San Francisco"
+- "Calculate a travel time matrix between these 3 hotel locations (Marriott, Sheraton and Hilton) and the convention center in Denver"
+- "Find the optimal route visiting these 3 tourist attractions (Golden Gate, Musical Stairs and Fisherman's Wharf) in San Francisco"
 
 ### Tips for Better Results
 
