@@ -41,7 +41,4 @@ new DirectionsTool().installTo(server);
 
 // Start receiving messages on stdin and sending messages on stdout
 const transport = new StdioServerTransport();
-console.log(
-  `Starting ${serverVersionInfo.name} v${serverVersionInfo.version}..`
-);
 await server.connect(transport);
