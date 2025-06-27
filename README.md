@@ -37,6 +37,41 @@ For detailed setup instructions for different integrations, refer to the followi
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
 
+## Example Prompts
+
+Try these prompts with Claude Desktop or other MCP clients after setup:
+
+### Location Discovery
+
+- "Find coffee shops within walking distance of the Empire State Building"
+- "Show me gas stations along the route from Boston to New York"
+- "What restaurants are near Times Square?"
+
+### Navigation & Travel
+
+- "Get driving directions from LAX to Hollywood with current traffic"
+- "How long would it take to walk from Central Park to Times Square?"
+- "Calculate travel time from my hotel (Four Seasons) to JFK Airport by taxi during rush hour"
+
+### Visualization & Maps
+
+- "Create a map image showing the route from Golden Gate Bridge to Fisherman's Wharf with markers at both locations"
+- "Show me a satellite view of Manhattan with key landmarks marked"
+- "Generate a map highlighting all Starbucks locations within a mile of downtown Seattle"
+
+### Analysis & Planning
+
+- "Show me areas reachable within 30 minutes of downtown Portland by car"
+- "Calculate a travel time matrix between these 3 hotel locations (Marriott, Sheraton and Hilton) and the convention center in Denver"
+- "Find the optimal route visiting these 3 tourist attractions (Golden Gate, Musical Stairs and Fisherman's Wharf) in San Francisco"
+
+### Tips for Better Results
+
+- Be specific about locations (use full addresses or landmark names)
+- Specify your preferred travel method (driving, walking, cycling)
+- Include time constraints when relevant ("during rush hour", "at 3 PM")
+- Ask for specific output formats when needed ("as a map image", "in JSON format")
+
 ## Tools
 
 ### Mapbox API tools
@@ -168,9 +203,53 @@ Set `VERBOSE_ERRORS=true` to get detailed error messages from the MCP server. Th
 
 By default, the server returns generic error messages. With verbose errors enabled, you'll receive the actual error details, which can help diagnose API connection issues, invalid parameters, or other problems.
 
-## Feedback
+## Data Usage & Privacy
 
-For feedback and questions about this MCP server, email mcp-feedback@mapbox.com.
+### What data is sent to Mapbox APIs
+
+When you use the MCP server tools, the following data is sent directly from your environment to Mapbox APIs:
+
+- **Geocoding tools**: Address/location text, coordinates, country/region filters
+- **Search tools**: Search queries, location coordinates for proximity, category filters
+- **Directions tool**: Start/end coordinates, waypoints, routing preferences, vehicle constraints
+- **Matrix tool**: Multiple coordinate pairs, travel profile, departure times
+- **Static map tool**: Coordinates, zoom level, styling preferences, marker information
+- **Isochrone tool**: Origin coordinates, time/distance parameters, travel profile
+
+### Your privacy
+
+- **Local execution**: All API calls are made directly from your environment to Mapbox APIs
+- **Token security**: Your Mapbox API token remains on your local machine and is never transmitted to or stored by this MCP server
+- **No data storage**: This MCP server does not store, log, or collect any of your data or API requests
+- **Direct communication**: There is no intermediary server between you and Mapbox APIs
+
+### Third-party data usage
+
+- **Mapbox's privacy policy** governs data sent to their APIs: https://www.mapbox.com/legal/privacy/
+- **API usage**: Standard Mapbox API terms apply to all requests made through these tools
+- **Data retention**: Refer to Mapbox's documentation for their data retention policies
+
+## Support & Contact
+
+### For MCP Server Issues
+
+- **Email**: mcp-feedback@mapbox.com
+- **GitHub Issues**: [Report bugs and feature requests](https://github.com/mapbox/mcp-server/issues)
+
+### For Mapbox API Questions
+
+- **Mapbox Support**: https://support.mapbox.com/
+- **Documentation**: https://docs.mapbox.com/
+- **API Status**: https://status.mapbox.com/
+
+### Maintenance Commitment
+
+This MCP server is officially maintained by Mapbox, Inc. We provide:
+
+- Regular updates for new Mapbox API features
+- Bug fixes and security updates
+- Compatibility with latest MCP protocol versions
+- Community support through GitHub issues
 
 ---
 
