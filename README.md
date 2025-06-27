@@ -170,7 +170,7 @@ By default, the server returns generic error messages. With verbose errors enabl
 
 ## Feedback
 
-For feedback and questions about this MCP server, email mcp-feedback@mapbox.com.
+For feedback and questions about this MCP server, email mcp-feedback@mapbox.com .
 
 ---
 
