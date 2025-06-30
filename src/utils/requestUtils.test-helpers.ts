@@ -1,9 +1,15 @@
-import { patchGlobalFetch } from './requestUtils.js';
+import { patchGlobalFetch, cleanup } from './requestUtils.js';
 
 let defaultHeaders: Record<string, string> = {};
 
 export function setupFetch(overrides?: any) {
+  // Clean up any previous patch state, but don't restore original fetch yet
+  cleanup();
+
+  // Set up mock fetch AFTER cleanup
   const mockFetch = (global.fetch = jest.fn());
+
+  // Now patch with the mock in place
   defaultHeaders = patchGlobalFetch({
     name: 'TestServer',
     version: '1.0.0',
