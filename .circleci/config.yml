@@ -6,8 +6,10 @@ workflows:
     jobs:
       - build:
           filters:
+            branches:
+              ignore: /.*/
             tags:
-              only: /.*/
+              only: /^v.*/
       - publish:
           requires:
             - build
