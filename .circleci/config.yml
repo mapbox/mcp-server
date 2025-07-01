@@ -1,0 +1,87 @@
+version: 2.1
+
+workflows:
+  version: 2
+  build-and-publish:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+      - publish:
+          requires:
+            - build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v(?!.*-dev).*/
+      - publish-dev:
+          requires:
+            - build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*-dev.*/
+
+jobs:
+  build:
+    docker:
+      - image: cimg/node:22.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package-lock.json" }}
+            - v1-dependencies-
+      - run:
+          name: Install dependencies
+          command: npm ci
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package-lock.json" }}
+      - run:
+          name: Run linting
+          command: npm run lint
+      - run:
+          name: Run tests
+          command: npm test
+      - run:
+          name: Build
+          command: npm run build
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+            - package.json
+            - package-lock.json
+
+  publish:
+    docker:
+      - image: cimg/node:22.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Authenticate with registry
+          command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+      - run:
+          name: Publish package
+          command: npm publish --access public
+
+  publish-dev:
+    docker:
+      - image: cimg/node:22.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Authenticate with registry
+          command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+      - run:
+          name: Publish dev package
+          command: npm publish --tag dev --access public
