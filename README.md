@@ -1,5 +1,7 @@
 # Mapbox MCP Server
 
+[![npm version](https://badge.fury.io/js/@mapbox%2Fmcp-server.svg)](https://badge.fury.io/js/@mapbox%2Fmcp-server)
+
 Node.js server implementing Model Context Protocol (MCP) for Mapbox APIs.
 
 ## Unlock Geospatial Intelligence for Your AI Applications
