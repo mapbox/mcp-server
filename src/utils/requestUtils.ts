@@ -11,13 +11,16 @@ export function patchGlobalFetch(versionInfo: VersionInfo): {
 } {
   // Initialize originalFetch if not already done
   if (!originalFetch) {
-    if (typeof global !== 'undefined' && typeof global.fetch === 'function') {
-      originalFetch = global.fetch;
-    } else if (
+    if (
       typeof globalThis !== 'undefined' &&
       typeof globalThis.fetch === 'function'
     ) {
       originalFetch = globalThis.fetch;
+    } else if (
+      typeof global !== 'undefined' &&
+      typeof global.fetch === 'function'
+    ) {
+      originalFetch = global.fetch;
     } else if (typeof fetch === 'function') {
       originalFetch = fetch;
     } else {
@@ -53,13 +56,16 @@ export function patchGlobalFetch(versionInfo: VersionInfo): {
     };
 
     // Patch fetch in the same way we detected it during initialization
-    if (typeof global !== 'undefined' && typeof global.fetch === 'function') {
-      global.fetch = patchedFetch;
-    } else if (
+    if (
       typeof globalThis !== 'undefined' &&
       typeof globalThis.fetch === 'function'
     ) {
       (globalThis as any).fetch = patchedFetch;
+    } else if (
+      typeof global !== 'undefined' &&
+      typeof global.fetch === 'function'
+    ) {
+      global.fetch = patchedFetch;
     }
     isPatched = true;
   }
