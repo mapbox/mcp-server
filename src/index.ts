@@ -8,6 +8,7 @@ import { MatrixTool } from './tools/matrix-tool/MatrixTool.js';
 import { PoiSearchTool } from './tools/poi-search-tool/PoiSearchTool.js';
 import { ReverseGeocodeTool } from './tools/reverse-geocode-tool/ReverseGeocodeTool.js';
 import { StaticMapImageTool } from './tools/static-map-image-tool/StaticMapImageTool.js';
+import { VersionTool } from './tools/version-tool/VersionTool.js';
 import { patchGlobalFetch } from './utils/requestUtils.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 
@@ -30,6 +31,7 @@ const server = new McpServer(
 );
 
 // INSERT NEW TOOL REGISTRATION HERE
+new VersionTool().installTo(server);
 new MatrixTool().installTo(server);
 new ReverseGeocodeTool().installTo(server);
 new ForwardGeocodeTool().installTo(server);
