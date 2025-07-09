@@ -1,6 +1,6 @@
 {
   "name": "@mapbox/mcp-server",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Mapbox MCP server.",
   "main": "dist/index.js",
   "module": "dist/index-esm.js",
