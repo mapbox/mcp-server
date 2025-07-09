@@ -124,16 +124,19 @@ const validateIsoDateTime = (
 export const DirectionsInputSchema = z.object({
   coordinates: z
     .array(
-      z.tuple([
-        z
-          .number()
-          .min(-180, 'Longitude must be between -180 and 180 degrees')
-          .max(180, 'Longitude must be between -180 and 180 degrees'),
-        z
-          .number()
-          .min(-90, 'Latitude must be between -90 and 90 degrees')
-          .max(90, 'Latitude must be between -90 and 90 degrees')
-      ])
+      z
+        .array(z.number())
+        .length(2)
+        .refine(
+          (coord) => {
+            const [lng, lat] = coord;
+            return lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
+          },
+          {
+            message:
+              'Each coordinate must be [longitude, latitude] where longitude is between -180 and 180, and latitude is between -90 and 90'
+          }
+        )
     )
     .min(2, 'At least two coordinate pairs are required.')
     .max(25, 'Up to 25 coordinate pairs are supported.')
