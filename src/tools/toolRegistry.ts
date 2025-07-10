@@ -1,3 +1,4 @@
+// INSERT NEW TOOL IMPORT HERE
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
 import { ForwardGeocodeTool } from './forward-geocode-tool/ForwardGeocodeTool.js';
@@ -8,10 +9,9 @@ import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
 import { VersionTool } from './version-tool/VersionTool.js';
 
-// INSERT NEW TOOL IMPORT HERE
-
 // Central registry of all tools
 export const ALL_TOOLS = [
+  // INSERT NEW TOOL INSTANCE HERE
   new VersionTool(),
   new CategorySearchTool(),
   new DirectionsTool(),
@@ -21,7 +21,6 @@ export const ALL_TOOLS = [
   new PoiSearchTool(),
   new ReverseGeocodeTool(),
   new StaticMapImageTool()
-  // INSERT NEW TOOL INSTANCE HERE
 ] as const;
 
 export type ToolInstance = (typeof ALL_TOOLS)[number];
