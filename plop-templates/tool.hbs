@@ -8,7 +8,7 @@ const {{pascalCase name}}InputSchema = z.object({
 export class {{pascalCase name}}Tool extends MapboxApiBasedTool<
   typeof {{pascalCase name}}InputSchema
 > {
-  name = '{{pascalCase name}}Tool';
+  name = '{{toolName}}';
   description = 'Tool description.';
 
   constructor() {
