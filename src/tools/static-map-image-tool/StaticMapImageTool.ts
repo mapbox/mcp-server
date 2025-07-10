@@ -358,7 +358,7 @@ const StaticMapImageInputSchema = z.object({
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
 > {
-  name = 'StaticMapImageTool';
+  name = 'static_map_image_tool';
   description =
     'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns PNG for vector styles, JPEG for raster-only styles.';
 

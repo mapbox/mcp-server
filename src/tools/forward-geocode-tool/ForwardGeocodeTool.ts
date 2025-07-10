@@ -135,7 +135,7 @@ const ForwardGeocodeInputSchema = z.object({
 export class ForwardGeocodeTool extends MapboxApiBasedTool<
   typeof ForwardGeocodeInputSchema
 > {
-  name = 'ForwardGeocodeTool';
+  name = 'forward_geocode_tool';
   description =
     'Forward geocode addresses, cities, towns, neighborhoods, districts, postcodes, regions, and countries using Mapbox Geocoding API v6. Converts location name into geographic coordinates. Setting a proximity point helps to bias results towards a specific area for more relevant results. Do not use this tool for geocoding points of interest like businesses, landmarks, historic sites, museums, etc. Supports both JSON and text output formats.';
 

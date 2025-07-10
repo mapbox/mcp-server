@@ -128,7 +128,7 @@ const PoiSearchInputSchema = z.object({
 export class PoiSearchTool extends MapboxApiBasedTool<
   typeof PoiSearchInputSchema
 > {
-  name = 'PoiSearchTool';
+  name = 'poi_search_tool';
   description =
     "Find one specific place or brand location by its proper name or unique brand. Use only when the user's query includes a distinct title (e.g., \"The Met\", \"Starbucks Reserve Roastery\") or a brand they want all nearby branches of (e.g., \"Macy's stores near me\"). Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc. Setting a proximity point is strongly encouraged for more relevant results. Always try to use a limit of at least 3 in case the user's intended result is not the first result. Supports both JSON and text output formats.";
 

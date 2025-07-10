@@ -8,7 +8,7 @@ import { getVersionInfo } from '../../utils/versionUtils.js';
 const InputSchema = z.object({});
 
 export class VersionTool {
-  readonly name = 'version';
+  readonly name = 'version_tool';
   readonly description =
     'Get the current version information of the MCP server';
   readonly inputSchema = InputSchema;

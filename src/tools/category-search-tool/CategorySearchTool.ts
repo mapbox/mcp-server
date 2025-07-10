@@ -586,7 +586,7 @@ const CategorySearchInputSchema = z.object({
 export class CategorySearchTool extends MapboxApiBasedTool<
   typeof CategorySearchInputSchema
 > {
-  name = 'CategorySearchTool';
+  name = 'category_search_tool';
   description =
     "Return all places that match a category (industry, amenity, or NAICS‑style code). Use when the user asks for a type of place, plural or generic terms like 'museums', 'coffee shops', 'electric‑vehicle chargers', or when the query includes is‑a phrases such as 'any', 'all', 'nearby'. Do not use when a unique name or brand is provided. Supports both JSON and text output formats.";
 

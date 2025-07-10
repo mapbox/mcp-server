@@ -1,12 +1,5 @@
 import { z } from 'zod';
-import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
-import { DirectionsTool } from './directions-tool/DirectionsTool.js';
-import { ForwardGeocodeTool } from './forward-geocode-tool/ForwardGeocodeTool.js';
-import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
-import { MatrixTool } from './matrix-tool/MatrixTool.js';
-import { PoiSearchTool } from './poi-search-tool/PoiSearchTool.js';
-import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
-import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
+import { getAllTools } from './toolRegistry.js';
 
 function detectTupleUsage(schema: z.ZodType): string[] {
   const issues: string[] = [];
@@ -47,17 +40,8 @@ function detectTupleUsage(schema: z.ZodType): string[] {
 }
 
 describe('Schema Validation - No Tuples', () => {
-  // Dynamically get all tool schemas
-  const tools = [
-    new DirectionsTool(),
-    new CategorySearchTool(),
-    new ForwardGeocodeTool(),
-    new ReverseGeocodeTool(),
-    new PoiSearchTool(),
-    new MatrixTool(),
-    new IsochroneTool(),
-    new StaticMapImageTool()
-  ];
+  // Dynamically get all tools from the central registry
+  const tools = [...getAllTools()];
 
   const schemas = tools.map((tool) => ({
     name: tool.constructor.name,

@@ -86,7 +86,7 @@ const IsochroneInputSchema = z.object({
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema
 > {
-  name = 'IsochroneTool';
+  name = 'isochrone_tool';
   description = `Computes areas that are reachable within a specified amount of time from a location, and returns the reachable regions as contours of Polygons or LineStrings in GeoJSON format that you can display on a map.
   Common use cases:
     - Show a user how far they can travel in X minutes from their current location

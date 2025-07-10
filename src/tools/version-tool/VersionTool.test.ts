@@ -51,7 +51,7 @@ describe('VersionTool', () => {
 
   describe('properties', () => {
     it('should have correct name', () => {
-      expect(tool.name).toBe('version');
+      expect(tool.name).toBe('version_tool');
     });
 
     it('should have correct description', () => {

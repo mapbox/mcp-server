@@ -1,18 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CategorySearchTool } from './tools/category-search-tool/CategorySearchTool.js';
-import { DirectionsTool } from './tools/directions-tool/DirectionsTool.js';
-import { ForwardGeocodeTool } from './tools/forward-geocode-tool/ForwardGeocodeTool.js';
-import { IsochroneTool } from './tools/isochrone-tool/IsochroneTool.js';
-import { MatrixTool } from './tools/matrix-tool/MatrixTool.js';
-import { PoiSearchTool } from './tools/poi-search-tool/PoiSearchTool.js';
-import { ReverseGeocodeTool } from './tools/reverse-geocode-tool/ReverseGeocodeTool.js';
-import { StaticMapImageTool } from './tools/static-map-image-tool/StaticMapImageTool.js';
-import { VersionTool } from './tools/version-tool/VersionTool.js';
+import { getAllTools } from './tools/toolRegistry.js';
 import { patchGlobalFetch } from './utils/requestUtils.js';
 import { getVersionInfo } from './utils/versionUtils.js';
-
-// INSERT NEW TOOL IMPORT HERE
 
 let serverVersionInfo = getVersionInfo();
 patchGlobalFetch(serverVersionInfo);
@@ -30,16 +20,10 @@ const server = new McpServer(
   }
 );
 
-// INSERT NEW TOOL REGISTRATION HERE
-new VersionTool().installTo(server);
-new MatrixTool().installTo(server);
-new ReverseGeocodeTool().installTo(server);
-new ForwardGeocodeTool().installTo(server);
-new IsochroneTool().installTo(server);
-new PoiSearchTool().installTo(server);
-new CategorySearchTool().installTo(server);
-new StaticMapImageTool().installTo(server);
-new DirectionsTool().installTo(server);
+// Register all tools from the registry
+getAllTools().forEach((tool) => {
+  tool.installTo(server);
+});
 
 // Start receiving messages on stdin and sending messages on stdout
 const transport = new StdioServerTransport();
