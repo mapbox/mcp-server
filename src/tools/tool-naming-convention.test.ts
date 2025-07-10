@@ -1,5 +1,16 @@
 import { getAllTools } from './toolRegistry.js';
 
+// Mock getVersionInfo to avoid import.meta.url issues in Jest
+jest.mock('../utils/versionUtils.js', () => ({
+  getVersionInfo: jest.fn(() => ({
+    name: 'Mapbox MCP server',
+    version: '1.0.0',
+    sha: 'mock-sha',
+    tag: 'mock-tag',
+    branch: 'mock-branch'
+  }))
+}));
+
 describe('Tool Naming Convention', () => {
   // Dynamically get all tools from the central registry
   const tools = [...getAllTools()];
