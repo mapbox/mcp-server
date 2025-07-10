@@ -89,7 +89,7 @@ describe('ReverseGeocodeTool', () => {
         limit: 6
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test limit too low
@@ -100,7 +100,7 @@ describe('ReverseGeocodeTool', () => {
         limit: 0
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -114,7 +114,7 @@ describe('ReverseGeocodeTool', () => {
         latitude: 40.733
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     await expect(
@@ -123,7 +123,7 @@ describe('ReverseGeocodeTool', () => {
         latitude: 40.733
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test invalid latitude
@@ -133,7 +133,7 @@ describe('ReverseGeocodeTool', () => {
         latitude: 91
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     await expect(
@@ -142,7 +142,7 @@ describe('ReverseGeocodeTool', () => {
         latitude: -91
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -167,7 +167,7 @@ describe('ReverseGeocodeTool', () => {
         limit: 3
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Should fail with multiple types when limit > 1
@@ -179,7 +179,7 @@ describe('ReverseGeocodeTool', () => {
         types: ['address', 'place']
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -216,7 +216,7 @@ describe('ReverseGeocodeTool', () => {
       latitude: 40.733
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
       text: 'Internal error has occurred.'
@@ -234,7 +234,7 @@ describe('ReverseGeocodeTool', () => {
         country: ['USA'] // Should be 2 characters
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -266,7 +266,7 @@ describe('ReverseGeocodeTool', () => {
       latitude: 40.733
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
@@ -307,7 +307,7 @@ describe('ReverseGeocodeTool', () => {
       latitude: 40.776
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -360,7 +360,7 @@ describe('ReverseGeocodeTool', () => {
       types: ['address']
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -389,7 +389,7 @@ describe('ReverseGeocodeTool', () => {
       latitude: 0.0
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
       'No results found.'
@@ -422,7 +422,7 @@ describe('ReverseGeocodeTool', () => {
       latitude: 35.456
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -459,7 +459,7 @@ describe('ReverseGeocodeTool', () => {
       format: 'json_string'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const jsonContent = (result.content[0] as { type: 'text'; text: string })
@@ -493,7 +493,7 @@ describe('ReverseGeocodeTool', () => {
       latitude: 45.515
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect(
       (result.content[0] as { type: 'text'; text: string }).text

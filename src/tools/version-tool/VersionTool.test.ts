@@ -26,7 +26,7 @@ describe('VersionTool', () => {
     it('should return version information', async () => {
       const result = await tool.run({});
 
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
       expect(result.content[0].text).toContain('Test MCP Server');
@@ -43,7 +43,7 @@ describe('VersionTool', () => {
 
       const result = await tool.run({});
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
     });

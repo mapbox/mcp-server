@@ -44,7 +44,7 @@ describe('StaticMapImageTool', () => {
       style: 'mapbox/satellite-v9'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content).toHaveLength(1);
     expect(result.content[0]).toMatchObject({
       type: 'image',
@@ -96,7 +96,7 @@ describe('StaticMapImageTool', () => {
       size: { width: 600, height: 400 }
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
       text: 'Internal error has occurred.'
@@ -114,7 +114,7 @@ describe('StaticMapImageTool', () => {
         size: { width: 600, height: 400 }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test invalid latitude
@@ -125,7 +125,7 @@ describe('StaticMapImageTool', () => {
         size: { width: 600, height: 400 }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -140,7 +140,7 @@ describe('StaticMapImageTool', () => {
         size: { width: 1281, height: 600 }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test size too small
@@ -151,7 +151,7 @@ describe('StaticMapImageTool', () => {
         size: { width: 0, height: 600 }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 

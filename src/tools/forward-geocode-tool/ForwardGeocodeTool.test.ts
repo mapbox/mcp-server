@@ -137,7 +137,7 @@ describe('ForwardGeocodeTool', () => {
       q: 'test query'
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
       text: 'Internal error has occurred.'
@@ -152,7 +152,7 @@ describe('ForwardGeocodeTool', () => {
         q: 'test; query'
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -165,7 +165,7 @@ describe('ForwardGeocodeTool', () => {
         q: longQuery
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -178,7 +178,7 @@ describe('ForwardGeocodeTool', () => {
         q: longQuery
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -192,7 +192,7 @@ describe('ForwardGeocodeTool', () => {
         limit: 11
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test limit too low
@@ -202,7 +202,7 @@ describe('ForwardGeocodeTool', () => {
         limit: 0
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -216,7 +216,7 @@ describe('ForwardGeocodeTool', () => {
         proximity: { longitude: -181, latitude: 40 }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test invalid latitude in bbox
@@ -231,7 +231,7 @@ describe('ForwardGeocodeTool', () => {
         }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -293,7 +293,7 @@ describe('ForwardGeocodeTool', () => {
       q: 'Seattle'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
@@ -333,7 +333,7 @@ describe('ForwardGeocodeTool', () => {
       q: 'NYC'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -382,7 +382,7 @@ describe('ForwardGeocodeTool', () => {
       limit: 2
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -406,7 +406,7 @@ describe('ForwardGeocodeTool', () => {
       q: 'nonexistentplace12345'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
       'No results found.'
@@ -438,7 +438,7 @@ describe('ForwardGeocodeTool', () => {
       q: 'Some Place'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -474,7 +474,7 @@ describe('ForwardGeocodeTool', () => {
       format: 'json_string'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const jsonContent = (result.content[0] as { type: 'text'; text: string })
@@ -507,7 +507,7 @@ describe('ForwardGeocodeTool', () => {
       q: 'Test City'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect(
       (result.content[0] as { type: 'text'; text: string }).text

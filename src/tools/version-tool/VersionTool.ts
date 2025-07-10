@@ -20,7 +20,7 @@ export class VersionTool {
       type: 'text';
       text: string;
     }>;
-    is_error: boolean;
+    isError: boolean;
   }> {
     try {
       const versionInfo = getVersionInfo();
@@ -34,7 +34,7 @@ export class VersionTool {
 
       return {
         content: [{ type: 'text', text: versionText }],
-        is_error: false
+        isError: false
       };
     } catch (error) {
       const errorMessage =
@@ -56,7 +56,7 @@ export class VersionTool {
               : 'Internal error has occurred.'
           }
         ],
-        is_error: true
+        isError: true
       };
     }
   }

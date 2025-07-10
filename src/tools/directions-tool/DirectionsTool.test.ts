@@ -158,7 +158,7 @@ describe('DirectionsTool', () => {
       ]
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
       text: 'Request failed with status 404: Not Found'
@@ -175,7 +175,7 @@ describe('DirectionsTool', () => {
         coordinates: [[-73.989, 40.733]]
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test with zero coordinates (invalid)
@@ -184,7 +184,7 @@ describe('DirectionsTool', () => {
         coordinates: []
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -199,7 +199,7 @@ describe('DirectionsTool', () => {
         coordinates: tooManyCoords
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -259,7 +259,7 @@ describe('DirectionsTool', () => {
           exclude: 'toll,motorway,unpaved'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Test with driving-traffic profile
@@ -273,7 +273,7 @@ describe('DirectionsTool', () => {
           exclude: 'tunnel,country_border,state_border'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
     });
 
@@ -291,7 +291,7 @@ describe('DirectionsTool', () => {
           exclude: 'toll'
         })
       ).resolves.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Test with cycling profile
@@ -305,7 +305,7 @@ describe('DirectionsTool', () => {
           exclude: 'motorway'
         })
       ).resolves.toMatchObject({
-        is_error: true
+        isError: true
       });
     });
 
@@ -324,7 +324,7 @@ describe('DirectionsTool', () => {
           exclude: 'ferry'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Test with walking profile
@@ -338,7 +338,7 @@ describe('DirectionsTool', () => {
           exclude: 'ferry'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Test with cycling profile
@@ -352,7 +352,7 @@ describe('DirectionsTool', () => {
           exclude: 'cash_only_tolls'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
     });
 
@@ -371,7 +371,7 @@ describe('DirectionsTool', () => {
           exclude: 'point(-73.95 40.75)'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Test with walking profile - should fail
@@ -385,7 +385,7 @@ describe('DirectionsTool', () => {
           exclude: 'point(-73.95 40.75)'
         })
       ).resolves.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Test with cycling profile - should fail
@@ -399,7 +399,7 @@ describe('DirectionsTool', () => {
           exclude: 'point(-73.95 40.75)'
         })
       ).resolves.toMatchObject({
-        is_error: true
+        isError: true
       });
     });
 
@@ -418,7 +418,7 @@ describe('DirectionsTool', () => {
           exclude: 'toll,motorway,ferry,cash_only_tolls,point(-73.95 40.75)'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Mixed valid and invalid exclusions (ferry is valid for walking, toll is not)
@@ -432,7 +432,7 @@ describe('DirectionsTool', () => {
           exclude: 'ferry,toll'
         })
       ).resolves.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // All valid exclusions for cycling profile
@@ -446,7 +446,7 @@ describe('DirectionsTool', () => {
           exclude: 'ferry,cash_only_tolls'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
     });
   });
@@ -468,7 +468,7 @@ describe('DirectionsTool', () => {
           depart_at: validDateTime
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       const calledUrlDriving = mockFetch.mock.calls[0][0];
@@ -487,7 +487,7 @@ describe('DirectionsTool', () => {
           depart_at: validDateTime
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       const calledUrlTraffic = mockFetch.mock.calls[1][0];
@@ -514,7 +514,7 @@ describe('DirectionsTool', () => {
             max_weight: 7.8
           })
         ).resolves.not.toMatchObject({
-          is_error: true
+          isError: true
         });
 
         const calledUrlDriving = mockFetch.mock.calls[0][0];
@@ -533,7 +533,7 @@ describe('DirectionsTool', () => {
             max_height: 3.2
           })
         ).resolves.not.toMatchObject({
-          is_error: true
+          isError: true
         });
 
         const calledUrlTraffic = mockFetch.mock.calls[1][0];
@@ -554,7 +554,7 @@ describe('DirectionsTool', () => {
             max_height: 4.5
           })
         ).resolves.toMatchObject({
-          is_error: true
+          isError: true
         });
 
         // Test with cycling profile
@@ -568,7 +568,7 @@ describe('DirectionsTool', () => {
             max_width: 2.0
           })
         ).resolves.toMatchObject({
-          is_error: true
+          isError: true
         });
       });
 
@@ -586,7 +586,7 @@ describe('DirectionsTool', () => {
             max_height: 15.0
           })
         ).resolves.toMatchObject({
-          is_error: true
+          isError: true
         });
 
         // Test invalid width (negative)
@@ -600,7 +600,7 @@ describe('DirectionsTool', () => {
             max_width: -1.0
           })
         ).resolves.toMatchObject({
-          is_error: true
+          isError: true
         });
 
         // Test invalid weight (too heavy)
@@ -614,7 +614,7 @@ describe('DirectionsTool', () => {
             max_weight: 150.0
           })
         ).resolves.toMatchObject({
-          is_error: true
+          isError: true
         });
       });
     });
@@ -634,7 +634,7 @@ describe('DirectionsTool', () => {
           depart_at: validDateTime
         })
       ).resolves.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Test with cycling profile
@@ -648,7 +648,7 @@ describe('DirectionsTool', () => {
           depart_at: validDateTime
         })
       ).resolves.toMatchObject({
-        is_error: true
+        isError: true
       });
     });
 
@@ -667,7 +667,7 @@ describe('DirectionsTool', () => {
           depart_at: '2025-06-05T10:30:00Z'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Format 2: YYYY-MM-DDThh:mmss±hh:mm
@@ -677,7 +677,7 @@ describe('DirectionsTool', () => {
           depart_at: '2025-06-05T10:30:00+02:00'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Format 3: YYYY-MM-DDThh:mm
@@ -687,7 +687,7 @@ describe('DirectionsTool', () => {
           depart_at: '2025-06-05T10:30'
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
     });
 
@@ -719,7 +719,7 @@ describe('DirectionsTool', () => {
           depart_at: format
         });
 
-        expect(result.is_error).toBe(true);
+        expect(result.isError).toBe(true);
       }
     });
 
@@ -746,7 +746,7 @@ describe('DirectionsTool', () => {
             depart_at: date
           })
         ).resolves.toMatchObject({
-          is_error: true
+          isError: true
         });
       }
     });
@@ -767,7 +767,7 @@ describe('DirectionsTool', () => {
           depart_at: dateTimeWithSeconds
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Verify the seconds were stripped in the API call
@@ -797,7 +797,7 @@ describe('DirectionsTool', () => {
           arrive_by: dateTimeWithSeconds
         })
       ).resolves.not.toMatchObject({
-        is_error: true
+        isError: true
       });
 
       // Verify the seconds were stripped in the API call
@@ -846,7 +846,7 @@ describe('DirectionsTool', () => {
         arrive_by: validDateTime
       });
 
-      expect(result1.is_error).toBe(true);
+      expect(result1.isError).toBe(true);
 
       // Test with walking profile
       const result2 = await new DirectionsTool().run({
@@ -858,7 +858,7 @@ describe('DirectionsTool', () => {
         arrive_by: validDateTime
       });
 
-      expect(result2.is_error).toBe(true);
+      expect(result2.isError).toBe(true);
 
       // Test with cycling profile
       const result3 = await new DirectionsTool().run({
@@ -870,7 +870,7 @@ describe('DirectionsTool', () => {
         arrive_by: validDateTime
       });
 
-      expect(result3.is_error).toBe(true);
+      expect(result3.isError).toBe(true);
     });
 
     it('rejects when both arrive_by and depart_at are provided', async () => {
@@ -884,7 +884,7 @@ describe('DirectionsTool', () => {
         arrive_by: '2025-06-05T10:30:00Z'
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
     });
 
     it('accepts valid ISO 8601 formats for arrive_by', async () => {
@@ -959,7 +959,7 @@ describe('DirectionsTool', () => {
           arrive_by: format
         });
 
-        expect(result.is_error).toBe(true);
+        expect(result.isError).toBe(true);
       }
     });
 
@@ -983,7 +983,7 @@ describe('DirectionsTool', () => {
           arrive_by: date
         });
 
-        expect(result.is_error).toBe(true);
+        expect(result.isError).toBe(true);
       }
     });
   });
@@ -1001,7 +1001,7 @@ describe('DirectionsTool', () => {
         geometries: 'none'
       })
     ).resolves.not.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     await expect(
@@ -1013,7 +1013,7 @@ describe('DirectionsTool', () => {
         geometries: 'geojson'
       })
     ).resolves.not.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Invalid values: 'polyline' and 'polyline6' were removed
@@ -1028,7 +1028,7 @@ describe('DirectionsTool', () => {
         geometries: 'polyline'
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     await expect(
@@ -1041,7 +1041,7 @@ describe('DirectionsTool', () => {
         geometries: 'polyline6'
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 });

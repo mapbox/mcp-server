@@ -95,7 +95,7 @@ describe('MatrixTool', () => {
       profile: 'driving'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     // Check that URL contains correct profile and coordinates
@@ -228,7 +228,7 @@ describe('MatrixTool', () => {
       sources: '1'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     const url = mockFetch.mock.calls[0][0];
     expect(url).toContain('annotations=distance%2Cduration');
     expect(url).toContain('approaches=curb%3Bunrestricted%3Bcurb');
@@ -253,7 +253,7 @@ describe('MatrixTool', () => {
       profile: 'walking'
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
       text: 'Internal error has occurred.'
@@ -273,7 +273,7 @@ describe('MatrixTool', () => {
       profile: 'driving-traffic'
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(mockFetch).not.toHaveBeenCalled();
 
     // Test for specific error message by calling execute directly
@@ -302,7 +302,7 @@ describe('MatrixTool', () => {
         profile: 'driving'
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error message using Zod validation from schema
       await expect(async () => {
@@ -323,7 +323,7 @@ describe('MatrixTool', () => {
         profile: 'driving'
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error message using Zod validation from schema
       await expect(async () => {
@@ -344,7 +344,7 @@ describe('MatrixTool', () => {
         ],
         profile: 'driving'
       });
-      expect(invalidLongitude.is_error).toBe(true);
+      expect(invalidLongitude.isError).toBe(true);
 
       // Test longitude bounds error message
       await expect(async () => {
@@ -364,7 +364,7 @@ describe('MatrixTool', () => {
         ],
         profile: 'driving'
       });
-      expect(invalidLatitude.is_error).toBe(true);
+      expect(invalidLatitude.isError).toBe(true);
 
       // Test latitude bounds error message
       await expect(async () => {
@@ -389,7 +389,7 @@ describe('MatrixTool', () => {
         approaches: 'curb;unrestricted' // Only 2 for 3 coordinates
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error for approaches length mismatch
       await expect(async () => {
@@ -417,7 +417,7 @@ describe('MatrixTool', () => {
         approaches: 'curb;invalid' // 'invalid' is not allowed
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error for invalid approach value
       await expect(async () => {
@@ -445,7 +445,7 @@ describe('MatrixTool', () => {
         bearings: '45,90;120,45' // Only 2 for 3 coordinates
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error for bearings length mismatch
       await expect(async () => {
@@ -473,7 +473,7 @@ describe('MatrixTool', () => {
         bearings: '45,90;invalid'
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error for invalid bearing format
       await expect(async () => {
@@ -498,7 +498,7 @@ describe('MatrixTool', () => {
         bearings: '400,90;120,45' // 400 is > 360
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error for invalid bearing angle
       await expect(async () => {
@@ -523,7 +523,7 @@ describe('MatrixTool', () => {
         bearings: '45,200;120,45' // 200 is > 180
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error for invalid bearing degrees
       await expect(async () => {
@@ -548,7 +548,7 @@ describe('MatrixTool', () => {
         sources: '0;2' // 2 is out of bounds
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error message for invalid sources indices
       await expect(async () => {
@@ -575,7 +575,7 @@ describe('MatrixTool', () => {
         destinations: '3' // 3 is out of bounds
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error message for invalid destinations indices
       await expect(async () => {
@@ -602,7 +602,7 @@ describe('MatrixTool', () => {
         destinations: '-1'
       });
 
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
 
       // Test direct error message for invalid destinations indices
       await expect(async () => {
@@ -677,7 +677,7 @@ describe('MatrixTool', () => {
         approaches: 'curb;;unrestricted'
       });
 
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       const url = mockFetch.mock.calls[0][0];
       expect(url).toContain('approaches=curb%3B%3Bunrestricted');
     });
@@ -697,7 +697,7 @@ describe('MatrixTool', () => {
         bearings: '45,90;;120,45'
       });
 
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       const url = mockFetch.mock.calls[0][0];
       expect(url).toContain('bearings=45%2C90%3B%3B120%2C45');
     });
@@ -717,7 +717,7 @@ describe('MatrixTool', () => {
         approaches: 'curb;;unrestricted'
       });
 
-      expect(resultWithSuccess1.is_error).toBe(false);
+      expect(resultWithSuccess1.isError).toBe(false);
 
       const resultWithSuccess2 = await tool.run({
         coordinates: [
@@ -728,7 +728,7 @@ describe('MatrixTool', () => {
         approaches: 'curb;'
       });
 
-      expect(resultWithSuccess2.is_error).toBe(false);
+      expect(resultWithSuccess2.isError).toBe(false);
     });
 
     it('rejects sources and destinations with unused coordinates', async () => {
@@ -745,7 +745,7 @@ describe('MatrixTool', () => {
         sources: '1',
         destinations: '2'
       });
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
       expect(mockFetch).not.toHaveBeenCalled();
 
       // Test direct error message for unused coordinates
@@ -836,7 +836,7 @@ describe('MatrixTool', () => {
         coordinates,
         profile: 'driving'
       });
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       expect(mockFetch).toHaveBeenCalled();
     });
 
@@ -855,7 +855,7 @@ describe('MatrixTool', () => {
         coordinates,
         profile: 'driving-traffic'
       });
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       expect(mockFetch).toHaveBeenCalled();
     });
 
@@ -872,7 +872,7 @@ describe('MatrixTool', () => {
         coordinates,
         profile: 'driving-traffic'
       });
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
       expect(mockFetch).not.toHaveBeenCalled();
 
       // Test direct error message for exceeding coordinate limit
@@ -908,7 +908,7 @@ describe('MatrixTool', () => {
         profile: 'driving-traffic'
       });
 
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       const url = mockFetch.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/driving-traffic');
     });
@@ -926,7 +926,7 @@ describe('MatrixTool', () => {
         profile: 'driving'
       });
 
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       const url = mockFetch.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/driving');
     });
@@ -944,7 +944,7 @@ describe('MatrixTool', () => {
         profile: 'walking'
       });
 
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       const url = mockFetch.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/walking');
     });
@@ -962,7 +962,7 @@ describe('MatrixTool', () => {
         profile: 'cycling'
       });
 
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       const url = mockFetch.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/cycling');
     });

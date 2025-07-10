@@ -63,7 +63,7 @@ describe('MapboxApiBasedTool', () => {
         const result = await toolWithInvalidToken.run({ testParam: 'test' });
 
         // Verify the error response
-        expect(result.is_error).toBe(true);
+        expect(result.isError).toBe(true);
 
         // Check for error message content
         if (process.env.VERBOSE_ERRORS === 'true') {
@@ -98,7 +98,7 @@ describe('MapboxApiBasedTool', () => {
       const result = await testTool.run({ testParam: 'test' });
 
       // The token validation should pass, and we should get the success result
-      expect(result.is_error).toBe(false);
+      expect(result.isError).toBe(false);
       expect(result.content[0]).toHaveProperty('type', 'text');
       expect(
         JSON.parse((result.content[0] as { type: 'text'; text: string }).text)
@@ -114,7 +114,7 @@ describe('MapboxApiBasedTool', () => {
       const result = await testTool.run({ testParam: 'test' });
 
       // Verify the response contains the generic error message
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
       expect(result.content).toHaveLength(1);
       expect(result.content[0]).toMatchObject({
         type: 'text',
@@ -135,7 +135,7 @@ describe('MapboxApiBasedTool', () => {
       const result = await testTool.run({ testParam: 'test' });
 
       // Verify the response contains the actual error message
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
       expect(result.content).toHaveLength(1);
       expect(result.content[0]).toMatchObject({
         type: 'text',
@@ -156,7 +156,7 @@ describe('MapboxApiBasedTool', () => {
       const result = await testTool.run({ testParam: 'test' });
 
       // Verify the response contains the generic error message
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
       expect(result.content).toHaveLength(1);
       expect(result.content[0]).toMatchObject({
         type: 'text',
@@ -181,7 +181,7 @@ describe('MapboxApiBasedTool', () => {
       const result = await testTool.run({ testParam: 'test' });
 
       // Verify the response contains the string error
-      expect(result.is_error).toBe(true);
+      expect(result.isError).toBe(true);
       expect(result.content).toHaveLength(1);
       expect(result.content[0]).toMatchObject({
         type: 'text',

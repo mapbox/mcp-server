@@ -144,7 +144,7 @@ describe('PoiSearchTool', () => {
       q: 'test query'
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
       text: 'Internal error has occurred.'
@@ -160,7 +160,7 @@ describe('PoiSearchTool', () => {
         q: longQuery
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -174,7 +174,7 @@ describe('PoiSearchTool', () => {
         limit: 11
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test limit too low
@@ -184,7 +184,7 @@ describe('PoiSearchTool', () => {
         limit: 0
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -198,7 +198,7 @@ describe('PoiSearchTool', () => {
         proximity: { longitude: -181, latitude: 40 }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test invalid latitude in bbox
@@ -213,7 +213,7 @@ describe('PoiSearchTool', () => {
         }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -291,7 +291,7 @@ describe('PoiSearchTool', () => {
       q: 'Starbucks'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
@@ -330,7 +330,7 @@ describe('PoiSearchTool', () => {
       q: 'Central Park'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -379,7 +379,7 @@ describe('PoiSearchTool', () => {
       limit: 2
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -403,7 +403,7 @@ describe('PoiSearchTool', () => {
       q: 'NonexistentPlace'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
       'No results found.'
@@ -435,7 +435,7 @@ describe('PoiSearchTool', () => {
       q: 'location'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -471,7 +471,7 @@ describe('PoiSearchTool', () => {
       format: 'json_string'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const jsonContent = (result.content[0] as { type: 'text'; text: string })
@@ -504,7 +504,7 @@ describe('PoiSearchTool', () => {
       q: 'Test Place'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect(
       (result.content[0] as { type: 'text'; text: string }).text

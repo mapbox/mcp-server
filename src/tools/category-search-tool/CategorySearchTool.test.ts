@@ -133,7 +133,7 @@ describe('CategorySearchTool', () => {
       category: 'restaurant'
     });
 
-    expect(result.is_error).toBe(true);
+    expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
       text: 'Internal error has occurred.'
@@ -150,7 +150,7 @@ describe('CategorySearchTool', () => {
         limit: 26
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test limit too low
@@ -160,7 +160,7 @@ describe('CategorySearchTool', () => {
         limit: 0
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -174,7 +174,7 @@ describe('CategorySearchTool', () => {
         proximity: { longitude: -181, latitude: 40 }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
 
     // Test invalid latitude in bbox
@@ -189,7 +189,7 @@ describe('CategorySearchTool', () => {
         }
       })
     ).resolves.toMatchObject({
-      is_error: true
+      isError: true
     });
   });
 
@@ -232,7 +232,7 @@ describe('CategorySearchTool', () => {
       category: 'cafe'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
@@ -271,7 +271,7 @@ describe('CategorySearchTool', () => {
       category: 'fast_food'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -320,7 +320,7 @@ describe('CategorySearchTool', () => {
       limit: 2
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -344,7 +344,7 @@ describe('CategorySearchTool', () => {
       category: 'nonexistent_category'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
       'No results found.'
@@ -376,7 +376,7 @@ describe('CategorySearchTool', () => {
       category: 'gas_station'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
@@ -412,7 +412,7 @@ describe('CategorySearchTool', () => {
       format: 'json_string'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
 
     const jsonContent = (result.content[0] as { type: 'text'; text: string })
@@ -445,7 +445,7 @@ describe('CategorySearchTool', () => {
       category: 'cafe'
     });
 
-    expect(result.is_error).toBe(false);
+    expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect(
       (result.content[0] as { type: 'text'; text: string }).text
