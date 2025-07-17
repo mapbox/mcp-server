@@ -72,13 +72,39 @@ const PoiSearchInputSchema = z.object({
     ),
   bbox: z
     .object({
-      minLongitude: z.number().min(-180).max(180),
-      minLatitude: z.number().min(-90).max(90),
-      maxLongitude: z.number().min(-180).max(180),
-      maxLatitude: z.number().min(-90).max(90)
+      minLongitude: z
+        .number()
+        .min(-180)
+        .max(180)
+        .describe(
+          "Minimum longitude. Must be named 'minLongitude' (not 'min_longitude', 'minLon', 'west', etc.)"
+        ),
+      minLatitude: z
+        .number()
+        .min(-90)
+        .max(90)
+        .describe(
+          "Minimum latitude. Must be named 'minLatitude' (not 'min_latitude', 'minLat', 'south', etc.)"
+        ),
+      maxLongitude: z
+        .number()
+        .min(-180)
+        .max(180)
+        .describe(
+          "Maximum longitude. Must be named 'maxLongitude' (not 'max_longitude', 'maxLon', 'east', etc.)"
+        ),
+      maxLatitude: z
+        .number()
+        .min(-90)
+        .max(90)
+        .describe(
+          "Maximum latitude. Must be named 'maxLatitude' (not 'max_latitude', 'maxLat', 'north', etc.)"
+        )
     })
     .optional()
-    .describe('Bounding box to limit results within specified bounds'),
+    .describe(`Bounding box to limit results within specified bounds. Bounding box with EXACT property names required:
+CORRECT: {"minLongitude": 12.4, "minLatitude": 41.8, "maxLongitude": 12.5, "maxLatitude": 41.9}
+INCORRECT: {"west": 12.4, "south": 41.8, "east": 12.5, "north": 41.9}`),
   country: z
     .array(z.string().length(2))
     .optional()
