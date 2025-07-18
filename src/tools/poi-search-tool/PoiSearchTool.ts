@@ -68,17 +68,43 @@ const PoiSearchInputSchema = z.object({
     ])
     .optional()
     .describe(
-      'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location. STRONGLY ENCOURAGED for relevant results.'
+      'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location. STRONGLY ENCOURAGED for relevant results.\n\nGOOD EXAMPLES:\n- {"longitude": -122.4194, "latitude": 37.7749} (coordinate object)\n- "{"longitude": -122.4194, "latitude": 37.7749}" (JSON string)\n- "[-122.4194, 37.7749]" (array string format)\n- "-122.4194,37.7749" (comma-separated string)\n- "ip" (use IP-based location)\n\nBAD EXAMPLES:\n- {"lat": 37.7749, "lng": -122.4194} (wrong property names)\n- {"x": -122.4194, "y": 37.7749} (wrong property names)\n- "37.7749,-122.4194" (latitude first - incorrect order)\n- "[37.7749, -122.4194]" (latitude first - incorrect order)'
     ),
   bbox: z
     .object({
-      minLongitude: z.number().min(-180).max(180),
-      minLatitude: z.number().min(-90).max(90),
-      maxLongitude: z.number().min(-180).max(180),
-      maxLatitude: z.number().min(-90).max(90)
+      minLongitude: z
+        .number()
+        .min(-180)
+        .max(180)
+        .describe(
+          "Minimum longitude. Must be named 'minLongitude' (not 'min_longitude', 'minLon', 'west', etc.)"
+        ),
+      minLatitude: z
+        .number()
+        .min(-90)
+        .max(90)
+        .describe(
+          "Minimum latitude. Must be named 'minLatitude' (not 'min_latitude', 'minLat', 'south', etc.)"
+        ),
+      maxLongitude: z
+        .number()
+        .min(-180)
+        .max(180)
+        .describe(
+          "Maximum longitude. Must be named 'maxLongitude' (not 'max_longitude', 'maxLon', 'east', etc.)"
+        ),
+      maxLatitude: z
+        .number()
+        .min(-90)
+        .max(90)
+        .describe(
+          "Maximum latitude. Must be named 'maxLatitude' (not 'max_latitude', 'maxLat', 'north', etc.)"
+        )
     })
     .optional()
-    .describe('Bounding box to limit results within specified bounds'),
+    .describe(`Bounding box to limit results within specified bounds. Bounding box with EXACT property names required:
+CORRECT: {"minLongitude": 12.4, "minLatitude": 41.8, "maxLongitude": 12.5, "maxLatitude": 41.9}
+INCORRECT: {"west": 12.4, "south": 41.8, "east": 12.5, "north": 41.9}`),
   country: z
     .array(z.string().length(2))
     .optional()
