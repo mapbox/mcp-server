@@ -555,7 +555,7 @@ const CategorySearchInputSchema = z.object({
     ])
     .optional()
     .describe(
-      'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location'
+      'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location.\n\nGOOD EXAMPLES:\n- {"longitude": -122.4194, "latitude": 37.7749} (coordinate object)\n- "{"longitude": -122.4194, "latitude": 37.7749}" (JSON string)\n- "[-122.4194, 37.7749]" (array string format)\n- "-122.4194,37.7749" (comma-separated string)\n- "ip" (use IP-based location)\n\nBAD EXAMPLES:\n- {"lat": 37.7749, "lng": -122.4194} (wrong property names)\n- {"x": -122.4194, "y": 37.7749} (wrong property names)\n- "37.7749,-122.4194" (latitude first - incorrect order)\n- "[37.7749, -122.4194]" (latitude first - incorrect order)'
     ),
   bbox: z
     .object({

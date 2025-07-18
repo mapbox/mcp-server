@@ -134,7 +134,7 @@ INCORRECT: {"west": 12.4, "south": 41.8, "east": 12.5, "north": 41.9}`),
     ])
     .optional()
     .describe(
-      'Location to bias results towards. Either [longitude, latitude] coordinates or "ip" for IP-based location. Can help get more relevant results when searching in a specific area.'
+      'Location to bias results towards. Either [longitude, latitude] coordinates or "ip" for IP-based location. Can help get more relevant results when searching in a specific area.\n\nGOOD EXAMPLES:\n- {"longitude": -122.4194, "latitude": 37.7749} (coordinate object)\n- "{"longitude": -122.4194, "latitude": 37.7749}" (JSON string)\n- "[-122.4194, 37.7749]" (array string format)\n- "-122.4194,37.7749" (comma-separated string)\n- "ip" (use IP-based location)\n\nBAD EXAMPLES:\n- {"lat": 37.7749, "lng": -122.4194} (wrong property names)\n- {"x": -122.4194, "y": 37.7749} (wrong property names)\n- "37.7749,-122.4194" (latitude first - incorrect order)\n- "[37.7749, -122.4194]" (latitude first - incorrect order)'
     ),
   types: z
     .array(
