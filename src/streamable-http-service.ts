@@ -130,20 +130,19 @@ app.post('/mcp', async (req: Request, res: Response) => {
 
     await server.connect(transport);
 
-    // Create a new request object with auth info
-    const authenticatedReq = Object.assign({}, req, {
-      auth: {
-        token: accessToken,
-        clientId: 'bearer-auth-client',
-        scopes: [],
-        extra: {
-          rawToken: accessToken,
-          type: 'bearer'
-        }
+    // Add auth info directly to the request object
+    (req as any).auth = {
+      token: accessToken,
+      clientId: 'bearer-auth-client',
+      scopes: [],
+      extra: {
+        accessToken: accessToken,
+        rawToken: accessToken,
+        type: 'bearer'
       }
-    });
+    };
 
-    await transport.handleRequest(authenticatedReq, res, req.body);
+    await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error('Error handling MCP request:', error);
     if (!res.headersSent) {

@@ -61,9 +61,11 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
   ): Promise<z.infer<typeof OutputSchema>> {
     try {
       // First check if token is provided via authentication context
-      const authToken = extra?.authInfo?.accessToken;
+      // Check both standard token field and accessToken in extra for compatibility
+      const authToken =
+        extra?.authInfo?.token ||
+        (extra?.authInfo?.extra as { accessToken?: string })?.accessToken;
       const accessToken = authToken || MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN;
-
       if (!accessToken) {
         throw new Error(
           'No access token available. Please provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var'
