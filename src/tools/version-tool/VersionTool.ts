@@ -45,11 +45,15 @@ export class VersionTool {
         `${this.name}: Error during execution: ${errorMessage}`
       );
 
+      const isVerboseErrors = process.env.VERBOSE_ERRORS === 'true';
+
       return {
         content: [
           {
             type: 'text',
-            text: errorMessage
+            text: isVerboseErrors
+              ? errorMessage
+              : 'Internal error has occurred.'
           }
         ],
         isError: true
