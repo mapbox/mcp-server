@@ -649,7 +649,8 @@ export class CategorySearchTool extends MapboxApiBasedTool<
   }
 
   protected async execute(
-    input: z.infer<typeof CategorySearchInputSchema>
+    input: z.infer<typeof CategorySearchInputSchema>,
+    accessToken: string
   ): Promise<{ type: 'text'; text: string }> {
     // Build URL with required parameters
     const url = new URL(
@@ -657,10 +658,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     );
 
     // Add access token
-    url.searchParams.append(
-      'access_token',
-      MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN!
-    );
+    url.searchParams.append('access_token', accessToken);
 
     // Add optional parameters
     if (input.language) {
