@@ -106,15 +106,11 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
         `${this.name}: Error during execution: ${errorMessage}`
       );
 
-      const isVerboseErrors = process.env.VERBOSE_ERRORS === 'true';
-
       return {
         content: [
           {
             type: 'text',
-            text: isVerboseErrors
-              ? errorMessage
-              : 'Internal error has occurred.'
+            text: errorMessage
           }
         ],
         isError: true
