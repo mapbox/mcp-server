@@ -25,7 +25,7 @@
     "*.{js,jsx,ts,tsx}": "eslint --fix",
     "*.{js,jsx,ts,tsx,md,html,css}": "prettier --write"
   },
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "BSD-3-Clause",
   "homepage": "https://github.com/mapbox/mcp-server#readme",
   "devDependencies": {
     "@eslint/js": "^9.27.0",
