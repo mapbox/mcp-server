@@ -19,7 +19,10 @@
     "build": "npm run prepare && npm run build:esm && npm run build:cjs && npm run generate-version && node scripts/add-shebang.cjs",
     "build:esm": "node scripts/build-helpers.cjs esm-package && tsc -p tsconfig.json",
     "build:cjs": "node scripts/build-helpers.cjs cjs-package && tsc -p tsconfig.json",
-    "generate-version": "node scripts/build-helpers.cjs generate-version"
+    "generate-version": "node scripts/build-helpers.cjs generate-version",
+    "stream-service": "npx tsx src/streamable-http-service.ts",
+    "stream-service:dev": "npx tsx watch src/streamable-http-service.ts",
+    "stream-service:build": "tsc src/streamable-http-service.ts --outDir dist --module esnext --target es2022 && node dist/streamable-http-service.js"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --fix",
@@ -29,6 +32,8 @@
   "homepage": "https://github.com/mapbox/mcp-server#readme",
   "devDependencies": {
     "@eslint/js": "^9.27.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
     "@types/jest": "^29.0.1",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
@@ -42,6 +47,7 @@
     "plop": "^4.0.1",
     "prettier": "^3.0.0",
     "ts-jest": "^29.3.4",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
   "prettier": {
@@ -71,6 +77,8 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
     "zod": "^3.25.42"
   }
 }

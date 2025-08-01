@@ -137,7 +137,8 @@ describe('PoiSearchTool', () => {
     const mockFetch = setupFetch({
       ok: false,
       status: 404,
-      statusText: 'Not Found'
+      statusText: 'Not Found',
+      text: async () => 'Not Found'
     });
 
     const result = await new PoiSearchTool().run({
@@ -147,7 +148,7 @@ describe('PoiSearchTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Internal error has occurred.'
+      text: 'Failed to search: 404 Not Found'
     });
   });
 

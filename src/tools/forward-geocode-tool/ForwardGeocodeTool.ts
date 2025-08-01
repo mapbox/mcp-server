@@ -191,7 +191,8 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
   }
 
   protected async execute(
-    input: z.infer<typeof ForwardGeocodeInputSchema>
+    input: z.infer<typeof ForwardGeocodeInputSchema>,
+    accessToken: string
   ): Promise<{ type: 'text'; text: string }> {
     const url = new URL(
       `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}search/geocode/v6/forward`
@@ -199,10 +200,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
 
     // Required parameters
     url.searchParams.append('q', input.q);
-    url.searchParams.append(
-      'access_token',
-      MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN!
-    );
+    url.searchParams.append('access_token', accessToken);
 
     // Optional parameters
     url.searchParams.append('permanent', input.permanent.toString());

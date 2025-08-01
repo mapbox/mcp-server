@@ -107,31 +107,7 @@ describe('MapboxApiBasedTool', () => {
   });
 
   describe('error handling', () => {
-    it('returns generic error message when VERBOSE_ERRORS is not set to true', async () => {
-      // Make sure VERBOSE_ERRORS is not set to true
-      delete process.env.VERBOSE_ERRORS;
-
-      const result = await testTool.run({ testParam: 'test' });
-
-      // Verify the response contains the generic error message
-      expect(result.isError).toBe(true);
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0]).toMatchObject({
-        type: 'text',
-        text: 'Internal error has occurred.'
-      });
-
-      // Verify the error was logged with the actual error message
-      expect(testTool['log']).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Test error message')
-      );
-    });
-
-    it('returns actual error message when VERBOSE_ERRORS=true', async () => {
-      // Set VERBOSE_ERRORS to true
-      process.env.VERBOSE_ERRORS = 'true';
-
+    it('returns actual error message', async () => {
       const result = await testTool.run({ testParam: 'test' });
 
       // Verify the response contains the actual error message
@@ -149,34 +125,11 @@ describe('MapboxApiBasedTool', () => {
       );
     });
 
-    it('returns generic error message when VERBOSE_ERRORS is set to a value other than true', async () => {
-      // Set VERBOSE_ERRORS to something other than 'true'
-      process.env.VERBOSE_ERRORS = 'yes';
-
-      const result = await testTool.run({ testParam: 'test' });
-
-      // Verify the response contains the generic error message
-      expect(result.isError).toBe(true);
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0]).toMatchObject({
-        type: 'text',
-        text: 'Internal error has occurred.'
-      });
-
-      // Verify the error was logged with the actual error message
-      expect(testTool['log']).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Test error message')
-      );
-    });
-
     it('handles non-Error objects thrown', async () => {
       // Override the execute method to throw a string instead of an Error
       testTool['execute'] = jest.fn().mockImplementation(() => {
         throw 'String error message';
       });
-
-      process.env.VERBOSE_ERRORS = 'true';
 
       const result = await testTool.run({ testParam: 'test' });
 

@@ -136,7 +136,7 @@ describe('CategorySearchTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Internal error has occurred.'
+      text: 'Failed to search category: 404 Not Found'
     });
   });
 
