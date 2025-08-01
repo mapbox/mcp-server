@@ -1,0 +1,37 @@
+{
+  "dxt_version": "0.1",
+  "name": "@mapbox/mcp-server",
+  "display_name": "Mapbox MCP Server",
+  "version": "0.2.3",
+  "description": "Mapbox MCP server.",
+  "author": {
+    "name": "Mapbox, Inc."
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "MAPBOX_ACCESS_TOKEN" : "${user_config.MAPBOX_ACCESS_TOKEN}"
+      }
+    }
+  },
+  "user_config": {
+    "MAPBOX_ACCESS_TOKEN": {
+      "type": "string",
+      "title": "Mapbox access_token",
+      "description": "Enter your Mapbox secret access token to get started, if you don't have one, please register from https://account.mapbox.com/access-tokens/",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mapbox/mcp-server.git"
+  }
+}
