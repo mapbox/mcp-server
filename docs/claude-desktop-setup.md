@@ -6,7 +6,29 @@ This guide explains how to set up and configure Claude Desktop for use with the 
 
 - Claude Desktop application installed on your system
 
-If you want to use locally, you need also do:
+## Setup Instructions
+
+### Install Claude Desktop
+
+[Download](https://claude.ai/download) and install the Claude Desktop application from the official page.
+
+## Option 1: DXT Installation (Recommended)
+
+The easiest way to install the Mapbox MCP Server is using the pre-built DXT package.
+
+**⚠️ Important: Make sure you have the latest version of Claude Desktop installed. Older versions may not support DXT files and will show errors during installation.**
+
+1. **Update Claude Desktop**: [Download the latest version](https://claude.ai/download) if you haven't already
+2. **Download the DXT package**: [📦 mcp-server.dxt](https://github.com/mapbox/mcp-server/releases/latest/download/mcp-server.dxt)
+3. **Open the file** with Claude Desktop (double-click or drag and drop)
+4. **Follow the installation prompts**
+5. **Provide your Mapbox access token** when prompted
+
+## Option 2: Manual Configuration
+
+If you prefer manual configuration or want to use a local development version:
+
+### Prerequisites for Manual Setup
 
 - Mapbox MCP Server built locally
 
@@ -24,12 +46,6 @@ where node
 # or alternatively, using docker
 docker build -t mapbox-mcp-server .
 ```
-
-## Setup Instructions
-
-### Install Claude Desktop
-
-[Download](https://claude.ai/download) and install the Claude Desktop application from the official page.
 
 ### Configure Claude to use Mapbox MCP Server
 
