@@ -191,7 +191,8 @@ export class PoiSearchTool extends MapboxApiBasedTool<
   }
 
   protected async execute(
-    input: z.infer<typeof PoiSearchInputSchema>
+    input: z.infer<typeof PoiSearchInputSchema>,
+    accessToken: string
   ): Promise<{ type: 'text'; text: string }> {
     this.log(
       'info',
@@ -204,10 +205,7 @@ export class PoiSearchTool extends MapboxApiBasedTool<
 
     // Required parameters
     url.searchParams.append('q', input.q);
-    url.searchParams.append(
-      'access_token',
-      MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN!
-    );
+    url.searchParams.append('access_token', accessToken);
 
     // Optional parameters
     if (input.language) {
@@ -267,7 +265,7 @@ export class PoiSearchTool extends MapboxApiBasedTool<
 
     this.log(
       'info',
-      `PoiSearchTool: Fetching from URL: ${url.toString().replace(MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN!, '[REDACTED]')}`
+      `PoiSearchTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
     );
 
     const response = await fetch(url.toString());

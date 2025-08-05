@@ -98,15 +98,13 @@ export class IsochroneTool extends MapboxApiBasedTool<
   }
 
   protected async execute(
-    input: z.infer<typeof IsochroneInputSchema>
+    input: z.infer<typeof IsochroneInputSchema>,
+    accessToken: string
   ): Promise<any> {
     const url = new URL(
       `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
     );
-    url.searchParams.append(
-      'access_token',
-      MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN!
-    );
+    url.searchParams.append('access_token', accessToken);
     if (
       (!input.contours_minutes || input.contours_minutes.length === 0) &&
       (!input.contours_meters || input.contours_meters.length === 0)

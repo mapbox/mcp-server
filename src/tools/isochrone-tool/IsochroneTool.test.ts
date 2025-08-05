@@ -111,9 +111,7 @@ describe('IsochroneTool', () => {
     });
 
     expect(result.content[0].type).toEqual('text');
-    if (result.content[0].type == 'text') {
-      expect(result.content[0].text).toContain('Internal error');
-    }
+    expect(result.isError).toBe(true);
   });
 
   it('throws if neither contours_minutes nor contours_meters is specified', async () => {
@@ -124,8 +122,6 @@ describe('IsochroneTool', () => {
     });
 
     expect(result.content[0].type).toEqual('text');
-    if (result.content[0].type == 'text') {
-      expect(result.content[0].text).toContain('Internal error');
-    }
+    expect(result.isError).toBe(true);
   });
 });
