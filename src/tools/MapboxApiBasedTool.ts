@@ -78,7 +78,7 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
       }
 
       const input = this.inputSchema.parse(rawInput);
-      const result = await this.execute(input, accessToken, extra);
+      const result = await this.execute(input, accessToken);
 
       // Check if result is already a content object (image or text)
       if (
@@ -123,8 +123,7 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
    */
   protected abstract execute(
     _input: z.infer<InputSchema>,
-    accessToken: string,
-    extra?: RequestHandlerExtra<any, any>
+    accessToken: string
   ): Promise<any>;
 
   /**
