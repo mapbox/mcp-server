@@ -124,7 +124,8 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   }
 
   protected async execute(
-    input: z.infer<typeof ReverseGeocodeInputSchema>
+    input: z.infer<typeof ReverseGeocodeInputSchema>,
+    accessToken: string
   ): Promise<{ type: 'text'; text: string }> {
     // When limit > 1, must specify exactly one type
     if (
@@ -144,10 +145,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     // Required parameters
     url.searchParams.append('longitude', input.longitude.toString());
     url.searchParams.append('latitude', input.latitude.toString());
-    url.searchParams.append(
-      'access_token',
-      MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN!
-    );
+    url.searchParams.append('access_token', accessToken);
 
     // Optional parameters
     url.searchParams.append('permanent', input.permanent.toString());

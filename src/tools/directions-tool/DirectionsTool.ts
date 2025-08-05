@@ -310,7 +310,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
     super({ inputSchema: DirectionsInputSchema });
   }
   protected async execute(
-    input: z.infer<typeof DirectionsInputSchema>
+    input: z.infer<typeof DirectionsInputSchema>,
+    accessToken: string
   ): Promise<any> {
     // Validate exclude parameter against the actual routing_profile
     // This is needed because some exclusions are only driving specific
@@ -406,10 +407,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
 
     // Build query parameters
     const queryParams = new URLSearchParams();
-    queryParams.append(
-      'access_token',
-      MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN as string
-    );
+    queryParams.append('access_token', accessToken);
     // Only add geometries parameter if not 'none'
     if (input.geometries !== 'none') {
       queryParams.append('geometries', input.geometries);

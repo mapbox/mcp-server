@@ -16,11 +16,12 @@ export class {{pascalCase name}}Tool extends MapboxApiBasedTool<
   }
 
   protected async execute(
-    input: z.infer<typeof {{pascalCase name}}InputSchema>
+    input: z.infer<typeof {{pascalCase name}}InputSchema>,
+    accessToken: string
   ): Promise<any> {
     ... write your logic here ...
     // e.g.:
-    // const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}...?access_token=${MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN}`;
+    // const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}...?access_token=${accessToken}`;
     // const response = await fetch(url);
     // const data = await response.json();
     // return data;

@@ -91,7 +91,8 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
   }
 
   protected async execute(
-    input: z.infer<typeof MatrixInputSchema>
+    input: z.infer<typeof MatrixInputSchema>,
+    accessToken: string
   ): Promise<any> {
     // Validate input based on profile type
     if (input.profile === 'driving-traffic' && input.coordinates.length > 10) {
@@ -234,10 +235,7 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
 
     // Build query parameters
     const queryParams = new URLSearchParams();
-    queryParams.append(
-      'access_token',
-      MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN as string
-    );
+    queryParams.append('access_token', accessToken);
 
     // Add annotations parameter if specified
     if (input.annotations) {
