@@ -1,11 +1,19 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import { getAllTools } from './tools/toolRegistry.js';
 import { patchGlobalFetch } from './utils/requestUtils.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 
 let serverVersionInfo = getVersionInfo();
 patchGlobalFetch(serverVersionInfo);
+
+// Parse configuration from command-line arguments
+const config = parseToolConfigFromArgs();
+
+// Get and filter tools based on configuration
+const allTools = getAllTools();
+const enabledTools = filterTools(allTools, config);
 
 // Create an MCP server
 const server = new McpServer(
@@ -20,8 +28,8 @@ const server = new McpServer(
   }
 );
 
-// Register all tools from the registry
-getAllTools().forEach((tool) => {
+// Register enabled tools to the server
+enabledTools.forEach((tool) => {
   tool.installTo(server);
 });
 
