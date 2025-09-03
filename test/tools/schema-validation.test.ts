@@ -1,9 +1,10 @@
+import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { getAllTools } from './toolRegistry.js';
+import { getAllTools } from '../../src/tools/toolRegistry.js';
 
-// Mock getVersionInfo to avoid import.meta.url issues in Jest
-jest.mock('../utils/versionUtils.js', () => ({
-  getVersionInfo: jest.fn(() => ({
+// Mock getVersionInfo to avoid import.meta.url issues in vitest
+vi.mock('../utils/versionUtils.js', () => ({
+  getVersionInfo: vi.fn(() => ({
     name: 'Mapbox MCP server',
     version: '1.0.0',
     sha: 'mock-sha',
@@ -59,7 +60,7 @@ describe('Schema Validation - No Tuples', () => {
     schema: (tool as any).inputSchema
   }));
 
-  test.each(schemas)(
+  it.each(schemas)(
     '$name should not contain z.tuple() usage',
     ({ name, schema }) => {
       const tupleIssues = detectTupleUsage(schema);
@@ -68,7 +69,7 @@ describe('Schema Validation - No Tuples', () => {
   );
 
   // Negative test to ensure detection works
-  test('should detect z.tuple() usage in test schemas', () => {
+  it('should detect z.tuple() usage in test schemas', () => {
     const schemaWithTuple = z.object({
       coordinates: z.tuple([z.number(), z.number()]),
       data: z.object({

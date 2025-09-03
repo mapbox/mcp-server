@@ -1,6 +1,7 @@
 import { URLSearchParams } from 'url';
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from 'src/utils/fetchRequest.js';
 
 // API documentation: https://docs.mapbox.com/api/navigation/matrix/
 
@@ -86,8 +87,11 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
   description =
     'Calculates travel times and distances between multiple points using Mapbox Matrix API.';
 
-  constructor() {
+  private fetch: typeof globalThis.fetch;
+
+  constructor(fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: MatrixInputSchema });
+    this.fetch = fetch;
   }
 
   protected async execute(
@@ -266,7 +270,7 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
     const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}directions-matrix/v1/mapbox/${input.profile}/${joined}?${queryParams.toString()}`;
 
     // Make the request
-    const response = await fetch(url);
+    const response = await this.fetch(url);
 
     if (!response.ok) {
       throw new Error(

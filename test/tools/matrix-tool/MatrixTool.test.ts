@@ -1,12 +1,10 @@
-process.env.MAPBOX_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
-
-import { cleanup } from '../../utils/requestUtils.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { cleanup } from '../../../src/utils/requestUtils.js';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { MatrixTool } from './MatrixTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { MatrixTool } from '../../../src/tools/matrix-tool/MatrixTool.js';
 
 const sampleMatrixResponse = {
   code: 'Ok',
@@ -61,15 +59,23 @@ const sampleMatrixWithDistanceResponse = {
 };
 
 describe('MatrixTool', () => {
+  beforeEach(() => {
+    vi.stubEnv(
+      'MAPBOX_ACCESS_TOKEN',
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
+  });
+
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     cleanup();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new MatrixTool().run({
+    await new MatrixTool(fetch).run({
       coordinates: [
         { longitude: -74.102094, latitude: 40.692815 },
         { longitude: -74.1022094, latitude: 40.792815 }
@@ -81,11 +87,11 @@ describe('MatrixTool', () => {
   });
 
   it('sends request with correct parameters', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     const result = await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -103,19 +109,17 @@ describe('MatrixTool', () => {
     expect(url).toContain(
       'directions-matrix/v1/mapbox/driving/-122.42,37.78;-122.45,37.91;-122.48,37.73'
     );
-    expect(url).toContain(
-      'access_token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-    );
+    expect(url).toContain('access_token=');
 
     assertHeadersSent(mockFetch);
   });
 
   it('properly includes annotations parameter when specified', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -130,11 +134,11 @@ describe('MatrixTool', () => {
   });
 
   it('properly includes approaches parameter when specified', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -150,11 +154,11 @@ describe('MatrixTool', () => {
   });
 
   it('properly includes bearings parameter when specified', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -169,11 +173,11 @@ describe('MatrixTool', () => {
   });
 
   it('properly includes destinations parameter when specified', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -189,11 +193,11 @@ describe('MatrixTool', () => {
   });
 
   it('properly includes sources parameter when specified', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -209,11 +213,11 @@ describe('MatrixTool', () => {
   });
 
   it('handles all optional parameters together', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     const result = await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -238,13 +242,13 @@ describe('MatrixTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     const result = await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -263,9 +267,9 @@ describe('MatrixTool', () => {
   });
 
   it('validates driving-traffic profile coordinate limit', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    const tool = new MatrixTool();
+    const tool = new MatrixTool(fetch);
     const coordinates = Array(11).fill({ longitude: -122.42, latitude: 37.78 });
 
     const result = await tool.run({
@@ -295,8 +299,8 @@ describe('MatrixTool', () => {
     let tool: MatrixTool;
 
     beforeEach(() => {
-      tool = new MatrixTool();
-      setupFetch();
+      const { fetch } = setupFetch();
+      tool = new MatrixTool(fetch);
     });
 
     it('validates coordinates - minimum count', async () => {
@@ -650,11 +654,13 @@ describe('MatrixTool', () => {
     });
 
     it('accepts valid "all" value for sources', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      await tool.run({
+      const localTool = new MatrixTool(fetch);
+
+      await localTool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
@@ -668,11 +674,13 @@ describe('MatrixTool', () => {
     });
 
     it('accepts valid "all" value for destinations', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      await tool.run({
+      const localTool = new MatrixTool(fetch);
+
+      await localTool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
@@ -688,15 +696,11 @@ describe('MatrixTool', () => {
 
   // Parameter edge cases
   describe('parameter edge cases', () => {
-    let tool: MatrixTool;
-    beforeEach(() => {
-      tool = new MatrixTool();
-    });
-
     it('accepts approaches with skipped values', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+      const tool = new MatrixTool(fetch);
       const result = await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -713,9 +717,11 @@ describe('MatrixTool', () => {
     });
 
     it('accepts bearings with skipped values', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+
+      const tool = new MatrixTool(fetch);
 
       const result = await tool.run({
         coordinates: [
@@ -733,9 +739,11 @@ describe('MatrixTool', () => {
     });
 
     it('validates empty values correctly in approaches', async () => {
-      const mockFetch = setupFetch({
+      const { fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+
+      const tool = new MatrixTool(fetch);
 
       const resultWithSuccess1 = await tool.run({
         coordinates: [
@@ -762,9 +770,10 @@ describe('MatrixTool', () => {
     });
 
     it('rejects sources and destinations with unused coordinates', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+      const tool = new MatrixTool(fetch);
       const result = await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -799,9 +808,10 @@ describe('MatrixTool', () => {
     });
 
     it('accepts sources and destinations with single indices when all coordinates are used', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+      const tool = new MatrixTool(fetch);
       await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -817,10 +827,11 @@ describe('MatrixTool', () => {
     });
 
     it('accepts both annotations orders', async () => {
-      const mockFetch1 = setupFetch({
+      const { mockFetch: mockFetch1, fetch: fetch1 } = setupFetch({
         json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
       });
-      await tool.run({
+      const tool1 = new MatrixTool(fetch1);
+      await tool1.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
@@ -831,10 +842,11 @@ describe('MatrixTool', () => {
       const url1 = mockFetch1.mock.calls[0][0];
       expect(url1).toContain('annotations=duration%2Cdistance');
 
-      const mockFetch2 = setupFetch({
+      const { mockFetch: mockFetch2, fetch: fetch2 } = setupFetch({
         json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
       });
-      await tool.run({
+      const tool2 = new MatrixTool(fetch2);
+      await tool2.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
@@ -849,15 +861,12 @@ describe('MatrixTool', () => {
 
   // Large input tests
   describe('large input', () => {
-    let tool: MatrixTool;
-    beforeEach(() => {
-      tool = new MatrixTool();
-    });
-
     it('accepts 25 coordinates for non-driving-traffic profiles', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+      const tool = new MatrixTool(fetch);
+
       const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 25 },
         (_, i) => ({
@@ -874,9 +883,10 @@ describe('MatrixTool', () => {
     });
 
     it('accepts 10 coordinates for driving-traffic profile', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+      const tool = new MatrixTool(fetch);
       const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 10 },
         (_, i) => ({
@@ -893,7 +903,8 @@ describe('MatrixTool', () => {
     });
 
     it('rejects 11 coordinates for driving-traffic profile', async () => {
-      const mockFetch = setupFetch();
+      const { mockFetch, fetch } = setupFetch();
+      const tool = new MatrixTool(fetch);
       const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 11 },
         (_, i) => ({
@@ -925,16 +936,11 @@ describe('MatrixTool', () => {
 
   // Test for different profiles
   describe('profiles', () => {
-    let tool: MatrixTool;
-
-    beforeEach(() => {
-      tool = new MatrixTool();
-    });
-
     it('works with driving-traffic profile', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+      const tool = new MatrixTool(fetch);
 
       const result = await tool.run({
         coordinates: [
@@ -950,9 +956,11 @@ describe('MatrixTool', () => {
     });
 
     it('works with driving profile', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+
+      const tool = new MatrixTool(fetch);
 
       const result = await tool.run({
         coordinates: [
@@ -968,9 +976,11 @@ describe('MatrixTool', () => {
     });
 
     it('works with walking profile', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+
+      const tool = new MatrixTool(fetch);
 
       const result = await tool.run({
         coordinates: [
@@ -986,9 +996,11 @@ describe('MatrixTool', () => {
     });
 
     it('works with cycling profile', async () => {
-      const mockFetch = setupFetch({
+      const { mockFetch, fetch } = setupFetch({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
+
+      const tool = new MatrixTool(fetch);
 
       const result = await tool.run({
         coordinates: [

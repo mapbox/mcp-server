@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from './formatIsoDateTime.js';
+import { fetchClient } from 'src/utils/fetchRequest.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -38,7 +39,6 @@ const validateIsoDateTime = (
   try {
     // Extract date and time components
     let dateTimeComponents: string[];
-    let timezonePart = '';
 
     if (val.includes('Z')) {
       // Format 1: YYYY-MM-DDThh:mm:ssZ
@@ -51,14 +51,13 @@ const validateIsoDateTime = (
         val.lastIndexOf('-')
       );
       dateTimeComponents = val.substring(0, timezoneSeparatorIndex).split('T');
-      timezonePart = val.substring(timezoneSeparatorIndex);
     } else {
       // Format 3: YYYY-MM-DDThh:mm
       dateTimeComponents = val.split('T');
     }
 
     const [datePart, timePart] = dateTimeComponents;
-    const [year, month, day] = datePart.split('-').map(Number);
+    const [month, day] = datePart.split('-').map(Number);
 
     let hours = 0,
       minutes = 0,
@@ -306,7 +305,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method.';
 
-  constructor() {
+  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: DirectionsInputSchema });
   }
   protected async execute(
@@ -465,7 +464,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
     }
 
     const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}directions/v5/mapbox/${input.routing_profile}/${encodedCoords}?${queryString}`;
-    const response = await fetch(url);
+
+    const response = await this.fetch(url);
 
     if (!response.ok) {
       throw new Error(

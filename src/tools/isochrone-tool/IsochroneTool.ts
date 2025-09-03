@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from 'src/utils/fetchRequest.js';
 
 const IsochroneInputSchema = z.object({
   profile: z
@@ -93,8 +94,11 @@ export class IsochroneTool extends MapboxApiBasedTool<
     - Determine whether a destination is within a certain travel time threshold
     - Compare travel ranges for different modes of transportation'`;
 
-  constructor() {
+  private fetch: typeof globalThis.fetch;
+
+  constructor(fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: IsochroneInputSchema });
+    this.fetch = fetch;
   }
 
   protected async execute(
@@ -147,7 +151,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
       url.searchParams.append('depart_at', input.depart_at);
     }
 
-    const response = await fetch(url);
+    const response = await this.fetch(url);
 
     if (!response.ok) {
       throw new Error(

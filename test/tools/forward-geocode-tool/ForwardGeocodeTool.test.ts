@@ -1,22 +1,27 @@
-// Set the token before importing the tool
-process.env.MAPBOX_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
-
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { ForwardGeocodeTool } from './ForwardGeocodeTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { ForwardGeocodeTool } from '../../../src/tools/forward-geocode-tool/ForwardGeocodeTool.js';
 
 describe('ForwardGeocodeTool', () => {
+  beforeEach(() => {
+    vi.stubEnv(
+      'MAPBOX_ACCESS_TOKEN',
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
+  });
+
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: '123 Main Street'
     });
 
@@ -24,9 +29,9 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('constructs correct URL with required parameters', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: '1600 Pennsylvania Avenue NW, Washington, DC'
     });
 
@@ -39,9 +44,9 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('includes all optional parameters in URL', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'restaurant',
       permanent: true,
       autocomplete: false,
@@ -75,9 +80,9 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('uses default values when not specified', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'Central Park'
     });
 
@@ -91,9 +96,9 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('handles string format proximity coordinates', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'coffee shop',
       proximity: '-82.451668,27.942976'
     });
@@ -103,9 +108,9 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('handles array-like string format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'bank',
       proximity: '[-82.451668, 27.942964]'
     });
@@ -115,9 +120,9 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('handles JSON-stringified object format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'office',
       proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
     });
@@ -127,13 +132,13 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'test query'
     });
 
@@ -236,9 +241,9 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('encodes special characters in query', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'café & restaurant'
     });
 
@@ -247,7 +252,7 @@ describe('ForwardGeocodeTool', () => {
   });
 
   it('supports proximity=ip for IP-based location', async () => {
-    const mockFetch = setupFetch({
+    const { fetch, mockFetch } = setupFetch({
       type: 'FeatureCollection',
       features: [
         {
@@ -257,7 +262,7 @@ describe('ForwardGeocodeTool', () => {
       ]
     });
 
-    await new ForwardGeocodeTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'coffee shop',
       proximity: 'ip'
     });
@@ -285,11 +290,11 @@ describe('ForwardGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'Seattle'
     });
 
@@ -325,11 +330,11 @@ describe('ForwardGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'NYC'
     });
 
@@ -373,11 +378,11 @@ describe('ForwardGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'Springfield',
       limit: 2
     });
@@ -398,11 +403,11 @@ describe('ForwardGeocodeTool', () => {
       features: []
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'nonexistentplace12345'
     });
 
@@ -430,11 +435,11 @@ describe('ForwardGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'Some Place'
     });
 
@@ -465,11 +470,11 @@ describe('ForwardGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'Test Location',
       format: 'json_string'
     });
@@ -499,11 +504,11 @@ describe('ForwardGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ForwardGeocodeTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'Test City'
     });
 

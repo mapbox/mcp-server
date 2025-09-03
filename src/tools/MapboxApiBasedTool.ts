@@ -1,7 +1,7 @@
 import {
   McpServer,
   RegisteredTool
-} from '@modelcontextprotocol/sdk/server/mcp';
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { z, ZodTypeAny } from 'zod';
 

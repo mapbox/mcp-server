@@ -1,20 +1,13 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterAll,
-  jest
-} from '@jest/globals';
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import {
   parseToolConfigFromArgs,
   filterTools,
   ToolConfig
-} from './toolConfig.js';
+} from '../../src/config/toolConfig.js';
 
-// Mock getVersionInfo to avoid import.meta.url issues in Jest
-jest.mock('../utils/versionUtils.js', () => ({
-  getVersionInfo: jest.fn(() => ({
+// Mock getVersionInfo to avoid import.meta.url issues in Vitest
+vi.mock('../../../src/utils/versionUtils.js', () => ({
+  getVersionInfo: vi.fn(() => ({
     name: 'Mapbox MCP server',
     version: '1.0.0',
     sha: 'mock-sha',

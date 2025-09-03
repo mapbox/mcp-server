@@ -1,8 +1,9 @@
-import { getAllTools } from './toolRegistry.js';
+import { describe, it, expect, vi } from 'vitest';
+import { getAllTools } from '../../src/tools/toolRegistry.js';
 
-// Mock getVersionInfo to avoid import.meta.url issues in Jest
-jest.mock('../utils/versionUtils.js', () => ({
-  getVersionInfo: jest.fn(() => ({
+// Mock getVersionInfo to avoid import.meta.url issues in vitest
+vi.mock('../utils/versionUtils.js', () => ({
+  getVersionInfo: vi.fn(() => ({
     name: 'Mapbox MCP server',
     version: '1.0.0',
     sha: 'mock-sha',
@@ -28,21 +29,21 @@ describe('Tool Naming Convention', () => {
     name: tool.name
   }));
 
-  test.each(toolData)(
+  it.each(toolData)(
     '$className should have snake_case name',
     ({ className, name }) => {
       expect(isSnakeCase(name)).toBe(true);
     }
   );
 
-  test.each(toolData)(
+  it.each(toolData)(
     '$className should have name ending with "_tool"',
     ({ className, name }) => {
       expect(endsWithTool(name)).toBe(true);
     }
   );
 
-  test('all tools should follow both naming conventions', () => {
+  it('all tools should follow both naming conventions', () => {
     const violations = tools
       .filter((tool) => !isSnakeCase(tool.name) || !endsWithTool(tool.name))
       .map((tool) => ({

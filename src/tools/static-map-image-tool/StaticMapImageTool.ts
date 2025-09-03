@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from 'src/utils/fetchRequest.js';
 
 // List of valid Maki icon names
 const MAKI_ICONS = [
@@ -362,7 +363,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   description =
     'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns PNG for vector styles, JPEG for raster-only styles.';
 
-  constructor() {
+  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: StaticMapImageInputSchema });
   }
 
@@ -435,7 +436,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const density = input.highDensity ? '@2x' : '';
     const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
 
-    const response = await fetch(url);
+    const response = await this.fetch(url);
 
     if (!response.ok) {
       throw new Error(

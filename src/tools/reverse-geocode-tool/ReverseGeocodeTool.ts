@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from 'src/utils/fetchRequest.js';
 
 const ReverseGeocodeInputSchema = z.object({
   longitude: z
@@ -72,7 +73,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   description =
     'Find addresses, cities, towns, neighborhoods, postcodes, districts, regions, and countries around a specified geographic coordinate pair. Converts geographic coordinates (longitude, latitude) into human-readable addresses or place names. Use limit=1 for best results. This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest that are not of the types mentioned. Supports both JSON and text output formats.';
 
-  constructor() {
+  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: ReverseGeocodeInputSchema });
   }
 
@@ -164,7 +165,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
       url.searchParams.append('types', input.types.join(','));
     }
 
-    const response = await fetch(url.toString());
+    const response = await this.fetch(url.toString());
 
     if (!response.ok) {
       throw new Error(

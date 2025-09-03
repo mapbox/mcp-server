@@ -2,21 +2,30 @@
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { CategorySearchTool } from '../category-search-tool/CategorySearchTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { CategorySearchTool } from '../../../src/tools/category-search-tool/CategorySearchTool.js';
 
 describe('CategorySearchTool', () => {
+  beforeEach(() => {
+    vi.stubEnv(
+      'MAPBOX_ACCESS_TOKEN',
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
+  });
+
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'restaurant'
     });
 
@@ -24,9 +33,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('constructs correct URL with required parameters', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'cafe'
     });
 
@@ -36,9 +45,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('includes all optional parameters in URL', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'hotel',
       language: 'es',
       limit: 15,
@@ -64,9 +73,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('handles IP-based proximity', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'gas_station',
       proximity: 'ip'
     });
@@ -76,9 +85,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('handles string format proximity coordinates', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'restaurant',
       proximity: '-82.451668,27.942976'
     });
@@ -88,9 +97,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('handles array-like string format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'restaurant',
       proximity: '[-82.451668, 27.942964]'
     });
@@ -100,9 +109,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('handles JSON-stringified object format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'taco_shop',
       proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
     });
@@ -112,9 +121,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('uses default limit when not specified', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'pharmacy'
     });
 
@@ -123,13 +132,13 @@ describe('CategorySearchTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'restaurant'
     });
 
@@ -194,9 +203,9 @@ describe('CategorySearchTool', () => {
   });
 
   it('encodes special characters in category', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new CategorySearchTool().run({
+    await new CategorySearchTool(fetch).run({
       category: 'shopping mall'
     });
 
@@ -224,11 +233,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'cafe'
     });
 
@@ -263,11 +272,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'fast_food'
     });
 
@@ -311,11 +320,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'department_store',
       limit: 2
     });
@@ -336,11 +345,11 @@ describe('CategorySearchTool', () => {
       features: []
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'nonexistent_category'
     });
 
@@ -368,11 +377,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'gas_station'
     });
 
@@ -403,11 +412,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'restaurant',
       format: 'json_string'
     });
@@ -437,11 +446,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool().run({
+    const result = await new CategorySearchTool(fetch).run({
       category: 'cafe'
     });
 

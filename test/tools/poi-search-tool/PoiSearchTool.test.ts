@@ -1,22 +1,27 @@
-// Set the token before importing the tool
-process.env.MAPBOX_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
-
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { PoiSearchTool } from '../poi-search-tool/PoiSearchTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { PoiSearchTool } from '../../../src/tools/poi-search-tool/PoiSearchTool.js';
 
 describe('PoiSearchTool', () => {
+  beforeEach(() => {
+    vi.stubEnv(
+      'MAPBOX_ACCESS_TOKEN',
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
+  });
+
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'coffee shop'
     });
 
@@ -24,9 +29,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('constructs correct URL with required parameters', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'starbucks'
     });
 
@@ -37,9 +42,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('includes all optional parameters in URL', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'restaurant',
       language: 'es',
       limit: 5,
@@ -75,9 +80,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('handles IP-based proximity', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'pizza',
       proximity: 'ip'
     });
@@ -87,9 +92,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('handles string format proximity coordinates', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'museum',
       proximity: '-82.451668,27.942976'
     });
@@ -99,9 +104,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('handles array-like string format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'bank',
       proximity: '[-82.451668, 27.942964]'
     });
@@ -111,9 +116,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('handles JSON-stringified object format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'restaurant',
       proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
     });
@@ -123,9 +128,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('uses default limit when not specified', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'pharmacy'
     });
 
@@ -134,14 +139,14 @@ describe('PoiSearchTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found',
       text: async () => 'Not Found'
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'test query'
     });
 
@@ -219,9 +224,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('encodes special characters in query', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'coffee & tea shop'
     });
 
@@ -230,10 +235,10 @@ describe('PoiSearchTool', () => {
   });
 
   it('validates navigation profile requires eta_type', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
     // navigation_profile should work when eta_type is set
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'test',
       eta_type: 'navigation',
       navigation_profile: 'driving'
@@ -245,7 +250,7 @@ describe('PoiSearchTool', () => {
   });
 
   it('supports proximity=ip for IP-based location', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       type: 'FeatureCollection',
       features: [
         {
@@ -255,7 +260,7 @@ describe('PoiSearchTool', () => {
       ]
     });
 
-    await new PoiSearchTool().run({
+    await new PoiSearchTool(fetch).run({
       q: 'Starbucks',
       proximity: 'ip'
     });
@@ -284,11 +289,11 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'Starbucks'
     });
 
@@ -323,11 +328,11 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'Central Park'
     });
 
@@ -371,11 +376,11 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'Starbucks',
       limit: 2
     });
@@ -396,11 +401,11 @@ describe('PoiSearchTool', () => {
       features: []
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'NonexistentPlace'
     });
 
@@ -428,11 +433,11 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'location'
     });
 
@@ -463,11 +468,11 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'Test POI',
       format: 'json_string'
     });
@@ -497,11 +502,11 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new PoiSearchTool(fetch).run({
       q: 'Test Place'
     });
 

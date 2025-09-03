@@ -1,41 +1,11 @@
 {
-  "compilerOptions": {
-    "module": "esnext",
-    "target": "ES2022",
-    // This is needed since we use both 'esnext' and 'node' module resolution.
-    // https://www.typescriptlang.org/docs/handbook/module-resolution.html#module-resolution-strategies
-    "moduleResolution": "node",
-    "lib": [
-      "ES2022",
-      "ESNext"
-    ],
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "baseUrl": ".",
-    "paths": {
-      "pkce-challenge": [
-        "node_modules/pkce-challenge/dist/index.node"
-      ]
+  "references": [
+    {
+      "path": "./tsconfig.src.json"
     },
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
-    ]
-  },
-  "include": [
-    "src/**/*"
+    {
+      "path": "./tsconfig.test.json"
+    }
   ],
-  "exclude": [
-    "node_modules",
-    "dist/*",
-    "dist/**/*"
-  ]
+  "files": []
 }

@@ -1,6 +1,5 @@
 import { readFileSync } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 export interface VersionInfo {
   name: string;
@@ -13,16 +12,14 @@ export interface VersionInfo {
 export function getVersionInfo(): VersionInfo {
   const name = 'Mapbox MCP server';
   try {
-    /* eslint-disable-next-line @typescript-eslint/ban-ts-comment */
-    // @ts-ignore CJS build will fail with this line, but ESM needs it
-    const dirname = path.dirname(fileURLToPath(import.meta.url));
+    const dirname = __dirname;
 
     // Try to read from version.json first (for build artifacts)
     const versionJsonPath = path.resolve(dirname, '..', 'version.json');
     try {
       const versionData = readFileSync(versionJsonPath, 'utf-8');
-      const info = JSON.parse(versionData) as VersionInfo;
-      info.name = name;
+      let info = JSON.parse(versionData) as VersionInfo;
+      info['name'] = name;
       return info;
     } catch {
       // Fall back to package.json

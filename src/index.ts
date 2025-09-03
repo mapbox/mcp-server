@@ -2,11 +2,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import { getAllTools } from './tools/toolRegistry.js';
-import { patchGlobalFetch } from './utils/requestUtils.js';
 import { getVersionInfo } from './utils/versionUtils.js';
+import 'dotenv/config';
 
-let serverVersionInfo = getVersionInfo();
-patchGlobalFetch(serverVersionInfo);
+const serverVersionInfo = getVersionInfo();
 
 // Parse configuration from command-line arguments
 const config = parseToolConfigFromArgs();
@@ -33,6 +32,13 @@ enabledTools.forEach((tool) => {
   tool.installTo(server);
 });
 
-// Start receiving messages on stdin and sending messages on stdout
-const transport = new StdioServerTransport();
-await server.connect(transport);
+async function main() {
+  // Start receiving messages on stdin and sending messages on stdout
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+main().catch((error) => {
+  console.error('Fatal error starting MCP server:', error);
+  process.exit(1);
+});

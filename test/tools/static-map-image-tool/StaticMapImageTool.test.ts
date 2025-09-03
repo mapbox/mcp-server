@@ -1,21 +1,27 @@
-process.env.MAPBOX_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
-
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { StaticMapImageTool } from '../static-map-image-tool/StaticMapImageTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
 
 describe('StaticMapImageTool', () => {
+  beforeEach(() => {
+    vi.stubEnv(
+      'MAPBOX_ACCESS_TOKEN',
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
+  });
+
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new StaticMapImageTool().run({
+    await new StaticMapImageTool(fetch).run({
       center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
       size: { width: 600, height: 400 },
@@ -33,11 +39,11 @@ describe('StaticMapImageTool', () => {
       mockImageBuffer.byteOffset + mockImageBuffer.byteLength
     );
 
-    const mockFetch = setupFetch({
-      arrayBuffer: jest.fn().mockResolvedValue(mockArrayBuffer)
+    const { fetch } = setupFetch({
+      arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
     });
 
-    const result = await new StaticMapImageTool().run({
+    const result = await new StaticMapImageTool(fetch).run({
       center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 10,
       size: { width: 800, height: 600 },
@@ -54,9 +60,9 @@ describe('StaticMapImageTool', () => {
   });
 
   it('constructs correct Mapbox Static API URL', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new StaticMapImageTool().run({
+    await new StaticMapImageTool(fetch).run({
       center: { longitude: -122.4194, latitude: 37.7749 },
       zoom: 15,
       size: { width: 1024, height: 768 },
@@ -71,9 +77,9 @@ describe('StaticMapImageTool', () => {
   });
 
   it('uses default style when not specified', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new StaticMapImageTool().run({
+    await new StaticMapImageTool(fetch).run({
       center: { longitude: 0, latitude: 0 },
       zoom: 1,
       size: { width: 300, height: 200 }
@@ -84,13 +90,13 @@ describe('StaticMapImageTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const result = await new StaticMapImageTool().run({
+    const result = await new StaticMapImageTool(fetch).run({
       center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
       size: { width: 600, height: 400 }
@@ -156,9 +162,9 @@ describe('StaticMapImageTool', () => {
   });
 
   it('supports high density parameter', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new StaticMapImageTool().run({
+    await new StaticMapImageTool(fetch).run({
       center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
       size: { width: 600, height: 400 },
@@ -171,9 +177,9 @@ describe('StaticMapImageTool', () => {
 
   describe('overlay support', () => {
     it('adds marker overlay to URL', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -194,9 +200,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('adds custom marker overlay to URL', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -217,9 +223,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('adds path overlay to URL', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -243,14 +249,14 @@ describe('StaticMapImageTool', () => {
     });
 
     it('adds GeoJSON overlay to URL', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
       const geoJsonData = {
         type: 'Point',
         coordinates: [-74.006, 40.7128]
       };
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -269,9 +275,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('supports multiple overlays in order', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -301,9 +307,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('works without overlays', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 }
@@ -315,9 +321,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('transforms uppercase labels to lowercase', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -339,9 +345,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('supports Maki icon names as labels', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -362,9 +368,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('transforms uppercase Maki icon names to lowercase', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -386,9 +392,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('supports numeric labels', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -409,9 +415,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('handles complex overlay combination with paths and markers', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -80.278, latitude: 25.796 },
         zoom: 15,
         size: { width: 800, height: 600 },
@@ -458,9 +464,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('truncates non-Maki multi-character labels to first character', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -491,9 +497,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('preserves full Maki icon names that are in the supported list', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      await new StaticMapImageTool().run({
+      await new StaticMapImageTool(fetch).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },

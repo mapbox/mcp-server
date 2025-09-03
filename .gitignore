@@ -148,3 +148,10 @@ dist
 .vscode
 .venv
 .DS_Store
+
+# tshy
+.tshy/
+.tshy-build/
+
+# Test results
+test-results.xml

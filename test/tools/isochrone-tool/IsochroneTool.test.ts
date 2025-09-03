@@ -1,24 +1,30 @@
-process.env.MAPBOX_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
-
-import { cleanup } from '../../utils/requestUtils.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { cleanup } from '../../../src/utils/requestUtils.js';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { IsochroneTool } from '../isochrone-tool/IsochroneTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { IsochroneTool } from '../../../src/tools/isochrone-tool/IsochroneTool.js';
 
 describe('IsochroneTool', () => {
+  beforeEach(() => {
+    vi.stubEnv(
+      'MAPBOX_ACCESS_TOKEN',
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
+  });
+
   afterEach(() => {
-    jest.restoreAllMocks();
-    jest.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     cleanup();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new IsochroneTool().run({
+    await new IsochroneTool(fetch).run({
       coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/driving',
       contours_minutes: [10],
@@ -29,11 +35,12 @@ describe('IsochroneTool', () => {
   });
 
   it('sends correct parameters', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       ok: true,
       json: async () => ({ type: 'FeatureCollection', features: [] })
     });
-    await new IsochroneTool().run({
+
+    await new IsochroneTool(fetch).run({
       coordinates: { longitude: 27.534527, latitude: 53.9353451 },
       profile: 'mapbox/driving',
       contours_minutes: [10, 20],
@@ -44,11 +51,14 @@ describe('IsochroneTool', () => {
       exclude: ['toll'],
       depart_at: '2025-06-02T12:00:00Z'
     });
+
     assertHeadersSent(mockFetch);
     const calledUrl = mockFetch.mock.calls[0][0].toString();
+
     expect(calledUrl).toContain(
       'isochrone/v1/mapbox/driving/27.534527%2C53.9353451'
     );
+
     expect(calledUrl).toContain('contours_minutes=10%2C20');
     expect(calledUrl).toContain('contours_colors=ff0000%2C00ff00');
     expect(calledUrl).toContain('polygons=true');
@@ -59,11 +69,11 @@ describe('IsochroneTool', () => {
   });
 
   it('does not send empty parameters', async () => {
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       ok: true,
       json: async () => ({ type: 'FeatureCollection', features: [] })
     });
-    await new IsochroneTool().run({
+    await new IsochroneTool(fetch).run({
       coordinates: { longitude: 27.534527, latitude: 53.9353451 },
       profile: 'mapbox/driving',
       contours_minutes: [10, 20],
@@ -83,12 +93,12 @@ describe('IsochroneTool', () => {
 
   it('returns geojson from API', async () => {
     const geojson = { type: 'FeatureCollection', features: [{ id: 42 }] };
-    const mockFetch = setupFetch({
+    const { mockFetch, fetch } = setupFetch({
       ok: true,
       json: async () => geojson
     });
 
-    const result = await new IsochroneTool().run({
+    const result = await new IsochroneTool(fetch).run({
       coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/walking',
       contours_minutes: [5],
