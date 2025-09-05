@@ -1,4 +1,5 @@
 // INSERT NEW TOOL IMPORT HERE
+import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
 import { ForwardGeocodeTool } from './forward-geocode-tool/ForwardGeocodeTool.js';
@@ -13,6 +14,7 @@ import { VersionTool } from './version-tool/VersionTool.js';
 export const ALL_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
   new VersionTool(),
+  new CategoryListTool(),
   new CategorySearchTool(),
   new DirectionsTool(),
   new ForwardGeocodeTool(),
