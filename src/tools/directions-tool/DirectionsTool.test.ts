@@ -15,9 +15,6 @@ describe('DirectionsTool', () => {
     jest
       .spyOn(cleanResponseModule, 'cleanResponseData')
       .mockImplementation((_, data) => data);
-
-    // Enable verbose errors for testing
-    process.env.VERBOSE_ERRORS = 'true';
   });
 
   afterEach(() => {

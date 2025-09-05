@@ -198,14 +198,6 @@ npx plop create-tool
 # provide tool name without suffix (e.g. Search)
 ```
 
-## Environment Variables
-
-### VERBOSE_ERRORS
-
-Set `VERBOSE_ERRORS=true` to get detailed error messages from the MCP server. This is useful for debugging issues when integrating with MCP clients.
-
-By default, the server returns generic error messages. With verbose errors enabled, you'll receive the actual error details, which can help diagnose API connection issues, invalid parameters, or other problems.
-
 ## Data Usage & Privacy
 
 ### What data is sent to Mapbox APIs
