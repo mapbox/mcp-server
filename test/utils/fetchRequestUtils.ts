@@ -1,5 +1,9 @@
 import { expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
+import {
+  PolicyPipeline,
+  UserAgentPolicy
+} from '../../src/utils/fetchRequest.js';
 
 export function setupFetch(overrides?: any) {
   const mockFetch = vi.fn();
@@ -12,17 +16,12 @@ export function setupFetch(overrides?: any) {
     ...overrides
   });
 
-  // Example: User-Agent policy
+  // Build a real pipeline with UserAgentPolicy
   const userAgent = 'TestServer/1.0.0 (default, no-tag, abcdef)';
-  function fetchWithPolicy(
-    input: string | URL | Request,
-    init: RequestInit = {}
-  ) {
-    const headers = { ...(init.headers || {}), 'User-Agent': userAgent };
-    return mockFetch(input, { ...init, headers });
-  }
+  const pipeline = new PolicyPipeline(mockFetch);
+  pipeline.use(new UserAgentPolicy(userAgent));
 
-  return { fetch: fetchWithPolicy, mockFetch };
+  return { fetch: pipeline.fetch.bind(pipeline), mockFetch };
 }
 
 export function assertHeadersSent(mockFetch: Mock) {

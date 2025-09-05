@@ -892,7 +892,6 @@ describe('DirectionsTool', () => {
     it('accepts valid ISO 8601 formats for arrive_by', async () => {
       const { fetch, mockFetch } = setupFetch();
 
-      // Test with Z format
       await new DirectionsTool(fetch).run({
         coordinates: [
           [-74.1, 40.7],

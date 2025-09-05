@@ -57,7 +57,7 @@ const validateIsoDateTime = (
     }
 
     const [datePart, timePart] = dateTimeComponents;
-    const [month, day] = datePart.split('-').map(Number);
+    const [, month, day] = datePart.split('-').map(Number);
 
     let hours = 0,
       minutes = 0,
