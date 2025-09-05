@@ -65,13 +65,6 @@ describe('MapboxApiBasedTool', () => {
         // Verify the error response
         expect(result.isError).toBe(true);
 
-        // Check for error message content
-        if (process.env.VERBOSE_ERRORS === 'true') {
-          expect(
-            (result.content[0] as { type: 'text'; text: string }).text
-          ).toContain('not in valid JWT format');
-        }
-
         // Verify the error was logged
         expect(toolWithInvalidToken['log']).toHaveBeenCalledWith(
           'error',

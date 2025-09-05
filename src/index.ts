@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
+import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllTools } from './tools/toolRegistry.js';
 import { patchGlobalFetch } from './utils/requestUtils.js';
 import { getVersionInfo } from './utils/versionUtils.js';
@@ -15,6 +16,9 @@ const config = parseToolConfigFromArgs();
 const allTools = getAllTools();
 const enabledTools = filterTools(allTools, config);
 
+// Get all resources
+const allResources = getAllResources();
+
 // Create an MCP server
 const server = new McpServer(
   {
@@ -23,7 +27,8 @@ const server = new McpServer(
   },
   {
     capabilities: {
-      logging: {}
+      logging: {},
+      resources: {}
     }
   }
 );
@@ -31,6 +36,11 @@ const server = new McpServer(
 // Register enabled tools to the server
 enabledTools.forEach((tool) => {
   tool.installTo(server);
+});
+
+// Register resources to the server
+allResources.forEach((resource) => {
+  resource.installTo(server);
 });
 
 // Start receiving messages on stdin and sending messages on stdout
