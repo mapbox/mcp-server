@@ -197,11 +197,11 @@ describe('CategorySearchTool', () => {
     const mockFetch = setupFetch();
 
     await new CategorySearchTool().run({
-      category: 'shopping mall'
+      category: 'shopping_mall'
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('category/shopping%20mall');
+    expect(calledUrl).toContain('category/shopping_mall');
   });
 
   it('formats GeoJSON response to text with basic information', async () => {
@@ -341,7 +341,7 @@ describe('CategorySearchTool', () => {
     });
 
     const result = await new CategorySearchTool().run({
-      category: 'nonexistent_category'
+      category: 'restaurant'
     });
 
     expect(result.isError).toBe(false);
