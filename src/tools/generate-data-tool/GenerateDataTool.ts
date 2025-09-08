@@ -105,7 +105,7 @@ export class GenerateDataTool {
 - Path: ${filePath}
 - Size: ${Buffer.byteLength(content, 'utf8')} bytes
 - Type: ${type}
-- Access via resource: resource://test-resources/${fileId}
+- Access via resource: test-resources://${fileId}
 - Content preview (first 100 chars): ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`;
 
       return {

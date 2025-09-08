@@ -33,6 +33,7 @@ describe('GenerateDataTool', () => {
     mockFs.existsSync.mockReturnValue(true);
     mockFs.writeFileSync.mockImplementation(() => {});
     mockFs.mkdirSync.mockImplementation(() => '');
+    mockFs.realpathSync.mockReturnValue('/tmp/test-resources');
 
     // Default mock for createFileMetadata
     mockCreateFileMetadata.mockResolvedValue({
@@ -55,7 +56,7 @@ describe('GenerateDataTool', () => {
       expect(result.content[0].text).toContain('Type: text');
       expect(result.content[0].text).toContain('File ID: mock-file-id-123');
       expect(result.content[0].text).toContain(
-        'resource://test-resources/mock-file-id-123'
+        'test-resources://mock-file-id-123'
       );
 
       expect(mockFs.writeFileSync).toHaveBeenCalledTimes(1);
@@ -221,7 +222,9 @@ describe('GenerateDataTool', () => {
 
     it('should have correct description', () => {
       expect(tool.description).toContain('Generate a file with random content');
-      expect(tool.description).toContain('/tmp/test-resources/');
+      expect(tool.description).toContain(
+        'Supports text, JSON, and CSV formats'
+      );
     });
 
     it('should have valid input schema', () => {

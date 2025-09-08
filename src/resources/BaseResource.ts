@@ -1,27 +1,47 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type {
+  McpServer,
+  ResourceTemplate
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export abstract class BaseResource {
   abstract readonly name: string;
-  abstract readonly uri: string;
+  abstract readonly uriTemplate: string | ResourceTemplate;
+  abstract readonly title: string;
   abstract readonly description: string;
-  abstract readonly mimeType: string;
 
   installTo(server: McpServer): void {
-    server.resource(
-      this.name,
-      this.uri,
-      {
-        description: this.description,
-        mimeType: this.mimeType
-      },
-      this.readCallback.bind(this)
-    );
+    if (typeof this.uriTemplate === 'string') {
+      server.resource(
+        this.name,
+        this.uriTemplate,
+        {
+          description: this.description,
+          mimeType: 'application/json'
+        },
+        this.readCallback.bind(this) as any
+      );
+    } else {
+      server.resource(
+        this.name,
+        this.uriTemplate,
+        {
+          description: this.description,
+          mimeType: 'application/json'
+        },
+        this.readCallback.bind(this) as any
+      );
+    }
   }
 
   protected abstract readCallback(
     uri: URL,
-    extra: any
+    params?: Record<string, any>
   ): Promise<{
-    contents: Array<{ uri: string; mimeType: string; text: string }>;
+    contents: Array<{
+      uri: string;
+      mimeType?: string;
+      text?: string;
+      blob?: string;
+    }>;
   }>;
 }
