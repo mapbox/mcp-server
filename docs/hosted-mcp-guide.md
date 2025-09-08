@@ -36,9 +36,9 @@ Follow the authentication flow described in Section 3.
 ### 2.2 Claude Desktop
 
 1. Open Claude Desktop settings
+2. Navigate to Developer → Edit Config
    ![Open Claude Desktop settings](./images/hosted-mcp/claude-desktop-1.png)
-1. Navigate to Developer → Edit Config
-1. Add the Mapbox MCP server configuration:
+3. Add the Mapbox MCP server configuration:
 
 > **Note**: Claude Desktop currently requires `mcp-remote` as middleware to connect to hosted endpoints.
 
