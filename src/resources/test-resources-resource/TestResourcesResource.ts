@@ -5,7 +5,7 @@ import { FileMetadataManager } from './FileMetadataManager.js';
 
 export class TestResourcesResource extends BaseResource {
   readonly name = 'test-resources';
-  readonly uriTemplate = new ResourceTemplate('test-resources://{fileId?}', {
+  readonly uriTemplate = new ResourceTemplate('test-resources://{fileId}', {
     list: undefined
   });
   readonly title = 'Test Resources Files';
@@ -14,7 +14,7 @@ export class TestResourcesResource extends BaseResource {
 
   private metadataManager: FileMetadataManager | null = null;
 
-  protected async readCallback(uri: URL, params?: Record<string, any>) {
+  protected async readCallback(uri: URL, variables?: Record<string, any>) {
     try {
       const testResourcesDir = '/tmp/test-resources';
       // Resolve the real path to handle symlinks
@@ -30,8 +30,8 @@ export class TestResourcesResource extends BaseResource {
       // Sync metadata with file system first
       await this.metadataManager!.syncWithFileSystem();
 
-      // Extract fileId from params (ResourceTemplate provides this)
-      const fileId = params?.fileId;
+      // Extract fileId from variables (ResourceTemplate provides this)
+      const fileId = variables?.fileId;
 
       if (fileId) {
         // Request for specific file by ID: test-resources://<fileid>

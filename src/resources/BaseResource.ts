@@ -35,7 +35,7 @@ export abstract class BaseResource {
 
   protected abstract readCallback(
     uri: URL,
-    params?: Record<string, any>
+    variables?: Record<string, any>
   ): Promise<{
     contents: Array<{
       uri: string;
