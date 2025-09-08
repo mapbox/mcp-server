@@ -26,9 +26,6 @@ export class FileMetadataManager {
       this.testResourcesDir = testResourcesDir;
     }
     this.metadataFile = path.join(this.testResourcesDir, '.metadata.json');
-    console.log(
-      `[FileMetadataManager] Using directory: ${this.testResourcesDir}`
-    );
   }
 
   generateFileId(filename: string): string {

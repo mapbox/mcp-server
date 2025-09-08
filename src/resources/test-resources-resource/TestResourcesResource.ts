@@ -22,11 +22,6 @@ export class TestResourcesResource extends BaseResource {
         ? fs.realpathSync(testResourcesDir)
         : testResourcesDir;
 
-      // Log URI for debugging
-      console.log(`[TestResourcesResource] Processing URI: ${uri.href}`);
-      console.log(`[TestResourcesResource] Params:`, params);
-      console.log(`[TestResourcesResource] Using directory: ${resolvedDir}`);
-
       // Create metadata manager with resolved path
       if (!this.metadataManager) {
         this.metadataManager = new FileMetadataManager(resolvedDir);
@@ -37,7 +32,6 @@ export class TestResourcesResource extends BaseResource {
 
       // Extract fileId from params (ResourceTemplate provides this)
       const fileId = params?.fileId;
-      console.log(`[TestResourcesResource] File ID from params: ${fileId}`);
 
       if (fileId) {
         // Request for specific file by ID: test-resources://<fileid>
@@ -70,13 +64,10 @@ export class TestResourcesResource extends BaseResource {
   }
 
   private async getFileById(uri: URL, fileId: string) {
-    console.log(`[TestResourcesResource] Getting file by ID: ${fileId}`);
     const metadata = await this.metadataManager!.getFileMetadata(fileId);
-    console.log(`[TestResourcesResource] Metadata found:`, metadata);
 
     if (!metadata) {
       const availableIds = await this.getAvailableFileIds();
-      console.log(`[TestResourcesResource] Available file IDs:`, availableIds);
       return {
         contents: [
           {

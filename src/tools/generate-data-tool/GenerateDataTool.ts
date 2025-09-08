@@ -58,9 +58,6 @@ export class GenerateDataTool {
 
       // Resolve the real path to handle symlinks (like /tmp -> /private/tmp on macOS)
       const resolvedTargetDir = fs.realpathSync(targetDir);
-      console.log(
-        `[GenerateDataTool] Using resolved directory: ${resolvedTargetDir}`
-      );
 
       // Create metadata manager with resolved path
       if (!this.metadataManager) {
