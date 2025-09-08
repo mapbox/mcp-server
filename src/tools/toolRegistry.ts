@@ -3,6 +3,7 @@ import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
 import { ForwardGeocodeTool } from './forward-geocode-tool/ForwardGeocodeTool.js';
+import { GenerateDataTool } from './generate-data-tool/GenerateDataTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MatrixTool } from './matrix-tool/MatrixTool.js';
 import { PoiSearchTool } from './poi-search-tool/PoiSearchTool.js';
@@ -13,6 +14,7 @@ import { VersionTool } from './version-tool/VersionTool.js';
 // Central registry of all tools
 export const ALL_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
+  new GenerateDataTool(),
   new VersionTool(),
   new CategoryListTool(),
   new CategorySearchTool(),
