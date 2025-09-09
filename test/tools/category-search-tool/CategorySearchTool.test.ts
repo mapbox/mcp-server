@@ -347,7 +347,7 @@ describe('CategorySearchTool', () => {
     expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
-      'No results found.'
+      'No results found. This category might not be valid or no places match the search criteria. Use the category_list_tool to see all available categories.'
     );
   });
 

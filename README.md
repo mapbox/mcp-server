@@ -23,6 +23,14 @@ Whether you're building an AI travel assistant, logistics optimizer, location-ba
 
 **A Mapbox access token is required to use this MCP server.**
 
+## Hosted MCP Endpoint
+
+For quick access, you can use our hosted MCP endpoint:
+
+**Endpoint**: https://mcp.mapbox.com/mcp
+
+For detailed setup instructions for different clients and API usage, see the [Hosted MCP Server Guide](./docs/hosted-mcp-guide.md).
+
 To get a Mapbox access token:
 
 1. Sign up for a free Mapbox account at [mapbox.com/signup](https://www.mapbox.com/signup/)
@@ -197,14 +205,6 @@ npx @modelcontextprotocol/inspector docker run -i --rm --env MAPBOX_ACCESS_TOKEN
 npx plop create-tool
 # provide tool name without suffix (e.g. Search)
 ```
-
-## Environment Variables
-
-### VERBOSE_ERRORS
-
-Set `VERBOSE_ERRORS=true` to get detailed error messages from the MCP server. This is useful for debugging issues when integrating with MCP clients.
-
-By default, the server returns generic error messages. With verbose errors enabled, you'll receive the actual error details, which can help diagnose API connection issues, invalid parameters, or other problems.
 
 ## Data Usage & Privacy
 
