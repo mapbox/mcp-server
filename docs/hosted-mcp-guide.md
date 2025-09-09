@@ -40,7 +40,7 @@ Follow the authentication flow described in Section 3.
    ![Open Claude Desktop settings](./images/hosted-mcp/claude-desktop-1.png)
 3. Add the Mapbox MCP server configuration:
 
-> **Note**: Claude Desktop currently requires `mcp-remote` as middleware to connect to hosted endpoints.
+> **Note**: Claude Desktop currently requires [`mcp-remote`](https://github.com/geelen/mcp-remote) as middleware to connect to hosted endpoints.
 
 ```json
 {
