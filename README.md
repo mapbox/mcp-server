@@ -23,6 +23,14 @@ Whether you're building an AI travel assistant, logistics optimizer, location-ba
 
 **A Mapbox access token is required to use this MCP server.**
 
+## Hosted MCP Endpoint
+
+For quick access, you can use our hosted MCP endpoint:
+
+**Endpoint**: https://mcp.mapbox.com/mcp
+
+For detailed setup instructions for different clients and API usage, see the [Hosted MCP Server Guide](./docs/hosted-mcp-guide.md).
+
 To get a Mapbox access token:
 
 1. Sign up for a free Mapbox account at [mapbox.com/signup](https://www.mapbox.com/signup/)
