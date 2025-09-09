@@ -1,3 +1,17 @@
+## 0.4.0 (Unreleased)
+
+### Features Added
+
+- New fetch pipeline with automatic retry behavior
+
+### Bug Fixes
+
+- Dual emits ESM and CommonJS bundles with types per target
+
+### Other Features
+
+- Migrated from Jest to vitest
+
 ## v0.2.0 (2025-06-25)
 
 - **Format Options**: Add `format` parameter to all geocoding and search tools
