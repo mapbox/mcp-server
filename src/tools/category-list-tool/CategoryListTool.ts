@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 const CategoryListInputSchema = z.object({
   language: z
@@ -47,7 +48,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
   description =
     'Get the complete list of supported search categories from Mapbox Search API. Returns all available category IDs by default. Only use pagination (limit/offset) if token usage optimization is required. If using pagination, make multiple calls to retrieve ALL categories before proceeding with other tasks to ensure complete data.';
 
-  constructor() {
+  constructor(private fetchImpl: typeof fetch = fetchClient) {
     super({ inputSchema: CategoryListInputSchema });
   }
 
@@ -65,7 +66,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
       url.searchParams.set('language', input.language);
     }
 
-    const response = await fetch(url.toString(), {
+    const response = await this.fetchImpl(url.toString(), {
       method: 'GET',
       headers: {
         'User-Agent': `@mapbox/mcp-server/${process.env.npm_package_version || 'dev'}`

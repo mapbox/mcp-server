@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from 'src/utils/fetchRequest.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 const PoiSearchInputSchema = z.object({
   q: z

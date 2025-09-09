@@ -9,11 +9,11 @@
   },
   "server": {
     "type": "node",
-    "entry_point": "dist/index.js",
+    "entry_point": "dist/esm/index.js",
     "mcp_config": {
       "command": "node",
       "args": [
-        "${__dirname}/dist/index.js"
+        "${__dirname}/dist/esm/index.js"
       ],
       "env": {
         "MAPBOX_ACCESS_TOKEN" : "${user_config.MAPBOX_ACCESS_TOKEN}"

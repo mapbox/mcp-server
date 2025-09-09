@@ -5,7 +5,7 @@ import { getAllTools } from './tools/toolRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import 'dotenv/config';
 
-const serverVersionInfo = getVersionInfo();
+const versionInfo = getVersionInfo();
 
 // Parse configuration from command-line arguments
 const config = parseToolConfigFromArgs();
@@ -17,12 +17,12 @@ const enabledTools = filterTools(allTools, config);
 // Create an MCP server
 const server = new McpServer(
   {
-    name: serverVersionInfo.name,
-    version: serverVersionInfo.version
+    name: versionInfo.name,
+    version: versionInfo.version
   },
   {
     capabilities: {
-      logging: {}
+      tools: {}
     }
   }
 );

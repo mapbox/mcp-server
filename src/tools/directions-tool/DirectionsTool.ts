@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from './formatIsoDateTime.js';
-import { fetchClient } from 'src/utils/fetchRequest.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 

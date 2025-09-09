@@ -1,7 +1,7 @@
 import { URLSearchParams } from 'url';
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from 'src/utils/fetchRequest.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 // API documentation: https://docs.mapbox.com/api/navigation/matrix/
 

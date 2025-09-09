@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from 'src/utils/fetchRequest.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 // List of valid Maki icon names
 const MAKI_ICONS = [
