@@ -1,5 +1,7 @@
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup } from '../../../src/utils/requestUtils.js';
 import {
   setupFetch,
   assertHeadersSent
@@ -59,17 +61,8 @@ const sampleMatrixWithDistanceResponse = {
 };
 
 describe('MatrixTool', () => {
-  beforeEach(() => {
-    vi.stubEnv(
-      'MAPBOX_ACCESS_TOKEN',
-      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-    );
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-    cleanup();
   });
 
   it('sends custom header', async () => {

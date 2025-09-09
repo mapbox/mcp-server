@@ -1,5 +1,6 @@
+process.env.MAPBOX_ACCESS_TOKEN = 'test.token.signature';
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup } from '../../../src/utils/requestUtils.js';
 import {
   setupFetch,
   assertHeadersSent
@@ -9,8 +10,6 @@ import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanRe
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
-    vi.stubEnv('MAPBOX_ACCESS_TOKEN', 'test.token.signature');
-
     // Mock the cleanResponseData function to return data unchanged, this make testing much easier
     // There should be separate test suits for `cleanResponseData`
     vi.spyOn(cleanResponseModule, 'cleanResponseData').mockImplementation(
@@ -24,7 +23,6 @@ describe('DirectionsTool', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
-    cleanup();
   });
 
   it('sends custom header', async () => {

@@ -1,8 +1,7 @@
-// Set the token before importing the tool
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
@@ -10,15 +9,7 @@ import {
 import { ReverseGeocodeTool } from '../../../src/tools/reverse-geocode-tool/ReverseGeocodeTool.js';
 
 describe('ReverseGeocodeTool', () => {
-  beforeEach(() => {
-    vi.stubEnv(
-      'MAPBOX_ACCESS_TOKEN',
-      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-    );
-  });
-
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 

@@ -18,7 +18,7 @@ export function getVersionInfo(): VersionInfo {
     const versionJsonPath = path.resolve(dirname, '..', 'version.json');
     try {
       const versionData = readFileSync(versionJsonPath, 'utf-8');
-      let info = JSON.parse(versionData) as VersionInfo;
+      const info = JSON.parse(versionData) as VersionInfo;
       info['name'] = name;
       return info;
     } catch {

@@ -1,3 +1,6 @@
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupFetch,
@@ -6,16 +9,8 @@ import {
 import { ForwardGeocodeTool } from '../../../src/tools/forward-geocode-tool/ForwardGeocodeTool.js';
 
 describe('ForwardGeocodeTool', () => {
-  beforeEach(() => {
-    vi.stubEnv(
-      'MAPBOX_ACCESS_TOKEN',
-      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-    );
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
   });
 
   it('sends custom header', async () => {

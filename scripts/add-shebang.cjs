@@ -14,8 +14,8 @@ function addShebang(filePath) {
   if (!content.startsWith(shebang)) {
     content = shebang + content;
     fs.writeFileSync(filePath, content);
-    console.log('Shebang added to dist/index.js');
+    console.log(`Shebang added to ${filePath}`);
   } else {
-    console.log('Shebang already exists in dist/index.js');
+    console.log(`Shebang already exists in ${filePath}`);
   }
 }

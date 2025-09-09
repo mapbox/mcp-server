@@ -1,4 +1,3 @@
-// Set the token before importing the tool
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
@@ -10,16 +9,8 @@ import {
 import { CategorySearchTool } from '../../../src/tools/category-search-tool/CategorySearchTool.js';
 
 describe('CategorySearchTool', () => {
-  beforeEach(() => {
-    vi.stubEnv(
-      'MAPBOX_ACCESS_TOKEN',
-      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-    );
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
   it('sends custom header', async () => {

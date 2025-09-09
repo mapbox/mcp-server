@@ -90,7 +90,7 @@ export class RetryPolicy implements FetchPolicy {
     next: typeof fetch
   ): Promise<Response> {
     let attempt = 0;
-    let lastError: any;
+    let lastError: Response | undefined;
 
     while (attempt <= this.maxRetries) {
       const response = await next(input, init);
@@ -113,7 +113,7 @@ export class RetryPolicy implements FetchPolicy {
     }
 
     // If all retries failed, return last response
-    return lastError;
+    return lastError!;
   }
 }
 

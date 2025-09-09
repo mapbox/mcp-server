@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { getAllTools } from '../../src/tools/toolRegistry.js';
 
 // Mock getVersionInfo to avoid import.meta.url issues in vitest
-vi.mock('../utils/versionUtils.js', () => ({
+vi.mock('../../src/utils/versionUtils.js', () => ({
   getVersionInfo: vi.fn(() => ({
     name: 'Mapbox MCP server',
     version: '1.0.0',

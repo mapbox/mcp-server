@@ -178,7 +178,7 @@ Computes areas that are reachable within a specified amount of times from a loca
 npm run build
 
 # Inspect
-npx @modelcontextprotocol/inspector node dist/index.js
+npx @modelcontextprotocol/inspector node dist/esm/index.js
 ```
 
 ### Using Docker
