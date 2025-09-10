@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 const PoiSearchInputSchema = z.object({
   q: z
@@ -132,8 +133,11 @@ export class PoiSearchTool extends MapboxApiBasedTool<
   description =
     "Find one specific place or brand location by its proper name or unique brand. Use only when the user's query includes a distinct title (e.g., \"The Met\", \"Starbucks Reserve Roastery\") or a brand they want all nearby branches of (e.g., \"Macy's stores near me\"). Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc. Setting a proximity point is strongly encouraged for more relevant results. Always try to use a limit of at least 3 in case the user's intended result is not the first result. Supports both JSON and text output formats.";
 
-  constructor() {
+  private fetch: typeof globalThis.fetch;
+
+  constructor(fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: PoiSearchInputSchema });
+    this.fetch = fetch;
   }
 
   private formatGeoJsonToText(geoJsonResponse: any): string {
@@ -200,7 +204,7 @@ export class PoiSearchTool extends MapboxApiBasedTool<
     );
 
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}search/searchbox/v1/forward`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/forward`
     );
 
     // Required parameters
@@ -268,7 +272,7 @@ export class PoiSearchTool extends MapboxApiBasedTool<
       `PoiSearchTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
     );
 
-    const response = await fetch(url.toString());
+    const response = await this.fetch(url.toString());
 
     if (!response.ok) {
       const errorBody = await response.text();

@@ -1,8 +1,10 @@
-import { getVersionInfo } from '../../utils/versionUtils.js';
-import { VersionTool } from './VersionTool';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
+import { getVersionInfo } from '../../../src/utils/versionUtils.js';
+import { VersionTool } from '../../../src/tools/version-tool/VersionTool.js';
 
-jest.mock('../../utils/versionUtils.js', () => ({
-  getVersionInfo: jest.fn(() => ({
+vi.mock('../../../src/utils/versionUtils.js', () => ({
+  getVersionInfo: vi.fn(() => ({
     name: 'Test MCP Server',
     version: '1.0.0',
     sha: 'abc123',
@@ -11,7 +13,7 @@ jest.mock('../../utils/versionUtils.js', () => ({
   }))
 }));
 
-const mockGetVersionInfo = getVersionInfo as jest.MockedFunction<
+const mockGetVersionInfo = getVersionInfo as MockedFunction<
   typeof getVersionInfo
 >;
 

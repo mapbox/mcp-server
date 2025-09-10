@@ -71,7 +71,7 @@ It connects to the Mapbox MCP server, which exposes Mapbox's functionality as to
      ```python
      server_parameters = StdioServerParameters(
         command=<YOUR_NODE_PATH>,
-        args=["/YOUR_PATH_TO_REPOSITORY/dist/index.js"],
+        args=["/YOUR_PATH_TO_REPOSITORY/dist/esm/index.js"],
         env={"MAPBOX_ACCESS_TOKEN": os.environ["MAPBOX_ACCESS_TOKEN"]},
      )
      ```

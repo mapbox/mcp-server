@@ -72,7 +72,7 @@ docker build -t mapbox-mcp-server .
                      "type": "stdio",
                      "command": <PATH_TO_YOUR_NODE>,
                      "args": [
-                         "/YOUR_PATH_TO_GIT_REPOSITORY/dist/index.js"
+                         "/YOUR_PATH_TO_GIT_REPOSITORY/dist/esm/index.js"
                      ],
                      "env": {
                          "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"

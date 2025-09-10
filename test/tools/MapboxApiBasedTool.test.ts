@@ -1,9 +1,6 @@
-// Use a token with valid JWT format for tests
-process.env.MAPBOX_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
-
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { z } from 'zod';
-import { MapboxApiBasedTool } from './MapboxApiBasedTool';
+import { MapboxApiBasedTool } from '../../src/tools/MapboxApiBasedTool.js';
 
 // Create a minimal implementation of MapboxApiBasedTool for testing
 class TestTool extends MapboxApiBasedTool<typeof TestTool.inputSchema> {
@@ -27,37 +24,36 @@ class TestTool extends MapboxApiBasedTool<typeof TestTool.inputSchema> {
 
 describe('MapboxApiBasedTool', () => {
   let testTool: TestTool;
-  const originalEnv = process.env;
 
   beforeEach(() => {
+    vi.stubEnv(
+      'MAPBOX_ACCESS_TOKEN',
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+    );
+
     testTool = new TestTool();
     // Mock the log method to test that errors are properly logged
-    testTool['log'] = jest.fn();
+    testTool['log'] = vi.fn();
   });
 
   afterEach(() => {
     // Restore the process.env to its original state
-    process.env = { ...originalEnv };
-    jest.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
   });
 
   describe('JWT token validation', () => {
     it('throws an error when the token is not in a valid JWT format', async () => {
       // Test the private isValidJwtFormat method directly
-      const originalToken = MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN;
+      const spy = vi
+        .spyOn(MapboxApiBasedTool, 'mapboxAccessToken', 'get')
+        .mockReturnValue('invalid-token-format');
 
       try {
-        // Temporarily modify the static property for testing
-        Object.defineProperty(MapboxApiBasedTool, 'MAPBOX_ACCESS_TOKEN', {
-          value: 'invalid-token-format',
-          writable: true,
-          configurable: true
-        });
-
         // Create a new instance with the modified token
         const toolWithInvalidToken = new TestTool();
         // Mock the log method separately for this instance
-        toolWithInvalidToken['log'] = jest.fn();
+        toolWithInvalidToken['log'] = vi.fn();
 
         // Try to call the run method, it should throw an error due to invalid JWT format
         const result = await toolWithInvalidToken.run({ testParam: 'test' });
@@ -76,12 +72,7 @@ describe('MapboxApiBasedTool', () => {
           expect.stringMatching(/.*not in valid JWT format.*/)
         );
       } finally {
-        // Restore the original value
-        Object.defineProperty(MapboxApiBasedTool, 'MAPBOX_ACCESS_TOKEN', {
-          value: originalToken,
-          writable: true,
-          configurable: true
-        });
+        spy.mockRestore();
       }
     });
 
@@ -91,7 +82,7 @@ describe('MapboxApiBasedTool', () => {
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
       // Override execute to return a success result instead of throwing an error
-      testTool['execute'] = jest.fn().mockResolvedValue({ success: true });
+      testTool['execute'] = vi.fn().mockResolvedValue({ success: true });
 
       const result = await testTool.run({ testParam: 'test' });
 
@@ -125,7 +116,7 @@ describe('MapboxApiBasedTool', () => {
 
     it('handles non-Error objects thrown', async () => {
       // Override the execute method to throw a string instead of an Error
-      testTool['execute'] = jest.fn().mockImplementation(() => {
+      testTool['execute'] = vi.fn().mockImplementation(() => {
         throw 'String error message';
       });
 

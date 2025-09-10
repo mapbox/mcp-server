@@ -1,19 +1,20 @@
 // Set the token before importing the tool
 process.env.MAPBOX_ACCESS_TOKEN = 'pk.eyJzdWIiOiJ0ZXN0In0.signature';
 
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { CategoryListTool } from './CategoryListTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { CategoryListTool } from '../../../src/tools/category-list-tool/CategoryListTool.js';
 
 describe('CategoryListTool', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch({
+    const { fetch, mockFetch } = setupFetch({
       json: async () => ({
         listItems: [
           {
@@ -25,20 +26,20 @@ describe('CategoryListTool', () => {
       })
     });
 
-    await new CategoryListTool().run({});
+    await new CategoryListTool(fetch).run({});
 
     assertHeadersSent(mockFetch);
   });
 
   it('constructs correct URL with access token', async () => {
-    const mockFetch = setupFetch({
+    const { fetch, mockFetch } = setupFetch({
       json: async () => ({
         listItems: [],
         version: '25:test'
       })
     });
 
-    await new CategoryListTool().run({});
+    await new CategoryListTool(fetch).run({});
 
     const calledUrl = mockFetch.mock.calls[0][0];
     expect(calledUrl).toContain(
@@ -48,14 +49,14 @@ describe('CategoryListTool', () => {
   });
 
   it('includes language parameter when provided', async () => {
-    const mockFetch = setupFetch({
+    const { fetch, mockFetch } = setupFetch({
       json: async () => ({
         listItems: [],
         version: '25:test'
       })
     });
 
-    await new CategoryListTool().run({
+    await new CategoryListTool(fetch).run({
       language: 'es'
     });
 
@@ -64,15 +65,13 @@ describe('CategoryListTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = jest.fn();
-    global.fetch = mockFetch;
-    mockFetch.mockResolvedValue({
+    const { fetch, mockFetch } = setupFetch({
       ok: false,
       status: 403,
       statusText: 'Forbidden'
     });
 
-    await expect(new CategoryListTool().run({})).resolves.toMatchObject({
+    await expect(new CategoryListTool(fetch).run({})).resolves.toMatchObject({
       isError: true
     });
   });
@@ -92,11 +91,11 @@ describe('CategoryListTool', () => {
       version: '25:test'
     };
 
-    setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategoryListTool().run({});
+    const result = await new CategoryListTool(fetch).run({});
 
     expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
@@ -120,11 +119,11 @@ describe('CategoryListTool', () => {
       version: '25:test'
     };
 
-    setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new CategoryListTool().run({
+    const result = await new CategoryListTool(fetch).run({
       limit: 2,
       offset: 1
     });
@@ -139,14 +138,14 @@ describe('CategoryListTool', () => {
   });
 
   it('handles empty results', async () => {
-    setupFetch({
+    const { fetch } = setupFetch({
       json: async () => ({
         listItems: [],
         version: '25:test'
       })
     });
 
-    const result = await new CategoryListTool().run({});
+    const result = await new CategoryListTool(fetch).run({});
 
     expect(result.isError).toBe(false);
     const text = (result.content[0] as { type: 'text'; text: string }).text;

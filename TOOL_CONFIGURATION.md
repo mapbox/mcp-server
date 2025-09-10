@@ -39,7 +39,7 @@ The following tools are available in the Mapbox MCP Server:
 ### Node.js
 
 ```bash
-node dist/index.js --enable-tools forward_geocode_tool,reverse_geocode_tool
+node dist/esm/index.js --enable-tools forward_geocode_tool,reverse_geocode_tool
 ```
 
 ### NPX

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 const ForwardGeocodeInputSchema = z.object({
   q: z
@@ -139,7 +140,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
   description =
     'Forward geocode addresses, cities, towns, neighborhoods, districts, postcodes, regions, and countries using Mapbox Geocoding API v6. Converts location name into geographic coordinates. Setting a proximity point helps to bias results towards a specific area for more relevant results. Do not use this tool for geocoding points of interest like businesses, landmarks, historic sites, museums, etc. Supports both JSON and text output formats.';
 
-  constructor() {
+  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: ForwardGeocodeInputSchema });
   }
 
@@ -195,7 +196,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
     accessToken: string
   ): Promise<{ type: 'text'; text: string }> {
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}search/geocode/v6/forward`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}search/geocode/v6/forward`
     );
 
     // Required parameters
@@ -239,7 +240,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
       url.searchParams.append('types', input.types.join(','));
     }
 
-    const response = await fetch(url.toString());
+    const response = await this.fetch(url.toString());
 
     if (!response.ok) {
       throw new Error(

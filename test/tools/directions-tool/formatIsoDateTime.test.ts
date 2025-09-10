@@ -1,4 +1,5 @@
-import { formatIsoDateTime } from './formatIsoDateTime';
+import { describe, it, expect } from 'vitest';
+import { formatIsoDateTime } from '../../../src/tools/directions-tool/formatIsoDateTime.js';
 
 describe('formatIsoDateTime', () => {
   it('converts YYYY-MM-DDThh:mm:ss to YYYY-MM-DDThh:mm by removing seconds', () => {

@@ -1,22 +1,22 @@
-// Set the token before importing the tool
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { ReverseGeocodeTool } from './ReverseGeocodeTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { ReverseGeocodeTool } from '../../../src/tools/reverse-geocode-tool/ReverseGeocodeTool.js';
 
 describe('ReverseGeocodeTool', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new ReverseGeocodeTool().run({
+    await new ReverseGeocodeTool(fetch).run({
       longitude: -73.989,
       latitude: 40.733
     });
@@ -25,9 +25,9 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('constructs correct URL for reverse geocoding', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new ReverseGeocodeTool().run({
+    await new ReverseGeocodeTool(fetch).run({
       longitude: -73.989,
       latitude: 40.733
     });
@@ -40,9 +40,9 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('includes all optional parameters', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new ReverseGeocodeTool().run({
+    await new ReverseGeocodeTool(fetch).run({
       longitude: -74.006,
       latitude: 40.7128,
       permanent: true,
@@ -65,9 +65,9 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('uses default values', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
-    await new ReverseGeocodeTool().run({
+    await new ReverseGeocodeTool(fetch).run({
       longitude: -73.989,
       latitude: 40.733
     });
@@ -147,10 +147,10 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('enforces types constraint when limit > 1', async () => {
-    const tool = new ReverseGeocodeTool();
+    const { mockFetch, fetch } = setupFetch();
 
-    // Should succeed with exactly one type
-    const mockFetch = setupFetch();
+    const tool = new ReverseGeocodeTool(fetch);
+
     await tool.run({
       longitude: -73.989,
       latitude: 40.733,
@@ -184,10 +184,10 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('allows limit of 1 without types constraint', async () => {
-    const mockFetch = setupFetch();
+    const { mockFetch, fetch } = setupFetch();
 
     // Should succeed with limit=1 and no types
-    await new ReverseGeocodeTool().run({
+    await new ReverseGeocodeTool(fetch).run({
       longitude: -73.989,
       latitude: 40.733,
       limit: 1
@@ -195,7 +195,7 @@ describe('ReverseGeocodeTool', () => {
     expect(mockFetch).toHaveBeenCalled();
 
     // Should also succeed with limit=1 and multiple types
-    await new ReverseGeocodeTool().run({
+    await new ReverseGeocodeTool(fetch).run({
       longitude: -73.989,
       latitude: 40.733,
       limit: 1,
@@ -205,13 +205,13 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: -73.989,
       latitude: 40.733
     });
@@ -257,11 +257,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: -73.989,
       latitude: 40.733
     });
@@ -298,11 +298,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: -73.971,
       latitude: 40.776
     });
@@ -349,11 +349,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: -73.99,
       latitude: 40.694,
       limit: 2,
@@ -380,11 +380,11 @@ describe('ReverseGeocodeTool', () => {
       features: []
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: 0.0,
       latitude: 0.0
     });
@@ -413,11 +413,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: -100.123,
       latitude: 35.456
     });
@@ -449,11 +449,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: -122.676,
       latitude: 45.515,
       format: 'json_string'
@@ -484,11 +484,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool().run({
+    const result = await new ReverseGeocodeTool(fetch).run({
       longitude: -122.676,
       latitude: 45.515
     });

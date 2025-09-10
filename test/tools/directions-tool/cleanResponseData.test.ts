@@ -1,4 +1,5 @@
-import { cleanResponseData } from './cleanResponseData.js';
+import { describe, it, expect } from 'vitest';
+import { cleanResponseData } from '../../../src/tools/directions-tool/cleanResponseData.js';
 
 describe('cleanResponseData', () => {
   // Create a complete mock input that satisfies the DirectionsInputSchema

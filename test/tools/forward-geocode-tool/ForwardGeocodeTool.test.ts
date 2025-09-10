@@ -1,49 +1,50 @@
-// Set the token before importing the tool
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { PoiSearchTool } from '../poi-search-tool/PoiSearchTool.js';
+} from '../../utils/fetchRequestUtils.js';
+import { ForwardGeocodeTool } from '../../../src/tools/forward-geocode-tool/ForwardGeocodeTool.js';
 
-describe('PoiSearchTool', () => {
+describe('ForwardGeocodeTool', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
-      q: 'coffee shop'
+    await new ForwardGeocodeTool(fetch).run({
+      q: '123 Main Street'
     });
 
     assertHeadersSent(mockFetch);
   });
 
   it('constructs correct URL with required parameters', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
-      q: 'starbucks'
+    await new ForwardGeocodeTool(fetch).run({
+      q: '1600 Pennsylvania Avenue NW, Washington, DC'
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('search/searchbox/v1/forward');
-    expect(calledUrl).toContain('q=starbucks');
+    expect(calledUrl).toContain('search/geocode/v6/forward');
+    expect(calledUrl).toContain(
+      'q=1600+Pennsylvania+Avenue+NW%2C+Washington%2C+DC'
+    );
     expect(calledUrl).toContain('access_token=');
   });
 
   it('includes all optional parameters in URL', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'restaurant',
-      language: 'es',
-      limit: 5,
-      proximity: { longitude: -74.006, latitude: 40.7128 },
+      permanent: true,
+      autocomplete: false,
       bbox: {
         minLongitude: -74.1,
         minLatitude: 40.6,
@@ -51,46 +52,49 @@ describe('PoiSearchTool', () => {
         maxLatitude: 40.8
       },
       country: ['US', 'CA'],
-      types: ['poi', 'address'],
-      poi_category: ['restaurant', 'cafe'],
-      auto_complete: true,
-      eta_type: 'navigation',
-      navigation_profile: 'driving',
-      origin: { longitude: -74.0, latitude: 40.7 }
+      format: 'formatted_text',
+      language: 'es',
+      limit: 3,
+      proximity: { longitude: -74.006, latitude: 40.7128 },
+      types: ['address', 'place'],
+      worldview: 'cn'
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
     expect(calledUrl).toContain('q=restaurant');
-    expect(calledUrl).toContain('language=es');
-    expect(calledUrl).toContain('limit=5');
-    expect(calledUrl).toContain('proximity=-74.006%2C40.7128');
+    expect(calledUrl).toContain('permanent=true');
+    expect(calledUrl).toContain('autocomplete=false');
     expect(calledUrl).toContain('bbox=-74.1%2C40.6%2C-73.9%2C40.8');
     expect(calledUrl).toContain('country=US%2CCA');
-    expect(calledUrl).toContain('types=poi%2Caddress');
-    expect(calledUrl).toContain('poi_category=restaurant%2Ccafe');
-    expect(calledUrl).toContain('auto_complete=true');
-    expect(calledUrl).toContain('eta_type=navigation');
-    expect(calledUrl).toContain('navigation_profile=driving');
-    expect(calledUrl).toContain('origin=-74%2C40.7');
+    expect(calledUrl).toContain('format=geojson');
+    expect(calledUrl).toContain('language=es');
+    expect(calledUrl).toContain('limit=3');
+    expect(calledUrl).toContain('proximity=-74.006%2C40.7128');
+    expect(calledUrl).toContain('types=address%2Cplace');
+    expect(calledUrl).toContain('worldview=cn');
   });
 
-  it('handles IP-based proximity', async () => {
-    const mockFetch = setupFetch();
+  it('uses default values when not specified', async () => {
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
-      q: 'pizza',
-      proximity: 'ip'
+    await new ForwardGeocodeTool(fetch).run({
+      q: 'Central Park'
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=ip');
+    // Check defaults
+    expect(calledUrl).toContain('permanent=false');
+    expect(calledUrl).toContain('autocomplete=true');
+    expect(calledUrl).toContain('format=geojson');
+    expect(calledUrl).toContain('limit=5');
+    expect(calledUrl).toContain('worldview=us');
   });
 
   it('handles string format proximity coordinates', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
-      q: 'museum',
+    await new ForwardGeocodeTool(fetch).run({
+      q: 'coffee shop',
       proximity: '-82.451668,27.942976'
     });
 
@@ -99,9 +103,9 @@ describe('PoiSearchTool', () => {
   });
 
   it('handles array-like string format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
+    await new ForwardGeocodeTool(fetch).run({
       q: 'bank',
       proximity: '[-82.451668, 27.942964]'
     });
@@ -111,10 +115,10 @@ describe('PoiSearchTool', () => {
   });
 
   it('handles JSON-stringified object format proximity', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
-      q: 'restaurant',
+    await new ForwardGeocodeTool(fetch).run({
+      q: 'office',
       proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
     });
 
@@ -122,38 +126,51 @@ describe('PoiSearchTool', () => {
     expect(calledUrl).toContain('proximity=-82.458107%2C27.937259');
   });
 
-  it('uses default limit when not specified', async () => {
-    const mockFetch = setupFetch();
-
-    await new PoiSearchTool().run({
-      q: 'pharmacy'
-    });
-
-    const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('limit=10');
-  });
-
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 404,
-      statusText: 'Not Found',
-      text: async () => 'Not Found'
+      statusText: 'Not Found'
     });
 
-    const result = await new PoiSearchTool().run({
+    const result = await new ForwardGeocodeTool(fetch).run({
       q: 'test query'
     });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Failed to search: 404 Not Found'
+      text: 'Failed to geocode: 404 Not Found'
+    });
+  });
+
+  it('validates query cannot contain semicolons', async () => {
+    const tool = new ForwardGeocodeTool();
+
+    await expect(
+      tool.run({
+        q: 'test; query'
+      })
+    ).resolves.toMatchObject({
+      isError: true
+    });
+  });
+
+  it('validates query word count', async () => {
+    const tool = new ForwardGeocodeTool();
+    const longQuery = 'word '.repeat(21).trim(); // 21 words, exceeds limit
+
+    await expect(
+      tool.run({
+        q: longQuery
+      })
+    ).resolves.toMatchObject({
+      isError: true
     });
   });
 
   it('validates query length constraint', async () => {
-    const tool = new PoiSearchTool();
+    const tool = new ForwardGeocodeTool();
     const longQuery = 'a'.repeat(257); // 257 characters, exceeds limit
 
     await expect(
@@ -166,7 +183,7 @@ describe('PoiSearchTool', () => {
   });
 
   it('validates limit constraints', async () => {
-    const tool = new PoiSearchTool();
+    const tool = new ForwardGeocodeTool();
 
     // Test limit too high
     await expect(
@@ -190,7 +207,7 @@ describe('PoiSearchTool', () => {
   });
 
   it('validates coordinate constraints', async () => {
-    const tool = new PoiSearchTool();
+    const tool = new ForwardGeocodeTool();
 
     // Test invalid longitude in proximity
     await expect(
@@ -219,44 +236,29 @@ describe('PoiSearchTool', () => {
   });
 
   it('encodes special characters in query', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new PoiSearchTool().run({
-      q: 'coffee & tea shop'
+    await new ForwardGeocodeTool(fetch).run({
+      q: 'café & restaurant'
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('q=coffee+%26+tea+shop');
-  });
-
-  it('validates navigation profile requires eta_type', async () => {
-    const mockFetch = setupFetch();
-
-    // navigation_profile should work when eta_type is set
-    await new PoiSearchTool().run({
-      q: 'test',
-      eta_type: 'navigation',
-      navigation_profile: 'driving'
-    });
-
-    const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('eta_type=navigation');
-    expect(calledUrl).toContain('navigation_profile=driving');
+    expect(calledUrl).toContain('q=caf%C3%A9+%26+restaurant');
   });
 
   it('supports proximity=ip for IP-based location', async () => {
-    const mockFetch = setupFetch({
+    const { fetch, mockFetch } = setupFetch({
       type: 'FeatureCollection',
       features: [
         {
           type: 'Feature',
-          properties: { name: 'Local Coffee Shop' }
+          properties: { place_name: 'Local Result' }
         }
       ]
     });
 
-    await new PoiSearchTool().run({
-      q: 'Starbucks',
+    await new ForwardGeocodeTool(fetch).run({
+      q: 'coffee shop',
       proximity: 'ip'
     });
 
@@ -271,25 +273,24 @@ describe('PoiSearchTool', () => {
         {
           type: 'Feature',
           properties: {
-            name: 'Starbucks Coffee',
-            full_address: '123 Main St, New York, NY 10001',
-            feature_type: 'poi',
-            poi_category: ['coffee', 'restaurant']
+            name: 'Seattle',
+            full_address: 'Seattle, Washington, United States',
+            feature_type: 'place'
           },
           geometry: {
             type: 'Point',
-            coordinates: [-74.006, 40.7128]
+            coordinates: [-122.335167, 47.608013]
           }
         }
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
-      q: 'Starbucks'
+    const result = await new ForwardGeocodeTool(fetch).run({
+      q: 'Seattle'
     });
 
     expect(result.isError).toBe(false);
@@ -297,11 +298,12 @@ describe('PoiSearchTool', () => {
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
-    expect(textContent).toContain('1. Starbucks Coffee');
-    expect(textContent).toContain('Address: 123 Main St, New York, NY 10001');
-    expect(textContent).toContain('Coordinates: 40.7128, -74.006');
-    expect(textContent).toContain('Type: poi');
-    expect(textContent).toContain('Category: coffee, restaurant');
+    expect(textContent).toContain('1. Seattle');
+    expect(textContent).toContain(
+      'Address: Seattle, Washington, United States'
+    );
+    expect(textContent).toContain('Coordinates: 47.608013, -122.335167');
+    expect(textContent).toContain('Type: place');
   });
 
   it('formats GeoJSON response with name_preferred', async () => {
@@ -311,33 +313,33 @@ describe('PoiSearchTool', () => {
         {
           type: 'Feature',
           properties: {
-            name: 'Central Park',
-            name_preferred: 'The Central Park',
-            place_formatted: 'Central Park, New York, NY'
+            name: 'NYC',
+            name_preferred: 'New York City',
+            place_formatted: 'New York, NY, United States'
           },
           geometry: {
             type: 'Point',
-            coordinates: [-73.965, 40.782]
+            coordinates: [-74.0059, 40.7128]
           }
         }
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
-      q: 'Central Park'
+    const result = await new ForwardGeocodeTool(fetch).run({
+      q: 'NYC'
     });
 
     expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
-    expect(textContent).toContain('1. Central Park (The Central Park)');
-    expect(textContent).toContain('Address: Central Park, New York, NY');
-    expect(textContent).toContain('Coordinates: 40.782, -73.965');
+    expect(textContent).toContain('1. NYC (New York City)');
+    expect(textContent).toContain('Address: New York, NY, United States');
+    expect(textContent).toContain('Coordinates: 40.7128, -74.0059');
   });
 
   it('handles multiple results in formatted text', async () => {
@@ -347,36 +349,36 @@ describe('PoiSearchTool', () => {
         {
           type: 'Feature',
           properties: {
-            name: 'Starbucks #1',
-            full_address: '123 Main St, New York, NY 10001',
-            feature_type: 'poi'
+            name: 'Springfield',
+            full_address: 'Springfield, Illinois, United States',
+            feature_type: 'place'
           },
           geometry: {
             type: 'Point',
-            coordinates: [-74.006, 40.7128]
+            coordinates: [-89.6501, 39.7817]
           }
         },
         {
           type: 'Feature',
           properties: {
-            name: 'Starbucks #2',
-            full_address: '456 Broadway, New York, NY 10013',
-            feature_type: 'poi'
+            name: 'Springfield',
+            full_address: 'Springfield, Massachusetts, United States',
+            feature_type: 'place'
           },
           geometry: {
             type: 'Point',
-            coordinates: [-74.012, 40.72]
+            coordinates: [-72.5395, 42.1015]
           }
         }
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
-      q: 'Starbucks',
+    const result = await new ForwardGeocodeTool(fetch).run({
+      q: 'Springfield',
       limit: 2
     });
 
@@ -384,10 +386,10 @@ describe('PoiSearchTool', () => {
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
-    expect(textContent).toContain('1. Starbucks #1');
-    expect(textContent).toContain('2. Starbucks #2');
-    expect(textContent).toContain('123 Main St, New York, NY 10001');
-    expect(textContent).toContain('456 Broadway, New York, NY 10013');
+    expect(textContent).toContain('1. Springfield');
+    expect(textContent).toContain('2. Springfield');
+    expect(textContent).toContain('Springfield, Illinois, United States');
+    expect(textContent).toContain('Springfield, Massachusetts, United States');
   });
 
   it('handles empty results gracefully', async () => {
@@ -396,12 +398,12 @@ describe('PoiSearchTool', () => {
       features: []
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
-      q: 'NonexistentPlace'
+    const result = await new ForwardGeocodeTool(fetch).run({
+      q: 'nonexistentplace12345'
     });
 
     expect(result.isError).toBe(false);
@@ -418,30 +420,30 @@ describe('PoiSearchTool', () => {
         {
           type: 'Feature',
           properties: {
-            name: 'Some Location'
+            name: 'Some Place'
           },
           geometry: {
             type: 'Point',
-            coordinates: [-74.006, 40.7128]
+            coordinates: [-100.123, 35.456]
           }
         }
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
-      q: 'location'
+    const result = await new ForwardGeocodeTool(fetch).run({
+      q: 'Some Place'
     });
 
     expect(result.isError).toBe(false);
 
     const textContent = (result.content[0] as { type: 'text'; text: string })
       .text;
-    expect(textContent).toContain('1. Some Location');
-    expect(textContent).toContain('Coordinates: 40.7128, -74.006');
+    expect(textContent).toContain('1. Some Place');
+    expect(textContent).toContain('Coordinates: 35.456, -100.123');
     expect(textContent).not.toContain('Address:');
   });
 
@@ -452,7 +454,7 @@ describe('PoiSearchTool', () => {
         {
           type: 'Feature',
           properties: {
-            name: 'Test POI',
+            name: 'Test Location',
             full_address: '123 Test St, Test City, TC 12345'
           },
           geometry: {
@@ -463,12 +465,12 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
-      q: 'Test POI',
+    const result = await new ForwardGeocodeTool(fetch).run({
+      q: 'Test Location',
       format: 'json_string'
     });
 
@@ -487,7 +489,7 @@ describe('PoiSearchTool', () => {
         {
           type: 'Feature',
           properties: {
-            name: 'Test Place'
+            name: 'Test City'
           },
           geometry: {
             type: 'Point',
@@ -497,18 +499,18 @@ describe('PoiSearchTool', () => {
       ]
     };
 
-    const mockFetch = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
-    const result = await new PoiSearchTool().run({
-      q: 'Test Place'
+    const result = await new ForwardGeocodeTool(fetch).run({
+      q: 'Test City'
     });
 
     expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
     expect(
       (result.content[0] as { type: 'text'; text: string }).text
-    ).toContain('1. Test Place');
+    ).toContain('1. Test City');
   });
 });

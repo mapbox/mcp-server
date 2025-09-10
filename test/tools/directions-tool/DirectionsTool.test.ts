@@ -1,31 +1,31 @@
 process.env.MAPBOX_ACCESS_TOKEN = 'test.token.signature';
 
-import { cleanup } from '../../utils/requestUtils.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent
-} from '../../utils/requestUtils.test-helpers.js';
-import { DirectionsTool } from './DirectionsTool.js';
-import * as cleanResponseModule from './cleanResponseData.js';
+} from '../../utils/fetchRequestUtils.js';
+import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
+import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
     // Mock the cleanResponseData function to return data unchanged, this make testing much easier
     // There should be separate test suits for `cleanResponseData`
-    jest
-      .spyOn(cleanResponseModule, 'cleanResponseData')
-      .mockImplementation((_, data) => data);
+    vi.spyOn(cleanResponseModule, 'cleanResponseData').mockImplementation(
+      (_, data) => data
+    );
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
-    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: [
         [-74.102094, 40.692815],
         [-74.1022094, 40.792815]
@@ -36,9 +36,9 @@ describe('DirectionsTool', () => {
   });
 
   it('constructs correct URL with required parameters', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: [
         [-73.989, 40.733],
         [-73.979, 40.743]
@@ -53,9 +53,9 @@ describe('DirectionsTool', () => {
   });
 
   it('includes all optional parameters in URL', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: [
         [-122.42, 37.78],
         [-122.4, 37.79],
@@ -81,9 +81,9 @@ describe('DirectionsTool', () => {
   });
 
   it('uses default parameters when not specified', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: [
         [-118.24, 34.05],
         [-118.3, 34.02]
@@ -100,9 +100,9 @@ describe('DirectionsTool', () => {
   });
 
   it('handles geometries=none', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: [
         [-118.24, 34.05],
         [-118.3, 34.02]
@@ -120,9 +120,9 @@ describe('DirectionsTool', () => {
   });
 
   it('handles exclude parameter with point format', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: [
         [-74.0, 40.7],
         [-73.9, 40.8]
@@ -142,13 +142,13 @@ describe('DirectionsTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
+    const { fetch, mockFetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const result = await new DirectionsTool().run({
+    const result = await new DirectionsTool(fetch).run({
       coordinates: [
         [-73.989, 40.733],
         [-73.979, 40.743]
@@ -201,9 +201,9 @@ describe('DirectionsTool', () => {
   });
 
   it('successfully processes exactly 2 coordinates (minimum allowed)', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: [
         [-73.989, 40.733],
         [-73.979, 40.743]
@@ -216,14 +216,14 @@ describe('DirectionsTool', () => {
   });
 
   it('successfully processes exactly 25 coordinates (maximum allowed)', async () => {
-    const mockFetch = setupFetch();
+    const { fetch, mockFetch } = setupFetch();
 
     // Create an array of exactly 25 coordinates (maximum allowed)
     const maxCoords = Array(25)
       .fill(0)
       .map((_, i) => [-74 + i * 0.01, 40 + i * 0.01]);
 
-    await new DirectionsTool().run({
+    await new DirectionsTool(fetch).run({
       coordinates: maxCoords
     });
 
@@ -242,8 +242,8 @@ describe('DirectionsTool', () => {
 
   describe('exclude parameter and routing profile validations', () => {
     it('accepts driving-specific exclusions with driving profiles', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
 
       // Test with driving profile
       await expect(
@@ -307,8 +307,8 @@ describe('DirectionsTool', () => {
     });
 
     it('accepts common exclusions with all routing profiles', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
 
       // Test with driving profile
       await expect(
@@ -354,8 +354,8 @@ describe('DirectionsTool', () => {
     });
 
     it('accepts point exclusions with driving profiles and rejects with non-driving profiles', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
 
       // Test with driving profile - should work
       await expect(
@@ -401,8 +401,8 @@ describe('DirectionsTool', () => {
     });
 
     it('handles multiple exclusions in a single request correctly', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
 
       // All valid exclusions for driving profile
       await expect(
@@ -450,8 +450,8 @@ describe('DirectionsTool', () => {
 
   describe('depart_at parameter validations', () => {
     it('accepts depart_at with driving profiles', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch, mockFetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
       const validDateTime = '2025-06-05T10:30:00Z';
 
       // Test with driving profile
@@ -495,8 +495,8 @@ describe('DirectionsTool', () => {
 
     describe('vehicle dimension parameters validations', () => {
       it('accepts vehicle dimensions with driving profiles', async () => {
-        const mockFetch = setupFetch();
-        const tool = new DirectionsTool();
+        const { fetch, mockFetch } = setupFetch();
+        const tool = new DirectionsTool(fetch);
 
         // Test with driving profile
         await expect(
@@ -650,8 +650,8 @@ describe('DirectionsTool', () => {
     });
 
     it('accepts valid date-time formats', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
       const baseCoordinates = [
         [-73.989, 40.733],
         [-73.979, 40.743]
@@ -749,8 +749,8 @@ describe('DirectionsTool', () => {
     });
 
     it('depart_at accepts and converts YYYY-MM-DDThh:mm:ss format (seconds but no timezone)', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch, mockFetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
 
       const dateTimeWithSeconds = '2025-06-05T10:30:45';
       const expectedConvertedDateTime = '2025-06-05T10:30'; // Without seconds
@@ -778,8 +778,8 @@ describe('DirectionsTool', () => {
     });
 
     it('arrive_by accepts and converts YYYY-MM-DDThh:mm:ss format (seconds but no timezone)', async () => {
-      const mockFetch = setupFetch();
-      const tool = new DirectionsTool();
+      const { fetch, mockFetch } = setupFetch();
+      const tool = new DirectionsTool(fetch);
 
       const dateTimeWithSeconds = '2025-06-05T10:30:45';
       const expectedConvertedDateTime = '2025-06-05T10:30'; // Without seconds
@@ -811,10 +811,10 @@ describe('DirectionsTool', () => {
   describe('arrive_by parameter validations', () => {
     it('accepts arrive_by with driving profile only', async () => {
       const validDateTime = '2025-06-05T10:30:00Z';
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
       // Test with driving profile - should work
-      await new DirectionsTool().run({
+      await new DirectionsTool(fetch).run({
         coordinates: [
           [-74.1, 40.7],
           [-74.2, 40.8]
@@ -885,10 +885,9 @@ describe('DirectionsTool', () => {
     });
 
     it('accepts valid ISO 8601 formats for arrive_by', async () => {
-      const mockFetch = setupFetch();
+      const { fetch, mockFetch } = setupFetch();
 
-      // Test with Z format
-      await new DirectionsTool().run({
+      await new DirectionsTool(fetch).run({
         coordinates: [
           [-74.1, 40.7],
           [-74.2, 40.8]
@@ -901,7 +900,7 @@ describe('DirectionsTool', () => {
       mockFetch.mockClear();
 
       // Test with timezone offset format
-      await new DirectionsTool().run({
+      await new DirectionsTool(fetch).run({
         coordinates: [
           [-74.1, 40.7],
           [-74.2, 40.8]
@@ -914,7 +913,7 @@ describe('DirectionsTool', () => {
       mockFetch.mockClear();
 
       // Test with simple time format (no seconds, no timezone)
-      await new DirectionsTool().run({
+      await new DirectionsTool(fetch).run({
         coordinates: [
           [-74.1, 40.7],
           [-74.2, 40.8]
@@ -986,7 +985,14 @@ describe('DirectionsTool', () => {
   });
 
   it('validates geometries enum values', async () => {
-    const tool = new DirectionsTool();
+    const { fetch, mockFetch } = setupFetch();
+    const tool = new DirectionsTool(fetch);
+
+    // Mock successful responses for valid values
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ routes: [], waypoints: [] })
+    });
 
     // Valid values: 'none' and 'geojson'
     await expect(
@@ -1021,6 +1027,7 @@ describe('DirectionsTool', () => {
           [-73.989, 40.733],
           [-73.979, 40.743]
         ],
+        /* eslint-disable-next-line @typescript-eslint/ban-ts-comment */
         // @ts-ignore - Testing with invalid value for runtime validation
         geometries: 'polyline'
       })
@@ -1034,6 +1041,7 @@ describe('DirectionsTool', () => {
           [-73.989, 40.733],
           [-73.979, 40.743]
         ],
+        /* eslint-disable-next-line @typescript-eslint/ban-ts-comment */
         // @ts-ignore - Testing with invalid value for runtime validation
         geometries: 'polyline6'
       })

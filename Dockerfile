@@ -16,7 +16,7 @@ COPY . .
 RUN mkdir -p dist && echo '{"sha":"unknown","tag":"unknown","branch":"docker","version":"0.0.1"}' > dist/version.json
 
 # Build the application, overriding the git commands to avoid errors
-RUN npm run build:esm && npm run build:cjs
+RUN npx tshy
 
 # Command to run the server
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/esm/index.js"]

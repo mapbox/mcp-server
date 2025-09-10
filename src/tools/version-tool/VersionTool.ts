@@ -1,7 +1,7 @@
 import {
   McpServer,
   RegisteredTool
-} from '@modelcontextprotocol/sdk/server/mcp';
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { getVersionInfo } from '../../utils/versionUtils.js';
 
@@ -15,6 +15,7 @@ export class VersionTool {
 
   private server: McpServer | null = null;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async run(_rawInput: unknown): Promise<{
     content: Array<{
       type: 'text';
