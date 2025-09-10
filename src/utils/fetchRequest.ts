@@ -1,6 +1,7 @@
 import { getVersionInfo } from './versionUtils.js';
 
 export interface FetchPolicy {
+  id: string;
   handle(
     input: string | URL | Request,
     init: RequestInit,
@@ -16,8 +17,24 @@ export class PolicyPipeline {
     this.fetchImpl = fetchImpl ?? fetch;
   }
 
-  use(policy: FetchPolicy) {
+  usePolicy(policy: FetchPolicy) {
     this.policies.push(policy);
+  }
+
+  removePolicy(policyOrId: FetchPolicy | string) {
+    if (typeof policyOrId === 'string') {
+      this.policies = this.policies.filter((p) => p.id !== policyOrId);
+    } else {
+      this.policies = this.policies.filter((p) => p !== policyOrId);
+    }
+  }
+
+  findPolicyById(id: string): FetchPolicy | undefined {
+    return this.policies.find((p) => p.id === id);
+  }
+
+  listPolicies() {
+    return this.policies;
   }
 
   async fetch(
@@ -41,7 +58,16 @@ export class PolicyPipeline {
 }
 
 export class UserAgentPolicy implements FetchPolicy {
-  constructor(private userAgent: string) {}
+  id: string;
+
+  constructor(
+    private userAgent: string,
+    id?: string
+  ) {
+    this.id =
+      id ??
+      `user-agent-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  }
   async handle(
     input: string | URL | Request,
     init: RequestInit,
@@ -65,24 +91,34 @@ export class UserAgentPolicy implements FetchPolicy {
     return next(input, { ...init, headers });
   }
 
-  static fromVersionInfo(versionInfo: {
-    name: string;
-    version: string;
-    sha: string;
-    tag: string;
-    branch: string;
-  }): UserAgentPolicy {
+  static fromVersionInfo(
+    versionInfo: {
+      name: string;
+      version: string;
+      sha: string;
+      tag: string;
+      branch: string;
+    },
+    id?: string
+  ): UserAgentPolicy {
     const userAgent = `${versionInfo.name}/${versionInfo.version} (${versionInfo.branch}, ${versionInfo.tag}, ${versionInfo.sha})`;
-    return new UserAgentPolicy(userAgent);
+    return new UserAgentPolicy(userAgent, id);
   }
 }
 
 export class RetryPolicy implements FetchPolicy {
+  id: string;
+
   constructor(
     private maxRetries: number = 3,
     private baseDelayMs: number = 200,
-    private maxDelayMs: number = 2000
-  ) {}
+    private maxDelayMs: number = 2000,
+    id?: string
+  ) {
+    this.id =
+      id ??
+      `retry-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  }
 
   async handle(
     input: string | URL | Request,
@@ -119,7 +155,10 @@ export class RetryPolicy implements FetchPolicy {
 
 const pipeline = new PolicyPipeline();
 const versionInfo = getVersionInfo();
-pipeline.use(UserAgentPolicy.fromVersionInfo(versionInfo));
-pipeline.use(new RetryPolicy(3, 200, 2000));
+pipeline.usePolicy(
+  UserAgentPolicy.fromVersionInfo(versionInfo, 'system-user-agent-policy')
+);
+pipeline.usePolicy(new RetryPolicy(3, 200, 2000, 'system-retry-policy'));
 
 export const fetchClient = pipeline.fetch.bind(pipeline);
+export const systemFetchPipeline = pipeline;

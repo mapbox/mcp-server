@@ -19,7 +19,7 @@ export function setupFetch(overrides?: any) {
   // Build a real pipeline with UserAgentPolicy
   const userAgent = 'TestServer/1.0.0 (default, no-tag, abcdef)';
   const pipeline = new PolicyPipeline(mockFetch);
-  pipeline.use(new UserAgentPolicy(userAgent));
+  pipeline.usePolicy(new UserAgentPolicy(userAgent));
 
   return { fetch: pipeline.fetch.bind(pipeline), mockFetch };
 }
