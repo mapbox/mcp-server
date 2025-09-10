@@ -196,7 +196,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
     accessToken: string
   ): Promise<{ type: 'text'; text: string }> {
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}search/geocode/v6/forward`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}search/geocode/v6/forward`
     );
 
     // Required parameters

@@ -106,7 +106,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
     accessToken: string
   ): Promise<any> {
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
     );
     url.searchParams.append('access_token', accessToken);
     if (

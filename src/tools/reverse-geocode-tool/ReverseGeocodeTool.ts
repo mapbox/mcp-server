@@ -140,7 +140,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     }
 
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}search/geocode/v6/reverse`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}search/geocode/v6/reverse`
     );
 
     // Required parameters

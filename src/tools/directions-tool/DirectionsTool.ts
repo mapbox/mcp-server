@@ -463,7 +463,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
       queryString += `&exclude=${excludeEncoded}`;
     }
 
-    const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}directions/v5/mapbox/${input.routing_profile}/${encodedCoords}?${queryString}`;
+    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions/v5/mapbox/${input.routing_profile}/${encodedCoords}?${queryString}`;
 
     const response = await this.fetch(url);
 

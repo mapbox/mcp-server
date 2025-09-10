@@ -45,16 +45,11 @@ describe('MapboxApiBasedTool', () => {
   describe('JWT token validation', () => {
     it('throws an error when the token is not in a valid JWT format', async () => {
       // Test the private isValidJwtFormat method directly
-      const originalToken = MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN;
+      const spy = vi
+        .spyOn(MapboxApiBasedTool, 'mapboxAccessToken', 'get')
+        .mockReturnValue('invalid-token-format');
 
       try {
-        // Temporarily modify the static property for testing
-        Object.defineProperty(MapboxApiBasedTool, 'MAPBOX_ACCESS_TOKEN', {
-          value: 'invalid-token-format',
-          writable: true,
-          configurable: true
-        });
-
         // Create a new instance with the modified token
         const toolWithInvalidToken = new TestTool();
         // Mock the log method separately for this instance
@@ -77,12 +72,7 @@ describe('MapboxApiBasedTool', () => {
           expect.stringMatching(/.*not in valid JWT format.*/)
         );
       } finally {
-        // Restore the original value
-        Object.defineProperty(MapboxApiBasedTool, 'MAPBOX_ACCESS_TOKEN', {
-          value: originalToken,
-          writable: true,
-          configurable: true
-        });
+        spy.mockRestore();
       }
     });
 

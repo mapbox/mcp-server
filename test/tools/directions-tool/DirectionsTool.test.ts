@@ -985,7 +985,14 @@ describe('DirectionsTool', () => {
   });
 
   it('validates geometries enum values', async () => {
-    const tool = new DirectionsTool();
+    const { fetch, mockFetch } = setupFetch();
+    const tool = new DirectionsTool(fetch);
+
+    // Mock successful responses for valid values
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ routes: [], waypoints: [] })
+    });
 
     // Valid values: 'none' and 'geojson'
     await expect(

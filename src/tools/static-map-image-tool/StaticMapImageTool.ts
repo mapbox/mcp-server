@@ -434,7 +434,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     }
 
     const density = input.highDensity ? '@2x' : '';
-    const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
+    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
 
     const response = await this.fetch(url);
 

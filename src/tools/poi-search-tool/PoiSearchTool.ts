@@ -204,7 +204,7 @@ export class PoiSearchTool extends MapboxApiBasedTool<
     );
 
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}search/searchbox/v1/forward`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/forward`
     );
 
     // Required parameters

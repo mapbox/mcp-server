@@ -267,7 +267,7 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
     }
 
     // Construct the URL for the Matrix API request
-    const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}directions-matrix/v1/mapbox/${input.profile}/${joined}?${queryParams.toString()}`;
+    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions-matrix/v1/mapbox/${input.profile}/${joined}?${queryParams.toString()}`;
 
     // Make the request
     const response = await this.fetch(url);

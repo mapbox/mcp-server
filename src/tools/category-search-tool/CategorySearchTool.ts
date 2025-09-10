@@ -169,7 +169,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
   ): Promise<{ type: 'text'; text: string }> {
     // Build URL with required parameters
     const url = new URL(
-      `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}search/searchbox/v1/category/${encodeURIComponent(input.category)}`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/category/${encodeURIComponent(input.category)}`
     );
 
     // Add access token
