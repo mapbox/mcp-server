@@ -23,9 +23,9 @@ export default defineConfig(
       }
     },
     rules: {
-      'unused-imports/no-unused-imports': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
       'n/prefer-node-protocol': 'warn',
+      'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [
         'warn',
         {
