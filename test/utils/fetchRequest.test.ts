@@ -36,7 +36,7 @@ describe('PolicyPipeline', () => {
         { status: 500 }
       ]);
       const pipeline = new PolicyPipeline(mockFetch);
-      pipeline.use(new RetryPolicy(3, 1, 10)); // Use small delays for test speed
+      pipeline.usePolicy(new RetryPolicy(3, 1, 10)); // Use small delays for test speed
 
       const response = await pipeline.fetch('http://test', {});
 
@@ -51,7 +51,7 @@ describe('PolicyPipeline', () => {
         { status: 200, ok: true }
       ]);
       const pipeline = new PolicyPipeline(mockFetch);
-      pipeline.use(new RetryPolicy(3, 1, 10));
+      pipeline.usePolicy(new RetryPolicy(3, 1, 10));
 
       const response = await pipeline.fetch('http://test', {});
 
@@ -63,7 +63,7 @@ describe('PolicyPipeline', () => {
     it('does not retry on 400 errors', async () => {
       const mockFetch = createMockFetch([{ status: 400 }]);
       const pipeline = new PolicyPipeline(mockFetch);
-      pipeline.use(new RetryPolicy(3, 1, 10));
+      pipeline.usePolicy(new RetryPolicy(3, 1, 10));
 
       const response = await pipeline.fetch('http://test', {});
 
@@ -74,7 +74,7 @@ describe('PolicyPipeline', () => {
     it('returns immediately on first success', async () => {
       const mockFetch = createMockFetch([{ status: 200, ok: true }]);
       const pipeline = new PolicyPipeline(mockFetch);
-      pipeline.use(new RetryPolicy(3, 1, 10));
+      pipeline.usePolicy(new RetryPolicy(3, 1, 10));
 
       const response = await pipeline.fetch('http://test', {});
 
@@ -99,7 +99,7 @@ describe('PolicyPipeline', () => {
       ) as Mock;
 
       const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
-      pipeline.use(new UserAgentPolicy('TestAgent/1.0'));
+      pipeline.usePolicy(new UserAgentPolicy('TestAgent/1.0'));
 
       await pipeline.fetch('http://test', {});
 
@@ -124,7 +124,7 @@ describe('PolicyPipeline', () => {
       ) as Mock;
 
       const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
-      pipeline.use(new UserAgentPolicy('TestAgent/1.0'));
+      pipeline.usePolicy(new UserAgentPolicy('TestAgent/1.0'));
 
       await pipeline.fetch('http://test', {
         headers: {
@@ -153,12 +153,113 @@ describe('PolicyPipeline', () => {
       ) as Mock;
 
       const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
-      pipeline.use(new UserAgentPolicy('TestAgent/1.0'));
+      pipeline.usePolicy(new UserAgentPolicy('TestAgent/1.0'));
 
       const headers = new Headers();
       await pipeline.fetch('http://test', { headers });
 
       expect(headers.get('User-Agent')).toBe('TestAgent/1.0');
+    });
+  });
+
+  describe('Policy Management', () => {
+    it('can add and list policies', () => {
+      const mockFetch = vi.fn();
+      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+
+      const userAgentPolicy = new UserAgentPolicy(
+        'TestAgent/1.0',
+        'user-agent-test'
+      );
+      const retryPolicy = new RetryPolicy(3, 100, 1000, 'retry-test');
+
+      pipeline.usePolicy(userAgentPolicy);
+      pipeline.usePolicy(retryPolicy);
+
+      const policies = pipeline.listPolicies();
+      expect(policies).toHaveLength(2);
+      expect(policies[0].id).toBe('user-agent-test');
+      expect(policies[1].id).toBe('retry-test');
+    });
+
+    it('can find policy by ID', () => {
+      const mockFetch = vi.fn();
+      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+
+      const userAgentPolicy = new UserAgentPolicy(
+        'TestAgent/1.0',
+        'user-agent-test'
+      );
+      pipeline.usePolicy(userAgentPolicy);
+
+      const foundPolicy = pipeline.findPolicyById('user-agent-test');
+      expect(foundPolicy).toBe(userAgentPolicy);
+
+      const notFoundPolicy = pipeline.findPolicyById('non-existent');
+      expect(notFoundPolicy).toBeUndefined();
+    });
+
+    it('can remove policy by ID', () => {
+      const mockFetch = vi.fn();
+      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+
+      const userAgentPolicy = new UserAgentPolicy(
+        'TestAgent/1.0',
+        'user-agent-test'
+      );
+      const retryPolicy = new RetryPolicy(3, 100, 1000, 'retry-test');
+
+      pipeline.usePolicy(userAgentPolicy);
+      pipeline.usePolicy(retryPolicy);
+
+      expect(pipeline.listPolicies()).toHaveLength(2);
+
+      pipeline.removePolicy('user-agent-test');
+
+      const policies = pipeline.listPolicies();
+      expect(policies).toHaveLength(1);
+      expect(policies[0].id).toBe('retry-test');
+    });
+
+    it('can remove policy by reference', () => {
+      const mockFetch = vi.fn();
+      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+
+      const userAgentPolicy = new UserAgentPolicy(
+        'TestAgent/1.0',
+        'user-agent-test'
+      );
+      const retryPolicy = new RetryPolicy(3, 100, 1000, 'retry-test');
+
+      pipeline.usePolicy(userAgentPolicy);
+      pipeline.usePolicy(retryPolicy);
+
+      expect(pipeline.listPolicies()).toHaveLength(2);
+
+      pipeline.removePolicy(userAgentPolicy);
+
+      const policies = pipeline.listPolicies();
+      expect(policies).toHaveLength(1);
+      expect(policies[0].id).toBe('retry-test');
+    });
+
+    it('generates automatic IDs for policies without explicit ID', () => {
+      const userAgentPolicy = new UserAgentPolicy('TestAgent/1.0');
+      const retryPolicy = new RetryPolicy(3, 100, 1000);
+
+      expect(userAgentPolicy.id).toMatch(/^user-agent-\d+-[a-z0-9]+$/);
+      expect(retryPolicy.id).toMatch(/^retry-\d+-[a-z0-9]+$/);
+    });
+
+    it('uses provided IDs when specified', () => {
+      const userAgentPolicy = new UserAgentPolicy(
+        'TestAgent/1.0',
+        'custom-ua-id'
+      );
+      const retryPolicy = new RetryPolicy(3, 100, 1000, 'custom-retry-id');
+
+      expect(userAgentPolicy.id).toBe('custom-ua-id');
+      expect(retryPolicy.id).toBe('custom-retry-id');
     });
   });
 });
