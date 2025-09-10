@@ -1,4 +1,4 @@
-import { URLSearchParams } from 'url';
+import { URLSearchParams } from 'node:url';
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { fetchClient } from '../../utils/fetchRequest.js';

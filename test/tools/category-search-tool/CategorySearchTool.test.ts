@@ -1,7 +1,7 @@
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   setupFetch,
   assertHeadersSent

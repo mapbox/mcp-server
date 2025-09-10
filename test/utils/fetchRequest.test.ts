@@ -10,7 +10,7 @@ function createMockFetch(
   responses: Array<{ status: number; ok?: boolean }>
 ): typeof fetch {
   let call = 0;
-  return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+  return vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => {
     const res = responses[Math.min(call, responses.length - 1)];
     call++;
     return {

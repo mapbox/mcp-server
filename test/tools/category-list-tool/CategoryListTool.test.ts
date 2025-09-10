@@ -65,7 +65,7 @@ describe('CategoryListTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const { fetch, mockFetch } = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 403,
       statusText: 'Forbidden'
