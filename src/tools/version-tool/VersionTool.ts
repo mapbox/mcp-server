@@ -1,4 +1,4 @@
-import {
+import type {
   McpServer,
   RegisteredTool
 } from '@modelcontextprotocol/sdk/server/mcp.js';
