@@ -1,4 +1,4 @@
-import { ToolInstance } from '../tools/toolRegistry.js';
+import type { ToolInstance } from '../tools/toolRegistry.js';
 
 export interface ToolConfig {
   enabledTools?: string[];

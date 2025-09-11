@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+import type { ToolConfig } from '../../src/config/toolConfig.js';
 import {
   parseToolConfigFromArgs,
-  filterTools,
-  ToolConfig
+  filterTools
 } from '../../src/config/toolConfig.js';
 
 // Mock getVersionInfo to avoid import.meta.url issues in Vitest

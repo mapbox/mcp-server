@@ -19,7 +19,6 @@ describe('DirectionsTool', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
   });
 
   it('sends custom header', async () => {

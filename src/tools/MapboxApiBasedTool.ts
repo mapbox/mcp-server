@@ -1,9 +1,10 @@
-import {
+import type {
   McpServer,
   RegisteredTool
 } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import { z, ZodTypeAny } from 'zod';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ZodTypeAny } from 'zod';
+import { z } from 'zod';
 
 export const OutputSchema = z.object({
   content: z.array(
