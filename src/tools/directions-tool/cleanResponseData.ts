@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { DirectionsInputSchema } from './DirectionsTool.js';
+import type { z } from 'zod';
+import type { DirectionsInputSchema } from './DirectionsTool.js';
 
 /**
  * Cleans up the API response to reduce token count while preserving useful data.

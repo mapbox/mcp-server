@@ -1,5 +1,9 @@
 import { getVersionInfo } from './versionUtils.js';
 
+function createRandomId(prefix: string): string {
+  return `${prefix}${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
 export interface FetchPolicy {
   id: string;
   handle(
@@ -64,9 +68,7 @@ export class UserAgentPolicy implements FetchPolicy {
     private userAgent: string,
     id?: string
   ) {
-    this.id =
-      id ??
-      `user-agent-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    this.id = id ?? createRandomId('user-agent-');
   }
   async handle(
     input: string | URL | Request,
@@ -115,9 +117,7 @@ export class RetryPolicy implements FetchPolicy {
     private maxDelayMs: number = 2000,
     id?: string
   ) {
-    this.id =
-      id ??
-      `retry-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    this.id = id ?? createRandomId('retry-');
   }
 
   async handle(

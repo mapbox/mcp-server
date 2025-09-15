@@ -21,10 +21,6 @@
       "pkce-challenge": [
         "node_modules/pkce-challenge/dist/index.node"
       ]
-    },
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
-    ]
+    }
   }
 }

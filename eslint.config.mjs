@@ -13,34 +13,41 @@ export default defineConfig(
   {
     plugins: {
       n: nPlugin,
-      'unused-imports': unusedImports,
+      'unused-imports': unusedImports
     },
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: {
-        ...globals.node,
+        ...globals.node
       }
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        {
+          prefer: 'type-imports',
+          disallowTypeAnnotations: false
+        }
+      ],
       'n/prefer-node-protocol': 'warn',
       'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [
         'warn',
         {
-          'vars': 'all',
-          'varsIgnorePattern': '^_',
-          'args': 'after-used',
-          'argsIgnorePattern': '^_',
-        },
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'after-used',
+          argsIgnorePattern: '^_'
+        }
       ]
-    } 
+    }
   },
   {
-    files: ['test/**/*.ts'], 
+    files: ['test/**/*.ts'],
     rules: {
-      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off'
     }
   }
 );

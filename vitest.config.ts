@@ -2,8 +2,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    testTimeout: 1200000,
-    hookTimeout: 1200000,
+    testTimeout: 60000,
+    hookTimeout: 60000,
     reporters: ['default', 'junit'],
     outputFile: {
       junit: 'test-results.xml'
