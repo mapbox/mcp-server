@@ -256,4 +256,4 @@ This MCP server is officially maintained by Mapbox, Inc. We provide:
 
 ---
 
-[BSD 3-Clause License](LICENSE.md)
+[MIT License](LICENSE.md)
