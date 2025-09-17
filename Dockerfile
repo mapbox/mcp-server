@@ -17,6 +17,7 @@ RUN mkdir -p dist && echo '{"sha":"unknown","tag":"unknown","branch":"docker","v
 
 # Build the application, overriding the git commands to avoid errors
 RUN npx tshy
+RUN cp package.json dist/package.json
 
 # Command to run the server
 CMD ["node", "dist/esm/index.js"]
