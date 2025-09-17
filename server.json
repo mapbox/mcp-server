@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.mapbox/mcp-server",
+  "description": "Unlock geospatial intelligence through Mapbox APIs like geocoding, POI search, directions, isochrones and more.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/mapbox/mcp-server",
+    "source": "github"
+  },
+  "version": "0.4.0",
+  "packages": [
+    {
+      "registry_type": "npm",
+      "registry_base_url": "https://registry.npmjs.org",
+      "runtime_hint": "npx",
+      "identifier": "@mapbox/mcp-server",
+      "version": "0.4.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "description": "Your Mapbox access token",
+          "is_required": true,
+          "format": "string",
+          "is_secret": true,
+          "name": "MAPBOX_ACCESS_TOKEN"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.mapbox.com/mcp"
+    }
+  ]  
+}
