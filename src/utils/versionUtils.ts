@@ -18,7 +18,7 @@ export function getVersionInfo(): VersionInfo {
     const dirname = path.dirname(fileURLToPath(import.meta.url));
 
     // Try to read from version.json first (for build artifacts)
-    const versionJsonPath = path.resolve(dirname, '..', 'version.json');
+    const versionJsonPath = path.resolve(dirname, '..', '..', 'version.json');
     try {
       const versionData = readFileSync(versionJsonPath, 'utf-8');
       const info = JSON.parse(versionData) as VersionInfo;
@@ -26,7 +26,13 @@ export function getVersionInfo(): VersionInfo {
       return info;
     } catch {
       // Fall back to package.json
-      const packageJsonPath = path.resolve(dirname, '..', '..', 'package.json');
+      const packageJsonPath = path.resolve(
+        dirname,
+        '..',
+        '..',
+        '..',
+        'package.json'
+      );
       const packageData = readFileSync(packageJsonPath, 'utf-8');
       const packageInfo = JSON.parse(packageData);
 
