@@ -2,6 +2,7 @@
   "name": "@mapbox/mcp-server",
   "version": "0.5.3",
   "description": "Mapbox MCP server.",
+  "mcpName": "io.github.mapbox/mcp-server",
   "main": "./dist/commonjs/index.js",
   "module": "./dist/esm/index.js",
   "type": "module",
