@@ -28,6 +28,7 @@ The following tools are available in the Mapbox MCP Server:
 - `category_search_tool` - Search for POIs by category
 - `directions_tool` - Get directions between locations
 - `forward_geocode_tool` - Convert addresses to coordinates
+- `search_and_geocode_tool` - Search for POIs, brands, chains, geocode cities, towns, addresses
 - `isochrone_tool` - Calculate reachable areas from a point
 - `matrix_tool` - Calculate travel times between multiple points
 - `poi_search_tool` - Search for points of interest

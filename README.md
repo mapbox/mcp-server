@@ -175,6 +175,10 @@ Computes areas that are reachable within a specified amount of times from a loca
 - Optional departure or arrival time specification
 - Color customization for visualization
 
+#### Search and geocode tool
+
+A combination of the category search and forward geocoding tools. If you are seeing usage confusion between forward geocoding and POI search, this tool combines them intuitively. If you have your POI already and only need geocoding, forward geocoding alone is sufficient.
+
 # Development
 
 ## Inspecting server
