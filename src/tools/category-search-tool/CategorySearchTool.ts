@@ -6,7 +6,7 @@ const CategorySearchInputSchema = z.object({
   category: z
     .string()
     .describe(
-      'The canonical category ID to search for (e.g., "restaurant", "hotel", "cafe"). To get the full list of supported categories, use the category_list_tool.'
+      'The canonical place category name to search for (e.g., "restaurant", "hotel", "cafe"). To get the full list of supported categories, use the category_list_tool.'
     ),
   language: z
     .string()
@@ -23,30 +23,11 @@ const CategorySearchInputSchema = z.object({
     .describe('Maximum number of results to return (1-25)'),
   proximity: z
     .union([
-      z.object({
-        longitude: z.number().min(-180).max(180),
-        latitude: z.number().min(-90).max(90)
-      }),
+      z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]),
       z.string().transform((val) => {
         // Handle special case of 'ip'
         if (val === 'ip') {
           return 'ip' as const;
-        }
-        // Handle JSON-stringified object: "{\"longitude\": -82.458107, \"latitude\": 27.937259}"
-        if (val.startsWith('{') && val.endsWith('}')) {
-          try {
-            const parsed = JSON.parse(val);
-            if (
-              typeof parsed === 'object' &&
-              parsed !== null &&
-              typeof parsed.longitude === 'number' &&
-              typeof parsed.latitude === 'number'
-            ) {
-              return { longitude: parsed.longitude, latitude: parsed.latitude };
-            }
-          } catch {
-            // Fall back to other formats
-          }
         }
         // Handle string that looks like an array: "[-82.451668, 27.942964]"
         if (val.startsWith('[') && val.endsWith(']')) {
@@ -55,32 +36,34 @@ const CategorySearchInputSchema = z.object({
             .split(',')
             .map((s) => Number(s.trim()));
           if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-            return { longitude: coords[0], latitude: coords[1] };
+            return coords as [number, number];
           }
         }
         // Handle comma-separated string: "-82.451668,27.942964"
         const parts = val.split(',').map((s) => Number(s.trim()));
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-          return { longitude: parts[0], latitude: parts[1] };
+          return parts as [number, number];
         }
         throw new Error(
-          'Invalid proximity format. Expected {longitude, latitude}, "longitude,latitude", or "ip"'
+          'Invalid proximity format. Expected [longitude, latitude], "longitude,latitude", or "ip"'
         );
       })
     ])
     .optional()
     .describe(
-      'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location'
+      'Location to bias results towards. Either [longitude, latitude] or "ip" for IP-based location'
     ),
   bbox: z
-    .object({
-      minLongitude: z.number().min(-180).max(180),
-      minLatitude: z.number().min(-90).max(90),
-      maxLongitude: z.number().min(-180).max(180),
-      maxLatitude: z.number().min(-90).max(90)
-    })
+    .tuple([
+      z.number().min(-180).max(180),
+      z.number().min(-90).max(90),
+      z.number().min(-180).max(180),
+      z.number().min(-90).max(90)
+    ])
     .optional()
-    .describe('Bounding box to limit results within specified bounds'),
+    .describe(
+      'Bounding box to limit results within [minLon, minLat, maxLon, maxLat]'
+    ),
   country: z
     .array(z.string().length(2))
     .optional()
@@ -115,7 +98,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       !geoJsonResponse.features ||
       geoJsonResponse.features.length === 0
     ) {
-      return 'No results found. This category might not be valid or no places match the search criteria. Use the category_list_tool to see all available categories.';
+      return 'No results found.';
     }
 
     const results = geoJsonResponse.features.map(
@@ -188,17 +171,16 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       if (input.proximity === 'ip') {
         url.searchParams.append('proximity', 'ip');
       } else {
-        const { longitude, latitude } = input.proximity;
-        url.searchParams.append('proximity', `${longitude},${latitude}`);
+        const [lng, lat] = input.proximity;
+        url.searchParams.append('proximity', `${lng},${lat}`);
       }
     }
 
     if (input.bbox) {
-      const { minLongitude, minLatitude, maxLongitude, maxLatitude } =
-        input.bbox;
+      const [minLon, minLat, maxLon, maxLat] = input.bbox;
       url.searchParams.append(
         'bbox',
-        `${minLongitude},${minLatitude},${maxLongitude},${maxLatitude}`
+        `${minLon},${minLat},${maxLon},${maxLat}`
       );
     }
 
