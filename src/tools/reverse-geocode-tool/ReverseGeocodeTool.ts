@@ -71,7 +71,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
 > {
   name = 'reverse_geocode_tool';
   description =
-    'Find addresses, cities, towns, neighborhoods, postcodes, districts, regions, and countries around a specified geographic coordinate pair. Converts geographic coordinates (longitude, latitude) into human-readable addresses or place names. Use limit=1 for best results. This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest that are not of the types mentioned.';
+    'Find addresses, cities, towns, neighborhoods, postcodes, districts, regions, and countries around a specified geographic coordinate pair. Converts geographic coordinates (longitude, latitude) into human-readable addresses or place names. Use limit=1 for best results. This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest that are not of the types mentioned. Supports both JSON and text output formats.';
 
   constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: ReverseGeocodeInputSchema });
