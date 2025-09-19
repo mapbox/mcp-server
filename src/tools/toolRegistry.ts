@@ -8,6 +8,7 @@ import { MatrixTool } from './matrix-tool/MatrixTool.js';
 import { PoiSearchTool } from './poi-search-tool/PoiSearchTool.js';
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
+import { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
 import { VersionTool } from './version-tool/VersionTool.js';
 
 // Central registry of all tools
@@ -22,7 +23,8 @@ export const ALL_TOOLS = [
   new MatrixTool(),
   new PoiSearchTool(),
   new ReverseGeocodeTool(),
-  new StaticMapImageTool()
+  new StaticMapImageTool(),
+  new SearchAndGeocodeTool()
 ] as const;
 
 export type ToolInstance = (typeof ALL_TOOLS)[number];
