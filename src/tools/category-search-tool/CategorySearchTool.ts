@@ -54,12 +54,12 @@ const CategorySearchInputSchema = z.object({
       'Location to bias results towards. Either [longitude, latitude] or "ip" for IP-based location'
     ),
   bbox: z
-    .tuple([
-      z.number().min(-180).max(180),
-      z.number().min(-90).max(90),
-      z.number().min(-180).max(180),
-      z.number().min(-90).max(90)
-    ])
+    .object({
+      minLongitude: z.number().min(-180).max(180),
+      minLatitude: z.number().min(-90).max(90),
+      maxLongitude: z.number().min(-180).max(180),
+      maxLatitude: z.number().min(-90).max(90)
+    })
     .optional()
     .describe(
       'Bounding box to limit results within [minLon, minLat, maxLon, maxLat]'
@@ -98,7 +98,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       !geoJsonResponse.features ||
       geoJsonResponse.features.length === 0
     ) {
-      return 'No results found.';
+      return 'No results found. This category might not be valid or no places match the search criteria. Use the category_list_tool to see all available categories.';
     }
 
     const results = geoJsonResponse.features.map(
@@ -171,16 +171,17 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       if (input.proximity === 'ip') {
         url.searchParams.append('proximity', 'ip');
       } else {
-        const [lng, lat] = input.proximity;
-        url.searchParams.append('proximity', `${lng},${lat}`);
+        const { longitude, latitude } = input.proximity;
+        url.searchParams.append('proximity', `${longitude},${latitude}`);
       }
     }
 
     if (input.bbox) {
-      const [minLon, minLat, maxLon, maxLat] = input.bbox;
+      const { minLongitude, minLatitude, maxLongitude, maxLatitude } =
+        input.bbox;
       url.searchParams.append(
         'bbox',
-        `${minLon},${minLat},${maxLon},${maxLat}`
+        `${minLongitude},${minLatitude},${maxLongitude},${maxLatitude}`
       );
     }
 
