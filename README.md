@@ -206,6 +206,24 @@ npx plop create-tool
 # provide tool name without suffix (e.g. Search)
 ```
 
+## Contributing
+
+We welcome contributions to the Mapbox MCP Server! Please review our standards and guidelines before contributing:
+
+- **[Engineering Standards (CLAUDE.md)](./CLAUDE.md)** - Code quality, testing, documentation, and collaboration standards for all contributors
+- **[AI Agent Instructions (AGENTS.md)](./AGENTS.md)** - Comprehensive guide for AI agents working with this codebase
+- **[GitHub Copilot Guidelines](./.github/copilot-instructions.md)** - Best practices for using GitHub Copilot responsibly in this project
+
+### Quick Start for Contributors
+
+1. Fork the repository and clone your fork
+2. Follow the development setup in our [Engineering Standards](./CLAUDE.md#getting-started)
+3. Make your changes following our coding standards
+4. Add tests for any new functionality
+5. Submit a pull request with a clear description
+
+All contributions must pass our CI checks and code review process. See [CLAUDE.md](./CLAUDE.md) for detailed requirements.
+
 ## Data Usage & Privacy
 
 ### What data is sent to Mapbox APIs
