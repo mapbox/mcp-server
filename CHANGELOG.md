@@ -1,3 +1,7 @@
+## 0.4.1
+
+- Minor changes to tool descriptions for clarity
+
 ## 0.4.0 (Unreleased)
 
 ### Features Added

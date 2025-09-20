@@ -138,7 +138,7 @@ export class ForwardGeocodeTool extends MapboxApiBasedTool<
 > {
   name = 'forward_geocode_tool';
   description =
-    'Forward geocode addresses, cities, towns, neighborhoods, districts, postcodes, regions, and countries using Mapbox Geocoding API v6. Converts location name into geographic coordinates. Setting a proximity point helps to bias results towards a specific area for more relevant results. Do not use this tool for geocoding points of interest like businesses, landmarks, historic sites, museums, etc. Supports both JSON and text output formats.';
+    'This tool converts addresses, cities, towns, neighborhoods, districts, postcodes, regions, and countries into geographic coordinates using Mapbox Geocoding API v6. Setting a proximity point helps to bias results towards a specific area for more relevant results. Do not use this tool for geocoding points of interest like businesses, landmarks, historic sites, museums, etc.';
 
   constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: ForwardGeocodeInputSchema });

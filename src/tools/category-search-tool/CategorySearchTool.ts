@@ -6,7 +6,7 @@ const CategorySearchInputSchema = z.object({
   category: z
     .string()
     .describe(
-      'The canonical category ID to search for (e.g., "restaurant", "hotel", "cafe"). To get the full list of supported categories, use the category_list_tool.'
+      'The canonical place category name to search for (e.g., "restaurant", "hotel", "cafe"). To get the full list of supported categories, use the category_list_tool.'
     ),
   language: z
     .string()
