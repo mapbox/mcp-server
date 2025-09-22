@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { fetchClient } from '../../utils/fetchRequest.js';
 
 const SearchAndGeocodeInputSchema = z.object({
   q: z
@@ -14,7 +15,10 @@ const SearchAndGeocodeInputSchema = z.object({
     ),
   proximity: z
     .union([
-      z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]),
+      z.object({
+        longitude: z.number().min(-180).max(180),
+        latitude: z.number().min(-90).max(90)
+      }),
       z.string().transform((val) => {
         // Handle special case of 'ip'
         if (val === 'ip') {
@@ -45,12 +49,12 @@ const SearchAndGeocodeInputSchema = z.object({
       'Location to bias results towards. Either [longitude, latitude] or "ip" for IP-based location. STRONGLY ENCOURAGED for relevant results.'
     ),
   bbox: z
-    .tuple([
-      z.number().min(-180).max(180),
-      z.number().min(-90).max(90),
-      z.number().min(-180).max(180),
-      z.number().min(-90).max(90)
-    ])
+    .object({
+      minLongitude: z.number().min(-180).max(180),
+      minLatitude: z.number().min(-90).max(90),
+      maxLongitude: z.number().min(-180).max(180),
+      maxLatitude: z.number().min(-90).max(90)
+    })
     .optional()
     .describe(
       'Bounding box to limit results within [minLon, minLat, maxLon, maxLat]'
@@ -84,9 +88,11 @@ const SearchAndGeocodeInputSchema = z.object({
     .optional()
     .describe('Routing profile for ETA calculations'),
   origin: z
-    .tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)])
+    .object({
+      longitude: z.number().min(-180).max(180),
+      latitude: z.number().min(-90).max(90)
+    })
     .optional()
-    .describe('Starting point for ETA calculations as [longitude, latitude]')
 });
 
 export class SearchAndGeocodeTool extends MapboxApiBasedTool<
@@ -96,7 +102,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   description =
     "Search for POIs, brands, chains, geocode cities, towns, addresses. Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc, since the CategorySearchTool is better for that. Setting a proximity point is strongly encouraged for more local results.";
 
-  constructor() {
+  constructor(private fetchImpl: typeof fetch = fetchClient) {
     super({ inputSchema: SearchAndGeocodeInputSchema });
   }
 
@@ -182,17 +188,22 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     if (input.proximity) {
       if (input.proximity === 'ip') {
         url.searchParams.append('proximity', 'ip');
-      } else {
+      } else if (Array.isArray(input.proximity)) {
         const [lng, lat] = input.proximity;
         url.searchParams.append('proximity', `${lng},${lat}`);
+      } else {
+        // Object format with longitude/latitude properties
+        url.searchParams.append(
+          'proximity',
+          `${input.proximity.longitude},${input.proximity.latitude}`
+        );
       }
     }
 
     if (input.bbox) {
-      const [minLon, minLat, maxLon, maxLat] = input.bbox;
       url.searchParams.append(
         'bbox',
-        `${minLon},${minLat},${maxLon},${maxLat}`
+        `${input.bbox.minLongitude},${input.bbox.minLatitude},${input.bbox.maxLongitude},${input.bbox.maxLatitude}`
       );
     }
 
@@ -221,8 +232,10 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     }
 
     if (input.origin) {
-      const [lng, lat] = input.origin;
-      url.searchParams.append('origin', `${lng},${lat}`);
+      url.searchParams.append(
+        'origin',
+        `${input.origin.longitude},${input.origin.latitude}`
+      );
     }
 
     this.log(
@@ -230,7 +243,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       `SearchAndGeocodeTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
     );
 
-    const response = await fetch(url.toString());
+    const response = await this.fetchImpl(url.toString());
 
     if (!response.ok) {
       const errorBody = await response.text();
