@@ -158,7 +158,7 @@ Computes areas that are reachable within a specified amount of times from a loca
 
 #### Search and geocode tool
 
-Uses the [Mapbox Search Box Text Searxh API](https://docs.mapbox.com/api/search/search-box/#search-request) endpoint to power searching for and geocoding POIs, addresses, places, and any other types supported by that API.
+Uses the [Mapbox Search Box Text Search API](https://docs.mapbox.com/api/search/search-box/#search-request) endpoint to power searching for and geocoding POIs, addresses, places, and any other types supported by that API.
 This tool consolidates the functionality that was previously provided by the ForwardGeocodeTool and PoiSearchTool (from earlier versions of this MCP server) into a single tool.
 
 # Development
