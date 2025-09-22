@@ -107,15 +107,6 @@ Generates static map images using the [Mapbox static image API](https://docs.map
 - Overlay options including polylines and polygons
 - Auto-fitting to specified coordinates
 
-#### POI search tool
-
-Finds specific points of interest or brand locations by name using the [Mapbox Search Box forward search API](https://docs.mapbox.com/api/search/search-box/#search-request). Features include:
-
-- Search for specific points of interest by proper name or unique brand (e.g., "Amalie Arena", "Starbucks")
-- Find all nearby branches of a brand (e.g., "Macy's stores near me")
-- Geographic proximity biasing for more relevant results
-- Support for multiple languages and countries
-
 #### Category search tool
 
 Performs a category search using the [Mapbox Search Box category search API](https://docs.mapbox.com/api/search/search-box/#category-search). Features include:
@@ -125,16 +116,6 @@ Performs a category search using the [Mapbox Search Box category search API](htt
 - Customizable result limits
 - Rich metadata for each result
 - Support for multiple languages
-
-#### Forward geocoding tool
-
-Performs forward geocoding using the [Mapbox geocoding V6 API](https://docs.mapbox.com/api/search/geocoding/#forward-geocoding-with-search-text-input). Features include:
-
-- Convert addresses or place names to geographic coordinates
-- Fuzzy matching for partial or misspelled inputs
-- Results filtering by country, region, or bounding box
-- Customizable result limits
-- Multiple language support
 
 #### Reverse geocoding tool
 
@@ -177,7 +158,8 @@ Computes areas that are reachable within a specified amount of times from a loca
 
 #### Search and geocode tool
 
-A combination of the category search and forward geocoding tools. If you are seeing usage confusion between forward geocoding and POI search, this tool combines them intuitively. If you have your POI already and only need geocoding, forward geocoding alone is sufficient.
+Uses the [Mapbox Search Box Text Searxh API](https://docs.mapbox.com/api/search/search-box/#search-request) endpoint to power searching for and geocoding POIs, addresses, places, and any other types supported by that API.
+This tool consolidates the functionality that was previously provided by the ForwardGeocodeTool and PoiSearchTool (from earlier versions of this MCP server) into a single tool.
 
 # Development
 
