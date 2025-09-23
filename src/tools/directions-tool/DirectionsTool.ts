@@ -123,24 +123,21 @@ const validateIsoDateTime = (
 export const DirectionsInputSchema = z.object({
   coordinates: z
     .array(
-      z
-        .array(z.number())
-        .length(2)
-        .refine(
-          (coord) => {
-            const [lng, lat] = coord;
-            return lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
-          },
-          {
-            message:
-              'Each coordinate must be [longitude, latitude] where longitude is between -180 and 180, and latitude is between -90 and 90'
-          }
-        )
+      z.object({
+        longitude: z
+          .number()
+          .min(-180, 'Longitude must be between -180 and 180 degrees')
+          .max(180, 'Longitude must be between -180 and 180 degrees'),
+        latitude: z
+          .number()
+          .min(-90, 'Latitude must be between -90 and 90 degrees')
+          .max(90, 'Latitude must be between -90 and 90 degrees')
+      })
     )
     .min(2, 'At least two coordinate pairs are required.')
     .max(25, 'Up to 25 coordinate pairs are supported.')
     .describe(
-      'Array of [longitude, latitude] coordinate pairs to visit in order. ' +
+      'Array of coordinate objects with longitude and latitude properties to visit in order. ' +
         'Must include at least 2 coordinate pairs (starting and ending points). ' +
         'Up to 25 coordinates total are supported.'
     ),
@@ -400,7 +397,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
     }
 
     const joined = input.coordinates
-      .map(([lng, lat]) => `${lng},${lat}`)
+      .map(({ longitude, latitude }) => `${longitude},${latitude}`)
       .join(';');
     const encodedCoords = encodeURIComponent(joined);
 
