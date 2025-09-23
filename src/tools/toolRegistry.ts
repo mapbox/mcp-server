@@ -2,12 +2,11 @@
 import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
-import { ForwardGeocodeTool } from './forward-geocode-tool/ForwardGeocodeTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MatrixTool } from './matrix-tool/MatrixTool.js';
-import { PoiSearchTool } from './poi-search-tool/PoiSearchTool.js';
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
+import { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
 import { VersionTool } from './version-tool/VersionTool.js';
 
 // Central registry of all tools
@@ -17,12 +16,11 @@ export const ALL_TOOLS = [
   new CategoryListTool(),
   new CategorySearchTool(),
   new DirectionsTool(),
-  new ForwardGeocodeTool(),
   new IsochroneTool(),
   new MatrixTool(),
-  new PoiSearchTool(),
   new ReverseGeocodeTool(),
-  new StaticMapImageTool()
+  new StaticMapImageTool(),
+  new SearchAndGeocodeTool()
 ] as const;
 
 export type ToolInstance = (typeof ALL_TOOLS)[number];

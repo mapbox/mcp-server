@@ -1,3 +1,9 @@
+## 0.5.0
+
+- Introduce new tool: SearchAndGeocodeTool
+- Remove former tools: ForwardGeocodeTool, PoiSearchTool; their
+  capabilities are combined in the new tool
+
 ## 0.4.1
 
 - Minor changes to tool descriptions for clarity
