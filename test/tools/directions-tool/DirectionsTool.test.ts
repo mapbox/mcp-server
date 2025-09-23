@@ -26,8 +26,8 @@ describe('DirectionsTool', () => {
 
     await new DirectionsTool(fetch).run({
       coordinates: [
-        [-74.102094, 40.692815],
-        [-74.1022094, 40.792815]
+        { longitude: -74.102094, latitude: 40.692815 },
+        { longitude: -74.1022094, latitude: 40.792815 }
       ]
     });
 
@@ -39,8 +39,8 @@ describe('DirectionsTool', () => {
 
     await new DirectionsTool(fetch).run({
       coordinates: [
-        [-73.989, 40.733],
-        [-73.979, 40.743]
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
       ]
     });
 
@@ -56,9 +56,9 @@ describe('DirectionsTool', () => {
 
     await new DirectionsTool(fetch).run({
       coordinates: [
-        [-122.42, 37.78],
-        [-122.4, 37.79],
-        [-122.39, 37.77]
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -122.4, latitude: 37.79 },
+        { longitude: -122.39, latitude: 37.77 }
       ],
       routing_profile: 'walking',
       geometries: 'geojson',
@@ -84,8 +84,8 @@ describe('DirectionsTool', () => {
 
     await new DirectionsTool(fetch).run({
       coordinates: [
-        [-118.24, 34.05],
-        [-118.3, 34.02]
+        { longitude: -118.24, latitude: 34.05 },
+        { longitude: -118.3, latitude: 34.02 }
       ]
     });
 
@@ -103,8 +103,8 @@ describe('DirectionsTool', () => {
 
     await new DirectionsTool(fetch).run({
       coordinates: [
-        [-118.24, 34.05],
-        [-118.3, 34.02]
+        { longitude: -118.24, latitude: 34.05 },
+        { longitude: -118.3, latitude: 34.02 }
       ],
       geometries: 'none'
     });
@@ -123,8 +123,8 @@ describe('DirectionsTool', () => {
 
     await new DirectionsTool(fetch).run({
       coordinates: [
-        [-74.0, 40.7],
-        [-73.9, 40.8]
+        { longitude: -74.0, latitude: 40.7 },
+        { longitude: -73.9, latitude: 40.8 }
       ],
       exclude: 'toll,point(-73.95 40.75)'
     });
@@ -149,8 +149,8 @@ describe('DirectionsTool', () => {
 
     const result = await new DirectionsTool(fetch).run({
       coordinates: [
-        [-73.989, 40.733],
-        [-73.979, 40.743]
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
       ]
     });
 
@@ -168,7 +168,7 @@ describe('DirectionsTool', () => {
     // Test with only one coordinate (invalid)
     await expect(
       tool.run({
-        coordinates: [[-73.989, 40.733]]
+        coordinates: [{ longitude: -73.989, latitude: 40.733 }]
       })
     ).resolves.toMatchObject({
       isError: true
@@ -188,7 +188,10 @@ describe('DirectionsTool', () => {
     const tool = new DirectionsTool();
 
     // Create an array of 26 coordinates (one more than allowed)
-    const tooManyCoords = Array(26).fill([-73.989, 40.733]);
+    const tooManyCoords = Array(26).fill({
+      longitude: -73.989,
+      latitude: 40.733
+    });
 
     await expect(
       tool.run({
@@ -204,8 +207,8 @@ describe('DirectionsTool', () => {
 
     await new DirectionsTool(fetch).run({
       coordinates: [
-        [-73.989, 40.733],
-        [-73.979, 40.743]
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
       ]
     });
 
@@ -220,7 +223,7 @@ describe('DirectionsTool', () => {
     // Create an array of exactly 25 coordinates (maximum allowed)
     const maxCoords = Array(25)
       .fill(0)
-      .map((_, i) => [-74 + i * 0.01, 40 + i * 0.01]);
+      .map((_, i) => ({ longitude: -74 + i * 0.01, latitude: 40 + i * 0.01 }));
 
     await new DirectionsTool(fetch).run({
       coordinates: maxCoords
@@ -230,7 +233,7 @@ describe('DirectionsTool', () => {
 
     // Check that all coordinates are properly encoded
     for (let i = 0; i < maxCoords.length; i++) {
-      const [lng, lat] = maxCoords[i];
+      const { longitude: lng, latitude: lat } = maxCoords[i];
       const semicolon = i < 24 ? '%3B' : '';
       const expectedCoord = `${lng}%2C${lat}` + semicolon;
       expect(calledUrl).toContain(expectedCoord);
@@ -248,8 +251,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving',
           exclude: 'toll,motorway,unpaved'
@@ -262,8 +265,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving-traffic',
           exclude: 'tunnel,country_border,state_border'
@@ -280,8 +283,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'walking',
           exclude: 'toll'
@@ -294,8 +297,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'cycling',
           exclude: 'motorway'
@@ -313,8 +316,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving',
           exclude: 'ferry'
@@ -327,8 +330,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'walking',
           exclude: 'ferry'
@@ -341,8 +344,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'cycling',
           exclude: 'cash_only_tolls'
@@ -360,8 +363,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving',
           exclude: 'point(-73.95 40.75)'
@@ -374,8 +377,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'walking',
           exclude: 'point(-73.95 40.75)'
@@ -388,8 +391,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'cycling',
           exclude: 'point(-73.95 40.75)'
@@ -407,8 +410,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving',
           exclude: 'toll,motorway,ferry,cash_only_tolls,point(-73.95 40.75)'
@@ -421,8 +424,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'walking',
           exclude: 'ferry,toll'
@@ -435,8 +438,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'cycling',
           exclude: 'ferry,cash_only_tolls'
@@ -457,8 +460,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving',
           depart_at: validDateTime
@@ -476,8 +479,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving-traffic',
           depart_at: validDateTime
@@ -501,8 +504,8 @@ describe('DirectionsTool', () => {
         await expect(
           tool.run({
             coordinates: [
-              [-73.989, 40.733],
-              [-73.979, 40.743]
+              { longitude: -73.989, latitude: 40.733 },
+              { longitude: -73.979, latitude: 40.743 }
             ],
             routing_profile: 'driving',
             max_height: 4.5,
@@ -522,8 +525,8 @@ describe('DirectionsTool', () => {
         await expect(
           tool.run({
             coordinates: [
-              [-73.989, 40.733],
-              [-73.979, 40.743]
+              { longitude: -73.989, latitude: 40.733 },
+              { longitude: -73.979, latitude: 40.743 }
             ],
             routing_profile: 'driving-traffic',
             max_height: 3.2
@@ -543,8 +546,8 @@ describe('DirectionsTool', () => {
         await expect(
           tool.run({
             coordinates: [
-              [-73.989, 40.733],
-              [-73.979, 40.743]
+              { longitude: -73.989, latitude: 40.733 },
+              { longitude: -73.979, latitude: 40.743 }
             ],
             routing_profile: 'walking',
             max_height: 4.5
@@ -557,8 +560,8 @@ describe('DirectionsTool', () => {
         await expect(
           tool.run({
             coordinates: [
-              [-73.989, 40.733],
-              [-73.979, 40.743]
+              { longitude: -73.989, latitude: 40.733 },
+              { longitude: -73.979, latitude: 40.743 }
             ],
             routing_profile: 'cycling',
             max_width: 2.0
@@ -575,8 +578,8 @@ describe('DirectionsTool', () => {
         await expect(
           tool.run({
             coordinates: [
-              [-73.989, 40.733],
-              [-73.979, 40.743]
+              { longitude: -73.989, latitude: 40.733 },
+              { longitude: -73.979, latitude: 40.743 }
             ],
             routing_profile: 'driving',
             max_height: 15.0
@@ -589,8 +592,8 @@ describe('DirectionsTool', () => {
         await expect(
           tool.run({
             coordinates: [
-              [-73.989, 40.733],
-              [-73.979, 40.743]
+              { longitude: -73.989, latitude: 40.733 },
+              { longitude: -73.979, latitude: 40.743 }
             ],
             routing_profile: 'driving',
             max_width: -1.0
@@ -603,8 +606,8 @@ describe('DirectionsTool', () => {
         await expect(
           tool.run({
             coordinates: [
-              [-73.989, 40.733],
-              [-73.979, 40.743]
+              { longitude: -73.989, latitude: 40.733 },
+              { longitude: -73.979, latitude: 40.743 }
             ],
             routing_profile: 'driving',
             max_weight: 150.0
@@ -623,8 +626,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'walking',
           depart_at: validDateTime
@@ -637,8 +640,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'cycling',
           depart_at: validDateTime
@@ -652,8 +655,8 @@ describe('DirectionsTool', () => {
       const { fetch } = setupFetch();
       const tool = new DirectionsTool(fetch);
       const baseCoordinates = [
-        [-73.989, 40.733],
-        [-73.979, 40.743]
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
       ];
 
       // Format 1: YYYY-MM-DDThh:mm:ssZ
@@ -690,8 +693,8 @@ describe('DirectionsTool', () => {
     it('rejects invalid date-time formats', async () => {
       const tool = new DirectionsTool();
       const baseCoordinates = [
-        [-73.989, 40.733],
-        [-73.979, 40.743]
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
       ];
 
       // Invalid format examples
@@ -722,8 +725,8 @@ describe('DirectionsTool', () => {
     it('rejects dates with invalid components', async () => {
       const tool = new DirectionsTool();
       const baseCoordinates = [
-        [-73.989, 40.733],
-        [-73.979, 40.743]
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
       ];
 
       // Invalid time components
@@ -757,8 +760,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           depart_at: dateTimeWithSeconds
         })
@@ -786,8 +789,8 @@ describe('DirectionsTool', () => {
       await expect(
         tool.run({
           coordinates: [
-            [-73.989, 40.733],
-            [-73.979, 40.743]
+            { longitude: -73.989, latitude: 40.733 },
+            { longitude: -73.979, latitude: 40.743 }
           ],
           routing_profile: 'driving',
           arrive_by: dateTimeWithSeconds
@@ -815,8 +818,8 @@ describe('DirectionsTool', () => {
       // Test with driving profile - should work
       await new DirectionsTool(fetch).run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'driving',
         arrive_by: validDateTime
@@ -835,8 +838,8 @@ describe('DirectionsTool', () => {
       // Test with driving-traffic profile
       const result1 = await new DirectionsTool().run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'driving-traffic',
         arrive_by: validDateTime
@@ -847,8 +850,8 @@ describe('DirectionsTool', () => {
       // Test with walking profile
       const result2 = await new DirectionsTool().run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'walking',
         arrive_by: validDateTime
@@ -859,8 +862,8 @@ describe('DirectionsTool', () => {
       // Test with cycling profile
       const result3 = await new DirectionsTool().run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'cycling',
         arrive_by: validDateTime
@@ -872,8 +875,8 @@ describe('DirectionsTool', () => {
     it('rejects when both arrive_by and depart_at are provided', async () => {
       const result = await new DirectionsTool().run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'driving',
         depart_at: '2025-06-05T09:30:00Z',
@@ -888,8 +891,8 @@ describe('DirectionsTool', () => {
 
       await new DirectionsTool(fetch).run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'driving',
         arrive_by: '2025-06-05T10:30:00Z'
@@ -901,8 +904,8 @@ describe('DirectionsTool', () => {
       // Test with timezone offset format
       await new DirectionsTool(fetch).run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'driving',
         arrive_by: '2025-06-05T10:30:00+02:00'
@@ -914,8 +917,8 @@ describe('DirectionsTool', () => {
       // Test with simple time format (no seconds, no timezone)
       await new DirectionsTool(fetch).run({
         coordinates: [
-          [-74.1, 40.7],
-          [-74.2, 40.8]
+          { longitude: -74.1, latitude: 40.7 },
+          { longitude: -74.2, latitude: 40.8 }
         ],
         routing_profile: 'driving',
         arrive_by: '2025-06-05T10:30'
@@ -947,8 +950,8 @@ describe('DirectionsTool', () => {
       for (const format of invalidFormats) {
         const result = await new DirectionsTool().run({
           coordinates: [
-            [-74.1, 40.7],
-            [-74.2, 40.8]
+            { longitude: -74.1, latitude: 40.7 },
+            { longitude: -74.2, latitude: 40.8 }
           ],
           routing_profile: 'driving',
           arrive_by: format
@@ -971,8 +974,8 @@ describe('DirectionsTool', () => {
       for (const date of invalidDates) {
         const result = await new DirectionsTool().run({
           coordinates: [
-            [-74.1, 40.7],
-            [-74.2, 40.8]
+            { longitude: -74.1, latitude: 40.7 },
+            { longitude: -74.2, latitude: 40.8 }
           ],
           routing_profile: 'driving',
           arrive_by: date
@@ -997,8 +1000,8 @@ describe('DirectionsTool', () => {
     await expect(
       tool.run({
         coordinates: [
-          [-73.989, 40.733],
-          [-73.979, 40.743]
+          { longitude: -73.989, latitude: 40.733 },
+          { longitude: -73.979, latitude: 40.743 }
         ],
         geometries: 'none'
       })
@@ -1009,8 +1012,8 @@ describe('DirectionsTool', () => {
     await expect(
       tool.run({
         coordinates: [
-          [-73.989, 40.733],
-          [-73.979, 40.743]
+          { longitude: -73.989, latitude: 40.733 },
+          { longitude: -73.979, latitude: 40.743 }
         ],
         geometries: 'geojson'
       })
@@ -1023,8 +1026,8 @@ describe('DirectionsTool', () => {
     await expect(
       tool.run({
         coordinates: [
-          [-73.989, 40.733],
-          [-73.979, 40.743]
+          { longitude: -73.989, latitude: 40.733 },
+          { longitude: -73.979, latitude: 40.743 }
         ],
         /* eslint-disable-next-line @typescript-eslint/ban-ts-comment */
         // @ts-ignore - Testing with invalid value for runtime validation
@@ -1037,8 +1040,8 @@ describe('DirectionsTool', () => {
     await expect(
       tool.run({
         coordinates: [
-          [-73.989, 40.733],
-          [-73.979, 40.743]
+          { longitude: -73.989, latitude: 40.733 },
+          { longitude: -73.979, latitude: 40.743 }
         ],
         /* eslint-disable-next-line @typescript-eslint/ban-ts-comment */
         // @ts-ignore - Testing with invalid value for runtime validation
