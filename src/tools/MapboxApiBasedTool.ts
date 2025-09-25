@@ -4,6 +4,7 @@ import type {
 } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny } from 'zod';
+import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
 export const OutputSchema = z.object({
@@ -26,6 +27,7 @@ export const OutputSchema = z.object({
 export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
   abstract readonly name: string;
   abstract readonly description: string;
+  abstract readonly annotations: ToolAnnotations;
 
   readonly inputSchema: InputSchema;
   protected server: McpServer | null = null;
@@ -136,10 +138,14 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
    */
   installTo(server: McpServer): RegisteredTool {
     this.server = server;
-    return server.tool(
+    return server.registerTool(
       this.name,
-      this.description,
-      (this.inputSchema as unknown as z.ZodObject<any>).shape,
+      {
+        title: this.annotations.title,
+        description: this.description,
+        inputSchema: (this.inputSchema as unknown as z.ZodObject<any>).shape,
+        annotations: this.annotations
+      },
       (args, extra) => this.run(args, extra)
     );
   }

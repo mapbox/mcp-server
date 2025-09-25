@@ -2,6 +2,7 @@ import type {
   McpServer,
   RegisteredTool
 } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { getVersionInfo } from '../../utils/versionUtils.js';
 
@@ -12,6 +13,13 @@ export class VersionTool {
   readonly description =
     'Get the current version information of the MCP server';
   readonly inputSchema = InputSchema;
+  readonly annotations: ToolAnnotations = {
+    title: 'Version Information Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false
+  };
 
   private server: McpServer | null = null;
 
@@ -60,10 +68,14 @@ export class VersionTool {
 
   installTo(server: McpServer): RegisteredTool {
     this.server = server;
-    return server.tool(
+    return server.registerTool(
       this.name,
-      this.description,
-      this.inputSchema.shape,
+      {
+        title: this.annotations.title,
+        description: this.description,
+        inputSchema: this.inputSchema.shape,
+        annotations: this.annotations
+      },
       this.run.bind(this)
     );
   }

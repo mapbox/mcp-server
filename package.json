@@ -16,7 +16,8 @@
     "prepare": "husky && node .husky/setup-hooks.js",
     "test": "vitest",
     "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
-    "generate-version": "node scripts/build-helpers.cjs generate-version"
+    "generate-version": "node scripts/build-helpers.cjs generate-version",
+    "dev:inspect": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --fix",

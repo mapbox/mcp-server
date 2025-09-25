@@ -86,6 +86,13 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
   name = 'matrix_tool';
   description =
     'Calculates travel times and distances between multiple points using Mapbox Matrix API.';
+  annotations = {
+    title: 'Matrix Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  };
 
   private fetch: typeof globalThis.fetch;
 
