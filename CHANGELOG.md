@@ -1,3 +1,7 @@
+## 0.5.3-dev
+
+- Add server.json for MCP registry
+
 ## 0.5.0
 
 - Introduce new tool: SearchAndGeocodeTool
