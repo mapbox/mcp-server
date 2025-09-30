@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "@mapbox/mcp-server",
   "display_name": "Mapbox MCP Server",
-  "version": "0.5.4",
+  "version": "0.5.5-dev",
   "description": "Mapbox MCP server.",
   "author": {
     "name": "Mapbox, Inc."

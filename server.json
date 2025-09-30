@@ -7,13 +7,13 @@
     "url": "https://github.com/mapbox/mcp-server",
     "source": "github"
   },
-  "version": "0.5.3-dev",
+  "version": "0.5.4-dev",
   "packages": [
     {
       "registry_type": "npm",
       "registry_base_url": "https://registry.npmjs.org",
       "runtime_hint": "npx",
-      "version": "0.5.3-dev",
+      "version": "0.5.4-dev",
       "identifier": "@mapbox/mcp-server",
       "transport": {
         "type": "stdio"
@@ -34,5 +34,5 @@
       "type": "streamable-http",
       "url": "https://mcp.mapbox.com/mcp"
     }
-  ]  
+  ]
 }
