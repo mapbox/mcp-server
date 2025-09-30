@@ -17,6 +17,7 @@
     "test": "vitest",
     "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
     "generate-version": "node scripts/build-helpers.cjs generate-version",
+    "sync-manifest": "node scripts/sync-manifest-version.cjs",
     "dev:inspect": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js"
   },
   "lint-staged": {

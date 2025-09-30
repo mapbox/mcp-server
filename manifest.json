@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "@mapbox/mcp-server",
   "display_name": "Mapbox MCP Server",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Mapbox MCP server.",
   "author": {
     "name": "Mapbox, Inc."
@@ -16,7 +16,7 @@
         "${__dirname}/dist/esm/index.js"
       ],
       "env": {
-        "MAPBOX_ACCESS_TOKEN" : "${user_config.MAPBOX_ACCESS_TOKEN}"
+        "MAPBOX_ACCESS_TOKEN": "${user_config.MAPBOX_ACCESS_TOKEN}"
       }
     }
   },
