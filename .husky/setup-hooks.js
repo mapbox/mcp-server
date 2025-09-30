@@ -1,7 +1,6 @@
-/*global console*/
-import { writeFileSync, mkdirSync, chmodSync, constants } from 'fs';
-import { execSync } from 'child_process';
-import { platform } from 'os';
+import { writeFileSync, mkdirSync, chmodSync, constants } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { platform } from 'node:os';
 
 mkdirSync('.husky', { recursive: true });
 
@@ -10,6 +9,8 @@ execSync('git config core.hooksPath .husky');
 writeFileSync(
   '.husky/pre-commit',
   `#!/usr/bin/env sh
+npm run sync-manifest
+git add manifest.json
 npx lint-staged`
 );
 
