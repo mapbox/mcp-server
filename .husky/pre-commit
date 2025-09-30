@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+npm run sync-manifest
+git add manifest.json
+npx lint-staged
