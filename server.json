@@ -12,18 +12,18 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "runtime_hint": "npx",
+      "runtimeHint": "npx",
       "version": "0.5.4-dev-0",
       "identifier": "@mapbox/mcp-server",
       "transport": {
         "type": "stdio"
       },
-      "environment_variables": [
+      "environmentVariables": [
         {
           "description": "Your Mapbox access token",
-          "is_required": true,
           "format": "string",
-          "is_secret": true,
+          "isRequired": true,
+          "isSecret": true,
           "name": "MAPBOX_ACCESS_TOKEN"
         }
       ]
