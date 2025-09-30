@@ -50,8 +50,8 @@ export abstract class BaseTool<InputSchema extends ZodTypeAny> {
     level: 'debug' | 'info' | 'warning' | 'error',
     data: any
   ): void {
-    if (this.server) {
-      this.server.server.sendLoggingMessage({ level, data });
+    if (this.server?.server) {
+      void this.server.server.sendLoggingMessage({ level, data });
     }
   }
 }
