@@ -93,6 +93,13 @@ export class IsochroneTool extends MapboxApiBasedTool<
     - Show a user how far they can travel in X minutes from their current location
     - Determine whether a destination is within a certain travel time threshold
     - Compare travel ranges for different modes of transportation'`;
+  annotations = {
+    title: 'Isochrone Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  };
 
   private fetch: typeof globalThis.fetch;
 

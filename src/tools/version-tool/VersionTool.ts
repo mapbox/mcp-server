@@ -1,19 +1,24 @@
-import type {
-  McpServer,
-  RegisteredTool
-} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { BaseTool } from '../BaseTool.js';
 import { getVersionInfo } from '../../utils/versionUtils.js';
 
 const InputSchema = z.object({});
 
-export class VersionTool {
+export class VersionTool extends BaseTool<typeof InputSchema> {
   readonly name = 'version_tool';
   readonly description =
     'Get the current version information of the MCP server';
-  readonly inputSchema = InputSchema;
+  readonly annotations = {
+    title: 'Version Information Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false
+  };
 
-  private server: McpServer | null = null;
+  constructor() {
+    super({ inputSchema: InputSchema });
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async run(_rawInput: unknown): Promise<{
@@ -55,22 +60,6 @@ export class VersionTool {
         ],
         isError: true
       };
-    }
-  }
-
-  installTo(server: McpServer): RegisteredTool {
-    this.server = server;
-    return server.tool(
-      this.name,
-      this.description,
-      this.inputSchema.shape,
-      this.run.bind(this)
-    );
-  }
-
-  private log(level: 'debug' | 'info' | 'warning' | 'error', data: any): void {
-    if (this.server) {
-      this.server.server.sendLoggingMessage({ level, data });
     }
   }
 }

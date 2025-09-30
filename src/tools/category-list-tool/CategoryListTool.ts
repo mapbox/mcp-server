@@ -47,6 +47,13 @@ export class CategoryListTool extends MapboxApiBasedTool<
   name = 'category_list_tool';
   description =
     'Tool for retrieving the list of supported categories from Mapbox Search API. Use this when another function requires a list of categories. Returns all available category IDs by default. Only use pagination (limit/offset) if token usage optimization is required. If using pagination, make multiple calls to retrieve ALL categories before proceeding with other tasks to ensure complete data.';
+  annotations = {
+    title: 'Category List Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  };
 
   constructor(private fetchImpl: typeof fetch = fetchClient) {
     super({ inputSchema: CategoryListInputSchema });

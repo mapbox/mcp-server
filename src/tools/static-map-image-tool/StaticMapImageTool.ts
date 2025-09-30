@@ -362,6 +362,13 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   name = 'static_map_image_tool';
   description =
     'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns PNG for vector styles, JPEG for raster-only styles.';
+  annotations = {
+    title: 'Static Map Image Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  };
 
   constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: StaticMapImageInputSchema });

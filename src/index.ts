@@ -22,8 +22,7 @@ const server = new McpServer(
   },
   {
     capabilities: {
-      tools: {},
-      logging: {}
+      tools: {}
     }
   }
 );

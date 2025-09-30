@@ -101,6 +101,13 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   name = 'search_and_geocode_tool';
   description =
     "Search for POIs, brands, chains, geocode cities, towns, addresses. Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc, because category_search_tool is better for that. Setting a proximity point is strongly encouraged for more local results.";
+  annotations = {
+    title: 'Search and Geocode Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  };
 
   constructor(private fetchImpl: typeof fetch = fetchClient) {
     super({ inputSchema: SearchAndGeocodeInputSchema });

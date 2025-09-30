@@ -301,6 +301,13 @@ export class DirectionsTool extends MapboxApiBasedTool<
   name = 'directions_tool';
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method.';
+  annotations = {
+    title: 'Directions Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  };
 
   constructor(private fetch: typeof globalThis.fetch = fetchClient) {
     super({ inputSchema: DirectionsInputSchema });

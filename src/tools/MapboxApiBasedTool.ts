@@ -1,10 +1,7 @@
-import type {
-  McpServer,
-  RegisteredTool
-} from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny } from 'zod';
 import { z } from 'zod';
+import { BaseTool } from './BaseTool.js';
 
 export const OutputSchema = z.object({
   content: z.array(
@@ -23,12 +20,12 @@ export const OutputSchema = z.object({
   isError: z.boolean().default(false)
 });
 
-export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
+export abstract class MapboxApiBasedTool<
+  InputSchema extends ZodTypeAny
+> extends BaseTool<InputSchema> {
   abstract readonly name: string;
   abstract readonly description: string;
-
-  readonly inputSchema: InputSchema;
-  protected server: McpServer | null = null;
+  abstract readonly annotations: import('@modelcontextprotocol/sdk/types.js').ToolAnnotations;
 
   static get mapboxAccessToken() {
     return process.env.MAPBOX_ACCESS_TOKEN;
@@ -39,7 +36,7 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
   }
 
   constructor(params: { inputSchema: InputSchema }) {
-    this.inputSchema = params.inputSchema;
+    super(params);
   }
 
   /**
@@ -130,29 +127,4 @@ export abstract class MapboxApiBasedTool<InputSchema extends ZodTypeAny> {
     _input: z.infer<InputSchema>,
     accessToken: string
   ): Promise<any>;
-
-  /**
-   * Installs the tool to the given MCP server.
-   */
-  installTo(server: McpServer): RegisteredTool {
-    this.server = server;
-    return server.tool(
-      this.name,
-      this.description,
-      (this.inputSchema as unknown as z.ZodObject<any>).shape,
-      (args, extra) => this.run(args, extra)
-    );
-  }
-
-  /**
-   * Helper method to send logging messages
-   */
-  protected log(
-    level: 'debug' | 'info' | 'warning' | 'error',
-    data: any
-  ): void {
-    if (this.server) {
-      this.server.server.sendLoggingMessage({ level, data });
-    }
-  }
 }
