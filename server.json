@@ -10,8 +10,8 @@
   "version": "0.5.4-dev-0",
   "packages": [
     {
-      "registry_type": "npm",
-      "registry_base_url": "https://registry.npmjs.org",
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
       "runtime_hint": "npx",
       "version": "0.5.4-dev-0",
       "identifier": "@mapbox/mcp-server",
