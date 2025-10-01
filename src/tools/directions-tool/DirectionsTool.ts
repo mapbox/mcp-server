@@ -1,5 +1,6 @@
 import { URLSearchParams } from 'node:url';
 import { z } from 'zod';
+import { coordinateSchema } from '../../schemas/shared.js';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from './formatIsoDateTime.js';
@@ -122,18 +123,7 @@ const validateIsoDateTime = (
 
 export const DirectionsInputSchema = z.object({
   coordinates: z
-    .array(
-      z.object({
-        longitude: z
-          .number()
-          .min(-180, 'Longitude must be between -180 and 180 degrees')
-          .max(180, 'Longitude must be between -180 and 180 degrees'),
-        latitude: z
-          .number()
-          .min(-90, 'Latitude must be between -90 and 90 degrees')
-          .max(90, 'Latitude must be between -90 and 90 degrees')
-      })
-    )
+    .array(coordinateSchema)
     .min(2, 'At least two coordinate pairs are required.')
     .max(25, 'Up to 25 coordinate pairs are supported.')
     .describe(
@@ -315,7 +305,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
     accessToken: string
-  ): Promise<any> {
+  ): Promise<unknown> {
     // Validate exclude parameter against the actual routing_profile
     // This is needed because some exclusions are only driving specific
     if (input.exclude) {

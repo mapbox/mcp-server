@@ -1,33 +1,25 @@
 import { z } from 'zod';
+import {
+  longitudeSchema,
+  latitudeSchema,
+  countrySchema,
+  languageSchema
+} from '../../schemas/shared.js';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 
 const ReverseGeocodeInputSchema = z.object({
-  longitude: z
-    .number()
-    .min(-180)
-    .max(180)
-    .describe('Longitude coordinate to reverse geocode'),
-  latitude: z
-    .number()
-    .min(-90)
-    .max(90)
-    .describe('Latitude coordinate to reverse geocode'),
+  longitude: longitudeSchema.describe(
+    'Longitude coordinate to reverse geocode'
+  ),
+  latitude: latitudeSchema.describe('Latitude coordinate to reverse geocode'),
   permanent: z
     .boolean()
     .optional()
     .default(false)
     .describe('Whether results can be stored permanently'),
-  country: z
-    .array(z.string().length(2))
-    .optional()
-    .describe('Array of ISO 3166 alpha 2 country codes to limit results'),
-  language: z
-    .string()
-    .optional()
-    .describe(
-      'IETF language tag for the response (e.g., "en", "es", "fr", "de", "ja")'
-    ),
+  country: countrySchema.optional(),
+  language: languageSchema.optional(),
   limit: z
     .number()
     .min(1)
