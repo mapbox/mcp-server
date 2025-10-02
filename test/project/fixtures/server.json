@@ -1,0 +1,12 @@
+{
+  "$schema": "test-schema",
+  "name": "test-server",
+  "version": "1.5.0",
+  "packages": [
+    {
+      "identifier": "test-package",
+      "version": "1.2.0",
+      "registryType": "npm"
+    }
+  ]
+}
