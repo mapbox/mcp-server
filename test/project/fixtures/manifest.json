@@ -1,0 +1,9 @@
+{
+  "dxt_version": "0.1",
+  "name": "test-manifest",
+  "version": "1.0.0",
+  "description": "Test manifest",
+  "author": {
+    "name": "Test Author"
+  }
+}
