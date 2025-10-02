@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { bboxSchema, countrySchema } from '../../schemas/shared.js';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 
@@ -48,19 +49,12 @@ const SearchAndGeocodeInputSchema = z.object({
     .describe(
       'Location to bias results towards. Either [longitude, latitude] or "ip" for IP-based location. STRONGLY ENCOURAGED for relevant results.'
     ),
-  bbox: z
-    .object({
-      minLongitude: z.number().min(-180).max(180),
-      minLatitude: z.number().min(-90).max(90),
-      maxLongitude: z.number().min(-180).max(180),
-      maxLatitude: z.number().min(-90).max(90)
-    })
+  bbox: bboxSchema
     .optional()
     .describe(
       'Bounding box to limit results within [minLon, minLat, maxLon, maxLat]'
     ),
-  country: z
-    .array(z.string().length(2))
+  country: countrySchema
     .optional()
     .describe('Array of ISO 3166 alpha 2 country codes to limit results'),
   types: z
@@ -122,7 +116,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       return 'No results found.';
     }
 
-    const results = geoJsonResponse.features.map(
+    const results = (geoJsonResponse as any).features.map(
       (feature: any, index: number) => {
         const props = feature.properties || {};
         const geom = feature.geometry || {};

@@ -1,5 +1,6 @@
 import { URLSearchParams } from 'node:url';
 import { z } from 'zod';
+import { coordinateSchema } from '../../schemas/shared.js';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 
@@ -7,18 +8,7 @@ import { fetchClient } from '../../utils/fetchRequest.js';
 
 const MatrixInputSchema = z.object({
   coordinates: z
-    .array(
-      z.object({
-        longitude: z
-          .number()
-          .min(-180, 'Longitude must be between -180 and 180 degrees')
-          .max(180, 'Longitude must be between -180 and 180 degrees'),
-        latitude: z
-          .number()
-          .min(-90, 'Latitude must be between -90 and 90 degrees')
-          .max(90, 'Latitude must be between -90 and 90 degrees')
-      })
-    )
+    .array(coordinateSchema)
     .min(2, 'At least two coordinate pairs are required.')
     .max(
       25,
@@ -104,7 +94,7 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
   protected async execute(
     input: z.infer<typeof MatrixInputSchema>,
     accessToken: string
-  ): Promise<any> {
+  ): Promise<unknown> {
     // Validate input based on profile type
     if (input.profile === 'driving-traffic' && input.coordinates.length > 10) {
       throw new Error(

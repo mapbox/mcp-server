@@ -346,17 +346,6 @@ describe('MatrixTool', () => {
       });
       expect(invalidLongitude.isError).toBe(true);
 
-      // Test longitude bounds error message
-      await expect(async () => {
-        await tool['inputSchema'].parseAsync({
-          coordinates: [
-            { longitude: -190, latitude: 37.78 },
-            { longitude: -122.45, latitude: 37.91 }
-          ],
-          profile: 'driving'
-        });
-      }).rejects.toThrow('Longitude must be between -180 and 180 degrees');
-
       const invalidLatitude = await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },

@@ -1,14 +1,10 @@
 import { z } from 'zod';
+import { languageSchema } from '../../schemas/shared.js';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 
 const CategoryListInputSchema = z.object({
-  language: z
-    .string()
-    .optional()
-    .describe(
-      'ISO language code for the response (e.g., "en", "es", "fr", "de", "ja"). If not provided, English (en) will be used as the default.'
-    ),
+  language: languageSchema.optional(),
   limit: z
     .number()
     .min(1)
@@ -62,7 +58,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
   protected async execute(
     input: CategoryListInput,
     accessToken: string
-  ): Promise<any> {
+  ): Promise<unknown> {
     const url = new URL(
       'https://api.mapbox.com/search/searchbox/v1/list/category'
     );

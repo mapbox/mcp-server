@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import { languageSchema, bboxSchema } from '../../schemas/shared.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 
 const CategorySearchInputSchema = z.object({
@@ -8,12 +9,7 @@ const CategorySearchInputSchema = z.object({
     .describe(
       'The canonical place category name to search for (e.g., "restaurant", "hotel", "cafe"). To get the full list of supported categories, use the category_list_tool.'
     ),
-  language: z
-    .string()
-    .optional()
-    .describe(
-      'ISO language code for the response (e.g., "en", "es", "fr", "de", "ja")'
-    ),
+  language: languageSchema.optional(),
   limit: z
     .number()
     .min(1)
@@ -72,15 +68,9 @@ const CategorySearchInputSchema = z.object({
     .describe(
       'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location'
     ),
-  bbox: z
-    .object({
-      minLongitude: z.number().min(-180).max(180),
-      minLatitude: z.number().min(-90).max(90),
-      maxLongitude: z.number().min(-180).max(180),
-      maxLatitude: z.number().min(-90).max(90)
-    })
-    .optional()
-    .describe('Bounding box to limit results within specified bounds'),
+  bbox: bboxSchema
+    .describe('Bounding box to limit results within specified bounds')
+    .optional(),
   country: z
     .array(z.string().length(2))
     .optional()
