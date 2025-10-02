@@ -1,4 +1,4 @@
-## 0.5.3-dev
+## 0.5.5
 
 - Add server.json for MCP registry
 
