@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { describe, it, expect } from 'vitest';
 import { cleanResponseData } from '../../../src/tools/directions-tool/cleanResponseData.js';
 

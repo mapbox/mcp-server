@@ -1,5 +1,8 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import type { z } from 'zod';
-import type { DirectionsInputSchema } from './DirectionsTool.js';
+import type { DirectionsInputSchema } from './DirectionsTool.schema.js';
 
 /**
  * Cleans up the API response to reduce token count while preserving useful data.

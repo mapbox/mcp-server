@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import type { ToolInstance } from '../tools/toolRegistry.js';
 
 export interface ToolConfig {

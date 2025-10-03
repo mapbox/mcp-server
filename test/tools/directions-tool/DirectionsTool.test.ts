@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 process.env.MAPBOX_ACCESS_TOKEN = 'test.token.signature';
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

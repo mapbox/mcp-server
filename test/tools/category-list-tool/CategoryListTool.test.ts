@@ -1,4 +1,6 @@
-// Set the token before importing the tool
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 process.env.MAPBOX_ACCESS_TOKEN = 'pk.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import { describe, it, expect, vi, afterEach } from 'vitest';

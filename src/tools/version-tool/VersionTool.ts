@@ -1,10 +1,11 @@
-import { z } from 'zod';
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { BaseTool } from '../BaseTool.js';
 import { getVersionInfo } from '../../utils/versionUtils.js';
+import { VersionSchema } from './VersionTool.schema.js';
 
-const InputSchema = z.object({});
-
-export class VersionTool extends BaseTool<typeof InputSchema> {
+export class VersionTool extends BaseTool<typeof VersionSchema> {
   readonly name = 'version_tool';
   readonly description =
     'Get the current version information of the MCP server';
@@ -17,7 +18,7 @@ export class VersionTool extends BaseTool<typeof InputSchema> {
   };
 
   constructor() {
-    super({ inputSchema: InputSchema });
+    super({ inputSchema: VersionSchema });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

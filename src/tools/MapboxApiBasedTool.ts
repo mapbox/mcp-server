@@ -1,24 +1,10 @@
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { ZodTypeAny } from 'zod';
-import { z } from 'zod';
-import { BaseTool } from './BaseTool.js';
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
 
-export const OutputSchema = z.object({
-  content: z.array(
-    z.union([
-      z.object({
-        type: z.literal('text'),
-        text: z.string()
-      }),
-      z.object({
-        type: z.literal('image'),
-        data: z.string(),
-        mimeType: z.string()
-      })
-    ])
-  ),
-  isError: z.boolean().default(false)
-});
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ZodTypeAny, z } from 'zod';
+import { BaseTool } from './BaseTool.js';
+import type { OutputSchema } from './MapboxApiBasedTool.schema.js';
 
 export abstract class MapboxApiBasedTool<
   InputSchema extends ZodTypeAny
