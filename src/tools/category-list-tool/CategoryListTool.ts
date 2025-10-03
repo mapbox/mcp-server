@@ -1,27 +1,10 @@
-import { z } from 'zod';
-import { languageSchema } from '../../schemas/shared.js';
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-
-const CategoryListInputSchema = z.object({
-  language: languageSchema.optional(),
-  limit: z
-    .number()
-    .min(1)
-    .max(100)
-    .optional()
-    .describe(
-      'Number of categories to return (1-100). WARNING: Only use this parameter if you need to optimize token usage. If using pagination, please make multiple calls to retrieve all categories before proceeding with other tasks. If not specified, returns all categories.'
-    ),
-  offset: z
-    .number()
-    .min(0)
-    .optional()
-    .default(0)
-    .describe('Number of categories to skip for pagination. Default is 0.')
-});
-
-type CategoryListInput = z.infer<typeof CategoryListInputSchema>;
+import type { CategoryListInput } from './CategoryListTool.schema.js';
+import { CategoryListInputSchema } from './CategoryListTool.schema.js';
 
 interface CategoryListResponse {
   listItems: Array<{

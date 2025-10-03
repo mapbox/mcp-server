@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import type { ToolConfig } from '../../src/config/toolConfig.js';
 import {

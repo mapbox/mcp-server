@@ -1,5 +1,8 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { describe, it, expect } from 'vitest';
-import { formatIsoDateTime } from '../../../src/tools/directions-tool/formatIsoDateTime.js';
+import { formatIsoDateTime } from '../../src/utils/dateUtils.js';
 
 describe('formatIsoDateTime', () => {
   it('converts YYYY-MM-DDThh:mm:ss to YYYY-MM-DDThh:mm by removing seconds', () => {

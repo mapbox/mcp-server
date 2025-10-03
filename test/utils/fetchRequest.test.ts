@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   RetryPolicy,

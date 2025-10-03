@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 /**
  * Helper function to format ISO datetime strings according to Mapbox API requirements.
  * It converts the format YYYY-MM-DDThh:mm:ss (with seconds but no timezone) to

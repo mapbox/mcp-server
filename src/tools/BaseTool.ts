@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import type {
   McpServer,
   RegisteredTool
@@ -48,7 +51,7 @@ export abstract class BaseTool<InputSchema extends ZodTypeAny> {
    */
   protected log(
     level: 'debug' | 'info' | 'warning' | 'error',
-    data: any
+    data: unknown
   ): void {
     if (this.server?.server) {
       void this.server.server.sendLoggingMessage({ level, data });

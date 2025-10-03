@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import { getAllTools } from '../../src/tools/toolRegistry.js';

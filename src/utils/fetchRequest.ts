@@ -1,3 +1,6 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
 import { getVersionInfo } from './versionUtils.js';
 
 function createRandomId(prefix: string): string {
