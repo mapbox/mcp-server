@@ -41,7 +41,11 @@ export class CategoryListTool extends MapboxApiBasedTool<
   protected async execute(
     input: CategoryListInput,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+  }> {
     const url = new URL(
       'https://api.mapbox.com/search/searchbox/v1/list/category'
     );
@@ -80,8 +84,14 @@ export class CategoryListTool extends MapboxApiBasedTool<
       .slice(startIndex, endIndex)
       .map((item) => item.canonical_id);
 
-    return {
+    const resultData = {
       listItems: categoryIds
+    };
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(resultData, null, 2) }],
+      structuredContent: resultData as Record<string, unknown>,
+      isError: false
     };
   }
 }

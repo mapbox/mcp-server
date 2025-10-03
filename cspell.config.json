@@ -1,0 +1,16 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "bbox",
+    "denoise",
+    "isochrone",
+    "mapbox",
+    "mmss",
+    "tilequery"
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "dist"
+  ]
+}

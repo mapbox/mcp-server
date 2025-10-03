@@ -31,7 +31,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+  }> {
     // Validate exclude parameter against the actual routing_profile
     // This is needed because some exclusions are only driving specific
     if (input.exclude) {
@@ -194,6 +198,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
     }
 
     const data = await response.json();
-    return cleanResponseData(input, data);
+    const cleanedData = cleanResponseData(input, data);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(cleanedData, null, 2) }],
+      structuredContent: cleanedData as Record<string, unknown>,
+      isError: false
+    };
   }
 }
