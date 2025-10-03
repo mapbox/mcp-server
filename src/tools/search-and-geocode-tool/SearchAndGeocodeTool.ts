@@ -81,7 +81,11 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
-  ): Promise<{ type: 'text'; text: string }> {
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+  }> {
     this.log(
       'info',
       `SearchAndGeocodeTool: Starting search with input: ${JSON.stringify(input)}`
@@ -177,9 +181,13 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     const data = await response.json();
     this.log(
       'info',
-      `SearchAndGeocodeTool: Successfully completed search, found ${(data as any).features?.length || 0} results`
+      `SearchAndGeocodeTool: Successfully completed search, found ${(data as unknown as any).features?.length || 0} results`
     );
 
-    return { type: 'text', text: this.formatGeoJsonToText(data) };
+    return {
+      content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
+      structuredContent: data as Record<string, unknown>,
+      isError: false
+    };
   }
 }

@@ -17,5 +17,6 @@ export const OutputSchema = z.object({
       })
     ])
   ),
+  structuredContent: z.record(z.unknown()).optional(),
   isError: z.boolean().default(false)
 });

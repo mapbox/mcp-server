@@ -31,7 +31,11 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
   protected async execute(
     input: z.infer<typeof MatrixInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+  }> {
     // Validate input based on profile type
     if (input.profile === 'driving-traffic' && input.coordinates.length > 10) {
       throw new Error(
@@ -214,6 +218,10 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
 
     // Return the matrix data
     const data = await response.json();
-    return data;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+      structuredContent: data as Record<string, unknown>,
+      isError: false
+    };
   }
 }

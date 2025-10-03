@@ -68,19 +68,37 @@ export abstract class MapboxApiBasedTool<
       const input = this.inputSchema.parse(rawInput);
       const result = await this.execute(input, accessToken);
 
-      // Check if result is already a content object (image or text)
+      // If result already has CallToolResult structure, return it directly
       if (
         result &&
         typeof result === 'object' &&
-        (result.type === 'image' || result.type === 'text')
+        'content' in result &&
+        Array.isArray(result.content)
       ) {
         return {
-          content: [result],
+          ...result,
+          isError: result.isError ?? false
+        };
+      }
+
+      // Handle string results - return as plain text
+      if (typeof result === 'string') {
+        return {
+          content: [{ type: 'text', text: result }],
           isError: false
         };
       }
 
-      // Otherwise return as text
+      // Handle object results - add to structuredContent and pretty-print as text
+      if (result && typeof result === 'object' && !Array.isArray(result)) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+          isError: false
+        };
+      }
+
+      // Handle other types (arrays, primitives, null, undefined)
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
         isError: false
@@ -112,5 +130,5 @@ export abstract class MapboxApiBasedTool<
   protected abstract execute(
     _input: z.infer<InputSchema>,
     accessToken: string
-  ): Promise<any>;
+  ): Promise<z.infer<typeof OutputSchema> | string | object>;
 }

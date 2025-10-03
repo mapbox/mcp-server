@@ -81,7 +81,11 @@ export class CategorySearchTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof CategorySearchInputSchema>,
     accessToken: string
-  ): Promise<{ type: 'text'; text: string }> {
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+  }> {
     // Build URL with required parameters
     const url = new URL(
       `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/category/${encodeURIComponent(input.category)}`
@@ -143,9 +147,17 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     const data = await response.json();
 
     if (input.format === 'json_string') {
-      return { type: 'text', text: JSON.stringify(data, null, 2) };
+      return {
+        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        structuredContent: data as Record<string, unknown>,
+        isError: false
+      };
     } else {
-      return { type: 'text', text: this.formatGeoJsonToText(data) };
+      return {
+        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
+        structuredContent: data as Record<string, unknown>,
+        isError: false
+      };
     }
   }
 }

@@ -74,7 +74,11 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof ReverseGeocodeInputSchema>,
     accessToken: string
-  ): Promise<{ type: 'text'; text: string }> {
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+  }> {
     // When limit > 1, must specify exactly one type
     if (
       input.limit &&
@@ -120,17 +124,28 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
       );
     }
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as Record<string, unknown>;
 
     // Check if the response has features
-    if (!data || !data.features || data.features.length === 0) {
-      return { type: 'text', text: 'No results found.' };
+    if (!data || !Array.isArray(data.features) || data.features.length === 0) {
+      return {
+        content: [{ type: 'text', text: 'No results found.' }],
+        isError: false
+      };
     }
 
     if (input.format === 'json_string') {
-      return { type: 'text', text: JSON.stringify(data, null, 2) };
+      return {
+        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        structuredContent: data as Record<string, unknown>,
+        isError: false
+      };
     } else {
-      return { type: 'text', text: this.formatGeoJsonToText(data) };
+      return {
+        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
+        structuredContent: data as Record<string, unknown>,
+        isError: false
+      };
     }
   }
 }

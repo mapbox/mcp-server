@@ -78,7 +78,10 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof StaticMapImageInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<{
+    content: Array<{ type: 'image'; data: string; mimeType: string }>;
+    isError?: boolean;
+  }> {
     const { longitude: lng, latitude: lat } = input.center;
     const { width, height } = input.size;
 
@@ -111,9 +114,14 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
     return {
-      type: 'image',
-      data: base64Data,
-      mimeType
+      content: [
+        {
+          type: 'image',
+          data: base64Data,
+          mimeType
+        }
+      ],
+      isError: false
     };
   }
 }

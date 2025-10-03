@@ -33,7 +33,11 @@ export class IsochroneTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof IsochroneInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    structuredContent?: Record<string, unknown>;
+    isError?: boolean;
+  }> {
     const url = new URL(
       `${MapboxApiBasedTool.mapboxApiEndpoint}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
     );
@@ -89,6 +93,10 @@ export class IsochroneTool extends MapboxApiBasedTool<
     }
 
     const data = await response.json();
-    return data;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data) }],
+      structuredContent: data as Record<string, unknown>,
+      isError: false
+    };
   }
 }
