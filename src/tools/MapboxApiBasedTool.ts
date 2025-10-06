@@ -5,6 +5,11 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import type { ZodTypeAny, z } from 'zod';
 import { BaseTool } from './BaseTool.js';
 import type { OutputSchema } from './MapboxApiBasedTool.schema.js';
+import {
+  createToolSpan,
+  traceAsync,
+  addSpanAttributes
+} from '../utils/tracing.js';
 
 export abstract class MapboxApiBasedTool<
   InputSchema extends ZodTypeAny
@@ -47,63 +52,91 @@ export abstract class MapboxApiBasedTool<
     rawInput: unknown,
     extra?: RequestHandlerExtra<any, any>
   ): Promise<z.infer<typeof OutputSchema>> {
-    try {
-      // First check if token is provided via authentication context
-      // Check both standard token field and accessToken in extra for compatibility
-      // In the streamableHttp, the authInfo is injected into extra from `req.auth`
-      // https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/server/streamableHttp.ts#L405
-      const authToken = extra?.authInfo?.token;
-      const accessToken = authToken || MapboxApiBasedTool.mapboxAccessToken;
-      if (!accessToken) {
-        throw new Error(
-          'No access token available. Please provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var'
-        );
-      }
+    const span = createToolSpan(this.name);
 
-      // Validate that the token has the correct JWT format
-      if (!this.isValidJwtFormat(accessToken)) {
-        throw new Error('Access token is not in valid JWT format');
-      }
+    return traceAsync(span, async () => {
+      try {
+        // Add input attributes to span (excluding sensitive data)
+        addSpanAttributes({
+          'tool.input.size': JSON.stringify(rawInput).length,
+          'tool.has_extra': Boolean(extra)
+        });
 
-      const input = this.inputSchema.parse(rawInput);
-      const result = await this.execute(input, accessToken);
+        // First check if token is provided via authentication context
+        // Check both standard token field and accessToken in extra for compatibility
+        // In the streamableHttp, the authInfo is injected into extra from `req.auth`
+        // https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/server/streamableHttp.ts#L405
+        const authToken = extra?.authInfo?.token;
+        const accessToken = authToken || MapboxApiBasedTool.mapboxAccessToken;
+        if (!accessToken) {
+          throw new Error(
+            'No access token available. Please provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var'
+          );
+        }
 
-      // Check if result is already a content object (image or text)
-      if (
-        result &&
-        typeof result === 'object' &&
-        (result.type === 'image' || result.type === 'text')
-      ) {
+        // Validate that the token has the correct JWT format
+        if (!this.isValidJwtFormat(accessToken)) {
+          throw new Error('Access token is not in valid JWT format');
+        }
+
+        addSpanAttributes({
+          'tool.has_token': true,
+          'tool.token_valid': true
+        });
+
+        const input = this.inputSchema.parse(rawInput);
+        const result = await this.execute(input, accessToken);
+
+        // Add result attributes to span
+        addSpanAttributes({
+          'tool.result.type': typeof result,
+          'tool.success': true
+        });
+
+        // Check if result is already a content object (image or text)
+        if (
+          result &&
+          typeof result === 'object' &&
+          (result.type === 'image' || result.type === 'text')
+        ) {
+          return {
+            content: [result],
+            isError: false
+          };
+        }
+
+        // Otherwise return as text
         return {
-          content: [result],
+          content: [{ type: 'text', text: JSON.stringify(result) }],
           isError: false
         };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        addSpanAttributes({
+          'tool.success': false,
+          'tool.error.message': errorMessage,
+          'tool.error.type':
+            error instanceof Error ? error.constructor.name : 'Unknown'
+        });
+
+        this.log(
+          'error',
+          `${this.name}: Error during execution: ${errorMessage}`
+        );
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: errorMessage
+            }
+          ],
+          isError: true
+        };
       }
-
-      // Otherwise return as text
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result) }],
-        isError: false
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      this.log(
-        'error',
-        `${this.name}: Error during execution: ${errorMessage}`
-      );
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: errorMessage
-          }
-        ],
-        isError: true
-      };
-    }
+    });
   }
 
   /**

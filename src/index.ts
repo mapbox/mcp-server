@@ -6,6 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import { getAllTools } from './tools/toolRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
+import { initializeTracing } from './utils/tracing.js';
 import 'dotenv/config';
 
 const versionInfo = getVersionInfo();
@@ -36,6 +37,14 @@ enabledTools.forEach((tool) => {
 });
 
 async function main() {
+  // Initialize OpenTelemetry tracing
+  await initializeTracing({
+    serviceName: versionInfo.name,
+    serviceVersion: versionInfo.version,
+    enableConsoleExporter: process.env.NODE_ENV === 'development',
+    enablePrometheus: process.env.OTEL_ENABLE_PROMETHEUS === 'true'
+  });
+
   // Start receiving messages on stdin and sending messages on stdout
   const transport = new StdioServerTransport();
   await server.connect(transport);

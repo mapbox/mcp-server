@@ -2,6 +2,12 @@
 // Licensed under the MIT License.
 
 import { getVersionInfo } from './versionUtils.js';
+import {
+  createHttpSpan,
+  traceAsync,
+  addSpanAttributes,
+  recordSpanEvent
+} from './tracing.js';
 
 function createRandomId(prefix: string): string {
   return `${prefix}${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
@@ -48,19 +54,44 @@ export class PolicyPipeline {
     input: string | URL | Request,
     init: RequestInit = {}
   ): Promise<Response> {
-    const dispatch = async (
-      i: number,
-      req: string | URL | Request,
-      options: RequestInit
-    ): Promise<Response> => {
-      if (i < this.policies.length) {
-        return this.policies[i].handle(req, options, (nextReq, nextOptions) =>
-          dispatch(i + 1, nextReq, nextOptions!)
-        );
+    // Extract method and URL for tracing
+    const method = init.method || 'GET';
+    const url = typeof input === 'string' ? input : input.toString();
+
+    const span = createHttpSpan(method, url);
+
+    return traceAsync(span, async () => {
+      const dispatch = async (
+        i: number,
+        req: string | URL | Request,
+        options: RequestInit
+      ): Promise<Response> => {
+        if (i < this.policies.length) {
+          return this.policies[i].handle(req, options, (nextReq, nextOptions) =>
+            dispatch(i + 1, nextReq, nextOptions!)
+          );
+        }
+        return this.fetchImpl(req, options); // Use injected fetch
+      };
+
+      const response = await dispatch(0, input, init);
+
+      // Add response attributes to span
+      addSpanAttributes({
+        'http.status_code': response.status,
+        'http.status_text': response.statusText,
+        'http.response.size': response.headers?.get?.('content-length') || 0
+      });
+
+      if (!response.ok) {
+        recordSpanEvent('http.error', {
+          'http.error.status': response.status,
+          'http.error.message': response.statusText
+        });
       }
-      return this.fetchImpl(req, options); // Use injected fetch
-    };
-    return dispatch(0, input, init);
+
+      return response;
+    });
   }
 }
 
