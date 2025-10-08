@@ -3,6 +3,7 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 import { IsochroneInputSchema } from './IsochroneTool.schema.js';
 
@@ -33,7 +34,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof IsochroneInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<z.infer<typeof OutputSchema>> {
     const url = new URL(
       `${MapboxApiBasedTool.mapboxApiEndpoint}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
     );
@@ -42,9 +43,15 @@ export class IsochroneTool extends MapboxApiBasedTool<
       (!input.contours_minutes || input.contours_minutes.length === 0) &&
       (!input.contours_meters || input.contours_meters.length === 0)
     ) {
-      throw new Error(
-        "At least one of 'contours_minutes' or 'contours_meters' must be provided"
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: "At least one of 'contours_minutes' or 'contours_meters' must be provided"
+          }
+        ],
+        isError: true
+      };
     }
     if (input.contours_minutes && input.contours_minutes.length > 0) {
       url.searchParams.append(
@@ -83,12 +90,22 @@ export class IsochroneTool extends MapboxApiBasedTool<
     const response = await this.fetch(url);
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to calculate isochrones: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to calculate isochrones: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
     const data = await response.json();
-    return data;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+      structuredContent: data as Record<string, unknown>,
+      isError: false
+    };
   }
 }

@@ -3,8 +3,13 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 import { ReverseGeocodeInputSchema } from './ReverseGeocodeTool.schema.js';
+import type {
+  MapboxFeatureCollection,
+  MapboxFeature
+} from '../../schemas/geojson.js';
 
 export class ReverseGeocodeTool extends MapboxApiBasedTool<
   typeof ReverseGeocodeInputSchema
@@ -24,7 +29,9 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     super({ inputSchema: ReverseGeocodeInputSchema });
   }
 
-  private formatGeoJsonToText(geoJsonResponse: any): string {
+  private formatGeoJsonToText(
+    geoJsonResponse: MapboxFeatureCollection
+  ): string {
     if (
       !geoJsonResponse ||
       !geoJsonResponse.features ||
@@ -34,9 +41,9 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     }
 
     const results = geoJsonResponse.features.map(
-      (feature: any, index: number) => {
+      (feature: MapboxFeature, index: number) => {
         const props = feature.properties || {};
-        const geom = feature.geometry || {};
+        const geom = feature.geometry;
 
         let result = `${index + 1}. `;
 
@@ -54,7 +61,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
         }
 
         // Geographic coordinates
-        if (geom.coordinates && Array.isArray(geom.coordinates)) {
+        if (geom && geom.type === 'Point' && geom.coordinates) {
           const [lng, lat] = geom.coordinates;
           result += `\n   Coordinates: ${lat}, ${lng}`;
         }
@@ -74,16 +81,22 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof ReverseGeocodeInputSchema>,
     accessToken: string
-  ): Promise<{ type: 'text'; text: string }> {
+  ): Promise<z.infer<typeof OutputSchema>> {
     // When limit > 1, must specify exactly one type
     if (
       input.limit &&
       input.limit > 1 &&
       (!input.types || input.types.length !== 1)
     ) {
-      throw new Error(
-        'When limit > 1 for reverse geocoding, you must specify exactly one type in the types parameter (e.g., types: ["address"]). Consider using limit: 1 instead for best results.'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'When limit > 1 for reverse geocoding, you must specify exactly one type in the types parameter (e.g., types: ["address"]). Consider using limit: 1 instead for best results.'
+          }
+        ],
+        isError: true
+      };
     }
 
     const url = new URL(
@@ -115,22 +128,39 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     const response = await this.fetch(url.toString());
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to reverse geocode: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to reverse geocode: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as MapboxFeatureCollection;
 
     // Check if the response has features
     if (!data || !data.features || data.features.length === 0) {
-      return { type: 'text', text: 'No results found.' };
+      return {
+        content: [{ type: 'text', text: 'No results found.' }],
+        isError: false
+      };
     }
 
     if (input.format === 'json_string') {
-      return { type: 'text', text: JSON.stringify(data, null, 2) };
+      return {
+        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        structuredContent: data as unknown as Record<string, unknown>,
+        isError: false
+      };
     } else {
-      return { type: 'text', text: this.formatGeoJsonToText(data) };
+      return {
+        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
+        structuredContent: data as unknown as Record<string, unknown>,
+        isError: false
+      };
     }
   }
 }

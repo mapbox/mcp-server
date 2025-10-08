@@ -2,9 +2,11 @@
 // Licensed under the MIT License.
 
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 import type { CategoryListInput } from './CategoryListTool.schema.js';
 import { CategoryListInputSchema } from './CategoryListTool.schema.js';
+import type { z } from 'zod';
 
 interface CategoryListResponse {
   listItems: Array<{
@@ -41,7 +43,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
   protected async execute(
     input: CategoryListInput,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<z.infer<typeof OutputSchema>> {
     const url = new URL(
       'https://api.mapbox.com/search/searchbox/v1/list/category'
     );
@@ -60,9 +62,15 @@ export class CategoryListTool extends MapboxApiBasedTool<
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Mapbox API request failed: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Mapbox API request failed: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
     const data = (await response.json()) as CategoryListResponse;
@@ -80,8 +88,12 @@ export class CategoryListTool extends MapboxApiBasedTool<
       .slice(startIndex, endIndex)
       .map((item) => item.canonical_id);
 
+    const result = { listItems: categoryIds };
+
     return {
-      listItems: categoryIds
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result,
+      isError: false
     };
   }
 }

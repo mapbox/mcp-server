@@ -3,6 +3,7 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.schema.js';
 import type { OverlaySchema } from './StaticMapImageTool.schema.js';
@@ -78,7 +79,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof StaticMapImageInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<z.infer<typeof OutputSchema>> {
     const { longitude: lng, latitude: lat } = input.center;
     const { width, height } = input.size;
 
@@ -97,9 +98,15 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const response = await this.fetch(url);
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch map image: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to fetch map image: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
     const buffer = await response.arrayBuffer();
@@ -111,9 +118,14 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
     return {
-      type: 'image',
-      data: base64Data,
-      mimeType
+      content: [
+        {
+          type: 'image',
+          data: base64Data,
+          mimeType
+        }
+      ],
+      isError: false
     };
   }
 }

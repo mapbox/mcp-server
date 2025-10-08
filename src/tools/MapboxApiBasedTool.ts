@@ -55,36 +55,28 @@ export abstract class MapboxApiBasedTool<
       const authToken = extra?.authInfo?.token;
       const accessToken = authToken || MapboxApiBasedTool.mapboxAccessToken;
       if (!accessToken) {
-        throw new Error(
-          'No access token available. Please provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var'
-        );
+        const errorMessage =
+          'No access token available. Please provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var';
+        this.log('error', `${this.name}: ${errorMessage}`);
+        return {
+          content: [{ type: 'text', text: errorMessage }],
+          isError: true
+        };
       }
 
       // Validate that the token has the correct JWT format
       if (!this.isValidJwtFormat(accessToken)) {
-        throw new Error('Access token is not in valid JWT format');
+        const errorMessage = 'Access token is not in valid JWT format';
+        this.log('error', `${this.name}: ${errorMessage}`);
+        return {
+          content: [{ type: 'text', text: errorMessage }],
+          isError: true
+        };
       }
 
       const input = this.inputSchema.parse(rawInput);
       const result = await this.execute(input, accessToken);
-
-      // Check if result is already a content object (image or text)
-      if (
-        result &&
-        typeof result === 'object' &&
-        (result.type === 'image' || result.type === 'text')
-      ) {
-        return {
-          content: [result],
-          isError: false
-        };
-      }
-
-      // Otherwise return as text
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result) }],
-        isError: false
-      };
+      return result;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -108,9 +100,10 @@ export abstract class MapboxApiBasedTool<
 
   /**
    * Tool logic to be implemented by subclasses.
+   * Must return a complete OutputSchema with content and optional structured content.
    */
   protected abstract execute(
     _input: z.infer<InputSchema>,
     accessToken: string
-  ): Promise<any>;
+  ): Promise<z.infer<typeof OutputSchema>>;
 }

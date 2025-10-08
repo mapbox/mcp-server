@@ -33,12 +33,28 @@ describe('VersionTool', () => {
 
       expect(result.isError).toBe(false);
       expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('Test MCP Server');
-      expect(result.content[0].text).toContain('1.0.0');
-      expect(result.content[0].text).toContain('abc123');
-      expect(result.content[0].text).toContain('v1.0.0');
-      expect(result.content[0].text).toContain('main');
+
+      // Best approach: exact match with template literal for readability and precision
+      const expectedText = `MCP Server Version Information:
+- Name: Test MCP Server
+- Version: 1.0.0
+- SHA: abc123
+- Tag: v1.0.0
+- Branch: main`;
+      expect(result.content[0]).toEqual({
+        type: 'text',
+        text: expectedText
+      });
+
+      // Verify structured content is included
+      expect(result.structuredContent).toBeDefined();
+      expect(result.structuredContent).toEqual({
+        name: 'Test MCP Server',
+        version: '1.0.0',
+        sha: 'abc123',
+        tag: 'v1.0.0',
+        branch: 'main'
+      });
     });
 
     it('should handle errors gracefully', async () => {

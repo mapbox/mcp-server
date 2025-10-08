@@ -3,8 +3,13 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
 import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.schema.js';
+import type {
+  MapboxFeatureCollection,
+  MapboxFeature
+} from '../../schemas/geojson.js';
 
 export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   typeof SearchAndGeocodeInputSchema
@@ -24,7 +29,9 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     super({ inputSchema: SearchAndGeocodeInputSchema });
   }
 
-  private formatGeoJsonToText(geoJsonResponse: any): string {
+  private formatGeoJsonToText(
+    geoJsonResponse: MapboxFeatureCollection
+  ): string {
     if (
       !geoJsonResponse ||
       !geoJsonResponse.features ||
@@ -33,10 +40,10 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       return 'No results found.';
     }
 
-    const results = (geoJsonResponse as any).features.map(
-      (feature: any, index: number) => {
+    const results = geoJsonResponse.features.map(
+      (feature: MapboxFeature, index: number) => {
         const props = feature.properties || {};
-        const geom = feature.geometry || {};
+        const geom = feature.geometry;
 
         let result = `${index + 1}. `;
 
@@ -54,7 +61,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
         }
 
         // Geographic coordinates
-        if (geom.coordinates && Array.isArray(geom.coordinates)) {
+        if (geom && geom.type === 'Point' && geom.coordinates) {
           const [lng, lat] = geom.coordinates;
           result += `\n   Coordinates: ${lat}, ${lng}`;
         }
@@ -81,7 +88,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
-  ): Promise<{ type: 'text'; text: string }> {
+  ): Promise<z.infer<typeof OutputSchema>> {
     this.log(
       'info',
       `SearchAndGeocodeTool: Starting search with input: ${JSON.stringify(input)}`
@@ -169,17 +176,27 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
         'error',
         `SearchAndGeocodeTool: API Error - Status: ${response.status}, Body: ${errorBody}`
       );
-      throw new Error(
-        `Failed to search: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to search: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as MapboxFeatureCollection;
     this.log(
       'info',
-      `SearchAndGeocodeTool: Successfully completed search, found ${(data as any).features?.length || 0} results`
+      `SearchAndGeocodeTool: Successfully completed search, found ${data.features?.length || 0} results`
     );
 
-    return { type: 'text', text: this.formatGeoJsonToText(data) };
+    return {
+      content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
+      structuredContent: data as unknown as Record<string, unknown>,
+      isError: false
+    };
   }
 }

@@ -9,6 +9,7 @@ import type {
   ToolAnnotations,
   CallToolResult
 } from '@modelcontextprotocol/sdk/types.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny } from 'zod';
 import type { z } from 'zod';
 
@@ -34,6 +35,7 @@ export abstract class BaseTool<InputSchema extends ZodTypeAny> {
       {
         title: this.annotations.title,
         description: this.description,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         inputSchema: (this.inputSchema as unknown as z.ZodObject<any>).shape,
         annotations: this.annotations
       },
@@ -44,7 +46,11 @@ export abstract class BaseTool<InputSchema extends ZodTypeAny> {
   /**
    * Tool logic to be implemented by subclasses.
    */
-  abstract run(rawInput: unknown, extra?: any): Promise<CallToolResult>;
+  abstract run(
+    rawInput: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    extra?: RequestHandlerExtra<any, any>
+  ): Promise<CallToolResult>;
 
   /**
    * Helper method to send logging messages

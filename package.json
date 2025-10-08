@@ -10,16 +10,18 @@
     "mcp-server": "dist/esm/index.js"
   },
   "scripts": {
-    "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" --fix",
+    "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
     "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\"",
     "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\"",
-    "prepare": "husky && node .husky/setup-hooks.js",
-    "test": "vitest",
-    "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
     "generate-version": "node scripts/build-helpers.cjs generate-version",
+    "inspect:build": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js",
+    "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" npx -y tsx src/index.ts",
+    "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" --fix",
+    "prepare": "husky && node .husky/setup-hooks.js",
+    "spellcheck": "cspell \"*.md\" \"src/**/*.ts\" \"test/**/*.ts\"",
     "sync-manifest": "node scripts/sync-manifest-version.cjs",
-    "dev:inspect": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\"  npx -y tsx src/index.ts"
+    "test": "vitest"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --fix",
@@ -33,6 +35,7 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vitest/coverage-istanbul": "^3.2.4",
+    "cspell": "^9.2.1",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-n": "^17.21.3",

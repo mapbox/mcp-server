@@ -103,7 +103,7 @@ describe('IsochroneTool', () => {
     assertHeadersSent(mockFetch);
     expect(result.content[0].type).toEqual('text');
     if (result.content[0].type == 'text') {
-      expect(result.content[0].text).toEqual(JSON.stringify(geojson));
+      expect(result.content[0].text).toEqual(JSON.stringify(geojson, null, 2));
     }
   });
 

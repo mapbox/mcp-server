@@ -122,7 +122,7 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const { fetch, mockFetch } = setupFetch({
+    const { fetch } = setupFetch({
       ok: false,
       status: 404,
       statusText: 'Not Found',
@@ -227,7 +227,7 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
@@ -292,7 +292,7 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
@@ -343,7 +343,7 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
@@ -367,7 +367,7 @@ describe('SearchAndGeocodeTool', () => {
       features: []
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
@@ -399,7 +399,7 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { fetch } = setupFetch({
       json: async () => mockResponse
     });
 
@@ -437,7 +437,7 @@ describe('SearchAndGeocodeTool', () => {
     await expect(
       tool.run({
         q: 'test',
-        proximity: 'invalid-format' as any
+        proximity: 'invalid-format'
       })
     ).resolves.toMatchObject({
       isError: true

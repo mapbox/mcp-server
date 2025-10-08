@@ -4,6 +4,7 @@
 import { URLSearchParams } from 'node:url';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from '../../utils/dateUtils.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
@@ -31,7 +32,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<z.infer<typeof OutputSchema>> {
     // Validate exclude parameter against the actual routing_profile
     // This is needed because some exclusions are only driving specific
     if (input.exclude) {
@@ -57,15 +58,27 @@ export class DirectionsTool extends MapboxApiBasedTool<
           item.endsWith(')') &&
           !isDrivingProfile
         ) {
-          throw new Error(
-            `Point exclusions (${item}) are only available for 'driving' and 'driving-traffic' profiles`
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Point exclusions (${item}) are only available for 'driving' and 'driving-traffic' profiles`
+              }
+            ],
+            isError: true
+          };
         }
         // Check for driving-only exclusions
         else if (drivingOnlyExclusions.includes(item) && !isDrivingProfile) {
-          throw new Error(
-            `Exclusion option '${item}' is only available for 'driving' and 'driving-traffic' profiles`
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Exclusion option '${item}' is only available for 'driving' and 'driving-traffic' profiles`
+              }
+            ],
+            isError: true
+          };
         }
         // Check if it's one of the valid enum values
         else if (
@@ -73,11 +86,18 @@ export class DirectionsTool extends MapboxApiBasedTool<
           !drivingOnlyExclusions.includes(item) &&
           !(item.startsWith('point(') && item.endsWith(')'))
         ) {
-          throw new Error(
-            `Invalid exclude option: '${item}'.Available options:\n` +
-              '- All profiles:  ferry, cash_only_tolls\n' +
-              '- Driving/Driving-traffic profiles only: `motorway`, `toll`, `unpaved`, `tunnel`, `country_border`, `state_border` or `point(<lng> <lat>)` for custom locations (note lng and lat are space separated)\n'
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Invalid exclude option: '${item}'.Available options:\\n` +
+                  '- All profiles:  ferry, cash_only_tolls\\n' +
+                  '- Driving/Driving-traffic profiles only: `motorway`, `toll`, `unpaved`, `tunnel`, `country_border`, `state_border` or `point(<lng> <lat>)` for custom locations (note lng and lat are space separated)\\n'
+              }
+            ],
+            isError: true
+          };
         }
       }
     }
@@ -88,23 +108,41 @@ export class DirectionsTool extends MapboxApiBasedTool<
 
     // Validate depart_at is only used with driving profiles
     if (input.depart_at && !isDrivingProfile) {
-      throw new Error(
-        `The depart_at parameter is only available for 'driving' and 'driving-traffic' profiles`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `The depart_at parameter is only available for 'driving' and 'driving-traffic' profiles`
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate arrive_by is only used with driving profile (not driving-traffic)
     if (input.arrive_by && input.routing_profile !== 'driving') {
-      throw new Error(
-        `The arrive_by parameter is only available for the 'driving' profile`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `The arrive_by parameter is only available for the 'driving' profile`
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate that depart_at and arrive_by are not used together
     if (input.depart_at && input.arrive_by) {
-      throw new Error(
-        `The depart_at and arrive_by parameters cannot be used together in the same request`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `The depart_at and arrive_by parameters cannot be used together in the same request`
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate vehicle dimension parameters are only used with driving profiles
@@ -114,9 +152,15 @@ export class DirectionsTool extends MapboxApiBasedTool<
         input.max_weight !== undefined) &&
       !isDrivingProfile
     ) {
-      throw new Error(
-        `Vehicle dimension parameters (max_height, max_width, max_weight) are only available for 'driving' and 'driving-traffic' profiles`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Vehicle dimension parameters (max_height, max_width, max_weight) are only available for 'driving' and 'driving-traffic' profiles`
+          }
+        ],
+        isError: true
+      };
     }
 
     const joined = input.coordinates
@@ -188,12 +232,23 @@ export class DirectionsTool extends MapboxApiBasedTool<
     const response = await this.fetch(url);
 
     if (!response.ok) {
-      throw new Error(
-        `Request failed with status ${response.status}: ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Request failed with status ${response.status}: ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
     const data = await response.json();
-    return cleanResponseData(input, data);
+    const cleanedData = cleanResponseData(input, data);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(cleanedData, null, 2) }],
+      structuredContent: cleanedData as Record<string, unknown>,
+      isError: false
+    };
   }
 }

@@ -85,7 +85,10 @@ describe('MapboxApiBasedTool', () => {
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
       // Override execute to return a success result instead of throwing an error
-      testTool['execute'] = vi.fn().mockResolvedValue({ success: true });
+      testTool['execute'] = vi.fn().mockResolvedValue({
+        content: [{ type: 'text', text: JSON.stringify({ success: true }) }],
+        isError: false
+      });
 
       const result = await testTool.run({ testParam: 'test' });
 

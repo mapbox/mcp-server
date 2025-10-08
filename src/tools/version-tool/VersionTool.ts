@@ -4,6 +4,8 @@
 import { BaseTool } from '../BaseTool.js';
 import { getVersionInfo } from '../../utils/versionUtils.js';
 import { VersionSchema } from './VersionTool.schema.js';
+import type { z } from 'zod';
+import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
 
 export class VersionTool extends BaseTool<typeof VersionSchema> {
   readonly name = 'version_tool';
@@ -22,13 +24,7 @@ export class VersionTool extends BaseTool<typeof VersionSchema> {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async run(_rawInput: unknown): Promise<{
-    content: Array<{
-      type: 'text';
-      text: string;
-    }>;
-    isError: boolean;
-  }> {
+  async run(_rawInput: unknown): Promise<z.infer<typeof OutputSchema>> {
     try {
       const versionInfo = getVersionInfo();
 
@@ -41,6 +37,7 @@ export class VersionTool extends BaseTool<typeof VersionSchema> {
 
       return {
         content: [{ type: 'text', text: versionText }],
+        structuredContent: versionInfo as unknown as Record<string, unknown>,
         isError: false
       };
     } catch (error) {

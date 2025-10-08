@@ -277,17 +277,21 @@ describe('MatrixTool', () => {
     expect(mockFetch).not.toHaveBeenCalled();
 
     // Test for specific error message by calling execute directly
-    await expect(async () => {
-      await tool['execute'](
-        {
-          coordinates,
-          profile: 'driving-traffic'
-        },
-        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-      );
-    }).rejects.toThrow(
-      'The driving-traffic profile supports a maximum of 10 coordinate pairs.'
+    const errorResult = await tool['execute'](
+      {
+        coordinates,
+        profile: 'driving-traffic'
+      },
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
     );
+
+    expect(errorResult.isError).toBe(true);
+    expect(errorResult.content[0].type).toBe('text');
+    if (errorResult.content[0].type === 'text') {
+      expect(errorResult.content[0].text).toBe(
+        'The driving-traffic profile supports a maximum of 10 coordinate pairs.'
+      );
+    }
   });
 
   // Input validation tests
@@ -384,22 +388,26 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error for approaches length mismatch
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 },
-              { longitude: -122.48, latitude: 37.73 }
-            ],
-            profile: 'driving',
-            approaches: 'curb;unrestricted'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'When provided, the number of approaches (including empty/skipped) must match the number of coordinates.'
+      const approachesResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 },
+            { longitude: -122.48, latitude: 37.73 }
+          ],
+          profile: 'driving',
+          approaches: 'curb;unrestricted'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(approachesResult.isError).toBe(true);
+      expect(approachesResult.content[0].type).toBe('text');
+      if (approachesResult.content[0].type === 'text') {
+        expect(approachesResult.content[0].text).toContain(
+          'When provided, the number of approaches (including empty/skipped) must match the number of coordinates.'
+        );
+      }
     });
 
     it('validates approaches parameter values', async () => {
@@ -415,21 +423,25 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error for invalid approach value
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 }
-            ],
-            profile: 'driving',
-            approaches: 'curb;invalid'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'Approaches parameter contains invalid values. Each value must be either "curb" or "unrestricted".'
+      const invalidApproachResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'driving',
+          approaches: 'curb;invalid'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(invalidApproachResult.isError).toBe(true);
+      expect(invalidApproachResult.content[0].type).toBe('text');
+      if (invalidApproachResult.content[0].type === 'text') {
+        expect(invalidApproachResult.content[0].text).toContain(
+          'Approaches parameter contains invalid values. Each value must be either "curb" or "unrestricted".'
+        );
+      }
     });
 
     it('validates bearings parameter length', async () => {
@@ -446,22 +458,26 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error for bearings length mismatch
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 },
-              { longitude: -122.48, latitude: 37.73 }
-            ],
-            profile: 'driving',
-            bearings: '45,90;120,45'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'When provided, the number of bearings (including empty/skipped) must match the number of coordinates.'
+      const bearingsLengthResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 },
+            { longitude: -122.48, latitude: 37.73 }
+          ],
+          profile: 'driving',
+          bearings: '45,90;120,45'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(bearingsLengthResult.isError).toBe(true);
+      expect(bearingsLengthResult.content[0].type).toBe('text');
+      if (bearingsLengthResult.content[0].type === 'text') {
+        expect(bearingsLengthResult.content[0].text).toContain(
+          'When provided, the number of bearings (including empty/skipped) must match the number of coordinates.'
+        );
+      }
     });
 
     it('validates bearings parameter format', async () => {
@@ -477,19 +493,25 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error for invalid bearing format
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 }
-            ],
-            profile: 'driving',
-            bearings: '45,90;invalid'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      const invalidBearingResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'driving',
+          bearings: '45,90;invalid'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      );
+
+      expect(invalidBearingResult.isError).toBe(true);
+      expect(invalidBearingResult.content[0].type).toBe('text');
+      if (invalidBearingResult.content[0].type === 'text') {
+        expect(invalidBearingResult.content[0].text).toContain(
+          'Invalid bearings format at index 1'
         );
-      }).rejects.toThrow('Invalid bearings format at index 1');
+      }
     });
 
     it('validates bearings parameter angle range', async () => {
@@ -505,19 +527,25 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error for invalid bearing angle
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 }
-            ],
-            profile: 'driving',
-            bearings: '400,90;120,45'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      const invalidAngleResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'driving',
+          bearings: '400,90;120,45'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      );
+
+      expect(invalidAngleResult.isError).toBe(true);
+      expect(invalidAngleResult.content[0].type).toBe('text');
+      if (invalidAngleResult.content[0].type === 'text') {
+        expect(invalidAngleResult.content[0].text).toContain(
+          'Invalid bearing angle at index 0'
         );
-      }).rejects.toThrow('Invalid bearing angle at index 0');
+      }
     });
 
     it('validates bearings parameter degrees range', async () => {
@@ -533,19 +561,25 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error for invalid bearing degrees
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 }
-            ],
-            profile: 'driving',
-            bearings: '45,200;120,45'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      const invalidDegreesResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'driving',
+          bearings: '45,200;120,45'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      );
+
+      expect(invalidDegreesResult.isError).toBe(true);
+      expect(invalidDegreesResult.content[0].type).toBe('text');
+      if (invalidDegreesResult.content[0].type === 'text') {
+        expect(invalidDegreesResult.content[0].text).toContain(
+          'Invalid bearing degrees at index 0'
         );
-      }).rejects.toThrow('Invalid bearing degrees at index 0');
+      }
     });
 
     it('validates sources parameter indices', async () => {
@@ -561,21 +595,25 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error message for invalid sources indices
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 }
-            ],
-            profile: 'driving',
-            sources: '0;2'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'Sources parameter contains invalid indices. All indices must be between 0 and 1.'
+      const invalidSourcesResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'driving',
+          sources: '0;2'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(invalidSourcesResult.isError).toBe(true);
+      expect(invalidSourcesResult.content[0].type).toBe('text');
+      if (invalidSourcesResult.content[0].type === 'text') {
+        expect(invalidSourcesResult.content[0].text).toContain(
+          'Sources parameter contains invalid indices. All indices must be between 0 and 1.'
+        );
+      }
     });
 
     it('validates destinations parameter indices', async () => {
@@ -591,21 +629,25 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error message for invalid destinations indices
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 }
-            ],
-            profile: 'driving',
-            destinations: '3'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'Destinations parameter contains invalid indices. All indices must be between 0 and 1.'
+      const invalidDestinationsResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'driving',
+          destinations: '3'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(invalidDestinationsResult.isError).toBe(true);
+      expect(invalidDestinationsResult.content[0].type).toBe('text');
+      if (invalidDestinationsResult.content[0].type === 'text') {
+        expect(invalidDestinationsResult.content[0].text).toContain(
+          'Destinations parameter contains invalid indices. All indices must be between 0 and 1.'
+        );
+      }
     });
 
     it('validates destinations parameter index negative', async () => {
@@ -621,21 +663,25 @@ describe('MatrixTool', () => {
       expect(result.isError).toBe(true);
 
       // Test direct error message for invalid destinations indices
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 }
-            ],
-            profile: 'driving',
-            destinations: '-1'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'Destinations parameter contains invalid indices. All indices must be between 0 and 1.'
+      const negativeDestinationsResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'driving',
+          destinations: '-1'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(negativeDestinationsResult.isError).toBe(true);
+      expect(negativeDestinationsResult.content[0].type).toBe('text');
+      if (negativeDestinationsResult.content[0].type === 'text') {
+        expect(negativeDestinationsResult.content[0].text).toContain(
+          'Destinations parameter contains invalid indices. All indices must be between 0 and 1.'
+        );
+      }
     });
 
     it('accepts valid "all" value for sources', async () => {
@@ -773,23 +819,27 @@ describe('MatrixTool', () => {
       expect(mockFetch).not.toHaveBeenCalled();
 
       // Test direct error message for unused coordinates
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates: [
-              { longitude: -122.42, latitude: 37.78 },
-              { longitude: -122.45, latitude: 37.91 },
-              { longitude: -122.48, latitude: 37.73 }
-            ],
-            profile: 'driving',
-            sources: '1',
-            destinations: '2'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'When specifying both sources and destinations, all coordinates must be used as either a source or destination.'
+      const unusedCoordsResult = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 },
+            { longitude: -122.48, latitude: 37.73 }
+          ],
+          profile: 'driving',
+          sources: '1',
+          destinations: '2'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(unusedCoordsResult.isError).toBe(true);
+      expect(unusedCoordsResult.content[0].type).toBe('text');
+      if (unusedCoordsResult.content[0].type === 'text') {
+        expect(unusedCoordsResult.content[0].text).toContain(
+          'When specifying both sources and destinations, all coordinates must be used as either a source or destination.'
+        );
+      }
     });
 
     it('accepts sources and destinations with single indices when all coordinates are used', async () => {
@@ -905,17 +955,21 @@ describe('MatrixTool', () => {
       expect(mockFetch).not.toHaveBeenCalled();
 
       // Test direct error message for exceeding coordinate limit
-      await expect(async () => {
-        await tool['execute'](
-          {
-            coordinates,
-            profile: 'driving-traffic'
-          },
-          'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
-        );
-      }).rejects.toThrow(
-        'The driving-traffic profile supports a maximum of 10 coordinate pairs.'
+      const trafficErrorResult = await tool['execute'](
+        {
+          coordinates,
+          profile: 'driving-traffic'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
+
+      expect(trafficErrorResult.isError).toBe(true);
+      expect(trafficErrorResult.content[0].type).toBe('text');
+      if (trafficErrorResult.content[0].type === 'text') {
+        expect(trafficErrorResult.content[0].text).toContain(
+          'The driving-traffic profile supports a maximum of 10 coordinate pairs.'
+        );
+      }
     });
   });
 
