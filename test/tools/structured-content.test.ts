@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MapboxApiBasedTool } from '../../src/tools/MapboxApiBasedTool.js';
-import type { OutputSchema } from '../../src/tools/MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../../src/tools/MapboxApiBasedTool.output.schema.js';
 import { z } from 'zod';
 
 const TestInputSchema = z.object({

@@ -3,16 +3,20 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-import { CategorySearchInputSchema } from './CategorySearchTool.schema.js';
+import { CategorySearchInputSchema } from './CategorySearchTool.input.schema.js';
+import { CategorySearchResponseSchema } from './CategorySearchTool.output.schema.js';
 import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
 
+// API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
+
 export class CategorySearchTool extends MapboxApiBasedTool<
-  typeof CategorySearchInputSchema
+  typeof CategorySearchInputSchema,
+  typeof CategorySearchResponseSchema
 > {
   name = 'category_search_tool';
   description =
@@ -26,7 +30,10 @@ export class CategorySearchTool extends MapboxApiBasedTool<
   };
 
   constructor(private fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: CategorySearchInputSchema });
+    super({
+      inputSchema: CategorySearchInputSchema,
+      outputSchema: CategorySearchResponseSchema
+    });
   }
 
   private formatGeoJsonToText(
@@ -153,7 +160,20 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       };
     }
 
-    const data = (await response.json()) as MapboxFeatureCollection;
+    const rawData = await response.json();
+
+    // Validate response against schema with graceful fallback
+    let data: MapboxFeatureCollection;
+    try {
+      data = CategorySearchResponseSchema.parse(rawData);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Schema validation failed for category search response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+      // Graceful fallback to raw data
+      data = rawData as MapboxFeatureCollection;
+    }
 
     if (input.format === 'json_string') {
       return {

@@ -3,16 +3,23 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.schema.js';
+import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.input.schema.js';
+import {
+  SearchBoxResponseSchema,
+  type SearchBoxResponse
+} from './SearchAndGeocodeTool.output.schema.js';
 import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
 
+// API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
+
 export class SearchAndGeocodeTool extends MapboxApiBasedTool<
-  typeof SearchAndGeocodeInputSchema
+  typeof SearchAndGeocodeInputSchema,
+  typeof SearchBoxResponseSchema
 > {
   name = 'search_and_geocode_tool';
   description =
@@ -26,7 +33,10 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   };
 
   constructor(private fetchImpl: typeof fetch = fetchClient) {
-    super({ inputSchema: SearchAndGeocodeInputSchema });
+    super({
+      inputSchema: SearchAndGeocodeInputSchema,
+      outputSchema: SearchBoxResponseSchema
+    });
   }
 
   private formatGeoJsonToText(
@@ -187,15 +197,34 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       };
     }
 
-    const data = (await response.json()) as MapboxFeatureCollection;
+    const rawData = await response.json();
+
+    // Validate response against schema with graceful fallback
+    let data: SearchBoxResponse;
+    try {
+      data = SearchBoxResponseSchema.parse(rawData);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Schema validation failed for search response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+      // Graceful fallback to raw data
+      data = rawData as SearchBoxResponse;
+    }
+
     this.log(
       'info',
       `SearchAndGeocodeTool: Successfully completed search, found ${data.features?.length || 0} results`
     );
 
     return {
-      content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
-      structuredContent: data as unknown as Record<string, unknown>,
+      content: [
+        {
+          type: 'text',
+          text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
+        }
+      ],
+      structuredContent: data,
       isError: false
     };
   }

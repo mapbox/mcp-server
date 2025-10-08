@@ -454,4 +454,10 @@ describe('CategorySearchTool', () => {
       (result.content[0] as { type: 'text'; text: string }).text
     ).toContain('1. Test Cafe');
   });
+
+  it('should have output schema defined', () => {
+    const tool = new CategorySearchTool();
+    expect(tool.outputSchema).toBeDefined();
+    expect(tool.outputSchema).toBeTruthy();
+  });
 });

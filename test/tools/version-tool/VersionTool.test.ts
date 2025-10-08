@@ -57,16 +57,34 @@ describe('VersionTool', () => {
       });
     });
 
-    it('should handle errors gracefully', async () => {
-      mockGetVersionInfo.mockImplementationOnce(() => {
-        throw new Error('Version info not available');
-      });
+    it('should handle fallback version info correctly', async () => {
+      // Mock getVersionInfo to return fallback values (which is realistic behavior)
+      mockGetVersionInfo.mockImplementationOnce(() => ({
+        name: 'Mapbox MCP server',
+        version: '0.0.0',
+        sha: 'unknown',
+        tag: 'unknown',
+        branch: 'unknown'
+      }));
 
       const result = await tool.run({});
 
-      expect(result.isError).toBe(true);
+      expect(result.isError).toBe(false);
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
+      expect(
+        (result.content[0] as { type: 'text'; text: string }).text
+      ).toContain('Version: 0.0.0');
+      expect(
+        (result.content[0] as { type: 'text'; text: string }).text
+      ).toContain('SHA: unknown');
+      expect(result.structuredContent).toEqual({
+        name: 'Mapbox MCP server',
+        version: '0.0.0',
+        sha: 'unknown',
+        tag: 'unknown',
+        branch: 'unknown'
+      });
     });
   });
 

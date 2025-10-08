@@ -4,11 +4,12 @@
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny, z } from 'zod';
 import { BaseTool } from './BaseTool.js';
-import type { OutputSchema } from './MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from './MapboxApiBasedTool.output.schema.js';
 
 export abstract class MapboxApiBasedTool<
-  InputSchema extends ZodTypeAny
-> extends BaseTool<InputSchema> {
+  InputSchema extends ZodTypeAny,
+  OutputSchema extends ZodTypeAny = ZodTypeAny
+> extends BaseTool<InputSchema, OutputSchema> {
   abstract readonly name: string;
   abstract readonly description: string;
   abstract readonly annotations: import('@modelcontextprotocol/sdk/types.js').ToolAnnotations;
@@ -21,7 +22,10 @@ export abstract class MapboxApiBasedTool<
     return process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/';
   }
 
-  constructor(params: { inputSchema: InputSchema }) {
+  constructor(params: {
+    inputSchema: InputSchema;
+    outputSchema?: OutputSchema;
+  }) {
     super(params);
   }
 
@@ -45,6 +49,7 @@ export abstract class MapboxApiBasedTool<
    */
   async run(
     rawInput: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     extra?: RequestHandlerExtra<any, any>
   ): Promise<z.infer<typeof OutputSchema>> {
     try {

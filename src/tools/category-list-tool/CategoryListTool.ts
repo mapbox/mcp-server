@@ -2,13 +2,14 @@
 // Licensed under the MIT License.
 
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-import type { CategoryListInput } from './CategoryListTool.schema.js';
-import { CategoryListInputSchema } from './CategoryListTool.schema.js';
-import type { z } from 'zod';
+import type { CategoryListInput } from './CategoryListTool.input.schema.js';
+import { CategoryListInputSchema } from './CategoryListTool.input.schema.js';
+import { CategoryListResponseSchema } from './CategoryListTool.output.schema.js';
 
-interface CategoryListResponse {
+// Interface for the full API response from Mapbox
+interface MapboxApiResponse {
   listItems: Array<{
     canonical_id: string;
     icon: string;
@@ -16,14 +17,19 @@ interface CategoryListResponse {
     version?: string;
     uuid?: string;
   }>;
+  attribution: string;
   version: string;
 }
+import type { z } from 'zod';
+
+// API Documentation: https://docs.mapbox.com/api/search/search-box/#list-categories
 
 /**
  * Tool for retrieving the list of supported categories from Mapbox Search API
  */
 export class CategoryListTool extends MapboxApiBasedTool<
-  typeof CategoryListInputSchema
+  typeof CategoryListInputSchema,
+  typeof CategoryListResponseSchema
 > {
   name = 'category_list_tool';
   description =
@@ -37,7 +43,10 @@ export class CategoryListTool extends MapboxApiBasedTool<
   };
 
   constructor(private fetchImpl: typeof fetch = fetchClient) {
-    super({ inputSchema: CategoryListInputSchema });
+    super({
+      inputSchema: CategoryListInputSchema,
+      outputSchema: CategoryListResponseSchema
+    });
   }
 
   protected async execute(
@@ -73,7 +82,10 @@ export class CategoryListTool extends MapboxApiBasedTool<
       };
     }
 
-    const data = (await response.json()) as CategoryListResponse;
+    const rawData = await response.json();
+
+    // Parse the API response (which has the full structure)
+    const data = rawData as MapboxApiResponse;
 
     // Apply pagination - if no limit specified, return all
     const startIndex = input.offset || 0;
@@ -83,12 +95,22 @@ export class CategoryListTool extends MapboxApiBasedTool<
       endIndex = Math.min(startIndex + input.limit, data.listItems.length);
     }
 
-    // Return simple object with listItems array
+    // Extract just the category IDs for our simplified response
     const categoryIds = data.listItems
       .slice(startIndex, endIndex)
       .map((item) => item.canonical_id);
 
     const result = { listItems: categoryIds };
+
+    // Validate our simplified output against the schema
+    try {
+      CategoryListResponseSchema.parse(result);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Output schema validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+    }
 
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],

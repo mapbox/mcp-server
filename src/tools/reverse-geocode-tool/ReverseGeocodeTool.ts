@@ -3,16 +3,20 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-import { ReverseGeocodeInputSchema } from './ReverseGeocodeTool.schema.js';
+import { ReverseGeocodeInputSchema } from './ReverseGeocodeTool.input.schema.js';
+import { GeocodingResponseSchema } from './ReverseGeocodeTool.output.schema.js';
 import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
 
+// API Docs https://docs.mapbox.com/api/search/geocoding/
+
 export class ReverseGeocodeTool extends MapboxApiBasedTool<
-  typeof ReverseGeocodeInputSchema
+  typeof ReverseGeocodeInputSchema,
+  typeof GeocodingResponseSchema
 > {
   name = 'reverse_geocode_tool';
   description =
@@ -26,7 +30,10 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   };
 
   constructor(private fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: ReverseGeocodeInputSchema });
+    super({
+      inputSchema: ReverseGeocodeInputSchema,
+      outputSchema: GeocodingResponseSchema
+    });
   }
 
   private formatGeoJsonToText(
@@ -139,12 +146,26 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
       };
     }
 
-    const data = (await response.json()) as MapboxFeatureCollection;
+    const rawData = await response.json();
+
+    // Validate response against schema with graceful fallback
+    let data: MapboxFeatureCollection;
+    try {
+      data = GeocodingResponseSchema.parse(rawData);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Schema validation failed for reverse geocoding response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+      // Graceful fallback to raw data
+      data = rawData as MapboxFeatureCollection;
+    }
 
     // Check if the response has features
     if (!data || !data.features || data.features.length === 0) {
       return {
         content: [{ type: 'text', text: 'No results found.' }],
+        structuredContent: data as unknown as Record<string, unknown>,
         isError: false
       };
     }

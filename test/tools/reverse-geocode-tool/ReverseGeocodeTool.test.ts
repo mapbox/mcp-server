@@ -397,6 +397,7 @@ describe('ReverseGeocodeTool', () => {
     expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
       'No results found.'
     );
+    expect(result.structuredContent).toEqual(mockResponse);
   });
 
   it('handles results with minimal properties', async () => {
@@ -501,5 +502,11 @@ describe('ReverseGeocodeTool', () => {
     expect(
       (result.content[0] as { type: 'text'; text: string }).text
     ).toContain('1. Test Location');
+  });
+
+  it('should have output schema defined', () => {
+    const tool = new ReverseGeocodeTool();
+    expect(tool.outputSchema).toBeDefined();
+    expect(tool.outputSchema).toBeTruthy();
   });
 });

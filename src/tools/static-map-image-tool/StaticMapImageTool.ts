@@ -3,10 +3,10 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-import { StaticMapImageInputSchema } from './StaticMapImageTool.schema.js';
-import type { OverlaySchema } from './StaticMapImageTool.schema.js';
+import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
+import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema

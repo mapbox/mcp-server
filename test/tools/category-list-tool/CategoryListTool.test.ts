@@ -173,4 +173,10 @@ describe('CategoryListTool', () => {
     // Invalid offset should throw
     expect(() => tool.inputSchema.parse({ offset: -1 })).toThrow();
   });
+
+  it('should have output schema defined', () => {
+    const tool = new CategoryListTool();
+    expect(tool.outputSchema).toBeDefined();
+    expect(tool.outputSchema).toBeTruthy();
+  });
 });

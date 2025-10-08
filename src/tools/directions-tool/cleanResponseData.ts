@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import type { z } from 'zod';
-import type { DirectionsInputSchema } from './DirectionsTool.schema.js';
+import type { DirectionsInputSchema } from './DirectionsTool.input.schema.js';
 
 /**
  * Cleans up the API response to reduce token count while preserving useful data.

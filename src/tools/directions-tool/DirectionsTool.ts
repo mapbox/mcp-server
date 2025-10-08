@@ -4,16 +4,21 @@
 import { URLSearchParams } from 'node:url';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from '../../utils/dateUtils.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-import { DirectionsInputSchema } from './DirectionsTool.schema.js';
+import { DirectionsInputSchema } from './DirectionsTool.input.schema.js';
+import {
+  DirectionsResponseSchema,
+  type DirectionsResponse
+} from './DirectionsTool.output.schema.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
 export class DirectionsTool extends MapboxApiBasedTool<
-  typeof DirectionsInputSchema
+  typeof DirectionsInputSchema,
+  typeof DirectionsResponseSchema
 > {
   name = 'directions_tool';
   description =
@@ -27,7 +32,10 @@ export class DirectionsTool extends MapboxApiBasedTool<
   };
 
   constructor(private fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: DirectionsInputSchema });
+    super({
+      inputSchema: DirectionsInputSchema,
+      outputSchema: DirectionsResponseSchema
+    });
   }
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
@@ -245,9 +253,23 @@ export class DirectionsTool extends MapboxApiBasedTool<
 
     const data = await response.json();
     const cleanedData = cleanResponseData(input, data);
+
+    // Validate the response data against our schema
+    let validatedData: DirectionsResponse;
+    try {
+      validatedData = DirectionsResponseSchema.parse(cleanedData);
+    } catch (error) {
+      // If validation fails, fall back to the original data
+      this.log(
+        'warning',
+        `DirectionsTool: Response validation failed: ${error}`
+      );
+      validatedData = cleanedData as DirectionsResponse;
+    }
+
     return {
-      content: [{ type: 'text', text: JSON.stringify(cleanedData, null, 2) }],
-      structuredContent: cleanedData as Record<string, unknown>,
+      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      structuredContent: validatedData,
       isError: false
     };
   }

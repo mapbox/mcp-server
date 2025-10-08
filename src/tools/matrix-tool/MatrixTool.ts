@@ -4,13 +4,20 @@
 import type { z } from 'zod';
 import { URLSearchParams } from 'node:url';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.schema.js';
+import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { fetchClient } from '../../utils/fetchRequest.js';
-import { MatrixInputSchema } from './MatrixTool.schema.js';
+import { MatrixInputSchema } from './MatrixTool.input.schema.js';
+import {
+  MatrixResponseSchema,
+  type MatrixResponse
+} from './MatrixTool.output.schema.js';
 
 // API documentation: https://docs.mapbox.com/api/navigation/matrix/
 
-export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
+export class MatrixTool extends MapboxApiBasedTool<
+  typeof MatrixInputSchema,
+  typeof MatrixResponseSchema
+> {
   name = 'matrix_tool';
   description =
     'Calculates travel times and distances between multiple points using Mapbox Matrix API.';
@@ -25,7 +32,10 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
   private fetch: typeof globalThis.fetch;
 
   constructor(fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: MatrixInputSchema });
+    super({
+      inputSchema: MatrixInputSchema,
+      outputSchema: MatrixResponseSchema
+    });
     this.fetch = fetch;
   }
 
@@ -284,9 +294,20 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
 
     // Return the matrix data
     const data = await response.json();
+
+    // Validate the response data against our schema
+    let validatedData: MatrixResponse;
+    try {
+      validatedData = MatrixResponseSchema.parse(data);
+    } catch (error) {
+      // If validation fails, fall back to the original data
+      this.log('warning', `MatrixTool: Response validation failed: ${error}`);
+      validatedData = data as MatrixResponse;
+    }
+
     return {
-      content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-      structuredContent: data as Record<string, unknown>,
+      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      structuredContent: validatedData,
       isError: false
     };
   }
