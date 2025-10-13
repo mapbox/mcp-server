@@ -31,6 +31,13 @@ export const CategorySearchInputSchema = z.object({
         }
         // Handle JSON-stringified object: "{\"longitude\": -82.458107, \"latitude\": 27.937259}"
         if (val.startsWith('{') && val.endsWith('}')) {
+          // Reject if over 200 characters
+          if (val.length > 200) {
+            throw new Error(
+              'Proximity JSON string too large. Only latitude/longitude pairs are allowed.'
+            );
+          }
+
           const parsed = JSON.parse(val);
           if (
             typeof parsed === 'object' &&
