@@ -4,7 +4,7 @@
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
+import type { HttpRequest } from '../../utils/types.js';
 import { ReverseGeocodeInputSchema } from './ReverseGeocodeTool.input.schema.js';
 import { GeocodingResponseSchema } from './ReverseGeocodeTool.output.schema.js';
 import type {
@@ -29,10 +29,11 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
+  constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: ReverseGeocodeInputSchema,
-      outputSchema: GeocodingResponseSchema
+      outputSchema: GeocodingResponseSchema,
+      httpRequest: params.httpRequest
     });
   }
 
@@ -132,7 +133,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
       url.searchParams.append('types', input.types.join(','));
     }
 
-    const response = await this.fetch(url.toString());
+    const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
       return {

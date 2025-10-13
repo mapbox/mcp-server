@@ -6,16 +6,19 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, vi } from 'vitest';
 import { SearchAndGeocodeTool } from '../../../src/tools/search-and-geocode-tool/SearchAndGeocodeTool.js';
+import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 describe('SearchAndGeocodeTool output schema registration', () => {
   it('should have an output schema defined', () => {
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });
 
   it('should register output schema with MCP server', () => {
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     // Mock the installTo method to verify it gets called with output schema
     const mockInstallTo = vi.fn().mockImplementation(() => {
@@ -78,7 +81,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     // This should not throw if the schema is correct
     expect(() => {
@@ -103,7 +107,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       ]
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -118,7 +123,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       features: []
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -206,7 +212,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       attribution: '© 2021 Mapbox and its suppliers. All rights reserved.'
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -230,7 +237,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       ]
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -257,7 +265,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       ]
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -281,7 +290,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       ]
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -296,7 +306,8 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       features: 'not an array'
     };
 
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {

@@ -5,9 +5,9 @@ process.env.MAPBOX_ACCESS_TOKEN = 'pk.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  setupFetch,
+  setupHttpRequest,
   assertHeadersSent
-} from '../../utils/fetchRequestUtils.js';
+} from '../../utils/httpPipelineUtils.js';
 import { CategoryListTool } from '../../../src/tools/category-list-tool/CategoryListTool.js';
 
 describe('CategoryListTool', () => {
@@ -16,7 +16,7 @@ describe('CategoryListTool', () => {
   });
 
   it('sends custom header', async () => {
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => ({
         listItems: [
           {
@@ -28,22 +28,22 @@ describe('CategoryListTool', () => {
       })
     });
 
-    await new CategoryListTool(fetch).run({});
+    await new CategoryListTool({ httpRequest }).run({});
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('constructs correct URL with access token', async () => {
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => ({
         listItems: [],
         version: '25:test'
       })
     });
 
-    await new CategoryListTool(fetch).run({});
+    await new CategoryListTool({ httpRequest }).run({});
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain(
       'https://api.mapbox.com/search/searchbox/v1/list/category'
     );
@@ -51,29 +51,31 @@ describe('CategoryListTool', () => {
   });
 
   it('includes language parameter when provided', async () => {
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => ({
         listItems: [],
         version: '25:test'
       })
     });
 
-    await new CategoryListTool(fetch).run({
+    await new CategoryListTool({ httpRequest }).run({
       language: 'es'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('language=es');
   });
 
   it('handles fetch errors gracefully', async () => {
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       ok: false,
       status: 403,
       statusText: 'Forbidden'
     });
 
-    await expect(new CategoryListTool(fetch).run({})).resolves.toMatchObject({
+    await expect(
+      new CategoryListTool({ httpRequest }).run({})
+    ).resolves.toMatchObject({
       isError: true
     });
   });
@@ -93,11 +95,11 @@ describe('CategoryListTool', () => {
       version: '25:test'
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategoryListTool(fetch).run({});
+    const result = await new CategoryListTool({ httpRequest }).run({});
 
     expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
@@ -121,11 +123,11 @@ describe('CategoryListTool', () => {
       version: '25:test'
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategoryListTool(fetch).run({
+    const result = await new CategoryListTool({ httpRequest }).run({
       limit: 2,
       offset: 1
     });
@@ -140,14 +142,14 @@ describe('CategoryListTool', () => {
   });
 
   it('handles empty results', async () => {
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => ({
         listItems: [],
         version: '25:test'
       })
     });
 
-    const result = await new CategoryListTool(fetch).run({});
+    const result = await new CategoryListTool({ httpRequest }).run({});
 
     expect(result.isError).toBe(false);
     const text = (result.content[0] as { type: 'text'; text: string }).text;
@@ -158,7 +160,8 @@ describe('CategoryListTool', () => {
   });
 
   it('validates input parameters correctly', async () => {
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     expect(() => tool.inputSchema.parse({})).not.toThrow();
     expect(() => tool.inputSchema.parse({ language: 'en' })).not.toThrow();
@@ -175,7 +178,8 @@ describe('CategoryListTool', () => {
   });
 
   it('should have output schema defined', () => {
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });

@@ -4,9 +4,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   RetryPolicy,
-  PolicyPipeline,
+  HttpPipeline,
   UserAgentPolicy
-} from '../../src/utils/fetchRequest.js';
+} from '../../src/utils/httpPipeline.js';
 import type { Mock } from 'vitest';
 
 function createMockFetch(
@@ -25,7 +25,7 @@ function createMockFetch(
   }) as typeof fetch;
 }
 
-describe('PolicyPipeline', () => {
+describe('HttpPipeline', () => {
   describe('RetryPolicy', () => {
     afterEach(() => {
       vi.restoreAllMocks();
@@ -38,10 +38,10 @@ describe('PolicyPipeline', () => {
         { status: 500 },
         { status: 500 }
       ]);
-      const pipeline = new PolicyPipeline(mockFetch);
+      const pipeline = new HttpPipeline(mockFetch);
       pipeline.usePolicy(new RetryPolicy(3, 1, 10)); // Use small delays for test speed
 
-      const response = await pipeline.fetch('http://test', {});
+      const response = await pipeline.execute('http://test', {});
 
       expect(mockFetch).toHaveBeenCalledTimes(4);
       expect(response.status).toBe(500);
@@ -53,10 +53,10 @@ describe('PolicyPipeline', () => {
         { status: 429 },
         { status: 200, ok: true }
       ]);
-      const pipeline = new PolicyPipeline(mockFetch);
+      const pipeline = new HttpPipeline(mockFetch);
       pipeline.usePolicy(new RetryPolicy(3, 1, 10));
 
-      const response = await pipeline.fetch('http://test', {});
+      const response = await pipeline.execute('http://test', {});
 
       expect(mockFetch).toHaveBeenCalledTimes(3);
       expect(response.status).toBe(200);
@@ -65,10 +65,10 @@ describe('PolicyPipeline', () => {
 
     it('does not retry on 400 errors', async () => {
       const mockFetch = createMockFetch([{ status: 400 }]);
-      const pipeline = new PolicyPipeline(mockFetch);
+      const pipeline = new HttpPipeline(mockFetch);
       pipeline.usePolicy(new RetryPolicy(3, 1, 10));
 
-      const response = await pipeline.fetch('http://test', {});
+      const response = await pipeline.execute('http://test', {});
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(response.status).toBe(400);
@@ -76,10 +76,10 @@ describe('PolicyPipeline', () => {
 
     it('returns immediately on first success', async () => {
       const mockFetch = createMockFetch([{ status: 200, ok: true }]);
-      const pipeline = new PolicyPipeline(mockFetch);
+      const pipeline = new HttpPipeline(mockFetch);
       pipeline.usePolicy(new RetryPolicy(3, 1, 10));
 
-      const response = await pipeline.fetch('http://test', {});
+      const response = await pipeline.execute('http://test', {});
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(response.status).toBe(200);
@@ -101,10 +101,10 @@ describe('PolicyPipeline', () => {
         }
       ) as Mock;
 
-      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
       pipeline.usePolicy(new UserAgentPolicy('TestAgent/1.0'));
 
-      await pipeline.fetch('http://test', {});
+      await pipeline.execute('http://test', {});
 
       const headers = mockFetch.mock.calls[0][1]?.headers as Record<
         string,
@@ -126,10 +126,10 @@ describe('PolicyPipeline', () => {
         }
       ) as Mock;
 
-      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
       pipeline.usePolicy(new UserAgentPolicy('TestAgent/1.0'));
 
-      await pipeline.fetch('http://test', {
+      await pipeline.execute('http://test', {
         headers: {
           'User-Agent': 'CustomAgent/2.0'
         }
@@ -155,11 +155,11 @@ describe('PolicyPipeline', () => {
         }
       ) as Mock;
 
-      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
       pipeline.usePolicy(new UserAgentPolicy('TestAgent/1.0'));
 
       const headers = new Headers();
-      await pipeline.fetch('http://test', { headers });
+      await pipeline.execute('http://test', { headers });
 
       expect(headers.get('User-Agent')).toBe('TestAgent/1.0');
     });
@@ -168,7 +168,7 @@ describe('PolicyPipeline', () => {
   describe('Policy Management', () => {
     it('can add and list policies', () => {
       const mockFetch = vi.fn();
-      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
 
       const userAgentPolicy = new UserAgentPolicy(
         'TestAgent/1.0',
@@ -187,7 +187,7 @@ describe('PolicyPipeline', () => {
 
     it('can find policy by ID', () => {
       const mockFetch = vi.fn();
-      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
 
       const userAgentPolicy = new UserAgentPolicy(
         'TestAgent/1.0',
@@ -204,7 +204,7 @@ describe('PolicyPipeline', () => {
 
     it('can remove policy by ID', () => {
       const mockFetch = vi.fn();
-      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
 
       const userAgentPolicy = new UserAgentPolicy(
         'TestAgent/1.0',
@@ -226,7 +226,7 @@ describe('PolicyPipeline', () => {
 
     it('can remove policy by reference', () => {
       const mockFetch = vi.fn();
-      const pipeline = new PolicyPipeline(mockFetch as unknown as typeof fetch);
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
 
       const userAgentPolicy = new UserAgentPolicy(
         'TestAgent/1.0',

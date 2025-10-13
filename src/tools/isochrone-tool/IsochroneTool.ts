@@ -4,7 +4,7 @@
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
+import type { HttpRequest } from '../../utils/types.js';
 import { IsochroneInputSchema } from './IsochroneTool.input.schema.js';
 import {
   IsochroneResponseSchema,
@@ -29,14 +29,12 @@ export class IsochroneTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  private fetch: typeof globalThis.fetch;
-
-  constructor(fetch: typeof globalThis.fetch = fetchClient) {
+  constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: IsochroneInputSchema,
-      outputSchema: IsochroneResponseSchema
+      outputSchema: IsochroneResponseSchema,
+      httpRequest: params.httpRequest
     });
-    this.fetch = fetch;
   }
 
   private formatIsochroneResponse(data: IsochroneResponse): string {
@@ -135,7 +133,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
       url.searchParams.append('depart_at', input.depart_at);
     }
 
-    const response = await this.fetch(url);
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
       return {

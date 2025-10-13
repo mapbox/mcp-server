@@ -3,7 +3,7 @@
 
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
+import type { HttpRequest } from '../../utils/types.js';
 import type { CategoryListInput } from './CategoryListTool.input.schema.js';
 import { CategoryListInputSchema } from './CategoryListTool.input.schema.js';
 import { CategoryListResponseSchema } from './CategoryListTool.output.schema.js';
@@ -42,10 +42,11 @@ export class CategoryListTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetchImpl: typeof fetch = fetchClient) {
+  constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: CategoryListInputSchema,
-      outputSchema: CategoryListResponseSchema
+      outputSchema: CategoryListResponseSchema,
+      httpRequest: params.httpRequest
     });
   }
 
@@ -63,7 +64,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
       url.searchParams.set('language', input.language);
     }
 
-    const response = await this.fetchImpl(url.toString(), {
+    const response = await this.httpRequest(url.toString(), {
       method: 'GET',
       headers: {
         'User-Agent': `@mapbox/mcp-server/${process.env.npm_package_version || 'dev'}`

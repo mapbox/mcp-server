@@ -4,7 +4,8 @@
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny, z } from 'zod';
 import { BaseTool } from './BaseTool.js';
-import type { OutputSchema } from './MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { HttpRequest } from '../utils/types.js';
 
 export abstract class MapboxApiBasedTool<
   InputSchema extends ZodTypeAny,
@@ -22,11 +23,15 @@ export abstract class MapboxApiBasedTool<
     return process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/';
   }
 
+  protected httpRequest: HttpRequest;
+
   constructor(params: {
     inputSchema: InputSchema;
     outputSchema?: OutputSchema;
+    httpRequest: HttpRequest;
   }) {
     super(params);
+    this.httpRequest = params.httpRequest;
   }
 
   /**
@@ -51,7 +56,7 @@ export abstract class MapboxApiBasedTool<
     rawInput: unknown,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     extra?: RequestHandlerExtra<any, any>
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     try {
       // First check if token is provided via authentication context
       // Check both standard token field and accessToken in extra for compatibility
@@ -110,5 +115,5 @@ export abstract class MapboxApiBasedTool<
   protected abstract execute(
     _input: z.infer<InputSchema>,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>>;
+  ): Promise<CallToolResult>;
 }

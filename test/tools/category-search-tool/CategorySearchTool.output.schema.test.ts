@@ -6,16 +6,19 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, vi } from 'vitest';
 import { CategorySearchTool } from '../../../src/tools/category-search-tool/CategorySearchTool.js';
+import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 describe('CategorySearchTool output schema registration', () => {
   it('should have an output schema defined', () => {
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });
 
   it('should register output schema with MCP server', () => {
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     // Mock the installTo method to verify it gets called with output schema
     const mockInstallTo = vi.fn().mockImplementation(() => {
@@ -112,7 +115,8 @@ describe('CategorySearchTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     // This should not throw if the schema is correct
     expect(() => {
@@ -225,7 +229,8 @@ describe('CategorySearchTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -259,7 +264,8 @@ describe('CategorySearchTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -287,7 +293,8 @@ describe('CategorySearchTool output schema registration', () => {
       // Missing attribution field
     };
 
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -303,7 +310,8 @@ describe('CategorySearchTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {

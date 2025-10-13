@@ -3,16 +3,19 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { MatrixTool } from '../../../src/tools/matrix-tool/MatrixTool.js';
+import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 describe('MatrixTool output schema registration', () => {
   it('should have an output schema defined', () => {
-    const tool = new MatrixTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new MatrixTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });
 
   it('should register output schema with MCP server', () => {
-    const tool = new MatrixTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new MatrixTool({ httpRequest });
 
     // Mock the installTo method to verify it gets called with output schema
     const installToSpy = vi.spyOn(tool, 'installTo').mockImplementation(() => {
@@ -28,7 +31,8 @@ describe('MatrixTool output schema registration', () => {
   });
 
   it('should validate response structure matches schema', () => {
-    const tool = new MatrixTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new MatrixTool({ httpRequest });
     const mockResponse = {
       code: 'Ok',
       durations: [
@@ -86,7 +90,8 @@ describe('MatrixTool output schema registration', () => {
   });
 
   it('should handle null values in durations and distances matrices', () => {
-    const tool = new MatrixTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new MatrixTool({ httpRequest });
     const mockResponseWithNulls = {
       code: 'Ok',
       durations: [
@@ -124,7 +129,8 @@ describe('MatrixTool output schema registration', () => {
   });
 
   it('should handle error responses with message field', () => {
-    const tool = new MatrixTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new MatrixTool({ httpRequest });
     const errorResponse = {
       code: 'InvalidInput',
       message: 'Invalid coordinates provided',

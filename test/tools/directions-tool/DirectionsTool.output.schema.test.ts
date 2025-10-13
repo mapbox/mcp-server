@@ -1,34 +1,44 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
+
 import { describe, it, expect, vi } from 'vitest';
 import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
+import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 describe('DirectionsTool output schema registration', () => {
   it('should have an output schema defined', () => {
-    const tool = new DirectionsTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new DirectionsTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });
 
   it('should register output schema with MCP server', () => {
-    const tool = new DirectionsTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new DirectionsTool({ httpRequest });
 
     // Mock the installTo method to verify it gets called with output schema
-    const installToSpy = vi.spyOn(tool, 'installTo').mockImplementation(() => {
+    const mockInstallTo = vi.fn().mockImplementation(() => {
       // Verify that the tool has an output schema when being installed
       expect(tool.outputSchema).toBeDefined();
-      return undefined;
+      return tool;
     });
 
-    const mockServer = {} as Parameters<typeof tool.installTo>[0];
-    tool.installTo(mockServer);
+    Object.defineProperty(tool, 'installTo', {
+      value: mockInstallTo
+    });
 
-    expect(installToSpy).toHaveBeenCalledWith(mockServer);
+    // Simulate server registration
+    tool.installTo({} as never);
+    expect(mockInstallTo).toHaveBeenCalled();
   });
 
   it('should validate response structure matches schema', () => {
-    const tool = new DirectionsTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new DirectionsTool({ httpRequest });
     const mockResponse = {
       routes: [
         {

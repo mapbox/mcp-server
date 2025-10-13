@@ -4,7 +4,7 @@
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
+import type { HttpRequest } from '../../utils/types.js';
 import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.input.schema.js';
 import {
   SearchBoxResponseSchema,
@@ -32,10 +32,11 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetchImpl: typeof fetch = fetchClient) {
+  constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: SearchAndGeocodeInputSchema,
-      outputSchema: SearchBoxResponseSchema
+      outputSchema: SearchBoxResponseSchema,
+      httpRequest: params.httpRequest
     });
   }
 
@@ -178,7 +179,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       `SearchAndGeocodeTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
     );
 
-    const response = await this.fetchImpl(url.toString());
+    const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
       const errorBody = await response.text();

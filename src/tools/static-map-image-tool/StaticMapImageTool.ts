@@ -4,7 +4,7 @@
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
+import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 
@@ -22,8 +22,11 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: StaticMapImageInputSchema });
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: StaticMapImageInputSchema,
+      httpRequest: params.httpRequest
+    });
   }
 
   private encodeOverlay(overlay: z.infer<typeof OverlaySchema>): string {
@@ -95,7 +98,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const density = input.highDensity ? '@2x' : '';
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
 
-    const response = await this.fetch(url);
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
       return {

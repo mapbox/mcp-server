@@ -4,9 +4,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../../src/tools/MapboxApiBasedTool.js';
+import type { HttpRequest } from '../../src/utils/types.js';
+import { setupHttpRequest } from '../utils/httpPipelineUtils.js';
 
 // Create a minimal implementation of MapboxApiBasedTool for testing
 class TestTool extends MapboxApiBasedTool<typeof TestTool.inputSchema> {
+  static readonly annotations = {
+    title: 'Test Tool for MapboxApiBasedTool',
+    readOnlyHint: true,
+    idempotentHint: true
+  };
+
+  readonly annotations = TestTool.annotations;
   readonly name = 'test-tool';
   readonly description = 'Tool for testing MapboxApiBasedTool error handling';
 
@@ -14,12 +23,16 @@ class TestTool extends MapboxApiBasedTool<typeof TestTool.inputSchema> {
     testParam: z.string()
   });
 
-  constructor() {
-    super({ inputSchema: TestTool.inputSchema });
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: TestTool.inputSchema,
+      httpRequest: params.httpRequest
+    });
   }
 
   protected async execute(
     _input: z.infer<typeof TestTool.inputSchema>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any> {
     throw new Error('Test error message');
   }
@@ -34,7 +47,8 @@ describe('MapboxApiBasedTool', () => {
       'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
     );
 
-    testTool = new TestTool();
+    const { httpRequest } = setupHttpRequest();
+    testTool = new TestTool({ httpRequest });
     // Mock the log method to test that errors are properly logged
     testTool['log'] = vi.fn();
   });
@@ -54,7 +68,8 @@ describe('MapboxApiBasedTool', () => {
 
       try {
         // Create a new instance with the modified token
-        const toolWithInvalidToken = new TestTool();
+        const { httpRequest } = setupHttpRequest();
+        const toolWithInvalidToken = new TestTool({ httpRequest });
         // Mock the log method separately for this instance
         toolWithInvalidToken['log'] = vi.fn();
 

@@ -7,12 +7,12 @@ import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from '../../utils/dateUtils.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
 import { DirectionsInputSchema } from './DirectionsTool.input.schema.js';
 import {
   DirectionsResponseSchema,
   type DirectionsResponse
 } from './DirectionsTool.output.schema.js';
+import type { HttpRequest } from '../..//utils/types.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -31,10 +31,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
+  constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: DirectionsInputSchema,
-      outputSchema: DirectionsResponseSchema
+      outputSchema: DirectionsResponseSchema,
+      httpRequest: params.httpRequest
     });
   }
   protected async execute(
@@ -237,7 +238,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
 
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions/v5/mapbox/${input.routing_profile}/${encodedCoords}?${queryString}`;
 
-    const response = await this.fetch(url);
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
       return {
@@ -251,7 +252,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
       };
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as DirectionsResponse;
     const cleanedData = cleanResponseData(input, data);
 
     // Validate the response data against our schema

@@ -6,9 +6,9 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  setupFetch,
+  setupHttpRequest,
   assertHeadersSent
-} from '../../utils/fetchRequestUtils.js';
+} from '../../utils/httpPipelineUtils.js';
 import { MatrixTool } from '../../../src/tools/matrix-tool/MatrixTool.js';
 
 const sampleMatrixResponse = {
@@ -69,9 +69,9 @@ describe('MatrixTool', () => {
   });
 
   it('sends custom header', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new MatrixTool(fetch).run({
+    await new MatrixTool({ httpRequest }).run({
       coordinates: [
         { longitude: -74.102094, latitude: 40.692815 },
         { longitude: -74.1022094, latitude: 40.792815 }
@@ -79,15 +79,15 @@ describe('MatrixTool', () => {
       profile: 'walking'
     });
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('sends request with correct parameters', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     const result = await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -98,24 +98,24 @@ describe('MatrixTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockHttpRequest).toHaveBeenCalledTimes(1);
 
     // Check that URL contains correct profile and coordinates
-    const url = mockFetch.mock.calls[0][0];
+    const url = mockHttpRequest.mock.calls[0][0];
     expect(url).toContain(
       'directions-matrix/v1/mapbox/driving/-122.42,37.78;-122.45,37.91;-122.48,37.73'
     );
     expect(url).toContain('access_token=');
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('properly includes annotations parameter when specified', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -125,16 +125,16 @@ describe('MatrixTool', () => {
       annotations: 'duration,distance'
     });
 
-    const url = mockFetch.mock.calls[0][0];
+    const url = mockHttpRequest.mock.calls[0][0];
     expect(url).toContain('annotations=duration%2Cdistance');
   });
 
   it('properly includes approaches parameter when specified', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -145,16 +145,16 @@ describe('MatrixTool', () => {
       approaches: 'curb;unrestricted;curb'
     });
 
-    const url = mockFetch.mock.calls[0][0];
+    const url = mockHttpRequest.mock.calls[0][0];
     expect(url).toContain('approaches=curb%3Bunrestricted%3Bcurb');
   });
 
   it('properly includes bearings parameter when specified', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -164,16 +164,16 @@ describe('MatrixTool', () => {
       bearings: '45,90;120,45'
     });
 
-    const url = mockFetch.mock.calls[0][0];
+    const url = mockHttpRequest.mock.calls[0][0];
     expect(url).toContain('bearings=45%2C90%3B120%2C45');
   });
 
   it('properly includes destinations parameter when specified', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -184,16 +184,16 @@ describe('MatrixTool', () => {
       destinations: '0;2'
     });
 
-    const url = mockFetch.mock.calls[0][0];
+    const url = mockHttpRequest.mock.calls[0][0];
     expect(url).toContain('destinations=0%3B2');
   });
 
   it('properly includes sources parameter when specified', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: () => Promise.resolve(sampleMatrixResponse)
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -204,16 +204,16 @@ describe('MatrixTool', () => {
       sources: '1'
     });
 
-    const url = mockFetch.mock.calls[0][0];
+    const url = mockHttpRequest.mock.calls[0][0];
     expect(url).toContain('sources=1');
   });
 
   it('handles all optional parameters together', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     const result = await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -229,7 +229,7 @@ describe('MatrixTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    const url = mockFetch.mock.calls[0][0];
+    const url = mockHttpRequest.mock.calls[0][0];
     expect(url).toContain('annotations=distance%2Cduration');
     expect(url).toContain('approaches=curb%3Bunrestricted%3Bcurb');
     expect(url).toContain('bearings=45%2C90%3B120%2C45%3B180%2C90');
@@ -238,13 +238,13 @@ describe('MatrixTool', () => {
   });
 
   it('handles fetch errors gracefully', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     const result = await tool.run({
       coordinates: [
         { longitude: -122.42, latitude: 37.78 },
@@ -259,13 +259,13 @@ describe('MatrixTool', () => {
       text: 'Request failed with status 404: Not Found'
     });
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('validates driving-traffic profile coordinate limit', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    const tool = new MatrixTool(fetch);
+    const tool = new MatrixTool({ httpRequest });
     const coordinates = Array(11).fill({ longitude: -122.42, latitude: 37.78 });
 
     const result = await tool.run({
@@ -274,7 +274,7 @@ describe('MatrixTool', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockHttpRequest).not.toHaveBeenCalled();
 
     // Test for specific error message by calling execute directly
     const errorResult = await tool['execute'](
@@ -299,8 +299,8 @@ describe('MatrixTool', () => {
     let tool: MatrixTool;
 
     beforeEach(() => {
-      const { fetch } = setupFetch();
-      tool = new MatrixTool(fetch);
+      const { httpRequest } = setupHttpRequest();
+      tool = new MatrixTool({ httpRequest });
     });
 
     it('validates coordinates - minimum count', async () => {
@@ -685,11 +685,11 @@ describe('MatrixTool', () => {
     });
 
     it('accepts valid "all" value for sources', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      const localTool = new MatrixTool(fetch);
+      const localTool = new MatrixTool({ httpRequest });
 
       await localTool.run({
         coordinates: [
@@ -700,16 +700,16 @@ describe('MatrixTool', () => {
         sources: 'all'
       });
 
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('sources=all');
     });
 
     it('accepts valid "all" value for destinations', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      const localTool = new MatrixTool(fetch);
+      const localTool = new MatrixTool({ httpRequest });
 
       await localTool.run({
         coordinates: [
@@ -720,7 +720,7 @@ describe('MatrixTool', () => {
         destinations: 'all'
       });
 
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('destinations=all');
     });
   });
@@ -728,10 +728,10 @@ describe('MatrixTool', () => {
   // Parameter edge cases
   describe('parameter edge cases', () => {
     it('accepts approaches with skipped values', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
       const result = await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -743,16 +743,16 @@ describe('MatrixTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('approaches=curb%3B%3Bunrestricted');
     });
 
     it('accepts bearings with skipped values', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
 
       const result = await tool.run({
         coordinates: [
@@ -765,16 +765,16 @@ describe('MatrixTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('bearings=45%2C90%3B%3B120%2C45');
     });
 
     it('validates empty values correctly in approaches', async () => {
-      const { fetch } = setupFetch({
+      const { httpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
 
       const resultWithSuccess1 = await tool.run({
         coordinates: [
@@ -801,10 +801,10 @@ describe('MatrixTool', () => {
     });
 
     it('rejects sources and destinations with unused coordinates', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
       const result = await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -816,7 +816,7 @@ describe('MatrixTool', () => {
         destinations: '2'
       });
       expect(result.isError).toBe(true);
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockHttpRequest).not.toHaveBeenCalled();
 
       // Test direct error message for unused coordinates
       const unusedCoordsResult = await tool['execute'](
@@ -843,10 +843,10 @@ describe('MatrixTool', () => {
     });
 
     it('accepts sources and destinations with single indices when all coordinates are used', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
       await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -856,16 +856,17 @@ describe('MatrixTool', () => {
         sources: '0',
         destinations: '1'
       });
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('sources=0');
       expect(url).toContain('destinations=1');
     });
 
     it('accepts both annotations orders', async () => {
-      const { mockFetch: mockFetch1, fetch: fetch1 } = setupFetch({
-        json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
-      });
-      const tool1 = new MatrixTool(fetch1);
+      const { mockHttpRequest: mockHttpRequest1, httpRequest: httpRequest1 } =
+        setupHttpRequest({
+          json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
+        });
+      const tool1 = new MatrixTool({ httpRequest: httpRequest1 });
       await tool1.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -874,13 +875,14 @@ describe('MatrixTool', () => {
         profile: 'driving',
         annotations: 'duration,distance'
       });
-      const url1 = mockFetch1.mock.calls[0][0];
+      const url1 = mockHttpRequest1.mock.calls[0][0];
       expect(url1).toContain('annotations=duration%2Cdistance');
 
-      const { mockFetch: mockFetch2, fetch: fetch2 } = setupFetch({
-        json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
-      });
-      const tool2 = new MatrixTool(fetch2);
+      const { mockHttpRequest: mockHttpRequest2, httpRequest: httpRequest2 } =
+        setupHttpRequest({
+          json: () => Promise.resolve(sampleMatrixWithDistanceResponse)
+        });
+      const tool2 = new MatrixTool({ httpRequest: httpRequest2 });
       await tool2.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
@@ -889,7 +891,7 @@ describe('MatrixTool', () => {
         profile: 'driving',
         annotations: 'distance,duration'
       });
-      const url2 = mockFetch2.mock.calls[0][0];
+      const url2 = mockHttpRequest2.mock.calls[0][0];
       expect(url2).toContain('annotations=distance%2Cduration');
     });
   });
@@ -897,10 +899,10 @@ describe('MatrixTool', () => {
   // Large input tests
   describe('large input', () => {
     it('accepts 25 coordinates for non-driving-traffic profiles', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
 
       const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 25 },
@@ -914,14 +916,14 @@ describe('MatrixTool', () => {
         profile: 'driving'
       });
       expect(result.isError).toBe(false);
-      expect(mockFetch).toHaveBeenCalled();
+      expect(mockHttpRequest).toHaveBeenCalled();
     });
 
     it('accepts 10 coordinates for driving-traffic profile', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
       const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 10 },
         (_, i) => ({
@@ -934,12 +936,12 @@ describe('MatrixTool', () => {
         profile: 'driving-traffic'
       });
       expect(result.isError).toBe(false);
-      expect(mockFetch).toHaveBeenCalled();
+      expect(mockHttpRequest).toHaveBeenCalled();
     });
 
     it('rejects 11 coordinates for driving-traffic profile', async () => {
-      const { mockFetch, fetch } = setupFetch();
-      const tool = new MatrixTool(fetch);
+      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const tool = new MatrixTool({ httpRequest });
       const coordinates: { longitude: number; latitude: number }[] = Array.from(
         { length: 11 },
         (_, i) => ({
@@ -952,7 +954,7 @@ describe('MatrixTool', () => {
         profile: 'driving-traffic'
       });
       expect(result.isError).toBe(true);
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockHttpRequest).not.toHaveBeenCalled();
 
       // Test direct error message for exceeding coordinate limit
       const trafficErrorResult = await tool['execute'](
@@ -976,10 +978,10 @@ describe('MatrixTool', () => {
   // Test for different profiles
   describe('profiles', () => {
     it('works with driving-traffic profile', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
 
       const result = await tool.run({
         coordinates: [
@@ -990,16 +992,16 @@ describe('MatrixTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/driving-traffic');
     });
 
     it('works with driving profile', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
 
       const result = await tool.run({
         coordinates: [
@@ -1010,16 +1012,16 @@ describe('MatrixTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/driving');
     });
 
     it('works with walking profile', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
 
       const result = await tool.run({
         coordinates: [
@@ -1030,16 +1032,16 @@ describe('MatrixTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/walking');
     });
 
     it('works with cycling profile', async () => {
-      const { mockFetch, fetch } = setupFetch({
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
 
-      const tool = new MatrixTool(fetch);
+      const tool = new MatrixTool({ httpRequest });
 
       const result = await tool.run({
         coordinates: [
@@ -1050,7 +1052,7 @@ describe('MatrixTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      const url = mockFetch.mock.calls[0][0];
+      const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('directions-matrix/v1/mapbox/cycling');
     });
   });

@@ -5,7 +5,7 @@ import type { z } from 'zod';
 import { URLSearchParams } from 'node:url';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
+import type { HttpRequest } from '../../utils/types.js';
 import { MatrixInputSchema } from './MatrixTool.input.schema.js';
 import {
   MatrixResponseSchema,
@@ -29,14 +29,12 @@ export class MatrixTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  private fetch: typeof globalThis.fetch;
-
-  constructor(fetch: typeof globalThis.fetch = fetchClient) {
+  constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: MatrixInputSchema,
-      outputSchema: MatrixResponseSchema
+      outputSchema: MatrixResponseSchema,
+      httpRequest: params.httpRequest
     });
-    this.fetch = fetch;
   }
 
   protected async execute(
@@ -278,7 +276,7 @@ export class MatrixTool extends MapboxApiBasedTool<
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions-matrix/v1/mapbox/${input.profile}/${joined}?${queryParams.toString()}`;
 
     // Make the request
-    const response = await this.fetch(url);
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
       return {

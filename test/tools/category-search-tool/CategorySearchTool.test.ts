@@ -6,9 +6,9 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
-  setupFetch,
+  setupHttpRequest,
   assertHeadersSent
-} from '../../utils/fetchRequestUtils.js';
+} from '../../utils/httpPipelineUtils.js';
 import { CategorySearchTool } from '../../../src/tools/category-search-tool/CategorySearchTool.js';
 
 describe('CategorySearchTool', () => {
@@ -17,31 +17,31 @@ describe('CategorySearchTool', () => {
   });
 
   it('sends custom header', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'restaurant'
     });
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('constructs correct URL with required parameters', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'cafe'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('search/searchbox/v1/category/cafe');
     expect(calledUrl).toContain('access_token=');
   });
 
   it('includes all optional parameters in URL', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'hotel',
       language: 'es',
       limit: 15,
@@ -56,7 +56,7 @@ describe('CategorySearchTool', () => {
       poi_category_exclusions: ['motel', 'hostel']
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('category/hotel');
     expect(calledUrl).toContain('language=es');
     expect(calledUrl).toContain('limit=15');
@@ -67,72 +67,72 @@ describe('CategorySearchTool', () => {
   });
 
   it('handles IP-based proximity', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'gas_station',
       proximity: 'ip'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=ip');
   });
 
   it('handles string format proximity coordinates', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'restaurant',
       proximity: '-82.451668,27.942976'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942976');
   });
 
   it('handles array-like string format proximity', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'restaurant',
       proximity: '[-82.451668, 27.942964]'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942964');
   });
 
   it('handles JSON-stringified object format proximity', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'taco_shop',
       proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.458107%2C27.937259');
   });
 
   it('uses default limit when not specified', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'pharmacy'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('limit=10');
   });
 
   it('handles fetch errors gracefully', async () => {
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'restaurant'
     });
 
@@ -144,7 +144,8 @@ describe('CategorySearchTool', () => {
   });
 
   it('validates limit constraints', async () => {
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     // Test limit too high
     await expect(
@@ -168,7 +169,8 @@ describe('CategorySearchTool', () => {
   });
 
   it('validates coordinate constraints', async () => {
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
 
     // Test invalid longitude in proximity
     await expect(
@@ -197,13 +199,13 @@ describe('CategorySearchTool', () => {
   });
 
   it('encodes special characters in category', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new CategorySearchTool(fetch).run({
+    await new CategorySearchTool({ httpRequest }).run({
       category: 'shopping mall'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('category/shopping%20mall');
   });
 
@@ -227,11 +229,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'cafe'
     });
 
@@ -266,11 +268,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'fast_food'
     });
 
@@ -314,11 +316,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'department_store',
       limit: 2
     });
@@ -339,11 +341,11 @@ describe('CategorySearchTool', () => {
       features: []
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'nonexistent_category'
     });
 
@@ -371,11 +373,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'gas_station'
     });
 
@@ -406,11 +408,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'restaurant',
       format: 'json_string'
     });
@@ -440,11 +442,11 @@ describe('CategorySearchTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new CategorySearchTool(fetch).run({
+    const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'cafe'
     });
 
@@ -456,7 +458,8 @@ describe('CategorySearchTool', () => {
   });
 
   it('should have output schema defined', () => {
-    const tool = new CategorySearchTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategorySearchTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });

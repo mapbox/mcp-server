@@ -4,7 +4,7 @@
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
+import type { HttpRequest } from '../../utils/types.js';
 import { CategorySearchInputSchema } from './CategorySearchTool.input.schema.js';
 import { CategorySearchResponseSchema } from './CategorySearchTool.output.schema.js';
 import type {
@@ -29,10 +29,11 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
+  constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: CategorySearchInputSchema,
-      outputSchema: CategorySearchResponseSchema
+      outputSchema: CategorySearchResponseSchema,
+      httpRequest: params.httpRequest
     });
   }
 
@@ -146,7 +147,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     }
 
     // Make the request
-    const response = await this.fetch(url.toString());
+    const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
       return {

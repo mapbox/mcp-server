@@ -11,19 +11,20 @@ import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
 import { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
 import { VersionTool } from './version-tool/VersionTool.js';
+import { httpRequest } from '../utils/httpPipeline.js';
 
 // Central registry of all tools
 export const ALL_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
   new VersionTool(),
-  new CategoryListTool(),
-  new CategorySearchTool(),
-  new DirectionsTool(),
-  new IsochroneTool(),
-  new MatrixTool(),
-  new ReverseGeocodeTool(),
-  new StaticMapImageTool(),
-  new SearchAndGeocodeTool()
+  new CategoryListTool({ httpRequest }),
+  new CategorySearchTool({ httpRequest }),
+  new DirectionsTool({ httpRequest }),
+  new IsochroneTool({ httpRequest }),
+  new MatrixTool({ httpRequest }),
+  new ReverseGeocodeTool({ httpRequest }),
+  new StaticMapImageTool({ httpRequest }),
+  new SearchAndGeocodeTool({ httpRequest })
 ] as const;
 
 export type ToolInstance = (typeof ALL_TOOLS)[number];

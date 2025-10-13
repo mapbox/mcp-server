@@ -6,16 +6,19 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, vi } from 'vitest';
 import { CategoryListTool } from '../../../src/tools/category-list-tool/CategoryListTool.js';
+import { setupHttpRequest } from 'test/utils/httpPipelineUtils.js';
 
 describe('CategoryListTool output schema registration', () => {
   it('should have an output schema defined', () => {
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });
 
   it('should register output schema with MCP server', () => {
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     // Mock the installTo method to verify it gets called with output schema
     const mockInstallTo = vi.fn().mockImplementation(() => {
@@ -44,7 +47,8 @@ describe('CategoryListTool output schema registration', () => {
       ]
     };
 
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     // This should not throw if the schema is correct
     expect(() => {
@@ -59,7 +63,8 @@ describe('CategoryListTool output schema registration', () => {
       listItems: ['food']
     };
 
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -73,7 +78,8 @@ describe('CategoryListTool output schema registration', () => {
       listItems: []
     };
 
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -98,7 +104,8 @@ describe('CategoryListTool output schema registration', () => {
       ]
     };
 
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -113,7 +120,8 @@ describe('CategoryListTool output schema registration', () => {
       someOtherField: 'value'
     };
 
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -131,7 +139,8 @@ describe('CategoryListTool output schema registration', () => {
       ]
     };
 
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -147,7 +156,8 @@ describe('CategoryListTool output schema registration', () => {
       version: '1.0.0'
     };
 
-    const tool = new CategoryListTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new CategoryListTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {

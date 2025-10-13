@@ -6,9 +6,9 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
-  setupFetch,
+  setupHttpRequest,
   assertHeadersSent
-} from '../../utils/fetchRequestUtils.js';
+} from '../../utils/httpPipelineUtils.js';
 import { IsochroneTool } from '../../../src/tools/isochrone-tool/IsochroneTool.js';
 
 describe('IsochroneTool', () => {
@@ -17,25 +17,25 @@ describe('IsochroneTool', () => {
   });
 
   it('sends custom header', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new IsochroneTool(fetch).run({
+    await new IsochroneTool({ httpRequest }).run({
       coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/driving',
       contours_minutes: [10],
       generalize: 1000
     });
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('sends correct parameters', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       ok: true,
       json: async () => ({ type: 'FeatureCollection', features: [] })
     });
 
-    await new IsochroneTool(fetch).run({
+    await new IsochroneTool({ httpRequest }).run({
       coordinates: { longitude: 27.534527, latitude: 53.9353451 },
       profile: 'mapbox/driving',
       contours_minutes: [10, 20],
@@ -47,8 +47,8 @@ describe('IsochroneTool', () => {
       depart_at: '2025-06-02T12:00:00Z'
     });
 
-    assertHeadersSent(mockFetch);
-    const calledUrl = mockFetch.mock.calls[0][0].toString();
+    assertHeadersSent(mockHttpRequest);
+    const calledUrl = mockHttpRequest.mock.calls[0][0].toString();
 
     expect(calledUrl).toContain(
       'isochrone/v1/mapbox/driving/27.534527%2C53.9353451'
@@ -64,17 +64,17 @@ describe('IsochroneTool', () => {
   });
 
   it('does not send empty parameters', async () => {
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       ok: true,
       json: async () => ({ type: 'FeatureCollection', features: [] })
     });
-    await new IsochroneTool(fetch).run({
+    await new IsochroneTool({ httpRequest }).run({
       coordinates: { longitude: 27.534527, latitude: 53.9353451 },
       profile: 'mapbox/driving',
       contours_minutes: [10, 20],
       generalize: 1000
     });
-    const calledUrl = mockFetch.mock.calls[0][0].toString();
+    const calledUrl = mockHttpRequest.mock.calls[0][0].toString();
     expect(calledUrl).toContain(
       'isochrone/v1/mapbox/driving/27.534527%2C53.9353451'
     );
@@ -88,19 +88,19 @@ describe('IsochroneTool', () => {
 
   it('returns geojson from API', async () => {
     const geojson = { type: 'FeatureCollection', features: [{ id: 42 }] };
-    const { mockFetch, fetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       ok: true,
       json: async () => geojson
     });
 
-    const result = await new IsochroneTool(fetch).run({
+    const result = await new IsochroneTool({ httpRequest }).run({
       coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/walking',
       contours_minutes: [5],
       generalize: 1000
     });
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
     expect(result.content[0].type).toEqual('text');
     if (result.content[0].type == 'text') {
       expect(result.content[0].text).toEqual(JSON.stringify(geojson, null, 2));
@@ -108,7 +108,8 @@ describe('IsochroneTool', () => {
   });
 
   it('throws on invalid input', async () => {
-    const tool = new IsochroneTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new IsochroneTool({ httpRequest });
     const result = await tool.run({
       coordinates: { longitude: 0, latitude: 0 },
       profile: 'invalid',
@@ -120,7 +121,8 @@ describe('IsochroneTool', () => {
   });
 
   it('throws if neither contours_minutes nor contours_meters is specified', async () => {
-    const result = await new IsochroneTool().run({
+    const { httpRequest } = setupHttpRequest();
+    const result = await new IsochroneTool({ httpRequest }).run({
       coordinates: { longitude: -74.006, latitude: 40.7128 },
       profile: 'mapbox/driving',
       generalize: 1000

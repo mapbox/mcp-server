@@ -6,16 +6,19 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, vi } from 'vitest';
 import { ReverseGeocodeTool } from '../../../src/tools/reverse-geocode-tool/ReverseGeocodeTool.js';
+import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 describe('ReverseGeocodeTool output schema registration', () => {
   it('should have an output schema defined', () => {
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });
 
   it('should register output schema with MCP server', () => {
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     // Mock the installTo method to verify it gets called with output schema
     const mockInstallTo = vi.fn().mockImplementation(() => {
@@ -103,7 +106,8 @@ describe('ReverseGeocodeTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     // This should not throw if the schema is correct
     expect(() => {
@@ -201,7 +205,8 @@ describe('ReverseGeocodeTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -236,7 +241,8 @@ describe('ReverseGeocodeTool output schema registration', () => {
       attribution: 'Mapbox'
     };
 
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
@@ -265,7 +271,8 @@ describe('ReverseGeocodeTool output schema registration', () => {
       // Missing attribution field
     };
 
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     expect(() => {
       if (tool.outputSchema) {
