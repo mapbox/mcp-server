@@ -1,3 +1,14 @@
+## 0.6.0 (Unreleased)
+
+### Features Added
+
+- Support for `structuredContent` for all applicable tools
+- Registers output schemas with the MCP server and validates schemas
+
+### Other Features
+
+- Refactored `fetchClient` to be generic `httpRequest`.
+
 ## 0.5.5
 
 - Add server.json for MCP registry
