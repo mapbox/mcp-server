@@ -4,7 +4,10 @@
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny, z } from 'zod';
 import { BaseTool } from './BaseTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  CallToolResult,
+  ToolAnnotations
+} from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../utils/types.js';
 
 export abstract class MapboxApiBasedTool<
@@ -13,7 +16,7 @@ export abstract class MapboxApiBasedTool<
 > extends BaseTool<InputSchema, OutputSchema> {
   abstract readonly name: string;
   abstract readonly description: string;
-  abstract readonly annotations: import('@modelcontextprotocol/sdk/types.js').ToolAnnotations;
+  abstract readonly annotations: ToolAnnotations;
 
   static get mapboxAccessToken() {
     return process.env.MAPBOX_ACCESS_TOKEN;
