@@ -120,12 +120,17 @@ describe('MapboxApiBasedTool', () => {
     it('returns actual error message', async () => {
       const result = await testTool.run({ testParam: 'test' });
 
+      const errorResponse = {
+        message: 'Test error message',
+        tool: 'test-tool'
+      };
+
       // Verify the response contains the actual error message
       expect(result.isError).toBe(true);
       expect(result.content).toHaveLength(1);
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: 'Test error message'
+        text: JSON.stringify(errorResponse)
       });
 
       // Verify the error was logged with the actual error message
@@ -141,6 +146,11 @@ describe('MapboxApiBasedTool', () => {
         throw 'String error message';
       });
 
+      const errorResponse = {
+        message: 'String error message',
+        tool: 'test-tool'
+      };
+
       const result = await testTool.run({ testParam: 'test' });
 
       // Verify the response contains the string error
@@ -148,7 +158,7 @@ describe('MapboxApiBasedTool', () => {
       expect(result.content).toHaveLength(1);
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: 'String error message'
+        text: JSON.stringify(errorResponse)
       });
 
       // Verify the error was logged
