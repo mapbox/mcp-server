@@ -2,11 +2,14 @@
 // Licensed under the MIT License.
 
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
-import type { CategoryListInput } from './CategoryListTool.schema.js';
-import { CategoryListInputSchema } from './CategoryListTool.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { HttpRequest } from '../../utils/types.js';
+import type { CategoryListInput } from './CategoryListTool.input.schema.js';
+import { CategoryListInputSchema } from './CategoryListTool.input.schema.js';
+import { CategoryListResponseSchema } from './CategoryListTool.output.schema.js';
 
-interface CategoryListResponse {
+// Interface for the full API response from Mapbox
+interface MapboxApiResponse {
   listItems: Array<{
     canonical_id: string;
     icon: string;
@@ -14,14 +17,18 @@ interface CategoryListResponse {
     version?: string;
     uuid?: string;
   }>;
+  attribution: string;
   version: string;
 }
+
+// API Documentation: https://docs.mapbox.com/api/search/search-box/#list-categories
 
 /**
  * Tool for retrieving the list of supported categories from Mapbox Search API
  */
 export class CategoryListTool extends MapboxApiBasedTool<
-  typeof CategoryListInputSchema
+  typeof CategoryListInputSchema,
+  typeof CategoryListResponseSchema
 > {
   name = 'category_list_tool';
   description =
@@ -34,14 +41,18 @@ export class CategoryListTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetchImpl: typeof fetch = fetchClient) {
-    super({ inputSchema: CategoryListInputSchema });
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: CategoryListInputSchema,
+      outputSchema: CategoryListResponseSchema,
+      httpRequest: params.httpRequest
+    });
   }
 
   protected async execute(
     input: CategoryListInput,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<CallToolResult> {
     const url = new URL(
       'https://api.mapbox.com/search/searchbox/v1/list/category'
     );
@@ -52,7 +63,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
       url.searchParams.set('language', input.language);
     }
 
-    const response = await this.fetchImpl(url.toString(), {
+    const response = await this.httpRequest(url.toString(), {
       method: 'GET',
       headers: {
         'User-Agent': `@mapbox/mcp-server/${process.env.npm_package_version || 'dev'}`
@@ -60,12 +71,21 @@ export class CategoryListTool extends MapboxApiBasedTool<
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Mapbox API request failed: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Mapbox API request failed: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
-    const data = (await response.json()) as CategoryListResponse;
+    const rawData = await response.json();
+
+    // Parse the API response (which has the full structure)
+    const data = rawData as MapboxApiResponse;
 
     // Apply pagination - if no limit specified, return all
     const startIndex = input.offset || 0;
@@ -75,13 +95,27 @@ export class CategoryListTool extends MapboxApiBasedTool<
       endIndex = Math.min(startIndex + input.limit, data.listItems.length);
     }
 
-    // Return simple object with listItems array
+    // Extract just the category IDs for our simplified response
     const categoryIds = data.listItems
       .slice(startIndex, endIndex)
       .map((item) => item.canonical_id);
 
+    const result = { listItems: categoryIds };
+
+    // Validate our simplified output against the schema
+    try {
+      CategoryListResponseSchema.parse(result);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Output schema validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+    }
+
     return {
-      listItems: categoryIds
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result,
+      isError: false
     };
   }
 }

@@ -54,18 +54,18 @@ function detectTupleUsage(schema: z.ZodType): string[] {
   return issues;
 }
 
-describe('Schema Validation - No Tuples', () => {
+describe('Input Schema Validation - No Tuples', () => {
   // Dynamically get all tools from the central registry
   const tools = [...getAllTools()];
 
   const schemas = tools.map((tool) => ({
     name: tool.constructor.name,
-    schema: (tool as any).inputSchema
+    schema: (tool as { inputSchema: z.ZodType }).inputSchema
   }));
 
   it.each(schemas)(
     '$name should not contain z.tuple() usage',
-    ({ name, schema }) => {
+    ({ name: _name, schema }) => {
       const tupleIssues = detectTupleUsage(schema);
       expect(tupleIssues).toEqual([]);
     }

@@ -5,9 +5,9 @@ process.env.MAPBOX_ACCESS_TOKEN = 'pk.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
-  setupFetch,
+  setupHttpRequest,
   assertHeadersSent
-} from '../../utils/fetchRequestUtils.js';
+} from '../../utils/httpPipelineUtils.js';
 import { SearchAndGeocodeTool } from '../../../src/tools/search-and-geocode-tool/SearchAndGeocodeTool.js';
 
 describe('SearchAndGeocodeTool', () => {
@@ -16,32 +16,32 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('sends custom header', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'coffee shop'
     });
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('constructs correct URL with required parameters', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'starbucks'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('search/searchbox/v1/forward');
     expect(calledUrl).toContain('q=starbucks');
     expect(calledUrl).toContain('access_token=');
   });
 
   it('includes all optional parameters in URL', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'restaurant',
       language: 'es',
       proximity: { longitude: -74.006, latitude: 40.7128 },
@@ -59,7 +59,7 @@ describe('SearchAndGeocodeTool', () => {
       navigation_profile: 'driving',
       origin: { longitude: -74.0, latitude: 40.7 }
     });
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('q=restaurant');
     expect(calledUrl).toContain('language=es');
     expect(calledUrl).toContain('limit=10'); // Hard-coded limit
@@ -75,61 +75,61 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('handles IP-based proximity', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'pizza',
       proximity: 'ip'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=ip');
   });
 
   it('handles string format proximity coordinates', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'museum',
       proximity: '-82.451668,27.942976'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942976');
   });
 
   it('handles array-like string format proximity', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'bank',
       proximity: '[-82.451668, 27.942964]'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942964');
   });
 
   it('uses hard-coded limit of 10', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'pharmacy'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('limit=10');
   });
 
   it('handles fetch errors gracefully', async () => {
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       ok: false,
       status: 404,
       statusText: 'Not Found',
       text: async () => 'Not Found'
     });
 
-    const result = await new SearchAndGeocodeTool(fetch).run({
+    const result = await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'test query'
     });
 
@@ -141,7 +141,8 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('validates query length constraint', async () => {
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
     const longQuery = 'a'.repeat(257); // 257 characters, exceeds limit
 
     await expect(
@@ -154,7 +155,8 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('validates coordinate constraints', async () => {
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     // Test invalid longitude in proximity
     await expect(
@@ -183,27 +185,27 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('encodes special characters in query', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'coffee & tea shop'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('q=coffee+%26+tea+shop');
   });
 
   it('validates navigation profile can be used with eta_type', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
     // navigation_profile should work when eta_type is set
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'test',
       eta_type: 'navigation',
       navigation_profile: 'driving'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('eta_type=navigation');
     expect(calledUrl).toContain('navigation_profile=driving');
   });
@@ -227,11 +229,11 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new SearchAndGeocodeTool(fetch).run({
+    const result = await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'Central Park'
     });
 
@@ -259,16 +261,16 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    await new SearchAndGeocodeTool(fetch).run({
+    await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'Starbucks',
       proximity: 'ip'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=ip');
   });
 
@@ -292,11 +294,11 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new SearchAndGeocodeTool(fetch).run({
+    const result = await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'Starbucks'
     });
 
@@ -343,11 +345,11 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new SearchAndGeocodeTool(fetch).run({
+    const result = await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'Starbucks'
     });
 
@@ -367,11 +369,11 @@ describe('SearchAndGeocodeTool', () => {
       features: []
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new SearchAndGeocodeTool(fetch).run({
+    const result = await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'NonexistentPlace'
     });
 
@@ -399,11 +401,11 @@ describe('SearchAndGeocodeTool', () => {
       ]
     };
 
-    const { fetch, mockFetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new SearchAndGeocodeTool(fetch).run({
+    const result = await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'location'
     });
 
@@ -417,7 +419,8 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('validates country code format', async () => {
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     // Test invalid country code (not 2 letters)
     await expect(
@@ -431,13 +434,14 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   it('handles invalid proximity format', async () => {
-    const tool = new SearchAndGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
 
     // Test invalid proximity string format
     await expect(
       tool.run({
         q: 'test',
-        proximity: 'invalid-format' as any
+        proximity: 'invalid-format'
       })
     ).resolves.toMatchObject({
       isError: true

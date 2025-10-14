@@ -4,12 +4,20 @@
 import type { z } from 'zod';
 import { URLSearchParams } from 'node:url';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
-import { MatrixInputSchema } from './MatrixTool.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { HttpRequest } from '../../utils/types.js';
+import { MatrixInputSchema } from './MatrixTool.input.schema.js';
+import {
+  MatrixResponseSchema,
+  type MatrixResponse
+} from './MatrixTool.output.schema.js';
 
 // API documentation: https://docs.mapbox.com/api/navigation/matrix/
 
-export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
+export class MatrixTool extends MapboxApiBasedTool<
+  typeof MatrixInputSchema,
+  typeof MatrixResponseSchema
+> {
   name = 'matrix_tool';
   description =
     'Calculates travel times and distances between multiple points using Mapbox Matrix API.';
@@ -21,22 +29,29 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
     openWorldHint: true
   };
 
-  private fetch: typeof globalThis.fetch;
-
-  constructor(fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: MatrixInputSchema });
-    this.fetch = fetch;
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: MatrixInputSchema,
+      outputSchema: MatrixResponseSchema,
+      httpRequest: params.httpRequest
+    });
   }
 
   protected async execute(
     input: z.infer<typeof MatrixInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<CallToolResult> {
     // Validate input based on profile type
     if (input.profile === 'driving-traffic' && input.coordinates.length > 10) {
-      throw new Error(
-        'The driving-traffic profile supports a maximum of 10 coordinate pairs.'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'The driving-traffic profile supports a maximum of 10 coordinate pairs.'
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate approaches parameter if provided
@@ -44,9 +59,15 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
       input.approaches &&
       input.approaches.split(';').length !== input.coordinates.length
     ) {
-      throw new Error(
-        'When provided, the number of approaches (including empty/skipped) must match the number of coordinates.'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'When provided, the number of approaches (including empty/skipped) must match the number of coordinates.'
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate that all approaches values are either "curb" or "unrestricted"
@@ -61,9 +82,15 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
             approach !== 'unrestricted'
         )
     ) {
-      throw new Error(
-        'Approaches parameter contains invalid values. Each value must be either "curb" or "unrestricted".'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Approaches parameter contains invalid values. Each value must be either "curb" or "unrestricted".'
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate bearings parameter if provided
@@ -71,35 +98,60 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
       input.bearings &&
       input.bearings.split(';').length !== input.coordinates.length
     ) {
-      throw new Error(
-        'When provided, the number of bearings (including empty/skipped) must match the number of coordinates.'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'When provided, the number of bearings (including empty/skipped) must match the number of coordinates.'
+          }
+        ],
+        isError: true
+      };
     }
 
     // Additional validation for bearings values
     if (input.bearings) {
       const bearingsArr = input.bearings.split(';');
-      bearingsArr.forEach((bearing, idx) => {
-        if (bearing.trim() === '') return; // allow skipped
+      for (let idx = 0; idx < bearingsArr.length; idx++) {
+        const bearing = bearingsArr[idx];
+        if (bearing.trim() === '') continue; // allow skipped
         const parts = bearing.split(',');
         if (parts.length !== 2) {
-          throw new Error(
-            `Invalid bearings format at index ${idx}: '${bearing}'. Each bearing must be two comma-separated numbers (angle,degrees).`
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid bearings format at index ${idx}: '${bearing}'. Each bearing must be two comma-separated numbers (angle,degrees).`
+              }
+            ],
+            isError: true
+          };
         }
         const angle = Number(parts[0]);
         const degrees = Number(parts[1]);
         if (isNaN(angle) || angle < 0 || angle > 360) {
-          throw new Error(
-            `Invalid bearing angle at index ${idx}: '${parts[0]}'. Angle must be a number between 0 and 360.`
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid bearing angle at index ${idx}: '${parts[0]}'. Angle must be a number between 0 and 360.`
+              }
+            ],
+            isError: true
+          };
         }
         if (isNaN(degrees) || degrees < 0 || degrees > 180) {
-          throw new Error(
-            `Invalid bearing degrees at index ${idx}: '${parts[1]}'. Degrees must be a number between 0 and 180.`
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid bearing degrees at index ${idx}: '${parts[1]}'. Degrees must be a number between 0 and 180.`
+              }
+            ],
+            isError: true
+          };
         }
-      });
+      }
     }
 
     // Validate sources parameter if provided - ensure all indices are valid
@@ -115,11 +167,18 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
         );
       })
     ) {
-      throw new Error(
-        'Sources parameter contains invalid indices. All indices must be between 0 and ' +
-          (input.coordinates.length - 1) +
-          '.'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              'Sources parameter contains invalid indices. All indices must be between 0 and ' +
+              (input.coordinates.length - 1) +
+              '.'
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate destinations parameter if provided - ensure all indices are valid
@@ -135,11 +194,18 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
         );
       })
     ) {
-      throw new Error(
-        'Destinations parameter contains invalid indices. All indices must be between 0 and ' +
-          (input.coordinates.length - 1) +
-          '.'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              'Destinations parameter contains invalid indices. All indices must be between 0 and ' +
+              (input.coordinates.length - 1) +
+              '.'
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate that when specifying both sources and destinations, all coordinates are used
@@ -160,9 +226,15 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
 
       // Check if all coordinate indices are used
       if (usedIndices.size < input.coordinates.length) {
-        throw new Error(
-          'When specifying both sources and destinations, all coordinates must be used as either a source or destination.'
-        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'When specifying both sources and destinations, all coordinates must be used as either a source or destination.'
+            }
+          ],
+          isError: true
+        };
       }
     }
 
@@ -204,16 +276,37 @@ export class MatrixTool extends MapboxApiBasedTool<typeof MatrixInputSchema> {
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions-matrix/v1/mapbox/${input.profile}/${joined}?${queryParams.toString()}`;
 
     // Make the request
-    const response = await this.fetch(url);
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
-      throw new Error(
-        `Request failed with status ${response.status}: ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Request failed with status ${response.status}: ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
     // Return the matrix data
     const data = await response.json();
-    return data;
+
+    // Validate the response data against our schema
+    let validatedData: MatrixResponse;
+    try {
+      validatedData = MatrixResponseSchema.parse(data);
+    } catch (error) {
+      // If validation fails, fall back to the original data
+      this.log('warning', `MatrixTool: Response validation failed: ${error}`);
+      validatedData = data as MatrixResponse;
+    }
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      structuredContent: validatedData,
+      isError: false
+    };
   }
 }

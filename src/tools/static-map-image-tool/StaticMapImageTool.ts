@@ -3,9 +3,10 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
-import { StaticMapImageInputSchema } from './StaticMapImageTool.schema.js';
-import type { OverlaySchema } from './StaticMapImageTool.schema.js';
+import type { HttpRequest } from '../../utils/types.js';
+import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
+import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
@@ -21,8 +22,11 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: StaticMapImageInputSchema });
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: StaticMapImageInputSchema,
+      httpRequest: params.httpRequest
+    });
   }
 
   private encodeOverlay(overlay: z.infer<typeof OverlaySchema>): string {
@@ -78,7 +82,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof StaticMapImageInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<CallToolResult> {
     const { longitude: lng, latitude: lat } = input.center;
     const { width, height } = input.size;
 
@@ -94,12 +98,18 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const density = input.highDensity ? '@2x' : '';
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
 
-    const response = await this.fetch(url);
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch map image: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to fetch map image: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
     const buffer = await response.arrayBuffer();
@@ -111,9 +121,14 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
     return {
-      type: 'image',
-      data: base64Data,
-      mimeType
+      content: [
+        {
+          type: 'image',
+          data: base64Data,
+          mimeType
+        }
+      ],
+      isError: false
     };
   }
 }

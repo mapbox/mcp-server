@@ -3,11 +3,20 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
-import { ReverseGeocodeInputSchema } from './ReverseGeocodeTool.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { HttpRequest } from '../../utils/types.js';
+import { ReverseGeocodeInputSchema } from './ReverseGeocodeTool.input.schema.js';
+import { GeocodingResponseSchema } from './ReverseGeocodeTool.output.schema.js';
+import type {
+  MapboxFeatureCollection,
+  MapboxFeature
+} from '../../schemas/geojson.js';
+
+// API Docs https://docs.mapbox.com/api/search/geocoding/
 
 export class ReverseGeocodeTool extends MapboxApiBasedTool<
-  typeof ReverseGeocodeInputSchema
+  typeof ReverseGeocodeInputSchema,
+  typeof GeocodingResponseSchema
 > {
   name = 'reverse_geocode_tool';
   description =
@@ -20,11 +29,17 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: ReverseGeocodeInputSchema });
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: ReverseGeocodeInputSchema,
+      outputSchema: GeocodingResponseSchema,
+      httpRequest: params.httpRequest
+    });
   }
 
-  private formatGeoJsonToText(geoJsonResponse: any): string {
+  private formatGeoJsonToText(
+    geoJsonResponse: MapboxFeatureCollection
+  ): string {
     if (
       !geoJsonResponse ||
       !geoJsonResponse.features ||
@@ -34,9 +49,9 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     }
 
     const results = geoJsonResponse.features.map(
-      (feature: any, index: number) => {
+      (feature: MapboxFeature, index: number) => {
         const props = feature.properties || {};
-        const geom = feature.geometry || {};
+        const geom = feature.geometry;
 
         let result = `${index + 1}. `;
 
@@ -54,7 +69,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
         }
 
         // Geographic coordinates
-        if (geom.coordinates && Array.isArray(geom.coordinates)) {
+        if (geom && geom.type === 'Point' && geom.coordinates) {
           const [lng, lat] = geom.coordinates;
           result += `\n   Coordinates: ${lat}, ${lng}`;
         }
@@ -74,16 +89,22 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof ReverseGeocodeInputSchema>,
     accessToken: string
-  ): Promise<{ type: 'text'; text: string }> {
+  ): Promise<CallToolResult> {
     // When limit > 1, must specify exactly one type
     if (
       input.limit &&
       input.limit > 1 &&
       (!input.types || input.types.length !== 1)
     ) {
-      throw new Error(
-        'When limit > 1 for reverse geocoding, you must specify exactly one type in the types parameter (e.g., types: ["address"]). Consider using limit: 1 instead for best results.'
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'When limit > 1 for reverse geocoding, you must specify exactly one type in the types parameter (e.g., types: ["address"]). Consider using limit: 1 instead for best results.'
+          }
+        ],
+        isError: true
+      };
     }
 
     const url = new URL(
@@ -112,25 +133,56 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
       url.searchParams.append('types', input.types.join(','));
     }
 
-    const response = await this.fetch(url.toString());
+    const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to reverse geocode: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to reverse geocode: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
-    const data = (await response.json()) as any;
+    const rawData = await response.json();
+
+    // Validate response against schema with graceful fallback
+    let data: MapboxFeatureCollection;
+    try {
+      data = GeocodingResponseSchema.parse(rawData);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Schema validation failed for reverse geocoding response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+      // Graceful fallback to raw data
+      data = rawData as MapboxFeatureCollection;
+    }
 
     // Check if the response has features
     if (!data || !data.features || data.features.length === 0) {
-      return { type: 'text', text: 'No results found.' };
+      return {
+        content: [{ type: 'text', text: 'No results found.' }],
+        structuredContent: data as unknown as Record<string, unknown>,
+        isError: false
+      };
     }
 
     if (input.format === 'json_string') {
-      return { type: 'text', text: JSON.stringify(data, null, 2) };
+      return {
+        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        structuredContent: data as unknown as Record<string, unknown>,
+        isError: false
+      };
     } else {
-      return { type: 'text', text: this.formatGeoJsonToText(data) };
+      return {
+        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
+        structuredContent: data as unknown as Record<string, unknown>,
+        isError: false
+      };
     }
   }
 }

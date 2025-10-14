@@ -3,11 +3,23 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
-import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.schema.js';
+import type { HttpRequest } from '../../utils/types.js';
+import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.input.schema.js';
+import {
+  SearchBoxResponseSchema,
+  type SearchBoxResponse
+} from './SearchAndGeocodeTool.output.schema.js';
+import type {
+  MapboxFeatureCollection,
+  MapboxFeature
+} from '../../schemas/geojson.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
+// API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
 export class SearchAndGeocodeTool extends MapboxApiBasedTool<
-  typeof SearchAndGeocodeInputSchema
+  typeof SearchAndGeocodeInputSchema,
+  typeof SearchBoxResponseSchema
 > {
   name = 'search_and_geocode_tool';
   description =
@@ -20,11 +32,17 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetchImpl: typeof fetch = fetchClient) {
-    super({ inputSchema: SearchAndGeocodeInputSchema });
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: SearchAndGeocodeInputSchema,
+      outputSchema: SearchBoxResponseSchema,
+      httpRequest: params.httpRequest
+    });
   }
 
-  private formatGeoJsonToText(geoJsonResponse: any): string {
+  private formatGeoJsonToText(
+    geoJsonResponse: MapboxFeatureCollection
+  ): string {
     if (
       !geoJsonResponse ||
       !geoJsonResponse.features ||
@@ -33,10 +51,10 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       return 'No results found.';
     }
 
-    const results = (geoJsonResponse as any).features.map(
-      (feature: any, index: number) => {
+    const results = geoJsonResponse.features.map(
+      (feature: MapboxFeature, index: number) => {
         const props = feature.properties || {};
-        const geom = feature.geometry || {};
+        const geom = feature.geometry;
 
         let result = `${index + 1}. `;
 
@@ -54,7 +72,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
         }
 
         // Geographic coordinates
-        if (geom.coordinates && Array.isArray(geom.coordinates)) {
+        if (geom && geom.type === 'Point' && geom.coordinates) {
           const [lng, lat] = geom.coordinates;
           result += `\n   Coordinates: ${lat}, ${lng}`;
         }
@@ -81,7 +99,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
-  ): Promise<{ type: 'text'; text: string }> {
+  ): Promise<CallToolResult> {
     this.log(
       'info',
       `SearchAndGeocodeTool: Starting search with input: ${JSON.stringify(input)}`
@@ -161,7 +179,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       `SearchAndGeocodeTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
     );
 
-    const response = await this.fetchImpl(url.toString());
+    const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -169,17 +187,46 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
         'error',
         `SearchAndGeocodeTool: API Error - Status: ${response.status}, Body: ${errorBody}`
       );
-      throw new Error(
-        `Failed to search: ${response.status} ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to search: ${response.status} ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
-    const data = await response.json();
+    const rawData = await response.json();
+
+    // Validate response against schema with graceful fallback
+    let data: SearchBoxResponse;
+    try {
+      data = SearchBoxResponseSchema.parse(rawData);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Schema validation failed for search response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+      // Graceful fallback to raw data
+      data = rawData as SearchBoxResponse;
+    }
+
     this.log(
       'info',
-      `SearchAndGeocodeTool: Successfully completed search, found ${(data as any).features?.length || 0} results`
+      `SearchAndGeocodeTool: Successfully completed search, found ${data.features?.length || 0} results`
     );
 
-    return { type: 'text', text: this.formatGeoJsonToText(data) };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
+        }
+      ],
+      structuredContent: data,
+      isError: false
+    };
   }
 }

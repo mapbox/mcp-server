@@ -4,15 +4,21 @@
 import { URLSearchParams } from 'node:url';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from '../../utils/dateUtils.js';
-import { fetchClient } from '../../utils/fetchRequest.js';
-import { DirectionsInputSchema } from './DirectionsTool.schema.js';
+import { DirectionsInputSchema } from './DirectionsTool.input.schema.js';
+import {
+  DirectionsResponseSchema,
+  type DirectionsResponse
+} from './DirectionsTool.output.schema.js';
+import type { HttpRequest } from '../..//utils/types.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
 export class DirectionsTool extends MapboxApiBasedTool<
-  typeof DirectionsInputSchema
+  typeof DirectionsInputSchema,
+  typeof DirectionsResponseSchema
 > {
   name = 'directions_tool';
   description =
@@ -25,13 +31,17 @@ export class DirectionsTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
-  constructor(private fetch: typeof globalThis.fetch = fetchClient) {
-    super({ inputSchema: DirectionsInputSchema });
+  constructor(params: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: DirectionsInputSchema,
+      outputSchema: DirectionsResponseSchema,
+      httpRequest: params.httpRequest
+    });
   }
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
     accessToken: string
-  ): Promise<unknown> {
+  ): Promise<CallToolResult> {
     // Validate exclude parameter against the actual routing_profile
     // This is needed because some exclusions are only driving specific
     if (input.exclude) {
@@ -57,15 +67,27 @@ export class DirectionsTool extends MapboxApiBasedTool<
           item.endsWith(')') &&
           !isDrivingProfile
         ) {
-          throw new Error(
-            `Point exclusions (${item}) are only available for 'driving' and 'driving-traffic' profiles`
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Point exclusions (${item}) are only available for 'driving' and 'driving-traffic' profiles`
+              }
+            ],
+            isError: true
+          };
         }
         // Check for driving-only exclusions
         else if (drivingOnlyExclusions.includes(item) && !isDrivingProfile) {
-          throw new Error(
-            `Exclusion option '${item}' is only available for 'driving' and 'driving-traffic' profiles`
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Exclusion option '${item}' is only available for 'driving' and 'driving-traffic' profiles`
+              }
+            ],
+            isError: true
+          };
         }
         // Check if it's one of the valid enum values
         else if (
@@ -73,11 +95,18 @@ export class DirectionsTool extends MapboxApiBasedTool<
           !drivingOnlyExclusions.includes(item) &&
           !(item.startsWith('point(') && item.endsWith(')'))
         ) {
-          throw new Error(
-            `Invalid exclude option: '${item}'.Available options:\n` +
-              '- All profiles:  ferry, cash_only_tolls\n' +
-              '- Driving/Driving-traffic profiles only: `motorway`, `toll`, `unpaved`, `tunnel`, `country_border`, `state_border` or `point(<lng> <lat>)` for custom locations (note lng and lat are space separated)\n'
-          );
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Invalid exclude option: '${item}'.Available options:\\n` +
+                  '- All profiles:  ferry, cash_only_tolls\\n' +
+                  '- Driving/Driving-traffic profiles only: `motorway`, `toll`, `unpaved`, `tunnel`, `country_border`, `state_border` or `point(<lng> <lat>)` for custom locations (note lng and lat are space separated)\\n'
+              }
+            ],
+            isError: true
+          };
         }
       }
     }
@@ -88,23 +117,41 @@ export class DirectionsTool extends MapboxApiBasedTool<
 
     // Validate depart_at is only used with driving profiles
     if (input.depart_at && !isDrivingProfile) {
-      throw new Error(
-        `The depart_at parameter is only available for 'driving' and 'driving-traffic' profiles`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `The depart_at parameter is only available for 'driving' and 'driving-traffic' profiles`
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate arrive_by is only used with driving profile (not driving-traffic)
     if (input.arrive_by && input.routing_profile !== 'driving') {
-      throw new Error(
-        `The arrive_by parameter is only available for the 'driving' profile`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `The arrive_by parameter is only available for the 'driving' profile`
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate that depart_at and arrive_by are not used together
     if (input.depart_at && input.arrive_by) {
-      throw new Error(
-        `The depart_at and arrive_by parameters cannot be used together in the same request`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `The depart_at and arrive_by parameters cannot be used together in the same request`
+          }
+        ],
+        isError: true
+      };
     }
 
     // Validate vehicle dimension parameters are only used with driving profiles
@@ -114,9 +161,15 @@ export class DirectionsTool extends MapboxApiBasedTool<
         input.max_weight !== undefined) &&
       !isDrivingProfile
     ) {
-      throw new Error(
-        `Vehicle dimension parameters (max_height, max_width, max_weight) are only available for 'driving' and 'driving-traffic' profiles`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Vehicle dimension parameters (max_height, max_width, max_weight) are only available for 'driving' and 'driving-traffic' profiles`
+          }
+        ],
+        isError: true
+      };
     }
 
     const joined = input.coordinates
@@ -185,15 +238,40 @@ export class DirectionsTool extends MapboxApiBasedTool<
 
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions/v5/mapbox/${input.routing_profile}/${encodedCoords}?${queryString}`;
 
-    const response = await this.fetch(url);
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
-      throw new Error(
-        `Request failed with status ${response.status}: ${response.statusText}`
-      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Request failed with status ${response.status}: ${response.statusText}`
+          }
+        ],
+        isError: true
+      };
     }
 
-    const data = await response.json();
-    return cleanResponseData(input, data);
+    const data = (await response.json()) as DirectionsResponse;
+    const cleanedData = cleanResponseData(input, data);
+
+    // Validate the response data against our schema
+    let validatedData: DirectionsResponse;
+    try {
+      validatedData = DirectionsResponseSchema.parse(cleanedData);
+    } catch (error) {
+      // If validation fails, fall back to the original data
+      this.log(
+        'warning',
+        `DirectionsTool: Response validation failed: ${error}`
+      );
+      validatedData = cleanedData as DirectionsResponse;
+    }
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      structuredContent: validatedData,
+      isError: false
+    };
   }
 }

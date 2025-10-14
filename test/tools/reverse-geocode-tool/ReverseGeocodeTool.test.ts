@@ -6,9 +6,9 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
-  setupFetch,
+  setupHttpRequest,
   assertHeadersSent
-} from '../../utils/fetchRequestUtils.js';
+} from '../../utils/httpPipelineUtils.js';
 import { ReverseGeocodeTool } from '../../../src/tools/reverse-geocode-tool/ReverseGeocodeTool.js';
 
 describe('ReverseGeocodeTool', () => {
@@ -17,25 +17,25 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('sends custom header', async () => {
-    const { fetch, mockFetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new ReverseGeocodeTool(fetch).run({
+    await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.989,
       latitude: 40.733
     });
 
-    assertHeadersSent(mockFetch);
+    assertHeadersSent(mockHttpRequest);
   });
 
   it('constructs correct URL for reverse geocoding', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new ReverseGeocodeTool(fetch).run({
+    await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.989,
       latitude: 40.733
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('search/geocode/v6/reverse');
     expect(calledUrl).toContain('longitude=-73.989');
     expect(calledUrl).toContain('latitude=40.733');
@@ -43,9 +43,9 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('includes all optional parameters', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new ReverseGeocodeTool(fetch).run({
+    await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -74.006,
       latitude: 40.7128,
       permanent: true,
@@ -56,7 +56,7 @@ describe('ReverseGeocodeTool', () => {
       worldview: 'jp'
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('longitude=-74.006');
     expect(calledUrl).toContain('latitude=40.7128');
     expect(calledUrl).toContain('permanent=true');
@@ -68,21 +68,22 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('uses default values', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new ReverseGeocodeTool(fetch).run({
+    await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.989,
       latitude: 40.733
     });
 
-    const calledUrl = mockFetch.mock.calls[0][0];
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('permanent=false');
     expect(calledUrl).toContain('limit=1');
     expect(calledUrl).toContain('worldview=us');
   });
 
   it('validates limit constraints', async () => {
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     // Test limit too high
     await expect(
@@ -108,7 +109,8 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('validates coordinate constraints', async () => {
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     // Test invalid longitude
     await expect(
@@ -150,9 +152,9 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('enforces types constraint when limit > 1', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    const tool = new ReverseGeocodeTool(fetch);
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     await tool.run({
       longitude: -73.989,
@@ -160,7 +162,7 @@ describe('ReverseGeocodeTool', () => {
       limit: 3,
       types: ['address']
     });
-    expect(mockFetch).toHaveBeenCalled();
+    expect(mockHttpRequest).toHaveBeenCalled();
 
     // Should fail without types when limit > 1
     await expect(
@@ -187,34 +189,34 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('allows limit of 1 without types constraint', async () => {
-    const { mockFetch, fetch } = setupFetch();
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
     // Should succeed with limit=1 and no types
-    await new ReverseGeocodeTool(fetch).run({
+    await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.989,
       latitude: 40.733,
       limit: 1
     });
-    expect(mockFetch).toHaveBeenCalled();
+    expect(mockHttpRequest).toHaveBeenCalled();
 
     // Should also succeed with limit=1 and multiple types
-    await new ReverseGeocodeTool(fetch).run({
+    await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.989,
       latitude: 40.733,
       limit: 1,
       types: ['address', 'place']
     });
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockHttpRequest).toHaveBeenCalledTimes(2);
   });
 
   it('handles fetch errors gracefully', async () => {
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       ok: false,
       status: 404,
       statusText: 'Not Found'
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.989,
       latitude: 40.733
     });
@@ -227,7 +229,8 @@ describe('ReverseGeocodeTool', () => {
   });
 
   it('validates country code format', async () => {
-    const tool = new ReverseGeocodeTool();
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
 
     // Should fail with invalid country code length
     await expect(
@@ -260,11 +263,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.989,
       latitude: 40.733
     });
@@ -301,11 +304,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.971,
       latitude: 40.776
     });
@@ -352,11 +355,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -73.99,
       latitude: 40.694,
       limit: 2,
@@ -383,11 +386,11 @@ describe('ReverseGeocodeTool', () => {
       features: []
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: 0.0,
       latitude: 0.0
     });
@@ -397,6 +400,7 @@ describe('ReverseGeocodeTool', () => {
     expect((result.content[0] as { type: 'text'; text: string }).text).toBe(
       'No results found.'
     );
+    expect(result.structuredContent).toEqual(mockResponse);
   });
 
   it('handles results with minimal properties', async () => {
@@ -416,11 +420,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -100.123,
       latitude: 35.456
     });
@@ -452,11 +456,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -122.676,
       latitude: 45.515,
       format: 'json_string'
@@ -487,11 +491,11 @@ describe('ReverseGeocodeTool', () => {
       ]
     };
 
-    const { fetch } = setupFetch({
+    const { httpRequest } = setupHttpRequest({
       json: async () => mockResponse
     });
 
-    const result = await new ReverseGeocodeTool(fetch).run({
+    const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -122.676,
       latitude: 45.515
     });
@@ -501,5 +505,12 @@ describe('ReverseGeocodeTool', () => {
     expect(
       (result.content[0] as { type: 'text'; text: string }).text
     ).toContain('1. Test Location');
+  });
+
+  it('should have output schema defined', () => {
+    const { httpRequest } = setupHttpRequest();
+    const tool = new ReverseGeocodeTool({ httpRequest });
+    expect(tool.outputSchema).toBeDefined();
+    expect(tool.outputSchema).toBeTruthy();
   });
 });
