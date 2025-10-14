@@ -8,8 +8,7 @@ import {
   VersionResponseSchema,
   type VersionResponse
 } from './VersionTool.output.schema.js';
-import type { z } from 'zod';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export class VersionTool extends BaseTool<
   typeof VersionSchema,
@@ -34,7 +33,7 @@ export class VersionTool extends BaseTool<
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async run(_rawInput: unknown): Promise<z.infer<typeof OutputSchema>> {
+  async run(_rawInput: unknown): Promise<CallToolResult> {
     const versionInfo = getVersionInfo();
 
     const versionText = `MCP Server Version Information:
@@ -58,7 +57,7 @@ export class VersionTool extends BaseTool<
     }
 
     return {
-      content: [{ type: 'text', text: versionText }],
+      content: [{ type: 'text' as const, text: versionText }],
       structuredContent: validatedVersionInfo,
       isError: false
     };

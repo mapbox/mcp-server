@@ -3,7 +3,7 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { ReverseGeocodeInputSchema } from './ReverseGeocodeTool.input.schema.js';
 import { GeocodingResponseSchema } from './ReverseGeocodeTool.output.schema.js';
@@ -89,7 +89,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof ReverseGeocodeInputSchema>,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     // When limit > 1, must specify exactly one type
     if (
       input.limit &&

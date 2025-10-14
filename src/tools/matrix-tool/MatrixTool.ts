@@ -4,7 +4,7 @@
 import type { z } from 'zod';
 import { URLSearchParams } from 'node:url';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { MatrixInputSchema } from './MatrixTool.input.schema.js';
 import {
@@ -40,7 +40,7 @@ export class MatrixTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof MatrixInputSchema>,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     // Validate input based on profile type
     if (input.profile === 'driving-traffic' && input.coordinates.length > 10) {
       return {

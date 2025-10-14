@@ -4,7 +4,7 @@
 import { URLSearchParams } from 'node:url';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { cleanResponseData } from './cleanResponseData.js';
 import { formatIsoDateTime } from '../../utils/dateUtils.js';
 import { DirectionsInputSchema } from './DirectionsTool.input.schema.js';
@@ -41,7 +41,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     // Validate exclude parameter against the actual routing_profile
     // This is needed because some exclusions are only driving specific
     if (input.exclude) {

@@ -3,7 +3,6 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.input.schema.js';
 import {
@@ -14,6 +13,7 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -99,7 +99,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     this.log(
       'info',
       `SearchAndGeocodeTool: Starting search with input: ${JSON.stringify(input)}`

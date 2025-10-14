@@ -3,7 +3,7 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { CategorySearchInputSchema } from './CategorySearchTool.input.schema.js';
 import { CategorySearchResponseSchema } from './CategorySearchTool.output.schema.js';
@@ -96,7 +96,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof CategorySearchInputSchema>,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     // Build URL with required parameters
     const url = new URL(
       `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/category/${encodeURIComponent(input.category)}`

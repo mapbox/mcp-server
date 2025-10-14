@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
 import type { CategoryListInput } from './CategoryListTool.input.schema.js';
 import { CategoryListInputSchema } from './CategoryListTool.input.schema.js';
@@ -20,7 +20,6 @@ interface MapboxApiResponse {
   attribution: string;
   version: string;
 }
-import type { z } from 'zod';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#list-categories
 
@@ -53,7 +52,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
   protected async execute(
     input: CategoryListInput,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     const url = new URL(
       'https://api.mapbox.com/search/searchbox/v1/list/category'
     );

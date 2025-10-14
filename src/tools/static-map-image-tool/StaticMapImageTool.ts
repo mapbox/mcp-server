@@ -3,10 +3,10 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { OutputSchema } from '../MapboxApiBasedTool.output.schema.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
@@ -82,7 +82,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   protected async execute(
     input: z.infer<typeof StaticMapImageInputSchema>,
     accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     const { longitude: lng, latitude: lat } = input.center;
     const { width, height } = input.size;
 
