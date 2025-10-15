@@ -18,7 +18,7 @@ export function getVersionInfo(): VersionInfo {
     const dirname = __dirname;
 
     // Try to read from version.json first (for build artifacts)
-    const versionJsonPath = path.resolve(dirname, '..', '..', 'version.json');
+    const versionJsonPath = path.resolve(dirname, '..', 'version.json');
     try {
       const versionData = readFileSync(versionJsonPath, 'utf-8');
       const info = JSON.parse(versionData) as VersionInfo;
