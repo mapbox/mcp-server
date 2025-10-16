@@ -51,7 +51,10 @@ if os.environ.get("MAPBOX_ACCESS_TOKEN", None) is None:
 server_parameters = StdioServerParameters(
     command="/Users/username/.nvm/versions/node/v22.3.0/bin/node",
     args=["/YOUR_PATH_TO_REPOSITORY/dist/esm/index.js"],
-    env={"MAPBOX_ACCESS_TOKEN": os.environ["MAPBOX_ACCESS_TOKEN"]},
+    env={
+      "MAPBOX_ACCESS_TOKEN": os.environ["MAPBOX_ACCESS_TOKEN"],
+      "MCP_DISABLE_LOGGING": "true",
+    }
 )
 
 

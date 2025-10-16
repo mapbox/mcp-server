@@ -63,7 +63,8 @@ docker build -t mapbox-mcp-server .
            "command": <PATH_TO_YOUR_NPX>,
            "args": [ "-y", "@mapbox/mcp-server"],
            "env": {
-             "MAPBOX_ACCESS_TOKEN": <YOUR_TOKEN>
+             "MAPBOX_ACCESS_TOKEN": <YOUR_TOKEN>,
+             "MCP_LOGGING_DISABLE": "true"
            }
          }
        }
@@ -78,7 +79,8 @@ docker build -t mapbox-mcp-server .
            "command": <PATH_TO_YOUR_NODE>,
            "args": ["YOUR_PATH_TO_GIT_REPOSITORY/dist/esm/index.js"],
            "env": {
-             "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN"
+             "MAPBOX_ACCESS_TOKEN": "YOUR_TOKEN",
+             "MCP_LOGGING_DISABLE": "true"
            }
          }
        }
@@ -98,6 +100,8 @@ docker build -t mapbox-mcp-server .
              "--rm",
              "-e",
              "MAPBOX_ACCESS_TOKEN=YOUR_TOKEN",
+             "-e",
+             "MCP_DISABLE_LOGGING=true",
              "mapbox-mcp-server"
            ]
          }
