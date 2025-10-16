@@ -2,13 +2,16 @@
 // Licensed under the MIT License.
 
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { ZodTypeAny, z } from 'zod';
+import type { ZodTypeAny } from 'zod';
 import { BaseTool } from './BaseTool.js';
 import type {
   CallToolResult,
   ToolAnnotations
 } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../utils/types.js';
+import { context, trace, SpanStatusCode } from '@opentelemetry/api';
+import type { ToolExecutionContext } from '../utils/tracing.js';
+import { createToolExecutionContext } from '../utils/tracing.js';
 
 export abstract class MapboxApiBasedTool<
   InputSchema extends ZodTypeAny,
@@ -60,50 +63,91 @@ export abstract class MapboxApiBasedTool<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     extra?: RequestHandlerExtra<any, any>
   ): Promise<CallToolResult> {
+    // First check if token is provided via authentication context
+    // Check both standard token field and accessToken in extra for compatibility
+    // In the streamableHttp, the authInfo is injected into extra from `req.auth`
+    // https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/server/streamableHttp.ts#L405
+    const authToken = extra?.authInfo?.token;
+    const accessToken = authToken || MapboxApiBasedTool.mapboxAccessToken;
+    if (!accessToken) {
+      const errorMessage =
+        'No access token available. Please provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var';
+      this.log('error', `${this.name}: ${errorMessage}`);
+      return {
+        content: [{ type: 'text', text: errorMessage }],
+        isError: true
+      };
+    }
+
+    // Validate that the token has the correct JWT format
+    if (!this.isValidJwtFormat(accessToken)) {
+      const errorMessage = 'Access token is not in valid JWT format';
+      this.log('error', `${this.name}: ${errorMessage}`);
+      return {
+        content: [{ type: 'text', text: errorMessage }],
+        isError: true
+      };
+    }
+
+    let toolContext: ToolExecutionContext | undefined;
+
     try {
-      // First check if token is provided via authentication context
-      // Check both standard token field and accessToken in extra for compatibility
-      // In the streamableHttp, the authInfo is injected into extra from `req.auth`
-      // https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/server/streamableHttp.ts#L405
-      const authToken = extra?.authInfo?.token;
-      const accessToken = authToken || MapboxApiBasedTool.mapboxAccessToken;
-      if (!accessToken) {
-        const errorMessage =
-          'No access token available. Please provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var';
-        this.log('error', `${this.name}: ${errorMessage}`);
-        return {
-          content: [{ type: 'text', text: errorMessage }],
-          isError: true
-        };
-      }
-
-      // Validate that the token has the correct JWT format
-      if (!this.isValidJwtFormat(accessToken)) {
-        const errorMessage = 'Access token is not in valid JWT format';
-        this.log('error', `${this.name}: ${errorMessage}`);
-        return {
-          content: [{ type: 'text', text: errorMessage }],
-          isError: true
-        };
-      }
-
       const input = this.inputSchema.parse(rawInput);
-      const result = await this.execute(input, accessToken);
+
+      // Create tool execution context - tracing is handled by the HTTP client
+      toolContext = {
+        ...createToolExecutionContext(
+          this.name,
+          0, // Input size not needed since tracing is in HTTP client
+          this.httpRequest,
+          extra
+        ),
+        httpRequest: this.httpRequest
+      };
+
+      // Execute tool within the tool span context to connect all child spans
+      const result = await context.with(
+        trace.setSpan(context.active(), toolContext.span),
+        async () => {
+          return await this.execute(
+            input,
+            MapboxApiBasedTool.mapboxAccessToken!,
+            toolContext!
+          );
+        }
+      );
+
+      // Mark span as successful and end it
+      toolContext.span.setStatus({ code: SpanStatusCode.OK });
+      toolContext.span.end();
       return result;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-
       this.log(
         'error',
         `${this.name}: Error during execution: ${errorMessage}`
       );
 
+      // Mark span as failed and end it
+      if (toolContext?.span) {
+        toolContext.span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: errorMessage
+        });
+        toolContext.span.end();
+      }
+
+      const errorResponse = {
+        message: errorMessage,
+        tool: this.name
+      };
+
       return {
         content: [
           {
-            type: 'text',
-            text: errorMessage
+            type: 'text' as const,
+            text: JSON.stringify(errorResponse)
           }
         ],
         isError: true
@@ -112,11 +156,12 @@ export abstract class MapboxApiBasedTool<
   }
 
   /**
-   * Tool logic to be implemented by subclasses.
-   * Must return a complete OutputSchema with content and optional structured content.
+   * Tool-specific logic to be implemented by subclasses.
    */
   protected abstract execute(
-    _input: z.infer<InputSchema>,
-    accessToken: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    input: any,
+    accessToken: string,
+    context: ToolExecutionContext
   ): Promise<CallToolResult>;
 }

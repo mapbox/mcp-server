@@ -4,6 +4,11 @@
 
 - Support for `structuredContent` for all applicable tools
 - Registers output schemas with the MCP server and validates schemas
+- Adds OpenTelemetry Instrumentation for all HTTP calls
+
+### Bug Fixes
+
+- Fixed the version tool to properly emit the git version and branch
 
 ### Other Features
 

@@ -14,14 +14,22 @@
     "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\"",
     "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\"",
     "generate-version": "node scripts/build-helpers.cjs generate-version",
-    "inspect:build": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js",
-    "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" npx -y tsx src/index.ts",
+    "inspect:build": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\"  node dist/esm/index.js",
+    "inspect:build:tracing": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" -e OTEL_SERVICE_NAME=mapbox-mcp-server-inspector -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 -e MCP_DISABLE_LOGGING=true node dist/esm/index.js",
+    "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\"  npx -y tsx src/index.ts",
+    "inspect:dev:tracing": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" -e OTEL_SERVICE_NAME=mapbox-mcp-server-dev -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 -e MCP_DISABLE_LOGGING=true npx tsx src/index.ts",
     "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" --fix",
     "prepare": "husky && node .husky/setup-hooks.js",
     "spellcheck": "cspell \"*.md\" \"src/**/*.ts\" \"test/**/*.ts\"",
     "sync-manifest": "node scripts/sync-manifest-version.cjs",
-    "test": "vitest"
+    "test": "vitest",
+    "test:tracing": "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 npm test",
+    "tracing:demo": "echo '⚠️  This demo shows tracing but uses console output - NOT for stdio transport!' && OTEL_EXPORTER_CONSOLE_ENABLED=true npx tsx scripts/tracing-demo.ts",
+    "tracing:jaeger:start": "docker run --rm -d --name jaeger -p 16686:16686 -p 14250:14250 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest",
+    "tracing:jaeger:stop": "docker stop jaeger",
+    "tracing:test": "OTEL_SERVICE_NAME=mapbox-mcp-server-test npx tsx scripts/test-tracing.ts",
+    "tracing:verify": "node -e \"console.log('🔍 Verifying tracing setup with Jaeger...\\nMake sure Jaeger is running: npm run tracing:jaeger:start\\nThen run: npm run inspect:build:tracing\\nCheck traces at: http://localhost:16686')\""
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --fix",
@@ -72,6 +80,14 @@
   "dependencies": {
     "dotenv": "^17.2.2",
     "@modelcontextprotocol/sdk": "^1.18.2",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.56.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
+    "@opentelemetry/instrumentation": "^0.56.0",
+    "@opentelemetry/resources": "^1.30.1",
+    "@opentelemetry/sdk-node": "^0.56.0",
+    "@opentelemetry/sdk-trace-base": "^1.30.1",
+    "@opentelemetry/semantic-conventions": "^1.30.1",
     "zod": "^3.25.42"
   },
   "tshy": {
