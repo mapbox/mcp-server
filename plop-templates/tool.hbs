@@ -1,27 +1,41 @@
 import { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
+import type { HttpRequest } from '../../utils/types.js';
+import { {{pascalCase name}}InputSchema } from './{{pascalCase name}}Tool.input.schema.js';
+import {
+  {{pascalCase name}}OutputSchema,
+  type {{pascalCase name}}Output
+} from './{{pascalCase name}}Tool.output.schema.js';
 
-const {{pascalCase name}}InputSchema = z.object({
-  ... write your input schema here ...
-});
-
+/**
+ * {{pascalCase name}}Tool - TODO: Add description
+ */
 export class {{pascalCase name}}Tool extends MapboxApiBasedTool<
-  typeof {{pascalCase name}}InputSchema
+  typeof {{pascalCase name}}InputSchema,
+  typeof {{pascalCase name}}OutputSchema
 > {
   name = '{{toolName}}';
-  description = 'Tool description.';
+  description = 'TODO: Add tool description here.';
 
-  constructor() {
-    super({ inputSchema: {{pascalCase name}}InputSchema });
+  constructor({ httpRequest }: { httpRequest: HttpRequest }) {
+    super({
+      inputSchema: {{pascalCase name}}InputSchema,
+      outputSchema: {{pascalCase name}}OutputSchema,
+      httpRequest
+    });
   }
 
+  /**
+   * Execute the tool logic
+   * @param input - Validated input from {{pascalCase name}}InputSchema
+   * @returns CallToolResult with structured output
+   */
   protected async execute(
-    input: z.infer<typeof {{pascalCase name}}InputSchema>,
-    accessToken: string
+    input: z.infer<typeof {{pascalCase name}}InputSchema>
   ): Promise<any> {
     ... write your logic here ...
     // e.g.:
-    // const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}...?access_token=${accessToken}`;
+    // const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}...?access_token=${MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN}`;
     // const response = await fetch(url);
     // const data = await response.json();
     // return data;
