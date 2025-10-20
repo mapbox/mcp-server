@@ -1,0 +1,20 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
+import { z } from 'zod';
+
+/**
+ * Output schema for {{pascalCase name}}Tool
+ *
+ * TODO: Define the appropriate output schema for your tool
+ * This is a placeholder schema that should be replaced with your actual output structure
+ */
+export const {{pascalCase name}}OutputSchema = z.object({
+  // Add your output schema fields here
+  result: z.unknown().describe('Tool execution result')
+});
+
+/**
+ * Type inference for {{pascalCase name}}Output
+ */
+export type {{pascalCase name}}Output = z.infer<typeof {{pascalCase name}}OutputSchema>;

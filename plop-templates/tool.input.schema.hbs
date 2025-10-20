@@ -1,0 +1,16 @@
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
+import z from 'zod';
+
+/**
+ * Input schema for {{pascalCase name}}Tool
+ */
+export const {{pascalCase name}}InputSchema = z.object({
+  query: z.string().describe('Natural language query for {{lowerCase name}}')
+});
+
+/**
+ * Type inference for {{pascalCase name}}Input
+ */
+export type {{pascalCase name}}Input = z.infer<typeof {{pascalCase name}}InputSchema>;

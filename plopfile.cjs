@@ -21,8 +21,18 @@ module.exports = function (plop) {
             },
             {
                 type: 'add',
-                path: 'src/tools/{{kebabCase name}}-tool/{{pascalCase name}}Tool.test.ts',
+                path: 'test/tools/{{kebabCase name}}-tool/{{pascalCase name}}Tool.test.ts',
                 templateFile: 'plop-templates/tool.test.hbs',
+            },
+            {
+                type: 'add',
+                path: 'src/tools/{{kebabCase name}}-tool/{{pascalCase name}}Tool.input.schema.ts',
+                templateFile: 'plop-templates/tool.input.schema.hbs',
+            },
+            {
+                type: 'add',
+                path: 'src/tools/{{kebabCase name}}-tool/{{pascalCase name}}Tool.output.schema.ts',
+                templateFile: 'plop-templates/tool.output.schema.hbs',
             },
             {
                 type: 'append',
