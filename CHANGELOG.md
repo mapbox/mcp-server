@@ -1,3 +1,9 @@
+## 0.6.1
+
+### Other
+
+- Update to MCP registry schema version 2025-10-17
+
 ## 0.6.0 (Unreleased)
 
 ### Features Added
