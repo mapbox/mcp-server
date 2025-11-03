@@ -4,27 +4,42 @@ This MCP server now has **comprehensive end-to-end tracing** for all major opera
 
 ## 🏗️ **Complete Tracing Architecture**
 
-### **1. Tool Execution Tracing**
+### **1. Configuration Loading Tracing**
+
+- .env file loading and parsing (using Node.js built-in parseEnv)
+- Number of environment variables loaded
+- Configuration errors and warnings
+- Startup configuration validation
+
+### **2. Tool Execution Tracing**
 
 - Tool lifecycle (start, execute, complete)
 - Input validation and processing
 - Error handling and propagation
 - Business logic performance
 
-### **2. HTTP Request Tracing**
+### **3. HTTP Request Tracing**
 
 - All outbound HTTP calls (Mapbox APIs, external services)
 - Request/response metadata (headers, status codes, timing)
+- CloudFront correlation IDs for Mapbox API requests
+- Cache hit/miss tracking via CloudFront headers
 - Retry logic and failure handling
 - Network-level performance metrics
 
 ## 🔗 **Connected Trace Hierarchy**
 
 ```
+⚙️  Configuration Loading (Startup)
+└── config.load_env
+    ├── File existence check
+    ├── Environment variable parsing
+    └── Configuration validation
+
 🔄 MCP Tool Execution (Root)
 ├── 🌐 HTTP API Calls
 │   ├── Request Preparation
-│   ├── Network Transfer
+│   ├── Network Transfer (with CloudFront correlation)
 │   └── Response Processing
 └── 📊 Business Logic
     ├── Data Transformation
@@ -41,6 +56,18 @@ This MCP server now has **comprehensive end-to-end tracing** for all major opera
 
 ## 📊 **Trace Attributes Captured**
 
+### Configuration Context
+
+```json
+{
+  "config.file.path": "/app/.env",
+  "config.file.exists": true,
+  "config.vars.loaded": 5,
+  "operation.type": "config_load",
+  "config.load.success": true
+}
+```
+
 ### Tool Context
 
 ```json
@@ -52,7 +79,7 @@ This MCP server now has **comprehensive end-to-end tracing** for all major opera
 }
 ```
 
-### HTTP Context
+### HTTP Context (with CloudFront Correlation)
 
 ```json
 {
@@ -60,7 +87,11 @@ This MCP server now has **comprehensive end-to-end tracing** for all major opera
   "http.url": "https://api.mapbox.com/search/v1",
   "http.status_code": 200,
   "http.response.content_length": 2048,
-  "http.duration_ms": 125
+  "http.duration_ms": 125,
+  "http.response.header.x_amz_cf_id": "HsL_E2ZgW72g4tg...",
+  "http.response.header.x_amz_cf_pop": "IAD55-P3",
+  "http.response.header.x_cache": "Miss from cloudfront",
+  "http.response.header.etag": "W/\"21fe5-88gH...\""
 }
 ```
 

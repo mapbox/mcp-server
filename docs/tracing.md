@@ -15,6 +15,13 @@ The server automatically detects the transport type and adjusts logging behavior
 
 ## Features
 
+### Configuration Loading Tracing
+
+- **Environment Variable Loading**: Automatic tracing of .env file loading
+- **Load Metrics**: Number of variables loaded, file existence, load success
+- **Error Tracking**: Detailed errors if configuration loading fails
+- **Startup Visibility**: See configuration issues at server startup
+
 ### Tool Execution Tracing
 
 - **Automatic Instrumentation**: All tool executions are automatically traced
@@ -28,6 +35,9 @@ The server automatically detects the transport type and adjusts logging behavior
 - **Full Request Lifecycle**: Complete HTTP request/response tracing with retry logic
 - **Performance Metrics**: Request duration, payload sizes, retry attempts
 - **Response Details**: Status codes, response sizes, content types
+- **CloudFront Correlation**: Automatic capture of CloudFront IDs for Mapbox API requests
+- **Cache Monitoring**: CloudFront cache hit/miss tracking via x-cache headers
+- **Geographic Insights**: CloudFront PoP location for geographic distribution analysis
 - **Error Classification**: Detailed error information with error types
 
 ### Security & Performance
@@ -103,70 +113,118 @@ To verify tracing is working correctly, see the [Tracing Verification Guide](./t
 - Test tracing with the MCP inspector
 - Troubleshoot common issues
 
-### Configuration Files
+### Configuration File
 
-Use the provided example configuration files:
+Use the provided `.env.example` file which includes:
 
-- `.env.tracing.example` - Basic tracing configuration with MCP-safe settings
-- `.env.aws.example` - AWS X-Ray specific configuration
+- Required settings (Mapbox API token)
+- OpenTelemetry tracing configuration (Jaeger/OTLP)
+- Optional AWS X-Ray configuration (commented out)
+- All MCP server settings
 
-Copy the relevant example file to `.env` and adjust values as needed.
+**Setup:**
+
+```bash
+# Copy the example configuration
+cp .env.example .env
+
+# Edit .env to:
+#   1. Add your MAPBOX_ACCESS_TOKEN
+#   2. Uncomment tracing settings for Jaeger/OTLP
+#   3. Or uncomment AWS X-Ray settings if using AWS
+```
+
+The server automatically loads configuration from `.env` at startup, eliminating the need for inline environment variables in npm scripts.
 
 ## Supported Backends
 
+The server supports **any OTLP-compatible observability backend**. Configuration examples are provided in `.env.example` for:
+
 ### Development
 
-- **Console Output**: Set `OTEL_EXPORTER_CONSOLE_ENABLED=true` for development tracing
-- **Jaeger**: Use `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`
+- **Jaeger**: Local development with Docker (see Quick Start)
+  - `npm run tracing:jaeger:start`
+  - Endpoint: `http://localhost:4318`
+  - UI: `http://localhost:16686`
 
-### Production
+### Production Cloud Providers
 
-- **AWS X-Ray**: Compatible via OTLP endpoint
-- **Google Cloud Trace**: Via OTLP HTTP exporter
-- **Azure Monitor**: Via OTLP HTTP exporter
-- **Datadog**: Via OTLP HTTP exporter
-- **New Relic**: Via OTLP HTTP exporter
-- **Honeycomb**: Via OTLP HTTP exporter
-- **Any OTLP-compatible backend**
+- **AWS X-Ray**: AWS-native distributed tracing
+
+  - Endpoint: AWS Distro for OpenTelemetry Collector
+  - Auth: IAM credentials
+  - [Setup Guide](https://aws-otel.github.io/docs/getting-started/collector)
+
+- **Azure Monitor**: Azure Application Insights
+
+  - Endpoint: `https://<region>.livediagnostics.monitor.azure.com`
+  - Auth: Connection string or AAD token
+  - [Setup Guide](https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable)
+
+- **Google Cloud Trace**: GCP-native tracing
+  - Endpoint: `https://cloudtrace.googleapis.com`
+  - Auth: Application Default Credentials
+  - [Setup Guide](https://cloud.google.com/trace/docs/setup)
+
+### Production SaaS Observability Platforms
+
+- **Datadog**: Full-stack observability platform
+
+  - Endpoint: `https://api.datadoghq.com/api/v2/traces` or local agent
+  - Auth: API key
+  - [Setup Guide](https://docs.datadoghq.com/tracing/trace_collection/opentelemetry/)
+
+- **New Relic**: Application performance monitoring
+
+  - Endpoint: `https://otlp.nr-data.net:4318` (US) or `https://otlp.eu01.nr-data.net:4318` (EU)
+  - Auth: License key
+  - [Setup Guide](https://docs.newrelic.com/docs/more-integrations/open-source-telemetry-integrations/opentelemetry/opentelemetry-setup/)
+
+- **Honeycomb**: Observability for complex systems
+  - Endpoint: `https://api.honeycomb.io:443`
+  - Auth: API key + dataset name
+  - [Setup Guide](https://docs.honeycomb.io/getting-data-in/opentelemetry-overview/)
+
+### Configuration
+
+All backends are configured via `.env` file. See `.env.example` for complete configuration examples for each platform.
 
 ## Quick Start
 
-### 1. Local Development with Console Output
+### 1. Setup .env Configuration
 
 ```bash
-# Enable console tracing
-export OTEL_EXPORTER_CONSOLE_ENABLED=true
+# Copy the example configuration
+cp .env.example .env
 
-# Start the server
-node dist/esm/index.js
+# Edit .env to:
+#   1. Add your MAPBOX_ACCESS_TOKEN
+#   2. The OTEL_EXPORTER_OTLP_ENDPOINT is already set to http://localhost:4318
+#   3. Customize OTEL_SERVICE_NAME if needed
 ```
 
 ### 2. Local Development with Jaeger
 
 ```bash
 # Start Jaeger (Docker)
-docker run -d --name jaeger \\
-  -p 16686:16686 \\
-  -p 14250:14250 \\
-  -p 4317:4317 \\
-  -p 4318:4318 \\
-  jaegertracing/all-in-one:latest
+npm run tracing:jaeger:start
 
-# Configure tracing
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-
-# Start the server
-node dist/esm/index.js
+# Build and run the server with MCP inspector
+npm run inspect:build
 
 # View traces at http://localhost:16686
+
+# Stop Jaeger when done
+npm run tracing:jaeger:stop
 ```
 
 ### 3. AWS X-Ray Integration
 
 ```bash
-# Configure AWS region and endpoint
-export AWS_REGION=us-east-1
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+# Edit .env and uncomment AWS X-Ray settings:
+#   - AWS_REGION=us-east-1
+#   - Update OTEL_RESOURCE_ATTRIBUTES to include aws.region
+#   - Uncomment OTEL_EXPORTER_OTLP_HEADERS for X-Ray trace IDs
 
 # Ensure AWS credentials are configured
 # (via IAM role, AWS CLI profile, or environment variables)
@@ -175,21 +233,30 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 # See: https://aws-otel.github.io/docs/getting-started/collector
 
 # Start the server
-node dist/esm/index.js
+npm run inspect:build
 ```
-
-## Testing Tracing
-
-Use the provided npm script to test tracing functionality:
-
-```bash
-# Run tests with tracing enabled
-npm run test:tracing
-```
-
-This will run the test suite with console tracing enabled and OTLP endpoint configured.
 
 ## Trace Structure
+
+### Configuration Loading Spans
+
+The server traces configuration loading at startup:
+
+```
+config.load_env
+├── config.file.path: "/path/to/.env"
+├── config.file.exists: true
+├── config.vars.loaded: 5
+├── operation.type: "config_load"
+└── config.load.success: true
+```
+
+This span captures:
+
+- Whether the .env file exists
+- Number of environment variables loaded
+- Any errors during configuration loading
+- Overall success/failure status
 
 ### Tool Execution Spans
 
@@ -217,8 +284,28 @@ http.post
 ├── http.user_agent: "mapbox-mcp-server/0.0.1"
 ├── http.request.content_length: 512
 ├── http.response.content_length: 1024
-└── http.response.content_type: "application/json"
+├── http.response.content_type: "application/json"
+├── http.response.header.x_amz_cf_id: "HsL_E2ZgW72g4tg_ppvpljSFWa2yYcWziQjZ4d7_1czoC7-53UkAdg=="
+├── http.response.header.x_amz_cf_pop: "IAD55-P3"
+├── http.response.header.x_cache: "Miss from cloudfront"
+└── http.response.header.etag: "W/\"21fe5-88gHkqbxd+dMWiCvnvxi2sikhUs\""
 ```
+
+#### CloudFront Correlation IDs
+
+For Mapbox API requests, the tracing system automatically captures CloudFront correlation headers:
+
+- **`x-amz-cf-id`**: CloudFront request ID for correlation with AWS support
+- **`x-amz-cf-pop`**: CloudFront Point of Presence location
+- **`x-cache`**: Cache hit/miss status from CloudFront
+- **`etag`**: Entity tag for cache validation
+
+These headers enable:
+
+- Correlation with Mapbox API logs and support tickets
+- Geographic distribution analysis (via PoP location)
+- Cache performance monitoring
+- End-to-end request tracing through CloudFront
 
 ## Troubleshooting
 
