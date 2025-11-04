@@ -180,8 +180,6 @@ Retrieves a single user feedback item by ID using the [Mapbox Feedback API](http
 - JSON and formatted text output formats
 - Requires `user-feedback:read` scope on the access token
 
-**Note:** These tools currently support reading feedback items. Future versions will support submitting feedback through the API when that feature becomes available.
-
 # Development
 
 ## Inspecting server
