@@ -1,8 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-process.env.MAPBOX_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
+process.env.MAPBOX_ACCESS_TOKEN = 'test.token.signature';
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
@@ -252,7 +251,7 @@ describe('FeedbackListTool', () => {
 
     expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text as string);
     expect(parsed).toEqual(mockResponse);
   });
 

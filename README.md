@@ -165,20 +165,20 @@ This tool consolidates the functionality that was previously provided by the For
 
 Lists user feedback items using the [Mapbox Feedback API](https://docs.mapbox.com/api/feedback/). Features include:
 
+- Requires `user-feedback:read` scope on the access token
 - Comprehensive filtering options (status, category, date ranges, trace IDs, search text)
 - Pagination support with cursor-based navigation
 - Sorting by received_at, created_at, or updated_at
 - Support for all feedback statuses: received, fixed, reviewed, out_of_scope
 - JSON and formatted text output formats
-- Requires `user-feedback:read` scope on the access token
 
 #### Feedback get tool
 
 Retrieves a single user feedback item by ID using the [Mapbox Feedback API](https://docs.mapbox.com/api/feedback/). Features include:
 
+- Requires `user-feedback:read` scope on the access token
 - Get detailed information about a specific feedback item
 - JSON and formatted text output formats
-- Requires `user-feedback:read` scope on the access token
 
 # Development
 
