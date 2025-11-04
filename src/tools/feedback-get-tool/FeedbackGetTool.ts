@@ -6,8 +6,8 @@ import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { FeedbackGetInputSchema } from './FeedbackGetTool.input.schema.js';
-import { FeedbackGetResponseSchema } from '../feedback-tool/FeedbackTool.output.schema.js';
-import type { FeedbackItem } from '../feedback-tool/FeedbackTool.output.schema.js';
+import { FeedbackGetResponseSchema } from '../feedback.schema.js';
+import type { FeedbackItem } from '../feedback.schema.js';
 
 // API Documentation: https://docs.mapbox.com/api/feedback/
 
