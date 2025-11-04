@@ -5,6 +5,7 @@
 import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
+import { FeedbackTool } from './feedback-tool/FeedbackTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MatrixTool } from './matrix-tool/MatrixTool.js';
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
@@ -20,6 +21,7 @@ export const ALL_TOOLS = [
   new CategoryListTool({ httpRequest }),
   new CategorySearchTool({ httpRequest }),
   new DirectionsTool({ httpRequest }),
+  new FeedbackTool({ httpRequest }),
   new IsochroneTool({ httpRequest }),
   new MatrixTool({ httpRequest }),
   new ReverseGeocodeTool({ httpRequest }),
