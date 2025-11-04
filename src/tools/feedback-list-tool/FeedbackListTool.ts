@@ -5,27 +5,23 @@ import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
-import { FeedbackInputSchema } from './FeedbackTool.input.schema.js';
-import type { FeedbackListInputSchema } from './FeedbackTool.input.schema.js';
-import {
-  FeedbackListResponseSchema,
-  FeedbackGetResponseSchema
-} from './FeedbackTool.output.schema.js';
+import { FeedbackListInputSchema } from './FeedbackListTool.input.schema.js';
+import { FeedbackListResponseSchema } from '../feedback-tool/FeedbackTool.output.schema.js';
 import type {
   FeedbackItem,
   FeedbackListResponse
-} from './FeedbackTool.output.schema.js';
+} from '../feedback-tool/FeedbackTool.output.schema.js';
 
 // API Documentation: https://docs.mapbox.com/api/feedback/
 
-export class FeedbackTool extends MapboxApiBasedTool<
-  typeof FeedbackInputSchema
+export class FeedbackListTool extends MapboxApiBasedTool<
+  typeof FeedbackListInputSchema
 > {
-  name = 'feedback_tool';
+  name = 'feedback_list_tool';
   description =
-    'Retrieve user feedback items from the Mapbox Feedback API. Supports listing feedback items with filtering, sorting, and pagination, or getting a single feedback item by ID. Use this tool to access user-reported issues, suggestions, and feedback about map data, routing, and POI details. Requires user-feedback:read scope on the access token.';
+    'List user feedback items from the Mapbox Feedback API with filtering, sorting, and pagination. Use this tool to access user-reported issues, suggestions, and feedback about map data, routing, and POI details. Supports comprehensive filtering by status, category, date ranges, trace IDs, and search text. Requires user-feedback:read scope on the access token.';
   annotations = {
-    title: 'Feedback Tool',
+    title: 'Feedback List Tool',
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: true,
@@ -34,7 +30,7 @@ export class FeedbackTool extends MapboxApiBasedTool<
 
   constructor(params: { httpRequest: HttpRequest }) {
     super({
-      inputSchema: FeedbackInputSchema,
+      inputSchema: FeedbackListInputSchema,
       httpRequest: params.httpRequest
     });
   }
@@ -51,7 +47,11 @@ export class FeedbackTool extends MapboxApiBasedTool<
     result += `Status: ${item.status}\n`;
     result += `Category: ${item.category}\n`;
     result += `Feedback: ${item.feedback}\n`;
-    result += `Location: ${item.location.place_name} (${item.location.lat}, ${item.location.lon})\n`;
+    if (item.location.place_name) {
+      result += `Location: ${item.location.place_name} (${item.location.lat}, ${item.location.lon})\n`;
+    } else {
+      result += `Location: ${item.location.lat}, ${item.location.lon}\n`;
+    }
     if (item.trace_id) {
       result += `Trace ID: ${item.trace_id}\n`;
     }
@@ -87,13 +87,6 @@ export class FeedbackTool extends MapboxApiBasedTool<
     }
 
     return result;
-  }
-
-  /**
-   * Formats a single feedback item for human-readable text output
-   */
-  private formatGetResponse(item: FeedbackItem): string {
-    return this.formatFeedbackItem(item);
   }
 
   /**
@@ -174,41 +167,18 @@ export class FeedbackTool extends MapboxApiBasedTool<
   }
 
   protected async execute(
-    input: z.infer<typeof FeedbackInputSchema>,
+    input: z.infer<typeof FeedbackListInputSchema>,
     accessToken: string,
     context: unknown
   ): Promise<CallToolResult> {
     // Context parameter is required by base class signature but not used in this implementation
-    // It will be used when submit operation is added in the future
     void context;
-    let url: URL;
 
-    if (input.operation === 'get') {
-      // Get single feedback item
-      // With discriminated union, TypeScript guarantees feedback_id is present
-      url = new URL(
-        `${MapboxApiBasedTool.mapboxApiEndpoint}user-feedback/v1/feedback/${input.feedback_id}`
-      );
-      url.searchParams.append('access_token', accessToken);
-    } else if (input.operation === 'list') {
-      // List feedback items
-      url = new URL(
-        `${MapboxApiBasedTool.mapboxApiEndpoint}user-feedback/v1/feedback`
-      );
-      url.searchParams.append('access_token', accessToken);
-      this.buildListParams(input, url);
-    } else {
-      // This should never happen with discriminated union, but TypeScript needs it
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error: Unknown operation: ${(input as { operation: string }).operation}`
-          }
-        ],
-        isError: true
-      };
-    }
+    const url = new URL(
+      `${MapboxApiBasedTool.mapboxApiEndpoint}user-feedback/v1/feedback`
+    );
+    url.searchParams.append('access_token', accessToken);
+    this.buildListParams(input, url);
 
     // Make the request
     const response = await this.httpRequest(url.toString());
@@ -219,7 +189,7 @@ export class FeedbackTool extends MapboxApiBasedTool<
         content: [
           {
             type: 'text',
-            text: `Failed to ${input.operation} feedback: ${response.status} ${response.statusText}. ${errorText}`
+            text: `Failed to list feedback: ${response.status} ${response.statusText}. ${errorText}`
           }
         ],
         isError: true
@@ -229,68 +199,34 @@ export class FeedbackTool extends MapboxApiBasedTool<
     const rawData = await response.json();
 
     // Validate and format response
-    if (input.operation === 'get') {
-      // Single item response
-      let data;
-      try {
-        data = FeedbackGetResponseSchema.parse(rawData);
-      } catch (validationError) {
-        this.log(
-          'warning',
-          `Schema validation failed for feedback get response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
-        );
-        data = rawData;
-      }
+    let data: FeedbackListResponse;
+    try {
+      data = FeedbackListResponseSchema.parse(rawData);
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `Schema validation failed for feedback list response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+      data = rawData as FeedbackListResponse;
+    }
 
-      if (input.format === 'json_string') {
-        return {
-          content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-          structuredContent: data as unknown as Record<string, unknown>,
-          isError: false
-        };
-      } else {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: this.formatGetResponse(data as FeedbackItem)
-            }
-          ],
-          structuredContent: data as unknown as Record<string, unknown>,
-          isError: false
-        };
-      }
+    if (input.format === 'json_string') {
+      return {
+        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        structuredContent: data as unknown as Record<string, unknown>,
+        isError: false
+      };
     } else {
-      // List response
-      let data: FeedbackListResponse;
-      try {
-        data = FeedbackListResponseSchema.parse(rawData);
-      } catch (validationError) {
-        this.log(
-          'warning',
-          `Schema validation failed for feedback list response: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
-        );
-        data = rawData as FeedbackListResponse;
-      }
-
-      if (input.format === 'json_string') {
-        return {
-          content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-          structuredContent: data as unknown as Record<string, unknown>,
-          isError: false
-        };
-      } else {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: this.formatListResponse(data)
-            }
-          ],
-          structuredContent: data as unknown as Record<string, unknown>,
-          isError: false
-        };
-      }
+      return {
+        content: [
+          {
+            type: 'text',
+            text: this.formatListResponse(data)
+          }
+        ],
+        structuredContent: data as unknown as Record<string, unknown>,
+        isError: false
+      };
     }
   }
 }

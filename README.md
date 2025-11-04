@@ -161,17 +161,26 @@ Computes areas that are reachable within a specified amount of times from a loca
 Uses the [Mapbox Search Box Text Search API](https://docs.mapbox.com/api/search/search-box/#search-request) endpoint to power searching for and geocoding POIs, addresses, places, and any other types supported by that API.
 This tool consolidates the functionality that was previously provided by the ForwardGeocodeTool and PoiSearchTool (from earlier versions of this MCP server) into a single tool.
 
-#### Feedback tool
+#### Feedback list tool
 
-Retrieves user feedback items using the [Mapbox Feedback API](https://docs.mapbox.com/api/user-feedback/feedback/). Features include:
+Lists user feedback items using the [Mapbox Feedback API](https://docs.mapbox.com/api/feedback/). Features include:
 
-- List feedback items with comprehensive filtering options (status, category, date ranges, trace IDs, search text)
-- Get a single feedback item by ID
+- Comprehensive filtering options (status, category, date ranges, trace IDs, search text)
 - Pagination support with cursor-based navigation
 - Sorting by received_at, created_at, or updated_at
 - Support for all feedback statuses: received, fixed, reviewed, out_of_scope
 - JSON and formatted text output formats
 - Requires `user-feedback:read` scope on the access token
+
+#### Feedback get tool
+
+Retrieves a single user feedback item by ID using the [Mapbox Feedback API](https://docs.mapbox.com/api/feedback/). Features include:
+
+- Get detailed information about a specific feedback item
+- JSON and formatted text output formats
+- Requires `user-feedback:read` scope on the access token
+
+**Note:** These tools currently support reading feedback items. Future versions will support submitting feedback through the API when that feature becomes available.
 
 # Development
 

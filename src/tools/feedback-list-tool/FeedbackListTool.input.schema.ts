@@ -24,25 +24,9 @@ export const feedbackStatusSchema = z.enum([
 ]);
 
 /**
- * Common fields shared between operations
- */
-const commonFeedbackFields = {
-  format: z
-    .enum(['json_string', 'formatted_text'])
-    .optional()
-    .default('formatted_text')
-    .describe(
-      'Output format: "json_string" returns raw JSON data as a JSON string that can be parsed; "formatted_text" returns human-readable text. Both return as text content but json_string contains parseable JSON data while formatted_text is for display.'
-    )
-};
-
-/**
- * Schema for list operation
+ * Input schema for Feedback List Tool
  */
 export const FeedbackListInputSchema = z.object({
-  operation: z
-    .literal('list')
-    .describe('List feedback items with optional filters'),
   feedback_ids: z
     .array(z.string().uuid())
     .optional()
@@ -127,27 +111,13 @@ export const FeedbackListInputSchema = z.object({
     .describe(
       'Return items last updated after the specified time. Use ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
     ),
-  ...commonFeedbackFields
+  format: z
+    .enum(['json_string', 'formatted_text'])
+    .optional()
+    .default('formatted_text')
+    .describe(
+      'Output format: "json_string" returns raw JSON data as a JSON string that can be parsed; "formatted_text" returns human-readable text. Both return as text content but json_string contains parseable JSON data while formatted_text is for display.'
+    )
 });
 
-/**
- * Schema for get operation
- */
-const FeedbackGetInputSchema = z.object({
-  operation: z.literal('get').describe('Get a single feedback item by ID'),
-  feedback_id: z
-    .string()
-    .uuid()
-    .describe('The unique identifier of the feedback item'),
-  ...commonFeedbackFields
-});
-
-/**
- * Input schema for Feedback Tool
- */
-export const FeedbackInputSchema = z.discriminatedUnion('operation', [
-  FeedbackListInputSchema,
-  FeedbackGetInputSchema
-]);
-
-export type FeedbackInput = z.infer<typeof FeedbackInputSchema>;
+export type FeedbackListInput = z.infer<typeof FeedbackListInputSchema>;
