@@ -6,12 +6,13 @@ import { z } from 'zod';
 /**
  * ISO 8601 date string validator
  */
-const iso8601DateSchema = z
-  .string()
-  .regex(
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/,
-    'Must be in ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
-  );
+const iso8601DateSchema = () =>
+  z
+    .string()
+    .regex(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/,
+      'Must be in ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
+    );
 
 /**
  * Feedback status enum
@@ -81,32 +82,32 @@ export const FeedbackListInputSchema = z.object({
     .describe(
       'Filter by one or more trace_id values. At least one must match.'
     ),
-  created_before: iso8601DateSchema
+  created_before: iso8601DateSchema()
     .optional()
     .describe(
       'Return items created before the specified time. Use ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
     ),
-  created_after: iso8601DateSchema
+  created_after: iso8601DateSchema()
     .optional()
     .describe(
       'Return items created after the specified time. Use ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
     ),
-  received_before: iso8601DateSchema
+  received_before: iso8601DateSchema()
     .optional()
     .describe(
       'Return items received by Mapbox before the specified time. Use ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
     ),
-  received_after: iso8601DateSchema
+  received_after: iso8601DateSchema()
     .optional()
     .describe(
       'Return items received by Mapbox after the specified time. Use ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
     ),
-  updated_before: iso8601DateSchema
+  updated_before: iso8601DateSchema()
     .optional()
     .describe(
       'Return items last updated before the specified time. Use ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
     ),
-  updated_after: iso8601DateSchema
+  updated_after: iso8601DateSchema()
     .optional()
     .describe(
       'Return items last updated after the specified time. Use ISO 8601 format: YYYY-MM-DDTHH:mm:ss.SSSZ'
