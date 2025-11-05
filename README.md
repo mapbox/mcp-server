@@ -168,11 +168,8 @@ This tool consolidates the functionality that was previously provided by the For
 ### Using Node.js
 
 ```sh
-# Build
-npm run build
-
-# Inspect
-npx @modelcontextprotocol/inspector node dist/esm/index.js
+# Run the built image
+npm run inspect:build
 ```
 
 ### Using Docker

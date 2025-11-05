@@ -121,6 +121,17 @@ global.fetch = myCustomFetch; // ❌ Don't do this
 
 ---
 
+## Environment Variables
+
+### OpenTelemetry Configuration
+
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — OTLP endpoint URL (e.g., `http://localhost:4318`)
+- `OTEL_SERVICE_NAME` — Override service name (default: `mapbox-mcp-server`)
+- `OTEL_EXPORTER_OTLP_HEADERS` — JSON string of additional headers for OTLP exporter
+- `OTEL_LOG_LEVEL` — OTEL diagnostic log level: `NONE` (default), `ERROR`, `WARN`, `INFO`, `DEBUG`, `VERBOSE`. Set to `NONE` to prevent OTEL logs from polluting stdio transport.
+
+---
+
 ## Enforcement
 
 Failure to follow these standards may result in PR changes being requested or, in repeated cases, reversion of non-compliant code.

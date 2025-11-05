@@ -86,7 +86,7 @@ npm run tracing:jaeger:stop
 ❌ **Docker not available**
 
 - Use alternative OTLP collector
-- Or run with console tracing: `OTEL_EXPORTER_CONSOLE_ENABLED=true npm run demo:tracing`
+- Note: Console tracing is not supported with stdio transport
 
 ## Alternative OTLP Endpoints
 

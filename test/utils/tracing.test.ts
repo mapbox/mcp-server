@@ -41,6 +41,17 @@ vi.mock('@opentelemetry/api', () => ({
   SpanKind: {
     INTERNAL: 0,
     CLIENT: 3
+  },
+  diag: {
+    setLogger: vi.fn()
+  },
+  DiagLogLevel: {
+    NONE: 0,
+    ERROR: 30,
+    WARN: 50,
+    INFO: 60,
+    DEBUG: 70,
+    VERBOSE: 80
   }
 }));
 

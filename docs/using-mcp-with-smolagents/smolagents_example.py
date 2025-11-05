@@ -47,13 +47,12 @@ if os.environ.get("MAPBOX_ACCESS_TOKEN", None) is None:
     raise EnvironmentError("To use Mapbox MCP you need to export `MAPBOX_ACCESS_TOKEN` environmental variable.")
 
 # Run server with node
-# alternatively you can use command="docker" and args=["run", "-i", "--rm", "mapbox-mcp-server"] 
+# alternatively you can use command="docker" and args=["run", "-i", "--rm", "mapbox-mcp-server"]
 server_parameters = StdioServerParameters(
     command="/Users/username/.nvm/versions/node/v22.3.0/bin/node",
     args=["/YOUR_PATH_TO_REPOSITORY/dist/esm/index.js"],
     env={
-      "MAPBOX_ACCESS_TOKEN": os.environ["MAPBOX_ACCESS_TOKEN"],
-      "MCP_DISABLE_LOGGING": "true",
+      "MAPBOX_ACCESS_TOKEN": os.environ["MAPBOX_ACCESS_TOKEN"]
     }
 )
 

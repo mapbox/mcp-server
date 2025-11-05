@@ -2,16 +2,15 @@
 
 This MCP server includes comprehensive distributed tracing using OpenTelemetry (OTEL), providing production-ready observability for tool executions and HTTP requests.
 
-## ⚠️ Important MCP Transport Compatibility
+## ⚠️ Important: stdio Transport Only
 
-**Console tracing should be avoided with stdio transport** as console output interferes with MCP's stdio JSON-RPC communication.
+This MCP server uses **stdio transport exclusively** for communication. Console logging and tracing output will interfere with JSON-RPC communication.
 
-**Transport-specific recommendations:**
+**Critical Requirements:**
 
-- **stdio transport (default):** Use OTLP exporters only, avoid console tracing
-- **SSE transport:** Console tracing is safe to use for development
-
-The server automatically detects the transport type and adjusts logging behavior accordingly.
+- ✅ **Use OTLP exporters** (like Jaeger, Datadog, etc.) to send traces to external collectors
+- ❌ **Console logging is disabled** - the server only logs via the MCP protocol
+- ✅ **OTEL diagnostic logging is suppressed by default** to prevent stdio pollution
 
 ## Features
 
@@ -56,10 +55,7 @@ The tracing system supports several configuration options through environment va
 #### Basic Configuration
 
 ```bash
-# Enable console tracing (development)
-OTEL_EXPORTER_CONSOLE_ENABLED=true
-
-# OTLP HTTP endpoint (production)
+# OTLP HTTP endpoint (required for tracing with stdio transport)
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 # Optional OTLP headers for authentication
@@ -82,28 +78,19 @@ OTEL_TRACES_SAMPLER=traceidratio
 OTEL_TRACES_SAMPLER_ARG=0.1
 ```
 
-### Transport-Specific Configuration
+### Configuration Requirements
 
-**For stdio transport (default):**
-
-```bash
-# ✅ RECOMMENDED: Use OTLP exporter for stdio transport
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-
-# ❌ AVOID: Console output interferes with stdio JSON-RPC
-# OTEL_EXPORTER_CONSOLE_ENABLED=true
-```
-
-**For SSE transport:**
+Since stdio is the only supported transport, follow these guidelines:
 
 ```bash
-# ✅ SAFE: Console tracing works with SSE transport
-SERVER_TRANSPORT=sse
-OTEL_EXPORTER_CONSOLE_ENABLED=true
-
-# ✅ ALSO GOOD: OTLP exporter works with any transport
+# ✅ RECOMMENDED: Use OTLP exporter to send traces to external collector
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+
+# ✅ OPTIONAL: Enable OTEL diagnostic logging for troubleshooting (outputs to stderr)
+# OTEL_LOG_LEVEL=ERROR
 ```
+
+**Important:** Console logging is disabled by default. All logging uses the MCP protocol via `server.sendLoggingMessage()`.
 
 ### Verification
 

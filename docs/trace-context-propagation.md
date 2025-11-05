@@ -93,11 +93,8 @@ span.name CONTAINS "HTTP" AND duration > 1000ms
 ### Required Environment Variables:
 
 ```bash
-# Enable tracing
+# Enable tracing with OTLP endpoint
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-
-# Optional: Enable console output for debugging
-OTEL_EXPORTER_CONSOLE_ENABLED=true
 ```
 
 ### Trace Sampling:
