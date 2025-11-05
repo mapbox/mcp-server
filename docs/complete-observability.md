@@ -102,7 +102,6 @@ This MCP server now has **comprehensive end-to-end tracing** for all major opera
 ```bash
 # Enable OTEL tracing
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-OTEL_EXPORTER_CONSOLE_ENABLED=true
 
 # API Keys
 MAPBOX_ACCESS_TOKEN=pk.xxx

@@ -9,10 +9,42 @@ import {
   ATTR_SERVICE_VERSION
 } from '@opentelemetry/semantic-conventions';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { trace, SpanStatusCode, SpanKind, type Span } from '@opentelemetry/api';
+import {
+  trace,
+  SpanStatusCode,
+  SpanKind,
+  type Span,
+  diag,
+  DiagLogLevel
+} from '@opentelemetry/api';
 import { getVersionInfo } from './versionUtils.js';
 import { ATTR_SERVICE_INSTANCE_ID } from '@opentelemetry/semantic-conventions/incubating';
 import { type HttpRequest } from './types.js';
+
+// Suppress OpenTelemetry diagnostic logging IMMEDIATELY to avoid polluting stdio
+// This must happen at module load time, before any OTEL operations
+// Use OTEL_LOG_LEVEL env var to override if needed for debugging
+const configureOtelDiagnostics = () => {
+  const logLevel = process.env.OTEL_LOG_LEVEL
+    ? DiagLogLevel[
+        process.env.OTEL_LOG_LEVEL.toUpperCase() as keyof typeof DiagLogLevel
+      ]
+    : DiagLogLevel.NONE;
+
+  diag.setLogger(
+    {
+      verbose: () => {},
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {}
+    },
+    logLevel
+  );
+};
+
+// Configure diagnostics at module load time
+configureOtelDiagnostics();
 
 // Global SDK instance
 let sdk: NodeSDK | null = null;

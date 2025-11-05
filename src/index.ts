@@ -39,20 +39,8 @@ if (existsSync(envPath)) {
       process.env[key] = value;
       envLoadedCount++;
     }
-
-    // Log success if logging is enabled
-    if (!process.env.MCP_DISABLE_LOGGING) {
-      console.error(
-        `✓ Loaded ${envLoadedCount} environment variables from ${envPath}`
-      );
-    }
   } catch (error) {
     envLoadError = error instanceof Error ? error : new Error(String(error));
-    if (!process.env.MCP_DISABLE_LOGGING) {
-      console.error(
-        `⚠️  Warning loading .env: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
   }
 }
 
@@ -83,26 +71,16 @@ enabledTools.forEach((tool) => {
   tool.installTo(server);
 });
 
-// MCP-compatible logging functions
-// Completely suppress logging when MCP_DISABLE_LOGGING is set (for MCP inspector compatibility)
-function logIfEnabled(level: 'log' | 'warn' | 'error', ...args: unknown[]) {
-  if (!process.env.MCP_DISABLE_LOGGING) {
-    console[level](...args);
-  }
-}
-
 async function main() {
   // Initialize OpenTelemetry tracing if not in test mode
+  let tracingInitialized = false;
   if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
     try {
       await initializeTracing();
-      logIfEnabled(
-        'log',
-        `OpenTelemetry tracing: ${isTracingInitialized() ? 'enabled' : 'disabled'}`
-      );
+      tracingInitialized = isTracingInitialized();
 
       // Record .env loading as a span (retrospectively since it happened before tracing init)
-      if (isTracingInitialized()) {
+      if (tracingInitialized) {
         const tracer = getTracer();
         const span = tracer.startSpan('config.load_env', {
           attributes: {
@@ -134,24 +112,52 @@ async function main() {
         span.end();
       }
     } catch (error) {
-      logIfEnabled('warn', 'Failed to initialize tracing:', error);
+      // Tracing initialization failed, log it but continue without tracing
+      server.server.sendLoggingMessage({
+        level: 'warning',
+        data: `Failed to initialize tracing: ${error instanceof Error ? error.message : String(error)}`
+      });
     }
   }
 
+  // Log tracing status and configuration
+  if (tracingInitialized) {
+    const tracingConfig = {
+      status: 'enabled',
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'not set',
+      serviceName:
+        process.env.OTEL_SERVICE_NAME || 'mapbox-mcp-server (default)'
+    };
+    server.server.sendLoggingMessage({
+      level: 'info',
+      data: `OpenTelemetry tracing enabled - Endpoint: ${tracingConfig.endpoint}, Service: ${tracingConfig.serviceName}`
+    });
+  } else {
+    server.server.sendLoggingMessage({
+      level: 'info',
+      data: 'OpenTelemetry tracing: disabled'
+    });
+  }
+
   // Send MCP logging message about environment variables
-  server.server.sendLoggingMessage({
-    level: 'info',
-    data: 'Environment variables loaded from .env file'
-  });
+  if (envLoadError) {
+    server.server.sendLoggingMessage({
+      level: 'warning',
+      data: `Warning loading .env file: ${envLoadError.message}`
+    });
+  } else if (envLoadedCount > 0) {
+    server.server.sendLoggingMessage({
+      level: 'info',
+      data: `Loaded ${envLoadedCount} environment variables from ${envPath}`
+    });
+  }
 
   const relevantEnvVars = Object.freeze({
     MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN ? '***' : undefined,
     MAPBOX_API_ENDPOINT: process.env.MAPBOX_API_ENDPOINT,
     OTEL_SERVICE_NAME: process.env.OTEL_SERVICE_NAME,
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-    OTEL_EXPORTER_CONSOLE_ENABLED: process.env.OTEL_EXPORTER_CONSOLE_ENABLED,
     OTEL_TRACING_ENABLED: process.env.OTEL_TRACING_ENABLED,
-    MCP_DISABLE_LOGGING: process.env.MCP_DISABLE_LOGGING,
     NODE_ENV: process.env.NODE_ENV
   });
 
@@ -170,15 +176,31 @@ async function shutdown() {
   // Shutdown tracing
   try {
     await shutdownTracing();
-  } catch (e) {
-    logIfEnabled('error', 'Error shutting down tracing:', e);
+  } catch (error) {
+    // Tracing shutdown failed, log via MCP if server is available
+    try {
+      server.server.sendLoggingMessage({
+        level: 'error',
+        data: `Error shutting down tracing: ${error instanceof Error ? error.message : String(error)}`
+      });
+    } catch {
+      // Server not available, ignore
+    }
   }
 
   process.exit(0);
 }
 
 function exitWithLog(message: string, error: unknown, code = 1) {
-  logIfEnabled('error', message, error);
+  // Log error via MCP server if available
+  try {
+    server.server.sendLoggingMessage({
+      level: 'error',
+      data: `${message}: ${error instanceof Error ? error.message : String(error)}`
+    });
+  } catch {
+    // Server not available, ignore
+  }
   process.exit(code);
 }
 
