@@ -1,13 +1,15 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   RetryPolicy,
   HttpPipeline,
-  UserAgentPolicy
+  UserAgentPolicy,
+  TracingPolicy
 } from '../../src/utils/httpPipeline.js';
 import type { Mock } from 'vitest';
+import * as traceApi from '@opentelemetry/api';
 
 function createMockFetch(
   responses: Array<{ status: number; ok?: boolean }>
@@ -263,6 +265,235 @@ describe('HttpPipeline', () => {
 
       expect(userAgentPolicy.id).toBe('custom-ua-id');
       expect(retryPolicy.id).toBe('custom-retry-id');
+    });
+  });
+
+  describe('TracingPolicy', () => {
+    let mockSpan: {
+      setAttribute: Mock;
+    };
+
+    beforeEach(() => {
+      mockSpan = {
+        setAttribute: vi.fn()
+      };
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('captures CloudFront response headers for Mapbox API requests when span is active', async () => {
+      vi.spyOn(traceApi.trace, 'getActiveSpan').mockReturnValue(
+        mockSpan as unknown as traceApi.Span
+      );
+
+      const mockFetch = vi.fn(
+        async (_input: string | URL | Request, _init?: RequestInit) => {
+          const headers = new Headers();
+          headers.set(
+            'x-amz-cf-id',
+            'HsL_E2ZgW72g4tg_ppvpljSFWa2yYcWziQjZ4d7_1czoC7-53UkAdg=='
+          );
+          headers.set('x-amz-cf-pop', 'IAD55-P3');
+          headers.set('x-cache', 'Miss from cloudfront');
+          headers.set('etag', 'W/"21fe5-88gHkqbxd+dMWiCvnvxi2sikhUs"');
+
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers,
+            json: async () => ({})
+          } as Response;
+        }
+      ) as Mock;
+
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
+      pipeline.usePolicy(new TracingPolicy());
+
+      await pipeline.execute('https://api.mapbox.com/geocoding/v5/test', {});
+
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.header.x_amz_cf_id',
+        'HsL_E2ZgW72g4tg_ppvpljSFWa2yYcWziQjZ4d7_1czoC7-53UkAdg=='
+      );
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.header.x_amz_cf_pop',
+        'IAD55-P3'
+      );
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.header.x_cache',
+        'Miss from cloudfront'
+      );
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.header.etag',
+        'W/"21fe5-88gHkqbxd+dMWiCvnvxi2sikhUs"'
+      );
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.status_code',
+        200
+      );
+    });
+
+    it('does not capture headers when span is not active', async () => {
+      vi.spyOn(traceApi.trace, 'getActiveSpan').mockReturnValue(undefined);
+
+      const mockFetch = vi.fn(
+        async (_input: string | URL | Request, _init?: RequestInit) => {
+          const headers = new Headers();
+          headers.set('x-amz-cf-id', 'test-id');
+
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers,
+            json: async () => ({})
+          } as Response;
+        }
+      ) as Mock;
+
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
+      pipeline.usePolicy(new TracingPolicy());
+
+      await pipeline.execute('http://test', {});
+
+      expect(mockSpan.setAttribute).not.toHaveBeenCalled();
+    });
+
+    it('only captures headers that are present in the response', async () => {
+      vi.spyOn(traceApi.trace, 'getActiveSpan').mockReturnValue(
+        mockSpan as unknown as traceApi.Span
+      );
+
+      const mockFetch = vi.fn(
+        async (_input: string | URL | Request, _init?: RequestInit) => {
+          const headers = new Headers();
+          headers.set('x-amz-cf-id', 'test-id');
+          // Only set one header
+
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers,
+            json: async () => ({})
+          } as Response;
+        }
+      ) as Mock;
+
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
+      pipeline.usePolicy(new TracingPolicy());
+
+      await pipeline.execute('https://api.mapbox.com/test', {});
+
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.header.x_amz_cf_id',
+        'test-id'
+      );
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.status_code',
+        200
+      );
+      // Should not call setAttribute for headers that don't exist
+      expect(mockSpan.setAttribute).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not capture Mapbox-specific headers for non-Mapbox URLs', async () => {
+      vi.spyOn(traceApi.trace, 'getActiveSpan').mockReturnValue(
+        mockSpan as unknown as traceApi.Span
+      );
+
+      const mockFetch = vi.fn(
+        async (_input: string | URL | Request, _init?: RequestInit) => {
+          const headers = new Headers();
+          headers.set('x-amz-cf-id', 'should-not-be-captured');
+          headers.set('x-amz-cf-pop', 'IAD55-P3');
+          headers.set('x-cache', 'Hit from cloudfront');
+          headers.set('etag', 'W/"test"');
+
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers,
+            json: async () => ({})
+          } as Response;
+        }
+      ) as Mock;
+
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
+      pipeline.usePolicy(new TracingPolicy());
+
+      await pipeline.execute('https://api.openai.com/v1/chat/completions', {});
+
+      // Should only capture status code, not Mapbox-specific headers
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.status_code',
+        200
+      );
+      expect(mockSpan.setAttribute).toHaveBeenCalledTimes(1);
+
+      // Verify Mapbox headers were NOT captured
+      expect(mockSpan.setAttribute).not.toHaveBeenCalledWith(
+        'http.response.header.x_amz_cf_id',
+        expect.anything()
+      );
+    });
+
+    it('respects MAPBOX_API_ENDPOINT environment variable', async () => {
+      const originalEndpoint = process.env.MAPBOX_API_ENDPOINT;
+      process.env.MAPBOX_API_ENDPOINT = 'https://custom.mapbox.example.com/';
+
+      vi.spyOn(traceApi.trace, 'getActiveSpan').mockReturnValue(
+        mockSpan as unknown as traceApi.Span
+      );
+
+      const mockFetch = vi.fn(
+        async (_input: string | URL | Request, _init?: RequestInit) => {
+          const headers = new Headers();
+          headers.set('x-amz-cf-id', 'custom-endpoint-id');
+
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers,
+            json: async () => ({})
+          } as Response;
+        }
+      ) as Mock;
+
+      const pipeline = new HttpPipeline(mockFetch as unknown as typeof fetch);
+      pipeline.usePolicy(new TracingPolicy());
+
+      await pipeline.execute(
+        'https://custom.mapbox.example.com/test/endpoint',
+        {}
+      );
+
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        'http.response.header.x_amz_cf_id',
+        'custom-endpoint-id'
+      );
+
+      // Restore original
+      if (originalEndpoint) {
+        process.env.MAPBOX_API_ENDPOINT = originalEndpoint;
+      } else {
+        delete process.env.MAPBOX_API_ENDPOINT;
+      }
+    });
+
+    it('generates automatic ID if not provided', () => {
+      const tracingPolicy = new TracingPolicy();
+      expect(tracingPolicy.id).toMatch(/^tracing-\d+-[a-z0-9]+$/);
+    });
+
+    it('uses provided ID when specified', () => {
+      const tracingPolicy = new TracingPolicy('custom-tracing-id');
+      expect(tracingPolicy.id).toBe('custom-tracing-id');
     });
   });
 });

@@ -3,6 +3,7 @@
 
 import { getVersionInfo } from './versionUtils.js';
 import { type HttpRequest } from './types.js';
+import { trace } from '@opentelemetry/api';
 
 function createRandomId(prefix: string): string {
   return `${prefix}${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
@@ -160,12 +161,71 @@ export class RetryPolicy implements HttpPolicy {
   }
 }
 
+export class TracingPolicy implements HttpPolicy {
+  id: string;
+
+  constructor(id?: string) {
+    this.id = id ?? createRandomId('tracing-');
+  }
+
+  async handle(
+    input: string | URL | Request,
+    init: RequestInit,
+    next: HttpRequest
+  ): Promise<Response> {
+    const response = await next(input, init);
+
+    // Capture response headers in the active span
+    const activeSpan = trace.getActiveSpan();
+    if (activeSpan) {
+      // Only capture Mapbox-specific headers for Mapbox API requests
+      const mapboxEndpoint =
+        process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/';
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+
+      if (url && url.startsWith(mapboxEndpoint)) {
+        // Capture Mapbox/CloudFront headers
+        const cfId = response.headers.get('x-amz-cf-id');
+        if (cfId) {
+          activeSpan.setAttribute('http.response.header.x_amz_cf_id', cfId);
+        }
+
+        const cfPop = response.headers.get('x-amz-cf-pop');
+        if (cfPop) {
+          activeSpan.setAttribute('http.response.header.x_amz_cf_pop', cfPop);
+        }
+
+        const xCache = response.headers.get('x-cache');
+        if (xCache) {
+          activeSpan.setAttribute('http.response.header.x_cache', xCache);
+        }
+
+        const etag = response.headers.get('etag');
+        if (etag) {
+          activeSpan.setAttribute('http.response.header.etag', etag);
+        }
+      }
+
+      // Always capture HTTP status for all requests
+      activeSpan.setAttribute('http.response.status_code', response.status);
+    }
+
+    return response;
+  }
+}
+
 const pipeline = new HttpPipeline();
 const versionInfo = getVersionInfo();
 pipeline.usePolicy(
   UserAgentPolicy.fromVersionInfo(versionInfo, 'system-user-agent-policy')
 );
 pipeline.usePolicy(new RetryPolicy(3, 200, 2000, 'system-retry-policy'));
+pipeline.usePolicy(new TracingPolicy('system-tracing-policy'));
 
 export const httpRequest = pipeline.execute.bind(pipeline);
 export const systemHttpPipeline = pipeline;

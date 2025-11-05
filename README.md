@@ -199,31 +199,57 @@ This MCP server includes comprehensive OpenTelemetry tracing for production obse
 ### Quick Demo
 
 ```sh
-# Run tracing demo with console output
-npm run demo:tracing
+# 1. Copy the example configuration
+cp .env.example .env
+
+# 2. Edit .env to add your MAPBOX_ACCESS_TOKEN and configure tracing
+
+# 3. Start Jaeger for local development
+npm run tracing:jaeger:start
+
+# 4. Run the server (it will automatically use .env configuration)
+npm run inspect:build
+
+# 5. View traces at http://localhost:16686
+
+# 6. Stop Jaeger when done
+npm run tracing:jaeger:stop
 ```
 
-### Testing with Tracing
+**Note:** The server automatically loads configuration from your `.env` file at startup. The `.env.example` file includes configuration examples for multiple observability platforms.
 
-```sh
-# Run tests with tracing enabled
-npm run test:tracing
-```
+### Supported Observability Platforms
+
+Configuration examples included in `.env.example` for:
+
+**Cloud Providers:**
+
+- ☁️ AWS X-Ray
+- ☁️ Azure Monitor (Application Insights)
+- ☁️ Google Cloud Trace
+
+**SaaS Platforms:**
+
+- 📊 Datadog
+- 📊 New Relic
+- 📊 Honeycomb
+- 📊 Any OTLP-compatible backend
 
 ### Production Configuration
 
 See [docs/tracing.md](./docs/tracing.md) for complete setup instructions including:
 
-- 🔧 Environment variable configuration
-- 📊 Supported backends (Jaeger, AWS X-Ray, Google Cloud, etc.)
+- 🔧 Platform-specific configuration guides
+- 📊 Authentication and endpoint setup
 - 🎯 Custom trace attributes and context
 - 🚀 Performance optimization (minimal overhead)
 - 🔍 Troubleshooting and debugging
 
 **Tracing Features:**
 
+- ✅ Configuration loading tracing (.env file loading)
 - ✅ Automatic tool execution tracing
-- ✅ HTTP request instrumentation
+- ✅ HTTP request instrumentation with CloudFront correlation IDs
 - ✅ Configurable exporters (console, OTLP)
 - ✅ Security-conscious (data protection, JWT validation)
 - ✅ Production-ready (<1% CPU overhead)
