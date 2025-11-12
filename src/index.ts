@@ -13,6 +13,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import { getAllTools } from './tools/toolRegistry.js';
+import { getAllResources } from './resources/resourceRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import {
   initializeTracing,
@@ -53,6 +54,9 @@ const config = parseToolConfigFromArgs();
 const allTools = getAllTools();
 const enabledTools = filterTools(allTools, config);
 
+// Get all resources
+const allResources = getAllResources();
+
 // Create an MCP server
 const server = new McpServer(
   {
@@ -61,7 +65,8 @@ const server = new McpServer(
   },
   {
     capabilities: {
-      tools: {}
+      tools: {},
+      resources: {}
     }
   }
 );
@@ -69,6 +74,11 @@ const server = new McpServer(
 // Register enabled tools to the server
 enabledTools.forEach((tool) => {
   tool.installTo(server);
+});
+
+// Register all resources to the server
+allResources.forEach((resource) => {
+  resource.installTo(server);
 });
 
 async function main() {
