@@ -15,7 +15,9 @@ The `smolagents_example.py` script shows a simple but powerful implementation of
 
 ## Prerequisites
 
-- Python with `smolagents` and `mcp` packages installed: `pip install 'smolagents[mcp]'`
+- Python with `smolagents` and `mcp` packages installed:
+  - Option 1: `pip install 'smolagents[mcp]'`
+  - Option 2: `pip install -r requirements.txt` (from this directory)
 - A Mapbox access token (set as an environment variable)
 - Node.js or docker (to run the MCP server)
 
@@ -46,6 +48,8 @@ The script demonstrates different ways to configure language models:
 5. **OpenAI**: For OpenAI's models
 
 It connects to the Mapbox MCP server, which exposes Mapbox's functionality as tools that the AI agent can use to answer location-based questions.
+
+**Important:** The example uses `structured_output=True` when connecting to MCP, which enables smolagents to properly handle the structured data returned by Mapbox tools. This allows the agent to work with complex data structures like directions, geocoding results, and map features more effectively.
 
 ## Getting Started
 
