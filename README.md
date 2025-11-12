@@ -44,6 +44,7 @@ For more information about Mapbox access tokens, see the [Mapbox documentation o
 For detailed setup instructions for different integrations, refer to the following guides:
 
 - [Claude Desktop Setup](./docs/claude-desktop-setup.md) - Instructions for configuring Claude Desktop to work with this MCP server
+- [Goose Setup](./docs/goose-setup.md) - Setting up Goose AI agent framework with MCP-UI support
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
@@ -155,6 +156,8 @@ node dist/esm/index.js --disable-mcp-ui
   }
 }
 ```
+
+**For more detailed information**, including compatible clients, technical implementation details, and troubleshooting, see the [MCP-UI documentation](./docs/mcp-ui.md).
 
 ## Tools
 
