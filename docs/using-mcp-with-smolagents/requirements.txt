@@ -1,0 +1,5 @@
+# Dependencies for using Mapbox MCP server with smolagents
+# Install with: pip install -r requirements.txt
+
+# smolagents with MCP support (includes mcp SDK)
+smolagents[mcp]
