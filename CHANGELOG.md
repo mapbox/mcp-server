@@ -1,3 +1,29 @@
+## 0.7.0
+
+### Features Added
+
+- **MCP Resources Support**: Added native MCP resource API support
+
+  - Introduced `CategoryListResource` exposing category lists as `mapbox://categories` resource
+  - Supports localized category lists via URI pattern `mapbox://categories/{language}` (e.g., `mapbox://categories/ja` for Japanese)
+  - Created base resource infrastructure (`BaseResource`, `MapboxApiBasedResource`) for future resource implementations
+  - Added `ResourceReaderTool` as fallback for clients without native resource support
+  - Enables more efficient access to static reference data without tool calls
+
+- **MCP-UI Support**: Added rich UI embedding for compatible MCP clients
+  - `StaticMapImageTool` now returns both image data and an embeddable iframe URL
+  - Enables inline map visualization in compatible clients (e.g., Goose)
+  - Fully backwards compatible - clients without MCP-UI support continue working unchanged
+  - Enabled by default, can be disabled via `ENABLE_MCP_UI=false` env var or `--disable-mcp-ui` flag
+  - Added `@mcp-ui/server@^5.13.1` dependency
+  - Configuration helper functions in `toolConfig.ts`
+
+### Deprecations
+
+- **CategoryListTool**: Marked as deprecated in favor of the new `mapbox://categories` resource
+  - Tool remains functional for backward compatibility
+  - Users are encouraged to migrate to either the native resource API or `resource_reader_tool`
+
 ## 0.6.1
 
 ### Other

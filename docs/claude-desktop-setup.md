@@ -126,3 +126,14 @@ Once configured, you can use any of the Mapbox tools directly in your Claude con
 ![Example prompt](images/mapbox-tool-example-usage.png)
 
 Note, the results can vary based on current traffic conditions and exact values of parameters used.
+
+## MCP-UI Support
+
+Claude Desktop does not currently support the MCP-UI specification for embedded interactive elements. When you use tools like `static_map_image_tool`, you'll receive:
+
+- ✅ **Base64-encoded map images** that Claude can display
+- ❌ **Interactive iframe embeds** (not supported by Claude Desktop)
+
+The server is fully backwards compatible - all tools work normally, you just won't see interactive map embeds. If you're interested in using MCP-UI features with inline map visualization, consider trying [Goose](https://github.com/block/goose), which supports MCP-UI.
+
+For more information about MCP-UI support in this server, see the [MCP-UI documentation](mcp-ui.md).

@@ -44,6 +44,7 @@ For more information about Mapbox access tokens, see the [Mapbox documentation o
 For detailed setup instructions for different integrations, refer to the following guides:
 
 - [Claude Desktop Setup](./docs/claude-desktop-setup.md) - Instructions for configuring Claude Desktop to work with this MCP server
+- [Goose Setup](./docs/goose-setup.md) - Setting up Goose AI agent framework with MCP-UI support
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
@@ -83,11 +84,109 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 - Include time constraints when relevant ("during rush hour", "at 3 PM")
 - Ask for specific output formats when needed ("as a map image", "in JSON format")
 
+## Resources
+
+The MCP server exposes static reference data as **MCP resources**. Resources provide read-only access to data that clients can reference directly without making tool calls.
+
+### Available Resources
+
+#### Mapbox Categories Resource
+
+**URI Pattern**: `mapbox://categories` or `mapbox://categories/{language}`
+
+Access the complete list of available category IDs for use with the category search tool. Categories can be used to filter search results by type (e.g., "restaurant", "hotel", "gas_station").
+
+**Examples**:
+
+- `mapbox://categories` - Default (English) category list
+- `mapbox://categories/ja` - Japanese category names
+- `mapbox://categories/es` - Spanish category names
+
+**Accessing Resources**:
+
+- **Clients with native MCP resource support**: Use the `resources/read` MCP protocol method
+- **Clients without resource support**: Use the `resource_reader_tool` with the resource URI
+
+## MCP-UI Support
+
+This MCP server supports **MCP-UI**, an open specification that allows compatible clients to render interactive UI elements like embedded iframes. This provides a richer visual experience while maintaining full backwards compatibility with clients that don't support MCP-UI.
+
+### What is MCP-UI?
+
+MCP-UI enables tools to return interactive UI resources alongside their standard output. Compatible clients can render these as embedded iframes, while clients without MCP-UI support simply ignore them and use the standard output.
+
+### Supported Tools
+
+- **Static Map Image Tool**: Returns both image data and an embeddable iframe URL for inline map visualization
+
+### Benefits
+
+- **Enhanced Experience**: Compatible clients (e.g., Goose) can display maps inline without leaving the chat
+- **Backwards Compatible**: Non-supporting clients (e.g., Claude Desktop) continue working unchanged
+- **No Configuration Required**: MCP-UI is enabled by default
+
+### Configuration
+
+MCP-UI is **enabled by default**. To disable it:
+
+**Via Environment Variable:**
+
+```bash
+ENABLE_MCP_UI=false npm run build
+```
+
+**Via Command-Line Flag:**
+
+```bash
+node dist/esm/index.js --disable-mcp-ui
+```
+
+**In Claude Desktop config:**
+
+```json
+{
+  "mcpServers": {
+    "mapbox": {
+      "command": "npx",
+      "args": ["-y", "@mapbox/mcp-server", "--disable-mcp-ui"],
+      "env": {
+        "MAPBOX_ACCESS_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
+```
+
+**For more detailed information**, including compatible clients, technical implementation details, and troubleshooting, see the [MCP-UI documentation](./docs/mcp-ui.md).
+
 ## Tools
 
-### Mapbox API tools
+### Utility Tools
 
-#### Matrix tool
+#### Resource Reader Tool
+
+Provides access to MCP resources for clients that don't support the native MCP resource API. Use this tool to read resources like the category list.
+
+**Parameters**:
+
+- `uri`: The resource URI to read (e.g., `mapbox://categories`, `mapbox://categories/ja`)
+
+**Example Usage**:
+
+- Read default categories: `{"uri": "mapbox://categories"}`
+- Read Japanese categories: `{"uri": "mapbox://categories/ja"}`
+
+**Note**: If your MCP client supports native resources, prefer using the resource API directly for better performance.
+
+### Mapbox API Tools
+
+#### Category List Tool (Deprecated)
+
+**⚠️ Deprecated**: Use the `resource_reader_tool` with URI `mapbox://categories` instead, or access the `mapbox://categories` resource directly if your client supports MCP resources.
+
+This tool is maintained for backward compatibility with clients that don't support MCP resources or the resource_reader_tool.
+
+#### Matrix Tool
 
 Calculates travel times and distances between multiple points using [Mapbox Matrix API](https://www.mapbox.com/matrix-api). Features include:
 

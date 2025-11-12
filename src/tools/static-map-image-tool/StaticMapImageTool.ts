@@ -2,11 +2,13 @@
 // Licensed under the MIT License.
 
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
 
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
@@ -120,14 +122,33 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
-    return {
-      content: [
-        {
-          type: 'image',
-          data: base64Data,
-          mimeType
+    // Build content array with image data
+    const content: CallToolResult['content'] = [
+      {
+        type: 'image',
+        data: base64Data,
+        mimeType
+      }
+    ];
+
+    // Conditionally add MCP-UI resource if enabled
+    if (isMcpUiEnabled()) {
+      const uiResource = createUIResource({
+        uri: `ui://mapbox/static-map/${input.style}/${lng},${lat},${input.zoom}`,
+        content: {
+          type: 'externalUrl',
+          iframeUrl: url
+        },
+        encoding: 'text',
+        uiMetadata: {
+          'preferred-frame-size': [`${width}px`, `${height}px`]
         }
-      ],
+      });
+      content.push(uiResource);
+    }
+
+    return {
+      content,
       isError: false
     };
   }

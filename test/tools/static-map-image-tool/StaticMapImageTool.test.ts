@@ -30,31 +30,44 @@ describe('StaticMapImageTool', () => {
   });
 
   it('returns image content with base64 data', async () => {
-    // Mock image buffer
-    const mockImageBuffer = Buffer.from('fake-image-data');
-    const mockArrayBuffer = mockImageBuffer.buffer.slice(
-      mockImageBuffer.byteOffset,
-      mockImageBuffer.byteOffset + mockImageBuffer.byteLength
-    );
+    // Disable MCP-UI for this test to focus on image data only
+    const originalEnv = process.env.ENABLE_MCP_UI;
+    process.env.ENABLE_MCP_UI = 'false';
 
-    const { httpRequest } = setupHttpRequest({
-      arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
-    });
+    try {
+      // Mock image buffer
+      const mockImageBuffer = Buffer.from('fake-image-data');
+      const mockArrayBuffer = mockImageBuffer.buffer.slice(
+        mockImageBuffer.byteOffset,
+        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
+      );
 
-    const result = await new StaticMapImageTool({ httpRequest }).run({
-      center: { longitude: -74.006, latitude: 40.7128 },
-      zoom: 10,
-      size: { width: 800, height: 600 },
-      style: 'mapbox/satellite-v9'
-    });
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
+      });
 
-    expect(result.isError).toBe(false);
-    expect(result.content).toHaveLength(1);
-    expect(result.content[0]).toMatchObject({
-      type: 'image',
-      data: mockImageBuffer.toString('base64'),
-      mimeType: 'image/jpeg' // satellite is a raster style
-    });
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 10,
+        size: { width: 800, height: 600 },
+        style: 'mapbox/satellite-v9'
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0]).toMatchObject({
+        type: 'image',
+        data: mockImageBuffer.toString('base64'),
+        mimeType: 'image/jpeg' // satellite is a raster style
+      });
+    } finally {
+      // Restore environment variable
+      if (originalEnv !== undefined) {
+        process.env.ENABLE_MCP_UI = originalEnv;
+      } else {
+        delete process.env.ENABLE_MCP_UI;
+      }
+    }
   });
 
   it('constructs correct Mapbox Static API URL', async () => {
@@ -536,6 +549,110 @@ describe('StaticMapImageTool', () => {
       expect(calledUrl).toContain('pin-s-restaurant+0000ff(-74.006,40.7128)');
       expect(calledUrl).toContain('pin-l-hospital+ff0000(-74.01,40.71)');
       expect(calledUrl).toContain('pin-s-bicycle+00ff00(-74.005,40.715)');
+    });
+  });
+
+  describe('MCP-UI support', () => {
+    it('includes UIResource when MCP-UI is enabled (default)', async () => {
+      // Mock image buffer
+      const mockImageBuffer = Buffer.from('fake-image-data');
+      const mockArrayBuffer = mockImageBuffer.buffer.slice(
+        mockImageBuffer.byteOffset,
+        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
+      );
+
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
+      });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12'
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content).toHaveLength(2); // image + UIResource
+      expect(result.content[0].type).toBe('image');
+      expect(result.content[1].type).toBe('resource');
+      if (result.content[1].type === 'resource') {
+        expect(result.content[1].resource.uri).toMatch(
+          /^ui:\/\/mapbox\/static-map\//
+        );
+      }
+    });
+
+    it('does not include UIResource when MCP-UI is disabled', async () => {
+      // Set environment variable to disable MCP-UI
+      const originalEnv = process.env.ENABLE_MCP_UI;
+      process.env.ENABLE_MCP_UI = 'false';
+
+      try {
+        // Mock image buffer
+        const mockImageBuffer = Buffer.from('fake-image-data');
+        const mockArrayBuffer = mockImageBuffer.buffer.slice(
+          mockImageBuffer.byteOffset,
+          mockImageBuffer.byteOffset + mockImageBuffer.byteLength
+        );
+
+        const { httpRequest } = setupHttpRequest({
+          arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
+        });
+
+        const result = await new StaticMapImageTool({ httpRequest }).run({
+          center: { longitude: -74.006, latitude: 40.7128 },
+          zoom: 12,
+          size: { width: 600, height: 400 },
+          style: 'mapbox/streets-v12'
+        });
+
+        expect(result.isError).toBe(false);
+        expect(result.content).toHaveLength(1); // image only, no UIResource
+        expect(result.content[0].type).toBe('image');
+      } finally {
+        // Restore environment variable
+        if (originalEnv !== undefined) {
+          process.env.ENABLE_MCP_UI = originalEnv;
+        } else {
+          delete process.env.ENABLE_MCP_UI;
+        }
+      }
+    });
+
+    it('UIResource includes correct iframe URL and dimensions', async () => {
+      // Mock image buffer
+      const mockImageBuffer = Buffer.from('fake-image-data');
+      const mockArrayBuffer = mockImageBuffer.buffer.slice(
+        mockImageBuffer.byteOffset,
+        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
+      );
+
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
+      });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -122.4194, latitude: 37.7749 },
+        zoom: 13,
+        size: { width: 800, height: 600 },
+        style: 'mapbox/satellite-streets-v12'
+      });
+
+      expect(result.isError).toBe(false);
+      if (result.content[1]?.type === 'resource') {
+        expect(result.content[1].resource.uri).toContain(
+          '-122.4194,37.7749,13'
+        );
+        // Check that UIMetadata has preferred dimensions
+        if ('uiMetadata' in result.content[1].resource) {
+          const metadata = result.content[1].resource.uiMetadata as Record<
+            string,
+            unknown
+          >;
+          expect(metadata['preferred-frame-size']).toEqual(['800px', '600px']);
+        }
+      }
     });
   });
 });

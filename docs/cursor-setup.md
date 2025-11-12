@@ -76,3 +76,12 @@ docker build -t mapbox-mcp-server .
      ```
 
    3. Click "Save" to apply the configuration.
+
+## MCP-UI Support
+
+Cursor IDE does not currently support the MCP-UI specification for embedded interactive elements. When you use tools like `static_map_image_tool`, you'll receive:
+
+- ✅ **Base64-encoded map images** that Cursor can display
+- ❌ **Interactive iframe embeds** (not supported by Cursor IDE)
+
+The server is fully backwards compatible - all tools work normally, you just won't see interactive map embeds. For more information about MCP-UI support in this server, see the [MCP-UI documentation](mcp-ui.md).

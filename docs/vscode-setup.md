@@ -91,3 +91,12 @@ You might need to restart VS Code. You should see Mapbox Server appear in tools 
 ![Example prompt](images/vscode-tool-example-usage.png)
 
 Note, the results can vary based on current traffic conditions and exact values of parameters used.
+
+## MCP-UI Support
+
+VS Code does not currently support the MCP-UI specification for embedded interactive elements. When you use tools like `static_map_image_tool`, you'll receive:
+
+- ✅ **Base64-encoded map images** that VS Code can display
+- ❌ **Interactive iframe embeds** (not supported by VS Code)
+
+The server is fully backwards compatible - all tools work normally, you just won't see interactive map embeds. For more information about MCP-UI support in this server, see the [MCP-UI documentation](mcp-ui.md).
