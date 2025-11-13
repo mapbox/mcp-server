@@ -1,0 +1,26 @@
+# LangChain - Core library with agents
+langchain
+
+# LangGraph - AI workflow framework
+langgraph
+
+# MCP adapter for LangChain/LangGraph
+langchain-mcp-adapters
+
+# Model Context Protocol SDK
+mcp
+
+# Optional: For using different LLM providers
+# Uncomment based on your needs:
+
+# OpenAI (enabled by default as example uses it)
+langchain-openai
+
+# Anthropic
+langchain-anthropic
+
+# Environment variables
+python-dotenv
+
+# Web UI (for warsaw_gradio.py)
+gradio

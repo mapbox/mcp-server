@@ -1,0 +1,24 @@
+# CrewAI - Multi-agent orchestration framework
+crewai
+
+# MCP support for CrewAI
+mcp
+
+# Optional: CrewAI tools with MCP support
+# crewai-tools[mcp]
+
+# Environment variables
+python-dotenv
+
+# Web UI (for warsaw_gradio.py)
+gradio
+
+# Optional: Additional LLM providers
+# OpenAI (default)
+# openai>=1.0.0
+
+# Anthropic
+# anthropic>=0.21.0
+
+# Google Gemini
+# google-generativeai>=0.3.0

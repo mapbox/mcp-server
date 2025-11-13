@@ -1,0 +1,20 @@
+# Pydantic AI - Type-safe AI framework (includes MCP support)
+pydantic-ai
+
+# Model Context Protocol SDK
+mcp
+
+# Optional: For using different LLM providers
+# Uncomment based on your needs:
+
+# OpenAI (enabled by default as example uses it)
+pydantic-ai[openai]
+
+# Anthropic
+pydantic-ai[anthropic]
+
+# Environment variables
+python-dotenv
+
+# Web UI (for warsaw_gradio.py)
+gradio
