@@ -121,19 +121,12 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     // Hard code limit to 10
     url.searchParams.append('limit', '10');
 
+    // Add proximity if provided (API defaults to IP-based location when omitted)
     if (input.proximity) {
-      if (input.proximity === 'ip') {
-        url.searchParams.append('proximity', 'ip');
-      } else if (Array.isArray(input.proximity)) {
-        const [lng, lat] = input.proximity;
-        url.searchParams.append('proximity', `${lng},${lat}`);
-      } else {
-        // Object format with longitude/latitude properties
-        url.searchParams.append(
-          'proximity',
-          `${input.proximity.longitude},${input.proximity.latitude}`
-        );
-      }
+      url.searchParams.append(
+        'proximity',
+        `${input.proximity.longitude},${input.proximity.latitude}`
+      );
     }
 
     if (input.bbox) {

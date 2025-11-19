@@ -114,13 +114,12 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       url.searchParams.append('limit', input.limit.toString());
     }
 
+    // Add proximity if provided (API defaults to IP-based location when omitted)
     if (input.proximity) {
-      if (input.proximity === 'ip') {
-        url.searchParams.append('proximity', 'ip');
-      } else {
-        const { longitude, latitude } = input.proximity;
-        url.searchParams.append('proximity', `${longitude},${latitude}`);
-      }
+      url.searchParams.append(
+        'proximity',
+        `${input.proximity.longitude},${input.proximity.latitude}`
+      );
     }
 
     if (input.bbox) {

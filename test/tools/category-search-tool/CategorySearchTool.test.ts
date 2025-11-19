@@ -66,52 +66,27 @@ describe('CategorySearchTool', () => {
     expect(calledUrl).toContain('poi_category_exclusions=motel%2Chostel');
   });
 
-  it('handles IP-based proximity', async () => {
+  it('does not include proximity parameter when not provided', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+
+    await new CategorySearchTool({ httpRequest }).run({
+      category: 'gas_station'
+    });
+
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
+    expect(calledUrl).not.toContain('proximity=');
+  });
+
+  it('includes proximity parameter when coordinates are provided', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
     await new CategorySearchTool({ httpRequest }).run({
       category: 'gas_station',
-      proximity: 'ip'
+      proximity: { longitude: -122.4194, latitude: 37.7749 }
     });
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=ip');
-  });
-
-  it('handles string format proximity coordinates', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
-
-    await new CategorySearchTool({ httpRequest }).run({
-      category: 'restaurant',
-      proximity: '-82.451668,27.942976'
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=-82.451668%2C27.942976');
-  });
-
-  it('handles array-like string format proximity', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
-
-    await new CategorySearchTool({ httpRequest }).run({
-      category: 'restaurant',
-      proximity: '[-82.451668, 27.942964]'
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=-82.451668%2C27.942964');
-  });
-
-  it('handles JSON-stringified object format proximity', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
-
-    await new CategorySearchTool({ httpRequest }).run({
-      category: 'taco_shop',
-      proximity: '{"longitude": -82.458107, "latitude": 27.937259}'
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=-82.458107%2C27.937259');
+    expect(calledUrl).toContain('proximity=-122.4194%2C37.7749');
   });
 
   it('uses default limit when not specified', async () => {

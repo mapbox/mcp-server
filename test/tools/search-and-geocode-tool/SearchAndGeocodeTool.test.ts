@@ -74,40 +74,27 @@ describe('SearchAndGeocodeTool', () => {
     expect(calledUrl).toContain('origin=-74%2C40.7');
   });
 
-  it('handles IP-based proximity', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+  it('does not include proximity parameter when not provided', async () => {
+    const { mockHttpRequest, httpRequest } = setupHttpRequest();
 
     await new SearchAndGeocodeTool({ httpRequest }).run({
-      q: 'pizza',
-      proximity: 'ip'
+      q: 'pizza'
     });
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=ip');
+    expect(calledUrl).not.toContain('proximity=');
   });
 
-  it('handles string format proximity coordinates', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+  it('includes proximity parameter when coordinates are provided', async () => {
+    const { mockHttpRequest, httpRequest } = setupHttpRequest();
 
     await new SearchAndGeocodeTool({ httpRequest }).run({
       q: 'museum',
-      proximity: '-82.451668,27.942976'
+      proximity: { longitude: -82.451668, latitude: 27.942976 }
     });
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('proximity=-82.451668%2C27.942976');
-  });
-
-  it('handles array-like string format proximity', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
-
-    await new SearchAndGeocodeTool({ httpRequest }).run({
-      q: 'bank',
-      proximity: '[-82.451668, 27.942964]'
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=-82.451668%2C27.942964');
   });
 
   it('uses hard-coded limit of 10', async () => {
@@ -244,34 +231,6 @@ describe('SearchAndGeocodeTool', () => {
     expect(textContent).toContain('1. Central Park (The Central Park)');
     expect(textContent).toContain('Address: Central Park, New York, NY');
     expect(textContent).toContain('Coordinates: 40.782, -73.965');
-  });
-
-  it('supports proximity=ip for IP-based location', async () => {
-    const mockResponse = {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          properties: { name: 'Local Coffee Shop' },
-          geometry: {
-            type: 'Point',
-            coordinates: [-74.006, 40.7128]
-          }
-        }
-      ]
-    };
-
-    const { httpRequest, mockHttpRequest } = setupHttpRequest({
-      json: async () => mockResponse
-    });
-
-    await new SearchAndGeocodeTool({ httpRequest }).run({
-      q: 'Starbucks',
-      proximity: 'ip'
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('proximity=ip');
   });
 
   it('formats GeoJSON response to text with basic information', async () => {
@@ -427,21 +386,6 @@ describe('SearchAndGeocodeTool', () => {
       tool.run({
         q: 'test',
         country: ['USA'] // Should be 'US'
-      })
-    ).resolves.toMatchObject({
-      isError: true
-    });
-  });
-
-  it('handles invalid proximity format', async () => {
-    const { httpRequest } = setupHttpRequest();
-    const tool = new SearchAndGeocodeTool({ httpRequest });
-
-    // Test invalid proximity string format
-    await expect(
-      tool.run({
-        q: 'test',
-        proximity: 'invalid-format'
       })
     ).resolves.toMatchObject({
       isError: true
