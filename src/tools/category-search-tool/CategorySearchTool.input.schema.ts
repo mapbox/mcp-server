@@ -19,58 +19,13 @@ export const CategorySearchInputSchema = z.object({
     .default(10)
     .describe('Maximum number of results to return (1-25)'),
   proximity: z
-    .union([
-      z.object({
-        longitude: z.number().min(-180).max(180),
-        latitude: z.number().min(-90).max(90)
-      }),
-      z.string().transform((val) => {
-        // Handle special case of 'ip'
-        if (val === 'ip') {
-          return 'ip' as const;
-        }
-        // Handle JSON-stringified object: "{\"longitude\": -82.458107, \"latitude\": 27.937259}"
-        if (val.startsWith('{') && val.endsWith('}')) {
-          // Reject if over 200 characters
-          if (val.length > 200) {
-            throw new Error(
-              'Proximity JSON string too large. Only latitude/longitude pairs are allowed.'
-            );
-          }
-
-          const parsed = JSON.parse(val);
-          if (
-            typeof parsed === 'object' &&
-            parsed !== null &&
-            typeof parsed.longitude === 'number' &&
-            typeof parsed.latitude === 'number'
-          ) {
-            return { longitude: parsed.longitude, latitude: parsed.latitude };
-          }
-        }
-        // Handle string that looks like an array: "[-82.451668, 27.942964]"
-        if (val.startsWith('[') && val.endsWith(']')) {
-          const coords = val
-            .slice(1, -1)
-            .split(',')
-            .map((s) => Number(s.trim()));
-          if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-            return { longitude: coords[0], latitude: coords[1] };
-          }
-        }
-        // Handle comma-separated string: "-82.451668,27.942964"
-        const parts = val.split(',').map((s) => Number(s.trim()));
-        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-          return { longitude: parts[0], latitude: parts[1] };
-        }
-        throw new Error(
-          'Invalid proximity format. Expected {longitude, latitude}, "longitude,latitude", or "ip"'
-        );
-      })
-    ])
+    .object({
+      longitude: z.number().min(-180).max(180),
+      latitude: z.number().min(-90).max(90)
+    })
     .optional()
     .describe(
-      'Location to bias results towards. Either coordinate object with longitude and latitude or "ip" for IP-based location'
+      'Location to bias results towards as {longitude, latitude}. If not provided, defaults to IP-based location.'
     ),
   bbox: bboxSchema
     .describe('Bounding box to limit results within specified bounds')

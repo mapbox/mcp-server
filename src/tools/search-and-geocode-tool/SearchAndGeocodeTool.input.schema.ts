@@ -16,39 +16,13 @@ export const SearchAndGeocodeInputSchema = z.object({
       'ISO language code for the response (e.g., "en", "es", "fr", "de", "ja")'
     ),
   proximity: z
-    .union([
-      z.object({
-        longitude: z.number().min(-180).max(180),
-        latitude: z.number().min(-90).max(90)
-      }),
-      z.string().transform((val) => {
-        // Handle special case of 'ip'
-        if (val === 'ip') {
-          return 'ip' as const;
-        }
-        // Handle string that looks like an array: "[-82.451668, 27.942964]"
-        if (val.startsWith('[') && val.endsWith(']')) {
-          const coords = val
-            .slice(1, -1)
-            .split(',')
-            .map((s) => Number(s.trim()));
-          if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-            return coords as [number, number];
-          }
-        }
-        // Handle comma-separated string: "-82.451668,27.942964"
-        const parts = val.split(',').map((s) => Number(s.trim()));
-        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-          return parts as [number, number];
-        }
-        throw new Error(
-          'Invalid proximity format. Expected [longitude, latitude], "longitude,latitude", or "ip"'
-        );
-      })
-    ])
+    .object({
+      longitude: z.number().min(-180).max(180),
+      latitude: z.number().min(-90).max(90)
+    })
     .optional()
     .describe(
-      'Location to bias results towards. Either [longitude, latitude] or "ip" for IP-based location. STRONGLY ENCOURAGED for relevant results.'
+      'Location to bias results towards as {longitude, latitude}. If not provided, defaults to IP-based location. STRONGLY ENCOURAGED for relevant results.'
     ),
   bbox: bboxSchema
     .optional()
