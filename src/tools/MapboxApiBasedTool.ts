@@ -109,11 +109,7 @@ export abstract class MapboxApiBasedTool<
       const result = await context.with(
         trace.setSpan(context.active(), toolContext.span),
         async () => {
-          return await this.execute(
-            input,
-            MapboxApiBasedTool.mapboxAccessToken!,
-            toolContext!
-          );
+          return await this.execute(input, accessToken, toolContext!);
         }
       );
 
