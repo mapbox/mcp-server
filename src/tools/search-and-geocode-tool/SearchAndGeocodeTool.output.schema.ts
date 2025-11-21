@@ -96,7 +96,7 @@ const SearchBoxFeaturePropertiesSchema = z.object({
   poi_category: z.array(z.string()).optional(),
   poi_category_ids: z.array(z.string()).optional(),
   brand: z.array(z.string()).optional(),
-  brand_id: z.string().optional(),
+  brand_id: z.union([z.string(), z.array(z.string())]).optional(),
   external_ids: z.record(z.string()).optional(),
 
   // Additional metadata
