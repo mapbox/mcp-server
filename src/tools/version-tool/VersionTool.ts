@@ -43,7 +43,9 @@ export class VersionTool extends BaseTool<
           const versionText = `MCP Server Version Information:\n- Name: ${versionInfo.name}\n- Version: ${versionInfo.version}\n- SHA: ${versionInfo.sha}\n- Tag: ${versionInfo.tag}\n- Branch: ${versionInfo.branch}`;
 
           // Validate with graceful fallback
-          const validatedVersionInfo = this.validateOutput(versionInfo);
+          const validatedVersionInfo = this.validateOutput(
+            versionInfo
+          ) as Record<string, unknown>;
 
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
