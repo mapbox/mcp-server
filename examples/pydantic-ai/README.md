@@ -86,6 +86,74 @@ python pydantic_ai_example.py
 
 **Note**: Remember to activate the virtual environment (`source venv/bin/activate`) whenever you work on this example.
 
+## Additional Examples
+
+### Gradio Web Interfaces
+
+This directory includes several Gradio-based web interfaces for interactive demos:
+
+#### 1. `warsaw_example.py` - Warsaw Tour Guide (CLI)
+
+Basic command-line example that demonstrates using Pydantic AI with the Mapbox MCP server.
+
+```bash
+python warsaw_example.py
+```
+
+#### 2. `warsaw_gradio.py` - Simple Chat Interface
+
+A basic Gradio chat interface for the Warsaw tour guide.
+
+```bash
+pip install gradio
+python warsaw_gradio.py
+```
+
+#### 3. `warsaw_gradio_blocks.py` - Enhanced UI with Static Maps
+
+An enhanced Gradio interface that displays static map images alongside chat responses.
+
+```bash
+python warsaw_gradio_blocks.py
+```
+
+#### 4. `warsaw_gradio_blocks_interactive.py` - Interactive Map Control
+
+A side-by-side interface with real-time map control, similar to the Mastra example but in Python/Gradio:
+
+```bash
+python warsaw_gradio_blocks_interactive.py
+```
+
+**Important**: This example requires a **public Mapbox token** (starts with `pk.`) for the browser-based map:
+
+```bash
+# Add to your .env file
+MAPBOX_PUBLIC_TOKEN=pk.your_public_token_here
+```
+
+Get a public token at: https://account.mapbox.com/access-tokens/
+
+**Features:**
+
+- Interactive Mapbox GL JS map embedded in the interface
+- Real-time map control (fly to locations, add markers, draw routes)
+- Side-by-side chat and map layout
+- Agent generates map commands that are executed in JavaScript
+
+**How it works:**
+
+1. The agent receives user queries and uses Mapbox MCP tools to find locations
+2. Agent generates structured `MAP_COMMANDS` in its response
+3. Python extracts these commands and passes them to the JavaScript map
+4. The map updates in real-time based on the commands
+
+**Example queries:**
+
+- "Show me the Palace of Culture and Science"
+- "Get directions from Old Town to Royal Castle"
+- "Fly to Lazienki Park"
+
 ## Usage
 
 ### Basic Usage
@@ -395,6 +463,20 @@ pip install -r requirements.txt
 
 - Make sure you've set the environment variable
 - Check that the variable is exported in your current shell
+
+**Interactive map not loading (warsaw_gradio_blocks_interactive.py)**
+
+The interactive map requires a **public Mapbox token** (different from your regular token):
+
+- Public tokens start with `pk.` and are safe to use in browsers
+- Regular tokens may start with `sk.` and should only be used server-side
+- Get a public token at: https://account.mapbox.com/access-tokens/
+- Add it to your `.env` file: `MAPBOX_PUBLIC_TOKEN=pk.your_token_here`
+
+**Why two tokens?**
+
+- `MAPBOX_ACCESS_TOKEN`: Used by the MCP server (server-side, private)
+- `MAPBOX_PUBLIC_TOKEN`: Used by the browser map (client-side, public)
 
 **Error: "MCP server timeout"**
 

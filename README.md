@@ -84,6 +84,59 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 - Include time constraints when relevant ("during rush hour", "at 3 PM")
 - Ask for specific output formats when needed ("as a map image", "in JSON format")
 
+## Prompts
+
+The MCP server provides **MCP prompts** - pre-built prompt templates that help guide common geospatial workflows. Prompts appear in MCP clients (like Claude Desktop) and provide structured guidance for multi-step tasks.
+
+### Available Prompts
+
+#### Find Places Nearby
+
+**Name**: `find-places-nearby`
+
+Helps you search for specific types of places near a location with optional map visualization.
+
+**Arguments**:
+
+- `location` (required): The location to search near (address, landmark, or coordinates)
+- `category` (optional): Type of place to find (e.g., "restaurant", "hotel", "gas_station", "coffee")
+
+**Example**: Find coffee shops near the Eiffel Tower, or discover hotels in downtown Seattle
+
+#### Get Directions
+
+**Name**: `get-directions`
+
+Provides turn-by-turn directions between two locations with options for different travel modes.
+
+**Arguments**:
+
+- `from` (required): Starting location (address, landmark, or coordinates)
+- `to` (required): Destination location (address, landmark, or coordinates)
+- `mode` (optional): Travel mode - "driving" (default), "walking", or "cycling"
+
+**Example**: Get walking directions from Central Park to Times Square, or driving directions from LAX to Hollywood
+
+#### Show Reachable Areas
+
+**Name**: `show-reachable-areas`
+
+Visualizes areas that can be reached from a location within a specified time using isochrones.
+
+**Arguments**:
+
+- `location` (required): Starting location (address, landmark, or coordinates)
+- `time_minutes` (optional): Travel time in minutes (default: "15")
+- `mode` (optional): Travel mode - "driving" (default), "walking", or "cycling"
+
+**Example**: Show areas reachable within 30 minutes of downtown Portland by car, or 15-minute walking radius from a hotel
+
+### Using Prompts
+
+In **Claude Desktop**, prompts appear in the prompt selector when you type `/` or click the prompts button. Select a prompt, fill in the arguments, and Claude will guide you through the geospatial workflow.
+
+In other **MCP clients**, prompts may appear as templates or slash commands depending on the client's implementation.
+
 ## Resources
 
 The MCP server exposes static reference data as **MCP resources**. Resources provide read-only access to data that clients can reference directly without making tool calls.

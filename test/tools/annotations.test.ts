@@ -27,7 +27,7 @@ describe('Tool Annotations', () => {
     );
 
     const tools = getAllTools();
-    const registeredTools = tools.map((tool) => tool.installTo(server as any));
+    const registeredTools = tools.map((tool) => tool.installTo(server));
 
     // All tools should be registered successfully
     expect(registeredTools).toHaveLength(tools.length);

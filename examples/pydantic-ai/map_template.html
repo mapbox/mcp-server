@@ -1,0 +1,341 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Warsaw Interactive Map</title>
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <link
+      rel="manifest"
+      href="data:application/json;base64,eyJuYW1lIjoiV2Fyc2F3IE1hcCIsInNob3J0X25hbWUiOiJXYXJzYXciLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUifQ=="
+    />
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+      .map-overlay {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        z-index: 1;
+        max-width: 300px;
+      }
+      .map-overlay h2 {
+        font-size: 16px;
+        font-weight: bold;
+        margin: 0 0 4px 0;
+      }
+      .map-overlay p {
+        font-size: 12px;
+        color: #666;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div class="map-overlay">
+      <h2>Warsaw, Poland 🇵🇱</h2>
+      <p>Use the chat to explore landmarks and navigate the city</p>
+    </div>
+    <div
+      id="loading-indicator"
+      style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      "
+    >
+      <div
+        style="
+          width: 20px;
+          height: 20px;
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid #007bff;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        "
+      ></div>
+      <span style="font-family: sans-serif; color: #333">Loading map...</span>
+    </div>
+    <style>
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+
+    <script>
+      // Check if token is provided
+      const token = '__MAPBOX_TOKEN__';
+      console.log(
+        'Token provided:',
+        token ? 'Yes (length: ' + token.length + ')' : 'No'
+      );
+      console.log('Token starts with:', token ? token.substring(0, 10) : 'N/A');
+      console.log('Is placeholder?', token === '__MAPBOX_TOKEN__');
+      console.log('Starts with pk?', token.startsWith('pk.'));
+
+      // Simplified validation - just check if it's a real Mapbox token
+      if (!token || !token.startsWith('pk.')) {
+        console.error(
+          'Token validation failed - not a valid Mapbox public token'
+        );
+        document.body.innerHTML =
+          '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f5f5f5;font-family:sans-serif;"><div style="text-align:center;padding:40px;background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);"><h2 style="color:#d32f2f;margin-top:0;">⚠️ Public Token Missing</h2><p>Set <code>MAPBOX_PUBLIC_TOKEN</code> in your .env file</p><p style="font-size:14px;color:#666;">Get one at: <a href="https://account.mapbox.com/access-tokens/">account.mapbox.com</a></p></div></div>';
+      } else {
+        console.log('Setting mapboxgl.accessToken');
+        mapboxgl.accessToken = token;
+
+        console.log('Checking map container...');
+        const container = document.getElementById('map');
+        console.log('Map container found:', container !== null);
+        console.log(
+          'Container dimensions:',
+          container
+            ? container.offsetWidth + 'x' + container.offsetHeight
+            : 'N/A'
+        );
+
+        try {
+          console.log('Creating Map instance...');
+          const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [21.0122, 52.2297], // Warsaw center
+            zoom: 12,
+            pitch: 45,
+            bearing: 0
+          });
+
+          console.log('Map instance created successfully');
+
+          // Add navigation controls
+          map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+          // Add scale
+          map.addControl(
+            new mapboxgl.ScaleControl({ unit: 'metric' }),
+            'bottom-right'
+          );
+
+          // Map error handling
+          map.on('error', (e) => {
+            console.error('Map error event:', e);
+            console.error('Error type:', e.error?.type);
+            console.error('Error message:', e.error?.message);
+            console.error('Error status:', e.error?.status);
+
+            let errorMsg = e.error?.message || 'Unknown error';
+            if (e.error?.status === 401) {
+              errorMsg =
+                'Invalid or unauthorized token. Make sure your MAPBOX_PUBLIC_TOKEN is a valid public token.';
+            }
+
+            document.body.innerHTML =
+              '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f5f5f5;font-family:sans-serif;"><div style="text-align:center;padding:40px;background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);"><h2 style="color:#d32f2f;margin-top:0;">⚠️ Map Error</h2><p>' +
+              errorMsg +
+              '</p><p style="font-size:14px;color:#666;">Check console for details</p></div></div>';
+          });
+
+          map.on('load', () => {
+            console.log('✓ Map loaded successfully! Tiles should be visible.');
+            // Hide loading indicator
+            const loadingIndicator =
+              document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+              loadingIndicator.style.display = 'none';
+            }
+          });
+
+          map.on('styledata', () => {
+            console.log('✓ Map style loaded');
+          });
+
+          map.on('sourcedataloading', (e) => {
+            console.log('Loading source:', e.sourceId);
+          });
+
+          // Store markers
+          let markers = [];
+
+          // Function to handle map commands
+          window.handleMapCommands = function (commandsJson) {
+            console.log('🟢 handleMapCommands called with:', commandsJson);
+
+            if (!commandsJson || commandsJson === '') {
+              console.log('⚠️ No commands provided');
+              return;
+            }
+
+            try {
+              const commands = JSON.parse(commandsJson);
+              console.log('🟢 Parsed commands:', commands);
+
+              if (!Array.isArray(commands)) {
+                console.error('❌ Commands is not an array:', typeof commands);
+                return;
+              }
+
+              console.log(`🟢 Executing ${commands.length} command(s)`);
+              commands.forEach((command, index) => {
+                console.log(`🟢 Command ${index}:`, command.type, command.data);
+                switch (command.type) {
+                  case 'flyTo':
+                    if (command.data.center) {
+                      map.flyTo({
+                        center: [
+                          command.data.center.lng,
+                          command.data.center.lat
+                        ],
+                        zoom: command.data.zoom || 15,
+                        pitch: command.data.pitch || 45,
+                        bearing: command.data.bearing || 0,
+                        duration: 2500,
+                        essential: true
+                      });
+                    }
+                    break;
+
+                  case 'addMarker':
+                    if (command.data.location) {
+                      const marker = new mapboxgl.Marker({
+                        color: command.data.color || '#ff0000'
+                      }).setLngLat([
+                        command.data.location.lng,
+                        command.data.location.lat
+                      ]);
+
+                      if (command.data.popup) {
+                        marker.setPopup(
+                          new mapboxgl.Popup().setHTML(command.data.popup)
+                        );
+                      }
+
+                      marker.addTo(map);
+                      markers.push(marker);
+
+                      // Open popup if provided
+                      if (command.data.popup) {
+                        marker.togglePopup();
+                      }
+                    }
+                    break;
+
+                  case 'clearMarkers':
+                    markers.forEach((marker) => marker.remove());
+                    markers = [];
+                    break;
+
+                  case 'drawRoute':
+                    if (command.data.coordinates) {
+                      // Remove existing route if it exists
+                      if (map.getSource('route')) {
+                        map.removeLayer('route');
+                        map.removeSource('route');
+                      }
+
+                      // Add route as a line
+                      map.addSource('route', {
+                        type: 'geojson',
+                        data: {
+                          type: 'Feature',
+                          properties: {},
+                          geometry: {
+                            type: 'LineString',
+                            coordinates: command.data.coordinates
+                          }
+                        }
+                      });
+
+                      map.addLayer({
+                        id: 'route',
+                        type: 'line',
+                        source: 'route',
+                        layout: {
+                          'line-join': 'round',
+                          'line-cap': 'round'
+                        },
+                        paint: {
+                          'line-color': command.data.color || '#007bff',
+                          'line-width': 5,
+                          'line-opacity': 0.75
+                        }
+                      });
+
+                      // Fit bounds to show entire route
+                      const bounds = command.data.coordinates.reduce(
+                        (bounds, coord) => bounds.extend(coord),
+                        new mapboxgl.LngLatBounds(
+                          command.data.coordinates[0],
+                          command.data.coordinates[0]
+                        )
+                      );
+
+                      map.fitBounds(bounds, {
+                        padding: 50,
+                        duration: 2000
+                      });
+                    }
+                    break;
+                }
+              });
+            } catch (e) {
+              console.error('Failed to handle map commands:', e);
+            }
+          };
+
+          // Listen for messages from parent window (Gradio)
+          window.addEventListener('message', function (event) {
+            console.log('🟢 Map: Received postMessage', event.data);
+            if (event.data.type === 'mapCommands') {
+              console.log('🟢 Map: Processing map commands');
+              handleMapCommands(event.data.commands);
+            } else {
+              console.log('🟢 Map: Ignoring message (not mapCommands type)');
+            }
+          });
+
+          console.log('✓ Map is ready and listening for commands');
+        } catch (e) {
+          console.error('Failed to initialize map:', e);
+          document.body.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f5f5f5;font-family:sans-serif;"><div style="text-align:center;padding:40px;background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);"><h2 style="color:#d32f2f;margin-top:0;">⚠️ Initialization Error</h2><p>' +
+            e.message +
+            '</p><p style="font-size:14px;color:#666;">Check browser console for details</p></div></div>';
+        }
+      }
+    </script>
+  </body>
+</html>

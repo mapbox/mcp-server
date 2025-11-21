@@ -34,6 +34,13 @@ async function createMapboxAgent() {
     - Find nearby cafes, restaurants, and points of interest
     - Get accurate coordinates and addresses
 
+    When creating static maps, use reasonable dimensions that fit well in a chat interface:
+    - Default size: width: 600, height: 400
+    - For detailed views: width: 800, height: 500
+    - Never exceed 800x600 unless specifically requested
+
+    The UI supports markdown formatting including images. When providing information from search tools that includes images, you can include them using markdown syntax: ![Description](url)
+
     Always be friendly, informative, and use the Mapbox tools to provide accurate location data.
     When users ask about Warsaw landmarks, use the tools to find exact locations.`,
     model: 'openai/gpt-4o',
@@ -49,7 +56,7 @@ export async function POST(req: Request) {
     const agent = await createMapboxAgent();
 
     // Collect UI resources from tool results
-    const uiResources: any[] = [];
+    const uiResources: unknown[] = [];
 
     const result = await agent.generate(lastMessage.content, {
       onStepFinish: ({ toolResults }) => {
@@ -58,16 +65,24 @@ export async function POST(req: Request) {
           toolResults.forEach((toolResult) => {
             // Content is inside payload.result.content
             const result = toolResult.payload?.result as
-              | { content?: any[] }
+              | { content?: unknown[] }
               | undefined;
             const content = result?.content;
 
             // Look for MCP-UI resources in the content array
             if (content && Array.isArray(content)) {
-              content.forEach((contentItem: any) => {
+              content.forEach((contentItem: unknown) => {
                 // MCP returns resources with type='resource' and nested resource object
-                if (contentItem.type === 'resource' && contentItem.resource) {
-                  uiResources.push(contentItem.resource);
+                if (
+                  typeof contentItem === 'object' &&
+                  contentItem !== null &&
+                  'type' in contentItem &&
+                  'resource' in contentItem &&
+                  (contentItem as { type: string }).type === 'resource'
+                ) {
+                  uiResources.push(
+                    (contentItem as { resource: unknown }).resource
+                  );
                 }
               });
             }
@@ -76,6 +91,7 @@ export async function POST(req: Request) {
       }
     });
 
+    // Keep markdown formatting in the response for proper rendering in the UI
     return Response.json({
       role: 'assistant',
       content: result.text,

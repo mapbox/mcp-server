@@ -9,6 +9,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Dynamically import UIResourceRenderer to avoid SSR issues
 const UIResourceRenderer = dynamic(
@@ -85,7 +87,7 @@ export default function Home() {
 
   // Example prompts
   const examplePrompts = [
-    'Find the Palace of Culture and Science',
+    'Show me a map of the Palace of Culture and Science',
     'Create a static map of Warsaw Old Town',
     'Get directions from Old Town to Royal Castle',
     'Show me a map of Łazienki Park',
@@ -152,17 +154,83 @@ export default function Home() {
               {message.role === 'user' ? 'You' : 'Tour Guide'}
             </div>
 
-            {/* Render text content */}
+            {/* Render text content with markdown support */}
             <div
               style={{
-                whiteSpace: 'pre-wrap',
                 marginBottom:
                   message.uiResources && message.uiResources.length > 0
                     ? '12px'
                     : '0'
               }}
+              className="markdown-content"
             >
-              {message.content}
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  // Style images to fit within the message box
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  img: ({ node: _node, ...props }) => (
+                    <img
+                      {...props}
+                      style={{
+                        maxWidth: '100%',
+                        height: 'auto',
+                        borderRadius: '8px',
+                        marginTop: '8px',
+                        marginBottom: '8px'
+                      }}
+                      alt={props.alt || 'Image'}
+                    />
+                  ),
+                  // Style links
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  a: ({ node: _node, ...props }) => (
+                    <a
+                      {...props}
+                      style={{
+                        color: message.role === 'user' ? '#fff' : '#007bff',
+                        textDecoration: 'underline'
+                      }}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
+                  ),
+                  // Style paragraphs
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  p: ({ node: _node, ...props }) => (
+                    <p
+                      {...props}
+                      style={{
+                        margin: '8px 0',
+                        lineHeight: '1.5'
+                      }}
+                    />
+                  ),
+                  // Style lists
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  ul: ({ node: _node, ...props }) => (
+                    <ul
+                      {...props}
+                      style={{
+                        margin: '8px 0',
+                        paddingLeft: '20px'
+                      }}
+                    />
+                  ),
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  ol: ({ node: _node, ...props }) => (
+                    <ol
+                      {...props}
+                      style={{
+                        margin: '8px 0',
+                        paddingLeft: '20px'
+                      }}
+                    />
+                  )
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
             </div>
 
             {/* Render MCP-UI resources if available */}
@@ -175,7 +243,9 @@ export default function Home() {
                       marginBottom: '12px',
                       border: '1px solid #e0e0e0',
                       borderRadius: '8px',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      maxWidth: '100%',
+                      maxHeight: '400px'
                     }}
                   >
                     <UIResourceRenderer

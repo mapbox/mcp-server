@@ -14,6 +14,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import { getAllTools } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
+import { getAllPrompts } from './prompts/promptRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import {
   initializeTracing,
@@ -57,6 +58,9 @@ const enabledTools = filterTools(allTools, config);
 // Get all resources
 const allResources = getAllResources();
 
+// Get all prompts
+const allPrompts = getAllPrompts();
+
 // Create an MCP server
 const server = new McpServer(
   {
@@ -66,7 +70,8 @@ const server = new McpServer(
   {
     capabilities: {
       tools: {},
-      resources: {}
+      resources: {},
+      prompts: {}
     }
   }
 );
@@ -79,6 +84,11 @@ enabledTools.forEach((tool) => {
 // Register all resources to the server
 allResources.forEach((resource) => {
   resource.installTo(server);
+});
+
+// Register all prompts to the server
+allPrompts.forEach((prompt) => {
+  prompt.installTo(server);
 });
 
 async function main() {

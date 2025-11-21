@@ -161,12 +161,12 @@ describe('Tool Configuration', () => {
 
   describe('filterTools', () => {
     // Mock tools for testing
-    const mockTools = [
+    const mockTools: Array<{ name: string; description: string }> = [
       { name: 'version_tool', description: 'Version tool' },
       { name: 'directions_tool', description: 'Directions tool' },
       { name: 'matrix_tool', description: 'Matrix tool' },
       { name: 'static_map_image_tool', description: 'Static map tool' }
-    ] as any;
+    ];
 
     it('should return all tools when no config provided', () => {
       const config: ToolConfig = {};

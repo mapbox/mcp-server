@@ -1,0 +1,6 @@
+  {
+    "name": "Warsaw Map",
+    "short_name": "Warsaw",
+    "start_url": "/",
+    "display": "standalone"
+  }
