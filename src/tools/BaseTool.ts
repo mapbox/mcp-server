@@ -87,4 +87,27 @@ export abstract class BaseTool<
       void this.server.server.sendLoggingMessage({ level, data });
     }
   }
+
+  /**
+   * Validates output data against the output schema with graceful fallback.
+   * If validation fails, logs a warning and returns the raw data.
+   * @param rawData The raw data to validate
+   * @returns The validated data, or raw data if validation fails
+   */
+  protected validateOutput<T>(rawData: unknown): T {
+    if (!this.outputSchema) {
+      return rawData as T;
+    }
+
+    try {
+      return this.outputSchema.parse(rawData) as T;
+    } catch (validationError) {
+      this.log(
+        'warning',
+        `${this.name}: Output schema validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+      );
+      // Graceful fallback to raw data
+      return rawData as T;
+    }
+  }
 }
