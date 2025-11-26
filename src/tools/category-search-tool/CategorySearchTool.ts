@@ -11,6 +11,23 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
+import {
+  isChatGptWidgetsEnabled,
+  createWidgetResponse,
+  WIDGET_CONFIGS,
+  WIDGET_URIS
+} from '../../widgets/widgetUtils.js';
+
+/**
+ * Place data structure for widget rendering
+ */
+interface WidgetPlace {
+  id: string;
+  name: string;
+  coords: [number, number];
+  description?: string;
+  category?: string;
+}
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -29,12 +46,56 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
+  // Widget configuration for ChatGPT Apps - included in tool descriptor
+  protected override getWidgetConfig() {
+    return isChatGptWidgetsEnabled()
+      ? { templateUri: WIDGET_URIS.MAP_WIDGET }
+      : undefined;
+  }
+
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: CategorySearchInputSchema,
       outputSchema: CategorySearchResponseSchema,
       httpRequest: params.httpRequest
     });
+  }
+
+  /**
+   * Transforms GeoJSON features to widget-friendly place objects
+   */
+  private transformToWidgetPlaces(
+    geoJsonResponse: MapboxFeatureCollection
+  ): WidgetPlace[] {
+    if (!geoJsonResponse?.features) {
+      return [];
+    }
+
+    return geoJsonResponse.features
+      .filter(
+        (
+          feature
+        ): feature is MapboxFeature & {
+          geometry: { type: 'Point'; coordinates: [number, number] };
+        } =>
+          feature.geometry?.type === 'Point' &&
+          'coordinates' in feature.geometry &&
+          Array.isArray(feature.geometry.coordinates)
+      )
+      .map((feature) => {
+        const props = feature.properties || {};
+        const coords = feature.geometry.coordinates;
+
+        return {
+          id: props.mapbox_id || `place-${coords[0]}-${coords[1]}`,
+          name: props.name || 'Unknown Place',
+          coords,
+          description: props.full_address || props.place_formatted,
+          category: Array.isArray(props.poi_category)
+            ? props.poi_category.join(', ')
+            : props.category
+        };
+      });
   }
 
   private formatGeoJsonToText(
@@ -175,6 +236,36 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       data = rawData as MapboxFeatureCollection;
     }
 
+    // Check if ChatGPT widgets are enabled
+    if (isChatGptWidgetsEnabled()) {
+      const places = this.transformToWidgetPlaces(data);
+
+      // Calculate center from proximity or first place
+      const center: [number, number] = input.proximity
+        ? [input.proximity.longitude, input.proximity.latitude]
+        : places[0]?.coords || [0, 0];
+
+      const widgetData = {
+        places,
+        center,
+        description: `Found ${places.length} ${input.category}(s)`
+      };
+
+      const textContent =
+        input.format === 'json_string'
+          ? JSON.stringify(data, null, 2)
+          : this.formatGeoJsonToText(data);
+
+      // Pass original GeoJSON (for schema validation) and widget data separately
+      return createWidgetResponse(
+        WIDGET_CONFIGS.categorySearch,
+        data, // Original GeoJSON for structuredContent
+        widgetData, // Transformed data for widget in _meta
+        textContent
+      );
+    }
+
+    // Standard response without widget support
     if (input.format === 'json_string') {
       return {
         content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
