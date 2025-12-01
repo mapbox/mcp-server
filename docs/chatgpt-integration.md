@@ -27,7 +27,15 @@ export MAPBOX_ACCESS_TOKEN=pk.xxx  # Your Mapbox public token
 export ENABLE_CHATGPT_WIDGETS=true
 ```
 
-### 2. Start the HTTP Server
+### 2. Build Widgets
+
+```bash
+cd widgets && npm install && npm run build && cd ..
+```
+
+This builds the map widget that displays search results, routes, and isochrones. The widget uses your `MAPBOX_ACCESS_TOKEN` for client-side map rendering.
+
+### 3. Start the HTTP Server
 
 ```bash
 npm run dev:http
@@ -35,7 +43,7 @@ npm run dev:http
 
 This starts the MCP server on `http://localhost:3000/mcp`.
 
-### 3. Expose via ngrok
+### 4. Expose via ngrok
 
 ```bash
 ngrok http 3000
@@ -43,7 +51,7 @@ ngrok http 3000
 
 Copy the `https://xxx.ngrok.io` URL.
 
-### 4. Register in ChatGPT
+### 5. Register in ChatGPT
 
 1. Go to [ChatGPT Apps](https://chatgpt.com/gpts/mine)
 2. Create a new GPT or edit an existing one
@@ -160,7 +168,30 @@ To create custom widgets for your tools, see the OpenAI documentation:
 - [Build your ChatGPT UI](https://developers.openai.com/apps-sdk/build/chatgpt-ui/)
 - [MCP Concepts](https://developers.openai.com/apps-sdk/concepts/mcp-server/)
 
-### Widget Development
+### Local Widget Development
+
+The `widgets/` directory is a standalone React project for building widget UI. You can develop and test widgets locally without ChatGPT:
+
+**Development Server (Port 4444)**
+
+```bash
+cd widgets
+npm install
+npm run dev      # Start Vite dev server on http://localhost:4444
+```
+
+Port 4444 is used to avoid conflicts with the main MCP server (port 3000), allowing you to run both simultaneously.
+
+**Build & Test Workflow**
+
+1. Make changes to widget source in `widgets/src/`
+2. Run `npm run dev` for hot-reload during development
+3. Run `npm run build` to generate `widgets/dist/map-widget.html`
+4. The MCP server automatically serves the built widget via MCP resources
+
+This separation lets you iterate on widget UI without needing ChatGPT connected.
+
+### Widget API
 
 The widget is a React component that reads from `window.openai`:
 
@@ -212,3 +243,22 @@ npm run build
 | `MAPBOX_ACCESS_TOKEN`    | Yes      | -       | Mapbox public access token               |
 | `ENABLE_CHATGPT_WIDGETS` | No       | `false` | Enable widget responses for ChatGPT Apps |
 | `PORT`                   | No       | `3000`  | HTTP server port                         |
+
+---
+
+## Token Security
+
+The Mapbox access token is used in two places:
+
+| Usage             | Location                  | Visible to Users?      |
+| ----------------- | ------------------------- | ---------------------- |
+| **API calls**     | MCP server (server-side)  | No                     |
+| **Map rendering** | Widget HTML (client-side) | Yes - embedded in HTML |
+
+When you run `npm run build` in the `widgets/` directory, your `MAPBOX_ACCESS_TOKEN` is embedded into the widget HTML for client-side map tile loading.
+
+**Recommendations:**
+
+- Use a **public token** (`pk.*`) - these are designed for client-side use and can be restricted by URL
+- Never use a **secret token** (`sk.*`) as it would be exposed in the widget HTML
+- Configure [URL restrictions](https://docs.mapbox.com/accounts/guides/tokens/#url-restrictions) on your token for additional security
