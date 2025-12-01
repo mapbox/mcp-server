@@ -43,6 +43,7 @@ interface RouteWaypoint {
   name: string;
   snap_location?: [number, number];
   location?: [number, number];
+  coords?: [number, number];
 }
 
 /**
@@ -397,7 +398,7 @@ function MapWidget() {
       const waypoints =
         widgetData?.route?.waypoints || toolOutput?.waypoints || [];
       waypoints.forEach((wp, index) => {
-        const location = wp.snap_location || wp.location;
+        const location = wp.snap_location || wp.location || wp.coords;
         if (!location) return;
 
         const isStart = index === 0;
