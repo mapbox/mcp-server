@@ -91,5 +91,29 @@ export const WIDGET_CONFIGS = {
     invoked: 'Found locations',
     widgetAccessible: true,
     widgetDescription: 'Interactive map showing search results'
+  } satisfies WidgetConfig,
+
+  searchAndGeocode: {
+    templateUri: WIDGET_URIS.MAP_WIDGET,
+    invoking: 'Searching...',
+    invoked: 'Found locations',
+    widgetAccessible: true,
+    widgetDescription: 'Interactive map showing search results'
+  } satisfies WidgetConfig,
+
+  directions: {
+    templateUri: WIDGET_URIS.MAP_WIDGET,
+    invoking: 'Calculating route...',
+    invoked: 'Route found',
+    widgetAccessible: true,
+    widgetDescription: 'Interactive map showing route directions'
+  } satisfies WidgetConfig,
+
+  isochrone: {
+    templateUri: WIDGET_URIS.MAP_WIDGET,
+    invoking: 'Calculating reachable area...',
+    invoked: 'Isochrone calculated',
+    widgetAccessible: true,
+    widgetDescription: 'Interactive map showing reachable area'
   } satisfies WidgetConfig
 } as const;

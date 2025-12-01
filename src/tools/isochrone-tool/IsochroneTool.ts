@@ -10,6 +10,12 @@ import {
   IsochroneResponseSchema,
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
+import {
+  isChatGptWidgetsEnabled,
+  createWidgetResponse,
+  WIDGET_CONFIGS,
+  WIDGET_URIS
+} from '../../widgets/widgetUtils.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -28,6 +34,13 @@ export class IsochroneTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
+
+  // Widget configuration for ChatGPT Apps - included in tool descriptor
+  protected override getWidgetConfig() {
+    return isChatGptWidgetsEnabled()
+      ? { templateUri: WIDGET_URIS.MAP_WIDGET }
+      : undefined;
+  }
 
   constructor(params: { httpRequest: HttpRequest }) {
     super({
@@ -155,6 +168,37 @@ export class IsochroneTool extends MapboxApiBasedTool<
     if (parsedData.success) {
       // Valid response - use formatted output
       const formattedText = this.formatIsochroneResponse(parsedData.data);
+
+      // Check if ChatGPT widgets are enabled
+      if (isChatGptWidgetsEnabled()) {
+        // The center is the input coordinates
+        const center: [number, number] = [
+          input.coordinates.longitude,
+          input.coordinates.latitude
+        ];
+
+        // Build description from contours
+        const contours = parsedData.data.features.map((f) => {
+          const metric = f.properties.metric || 'time';
+          const value = f.properties.contour;
+          return metric === 'time' ? `${value} min` : `${value} m`;
+        });
+
+        const widgetData = {
+          isochrone: parsedData.data,
+          center,
+          displayMode: 'isochrone' as const,
+          description: `Reachable area: ${contours.join(', ')}`
+        };
+
+        return createWidgetResponse(
+          WIDGET_CONFIGS.isochrone,
+          parsedData.data,
+          widgetData,
+          formattedText
+        );
+      }
+
       return {
         content: [{ type: 'text', text: formattedText }],
         structuredContent: parsedData.data as unknown as Record<
