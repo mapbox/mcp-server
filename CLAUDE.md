@@ -1,13 +1,13 @@
-# Mapbox MCP Server Engineering Standards
+# Mapbox MCP Server
 
-This document defines the standards and best practices for all contributors to the Mapbox MCP server. Adhering to these guidelines ensures code quality, maintainability, and a consistent developer experience.
+An MCP (Model Context Protocol) server that provides AI agents with geospatial intelligence capabilities through Mapbox APIs. This enables AI applications to understand locations, navigate the physical world, and access rich spatial data including geocoding, search, routing, travel time analysis, and map visualization.
 
-## Toolchain
+## Tech Stack
 
-- **Node.js:** Use the current LTS version.
-- **TypeScript:** All code must be written in TypeScript.
-- **Vitest:** All tests must use Vitest.
-- **npm:** Use npm for all package management and scripts.
+- **Runtime**: Node.js 22+ LTS
+- **Language**: TypeScript (strict mode)
+- **Testing**: Vitest
+- **Package Manager**: npm
 
 ## Project Structure
 
@@ -19,121 +19,69 @@ src/
 │   ├── MapboxApiBasedTool.ts   # Base class for Mapbox API tools
 │   ├── toolRegistry.ts         # Tool registration system
 │   └── */Tool.ts               # Individual tool implementations
+├── resources/                  # MCP resources (static data)
+│   ├── MapboxApiBasedResource.ts
+│   └── resourceRegistry.ts
 └── utils/
-    ├── fetchRequest.ts         # HTTP policy pipeline system
+    ├── httpPipeline.ts         # HTTP policy pipeline system
+    ├── tracing.ts              # OpenTelemetry instrumentation
     └── versionUtils.ts         # Version info utilities
 
-test/                           # Mirror src/ structure for tests
+test/                           # Mirrors src/ structure
 ```
 
----
+## Key Patterns
 
-## 1. Code Quality
+### Tool Architecture
 
-- **TypeScript Only:** All code must be written in TypeScript. No JavaScript files in `src/` or `test/`.
-- **Linting:** All code must pass ESLint and Prettier checks before merging. Run `npm run lint` and `npm run format`.
-- **Strict Typing:** Use strict types. Avoid `any` unless absolutely necessary and justified with a comment.
-- **No Global Pollution:** Do not patch or override global objects (e.g., `global.fetch`). Use dependency injection and explicit pipelines.
+- All Mapbox API tools extend `MapboxApiBasedTool` (src/tools/MapboxApiBasedTool.ts:16)
+- Tools receive `httpRequest` via dependency injection (src/tools/toolRegistry.ts:22-29)
+- Register new tools in `ALL_TOOLS` array (src/tools/toolRegistry.ts:18)
 
----
+### HTTP Pipeline System
 
-## 2. Testing
+- **Never patch global.fetch** - use `HttpPipeline` with dependency injection instead
+- Pipeline applies policies (User-Agent, Retry, etc.) to all HTTP requests (src/utils/httpPipeline.ts:21)
+- Default pipeline exported as `httpRequest` (src/utils/httpPipeline.ts)
 
-- **Test Coverage:** All new features and bug fixes must include unit tests. Aim for 100% coverage on critical logic.
-- **Testing Framework:** Use Vitest for all tests. Place tests in the `test/` directory, mirroring the `src/` structure.
-- **Mocking:** Use dependency injection for testability. Mock external services and APIs; do not make real network calls in tests.
-- **CI Passing:** All tests must pass in CI before merging.
+### Resource System
 
----
+- Static reference data exposed as MCP resources (src/resources/)
+- Resources use URI pattern: `mapbox://resource-name`
+- Example: category list at `mapbox://categories` or `mapbox://categories/{language}`
 
-## 3. Documentation
+## Essential Workflows
 
-- **JSDoc:** All public classes, methods, and exported functions must have JSDoc comments.
-- **README:** Update the main `README.md` with any new features, breaking changes, or setup instructions.
-- **Changelog:** All user-facing changes must be documented in `CHANGELOG.md` following semantic versioning.
+### Development
 
----
-
-## 4. API & Tooling
-
-- **Explicit Pipelines:** Use the `PolicyPipeline` for all HTTP requests. Add policies (e.g., User-Agent, Retry) via the pipeline, not by patching globals.
-- **Tool Registration:** All tools must be registered via the standard interface and support dependency injection for fetch/pipeline.
-- **Error Handling:** Handle and log errors gracefully. Do not swallow exceptions.
-
-### Code Examples
-
-```typescript
-// Correct: Use PolicyPipeline with dependency injection
-const pipeline = new PolicyPipeline();
-pipeline.usePolicy(new UserAgentPolicy(userAgent));
-pipeline.usePolicy(new RetryPolicy(3, 200, 2000));
-
-class MyTool extends MapboxApiBasedTool {
-  constructor(fetch: typeof fetch = fetchClient) {
-    super({ inputSchema: MySchema });
-    this.fetch = fetch;
-  }
-}
-
-// Incorrect: Global fetch patching
-global.fetch = myCustomFetch; // ❌ Don't do this
+```bash
+npm install              # Install dependencies
+npm test                 # Run tests with Vitest
+npm run build            # Compile TypeScript
+npm run inspect:build    # Test with MCP inspector
 ```
 
----
+### Creating a New Tool
 
-## 5. Collaboration
+```bash
+npx plop create-tool     # Interactive tool scaffolding
+# Provide tool name without suffix (e.g., "Search" creates "SearchTool")
+```
 
-- **Pull Requests:** All changes must be submitted via pull request. PRs should be small, focused, and reference relevant issues.
-- **Reviews:** At least one approval from a core maintainer is required before merging.
-- **Issue Tracking:** Use GitHub Issues for bugs, features, and technical debt. Link PRs to issues.
+### Pre-commit
 
----
+- Husky hooks auto-run linting and formatting
+- All checks must pass before commit
 
-## 6. Security & Secrets
+## Important Constraints
 
-- **No Secrets in Code:** Never commit API keys, tokens, or secrets. Use environment variables and `.env` files (excluded from git).
-- **Dependency Updates:** Keep dependencies up to date and monitor for vulnerabilities.
+- **Dependency Injection**: Tools must accept `httpRequest` parameter for testability
+- **No Global Patching**: Use explicit pipelines instead of modifying globals
+- **Strict Types**: Avoid `any` - add comment if absolutely necessary
+- **Test Mocking**: Never make real network calls in tests
 
----
+## Documentation
 
-## 7. Automation
-
-- **Pre-commit Hooks:** Use pre-commit hooks to enforce linting and formatting.
-- **CI/CD:** All merges to `main` must pass CI checks and deploy to the appropriate environment.
-
----
-
-## 8. Accessibility & Inclusion
-
-- **Naming:** Use clear, descriptive names for files, variables, and tools.
-- **Comments:** Write comments for complex logic. Assume the next reader is not the original author.
-
----
-
-## Getting Started
-
-1. Install dependencies: `npm install`
-2. Run tests: `npm test`
-3. Check linting: `npm run lint`
-4. Format code: `npm run format`
-5. Build project: `npm run build`
-6. Test project: `npm run test`
-
----
-
-## Environment Variables
-
-### OpenTelemetry Configuration
-
-- `OTEL_EXPORTER_OTLP_ENDPOINT` — OTLP endpoint URL (e.g., `http://localhost:4318`)
-- `OTEL_SERVICE_NAME` — Override service name (default: `mapbox-mcp-server`)
-- `OTEL_EXPORTER_OTLP_HEADERS` — JSON string of additional headers for OTLP exporter
-- `OTEL_LOG_LEVEL` — OTEL diagnostic log level: `NONE` (default), `ERROR`, `WARN`, `INFO`, `DEBUG`, `VERBOSE`. Set to `NONE` to prevent OTEL logs from polluting stdio transport.
-
----
-
-## Enforcement
-
-Failure to follow these standards may result in PR changes being requested or, in repeated cases, reversion of non-compliant code.
-
----
+- **Detailed Standards**: See docs/engineering_standards.md for complete guidelines
+- **Tracing Setup**: See docs/tracing.md for OpenTelemetry configuration
+- **Integration Guides**: See docs/ for Claude Desktop, VS Code, Cursor, and Goose setup
