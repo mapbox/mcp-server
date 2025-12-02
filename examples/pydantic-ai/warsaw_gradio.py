@@ -106,7 +106,6 @@ demo = gr.ChatInterface(
     title="🇵🇱 Warsaw Tour Guide",
     description="Ask me about Warsaw landmarks, directions, or places to visit! Powered by Pydantic AI + Mapbox MCP Server",
     examples=examples,
-    theme=gr.themes.Soft(),
 )
 
 if __name__ == "__main__":

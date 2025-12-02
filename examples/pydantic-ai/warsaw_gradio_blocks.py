@@ -125,7 +125,7 @@ examples = [
 
 
 # Create the Gradio Blocks interface
-with gr.Blocks(theme=gr.themes.Soft(), title="🇵🇱 Warsaw Tour Guide") as demo:
+with gr.Blocks(title="🇵🇱 Warsaw Tour Guide") as demo:
     gr.Markdown(
         """
         # 🇵🇱 Warsaw Tour Guide
@@ -141,8 +141,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="🇵🇱 Warsaw Tour Guide") as de
         with gr.Column(scale=2):
             chatbot = gr.Chatbot(
                 label="Chat",
-                height=500,
-                type="messages"
+                height=500
             )
 
             with gr.Row():

@@ -216,10 +216,52 @@ def chat_wrapper(message: str, history: list):
     return asyncio.run(chat_with_map_control(message, history))
 
 
+def create_map_with_commands(commands_json: str, port: int) -> str:
+    """Create map HTML file with commands embedded, returns iframe HTML."""
+    import time
+
+    # Read the template
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    template_path = os.path.join(script_dir, "map_template.html")
+
+    with open(template_path, 'r') as f:
+        template = f.read()
+
+    # Replace token
+    mapbox_public_token = os.environ.get("MAPBOX_PUBLIC_TOKEN", "")
+    map_html_content = template.replace('__MAPBOX_TOKEN__', mapbox_public_token)
+
+    # If we have commands, inject them into the HTML
+    if commands_json and commands_json != "" and commands_json != "[]":
+        commands_script = f"""
+        <script>
+        window.addEventListener('load', function() {{
+            setTimeout(function() {{
+                const commands = {commands_json};
+                if (window.handleMapCommands) {{
+                    window.handleMapCommands(JSON.stringify(commands));
+                }}
+            }}, 800);
+        }});
+        </script>
+        </body>
+        """
+        map_html_content = map_html_content.replace('</body>', commands_script)
+
+    # Write to a unique file
+    unique_id = int(time.time() * 1000)
+    map_file_path = os.path.join(script_dir, f"map_interactive_{unique_id}.html")
+
+    with open(map_file_path, 'w') as f:
+        f.write(map_html_content)
+
+    # Return iframe pointing to the new file
+    return f'<iframe src="http://127.0.0.1:{port}/map_interactive_{unique_id}.html" width="100%" height="600px" frameborder="0" style="border:0;"></iframe>'
+
+
 # Get Mapbox public token for the client-side map
 # Note: This must be a PUBLIC token (starts with pk.) for browser use
 mapbox_public_token = os.environ.get("MAPBOX_PUBLIC_TOKEN", "")
-print(f"DEBUG: Token loaded: {mapbox_public_token[:20] if mapbox_public_token else 'NONE'}...")
 if not mapbox_public_token:
     print("WARNING: MAPBOX_PUBLIC_TOKEN not set. The map will not load.")
     print("Get a public token at https://account.mapbox.com/access-tokens/")
@@ -236,9 +278,7 @@ map_file_path = os.path.join(script_dir, "map_interactive.html")
 with open(template_path, 'r') as f:
     template = f.read()
 
-print(f"DEBUG: Template contains __MAPBOX_TOKEN__: {'__MAPBOX_TOKEN__' in template}")
 map_html_content = template.replace('__MAPBOX_TOKEN__', mapbox_public_token)
-print(f"DEBUG: After replacement, still contains __MAPBOX_TOKEN__: {'__MAPBOX_TOKEN__' in map_html_content}")
 
 # Write the map file
 with open(map_file_path, 'w') as f:
@@ -280,8 +320,7 @@ server_thread = threading.Thread(target=start_server, daemon=True)
 server_thread.start()
 
 # Create iframe pointing to the local server
-map_html = f'<iframe src="http://127.0.0.1:{map_port}/map_interactive.html" width="100%" height="600px" frameborder="0" style="border:0;"></iframe>'
-print(f"DEBUG: Map will be served at http://127.0.0.1:{map_port}/map_interactive.html")
+map_html = f'<iframe id="mapIframe" src="http://127.0.0.1:{map_port}/map_interactive.html" width="100%" height="600px" frameborder="0" style="border:0;"></iframe>'
 
 # Example prompts
 examples = [
@@ -294,7 +333,7 @@ examples = [
 
 
 # Create the Gradio Blocks interface
-with gr.Blocks(theme=gr.themes.Soft(), title="🇵🇱 Warsaw Interactive Map Guide") as demo:
+with gr.Blocks(title="🇵🇱 Warsaw Interactive Map Guide") as demo:
     gr.Markdown(
         """
         # 🇵🇱 Warsaw Interactive Map Guide
@@ -309,8 +348,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="🇵🇱 Warsaw Interactive Map Gu
         with gr.Column(scale=1):
             chatbot = gr.Chatbot(
                 label="Warsaw Guide Chat",
-                height=600,
-                type="messages"
+                height=600
             )
 
             msg = gr.Textbox(
@@ -332,13 +370,11 @@ with gr.Blocks(theme=gr.themes.Soft(), title="🇵🇱 Warsaw Interactive Map Gu
         # Right panel - Interactive Map
         with gr.Column(scale=1):
             map_display = gr.HTML(value=map_html)
-            # Hidden textbox to trigger JS when commands are ready
-            map_commands_trigger = gr.Textbox(visible=False, elem_id="map_commands_trigger")
 
     def respond(message, chat_history):
         """Handle user message and update both chat and map."""
         if not message.strip():
-            return "", chat_history, ""
+            return "", chat_history, map_html
 
         print(f"\n🔵 User message: {message}")
 
@@ -352,57 +388,19 @@ with gr.Blocks(theme=gr.themes.Soft(), title="🇵🇱 Warsaw Interactive Map Gu
         chat_history.append({"role": "user", "content": message})
         chat_history.append({"role": "assistant", "content": text})
 
-        return "", chat_history, commands
+        # Create new map HTML file with embedded commands
+        new_map_html = create_map_with_commands(commands, map_port)
+
+        return "", chat_history, new_map_html
 
     def clear_chat():
         """Clear the chat history."""
         return []
 
-    # Wire up the events
-    msg.submit(respond, [msg, chatbot], [msg, chatbot, map_commands_trigger])
-    submit.click(respond, [msg, chatbot], [msg, chatbot, map_commands_trigger])
+    # Wire up the events - simple and reliable
+    msg.submit(respond, [msg, chatbot], [msg, chatbot, map_display])
+    submit.click(respond, [msg, chatbot], [msg, chatbot, map_display])
     clear.click(clear_chat, None, chatbot)
-
-    # JavaScript to send map commands to the iframe
-    map_commands_trigger.change(
-        None,
-        map_commands_trigger,
-        None,
-        js="""
-        (commands) => {
-            console.log('🔵 Gradio: Map commands trigger changed');
-            console.log('🔵 Commands received:', commands);
-            console.log('🔵 Commands type:', typeof commands);
-
-            if (commands && commands !== "" && commands !== "null") {
-                const iframes = document.querySelectorAll('iframe');
-                console.log('🔵 Found iframes:', iframes.length);
-
-                // Try to find the map iframe (it should be the one with our map server URL)
-                let mapIframe = null;
-                iframes.forEach((iframe, index) => {
-                    console.log('🔵 Iframe', index, 'src:', iframe.src);
-                    if (iframe.src.includes('127.0.0.1')) {
-                        mapIframe = iframe;
-                    }
-                });
-
-                if (mapIframe) {
-                    console.log('🔵 Sending postMessage to map iframe');
-                    mapIframe.contentWindow.postMessage({
-                        type: 'mapCommands',
-                        commands: commands
-                    }, '*');
-                    console.log('✅ PostMessage sent successfully');
-                } else {
-                    console.error('❌ Map iframe not found');
-                }
-            } else {
-                console.log('⚠️ No commands to send (empty or null)');
-            }
-        }
-        """
-    )
 
 
 if __name__ == "__main__":

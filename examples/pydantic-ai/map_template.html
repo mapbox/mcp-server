@@ -327,6 +327,24 @@
             }
           });
 
+          // Poll localStorage for commands from parent (backup method)
+          let lastCommandTimestamp = 0;
+          setInterval(function () {
+            try {
+              const commandData = localStorage.getItem('mapCommands');
+              if (commandData) {
+                const data = JSON.parse(commandData);
+                if (data.timestamp > lastCommandTimestamp) {
+                  console.log('🟢 Map: New commands from localStorage');
+                  lastCommandTimestamp = data.timestamp;
+                  handleMapCommands(data.commands);
+                }
+              }
+            } catch (e) {
+              // Ignore errors (localStorage might not be available)
+            }
+          }, 300);
+
           console.log('✓ Map is ready and listening for commands');
         } catch (e) {
           console.error('Failed to initialize map:', e);
