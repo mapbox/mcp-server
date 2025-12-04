@@ -354,19 +354,21 @@ See [docs/tracing.md](./docs/tracing.md) for complete setup instructions includi
 
 We welcome contributions to the Mapbox MCP Server! Please review our standards and guidelines before contributing:
 
-- **[Engineering Standards (CLAUDE.md)](./CLAUDE.md)** - Code quality, testing, documentation, and collaboration standards for all contributors
-- **[AI Agent Instructions (AGENTS.md)](./AGENTS.md)** - Comprehensive guide for AI agents working with this codebase
+- **[Engineering Standards (docs/engineering_standards.md)](./docs/engineering_standards.md)** - Complete code quality, testing, documentation, and collaboration standards for all contributors
+- **[Claude Code Guide (CLAUDE.md)](./CLAUDE.md)** - Standards and patterns for contributors using Claude Code
+- **[AI Agent Instructions (AGENTS.md)](./AGENTS.md)** - Guide for general AI coding assistants (Cursor, Continue, Aider, etc.)
 - **[GitHub Copilot Guidelines](./.github/copilot-instructions.md)** - Best practices for using GitHub Copilot responsibly in this project
 
 ### Quick Start for Contributors
 
 1. Fork the repository and clone your fork
-2. Follow the development setup in our [Engineering Standards](./CLAUDE.md#getting-started)
+2. Install dependencies: `npm install`
 3. Make your changes following our coding standards
-4. Add tests for any new functionality
-5. Submit a pull request with a clear description
+4. Run tests and linting: `npm test && npm run lint`
+5. Add tests for any new functionality
+6. Submit a pull request with a clear description
 
-All contributions must pass our CI checks and code review process. See [CLAUDE.md](./CLAUDE.md) for detailed requirements.
+All contributions must pass our CI checks and code review process. See [docs/engineering_standards.md](./docs/engineering_standards.md) for detailed requirements.
 
 ## Data Usage & Privacy
 
