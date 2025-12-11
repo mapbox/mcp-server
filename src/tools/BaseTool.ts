@@ -13,6 +13,15 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import type { ZodTypeAny } from 'zod';
 import type { z } from 'zod';
 
+/**
+ * Widget configuration for ChatGPT Apps integration.
+ * When provided, the tool descriptor will include _meta with openai/outputTemplate.
+ */
+export interface WidgetConfig {
+  /** URI of the widget template resource (e.g., "ui://widget/map-widget.html") */
+  templateUri: string;
+}
+
 export abstract class BaseTool<
   InputSchema extends ZodTypeAny,
   OutputSchema extends ZodTypeAny = ZodTypeAny
@@ -20,6 +29,14 @@ export abstract class BaseTool<
   abstract readonly name: string;
   abstract readonly description: string;
   abstract readonly annotations: ToolAnnotations;
+
+  /**
+   * Override in subclasses to provide widget configuration for ChatGPT Apps.
+   * When this returns a config, the tool descriptor will include _meta["openai/outputTemplate"].
+   */
+  protected getWidgetConfig(): WidgetConfig | undefined {
+    return undefined;
+  }
 
   readonly inputSchema: InputSchema;
   readonly outputSchema?: OutputSchema;
@@ -47,6 +64,7 @@ export abstract class BaseTool<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       outputSchema?: any;
       annotations?: ToolAnnotations;
+      _meta?: Record<string, unknown>;
     } = {
       title: this.annotations.title,
       description: this.description,
@@ -60,6 +78,14 @@ export abstract class BaseTool<
       config.outputSchema =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (this.outputSchema as unknown as z.ZodObject<any>).shape;
+    }
+
+    // Add _meta with widget template URI for ChatGPT Apps integration
+    const widgetConfig = this.getWidgetConfig();
+    if (widgetConfig) {
+      config._meta = {
+        'openai/outputTemplate': widgetConfig.templateUri
+      };
     }
 
     return server.registerTool(this.name, config, (args, extra) =>

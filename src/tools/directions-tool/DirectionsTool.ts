@@ -13,8 +13,22 @@ import {
   type DirectionsResponse
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
+import {
+  isChatGptWidgetsEnabled,
+  createWidgetResponse,
+  WIDGET_CONFIGS,
+  WIDGET_URIS
+} from '../../widgets/widgetUtils.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
+
+/**
+ * Waypoint data structure for widget rendering
+ */
+interface WidgetWaypoint {
+  name: string;
+  coords: [number, number];
+}
 
 export class DirectionsTool extends MapboxApiBasedTool<
   typeof DirectionsInputSchema,
@@ -31,12 +45,57 @@ export class DirectionsTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
+  // Widget configuration for ChatGPT Apps - included in tool descriptor
+  protected override getWidgetConfig() {
+    return isChatGptWidgetsEnabled()
+      ? { templateUri: WIDGET_URIS.MAP_WIDGET }
+      : undefined;
+  }
+
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: DirectionsInputSchema,
       outputSchema: DirectionsResponseSchema,
       httpRequest: params.httpRequest
     });
+  }
+
+  /**
+   * Transforms directions response waypoints to widget-friendly format
+   */
+  private transformToWidgetWaypoints(
+    response: DirectionsResponse
+  ): WidgetWaypoint[] {
+    if (!response.waypoints) {
+      return [];
+    }
+
+    return response.waypoints.map((wp, index) => ({
+      name: wp.name || `Waypoint ${index + 1}`,
+      coords: wp.snap_location
+    }));
+  }
+
+  /**
+   * Formats duration in seconds to human-readable string
+   */
+  private formatDuration(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.round((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes} min`;
+  }
+
+  /**
+   * Formats distance in meters to human-readable string
+   */
+  private formatDistance(meters: number): string {
+    if (meters >= 1000) {
+      return `${(meters / 1000).toFixed(1)} km`;
+    }
+    return `${Math.round(meters)} m`;
   }
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
@@ -180,9 +239,16 @@ export class DirectionsTool extends MapboxApiBasedTool<
     // Build query parameters
     const queryParams = new URLSearchParams();
     queryParams.append('access_token', accessToken);
+
+    // When widgets are enabled, force geojson geometry for route rendering
+    // Otherwise respect the input parameter (default is 'none' for token efficiency)
+    const effectiveGeometries = isChatGptWidgetsEnabled()
+      ? 'geojson'
+      : input.geometries;
+
     // Only add geometries parameter if not 'none'
-    if (input.geometries !== 'none') {
-      queryParams.append('geometries', input.geometries);
+    if (effectiveGeometries !== 'none') {
+      queryParams.append('geometries', effectiveGeometries);
     }
     queryParams.append('alternatives', input.alternatives.toString());
 
@@ -268,8 +334,50 @@ export class DirectionsTool extends MapboxApiBasedTool<
       validatedData = cleanedData as DirectionsResponse;
     }
 
+    const textContent = JSON.stringify(validatedData, null, 2);
+
+    // Check if ChatGPT widgets are enabled
+    if (isChatGptWidgetsEnabled()) {
+      const route = validatedData.routes?.[0];
+      const waypoints = this.transformToWidgetWaypoints(validatedData);
+
+      // Calculate center from waypoints midpoint
+      let center: [number, number] = [0, 0];
+      if (waypoints.length > 0) {
+        const lngs = waypoints.map((w) => w.coords[0]);
+        const lats = waypoints.map((w) => w.coords[1]);
+        center = [
+          (Math.min(...lngs) + Math.max(...lngs)) / 2,
+          (Math.min(...lats) + Math.max(...lats)) / 2
+        ];
+      }
+
+      const widgetData = {
+        route: route
+          ? {
+              geometry: route.geometry,
+              waypoints,
+              duration: route.duration,
+              distance: route.distance
+            }
+          : undefined,
+        center,
+        displayMode: 'route' as const,
+        description: route
+          ? `Route: ${this.formatDistance(route.distance)} (${this.formatDuration(route.duration)})`
+          : 'No route found'
+      };
+
+      return createWidgetResponse(
+        WIDGET_CONFIGS.directions,
+        validatedData,
+        widgetData,
+        textContent
+      );
+    }
+
     return {
-      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      content: [{ type: 'text', text: textContent }],
       structuredContent: validatedData,
       isError: false
     };
