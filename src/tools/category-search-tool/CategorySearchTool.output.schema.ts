@@ -96,7 +96,8 @@ const CoordinatesSchema = z.object({
 
 // Metadata schema for additional feature information
 const MetadataSchema = z.object({
-  primary_photo: z.array(z.string()).optional(),
+  // API sometimes returns string, sometimes array - accept both
+  primary_photo: z.union([z.string(), z.array(z.string())]).optional(),
   reading: z
     .object({
       ja_kana: z.string().optional(),
