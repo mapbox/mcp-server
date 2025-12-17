@@ -93,6 +93,62 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     return results.join('\n\n');
   }
 
+  /**
+   * Simplify GeoJSON response to only essential fields
+   * Removes verbose nested context, attribution, and metadata while keeping valid GeoJSON structure
+   */
+  private compactGeoJsonResponse(
+    geoJsonResponse: MapboxFeatureCollection
+  ): Record<string, unknown> {
+    return {
+      type: 'FeatureCollection',
+      features: geoJsonResponse.features.map((feature) => {
+        const props = feature.properties || {};
+        const context = (props.context || {}) as Record<string, any>;
+        const geom = feature.geometry;
+
+        // Extract coordinates safely
+        let coordinates: [number, number] | undefined;
+        if (geom && geom.type === 'Point' && 'coordinates' in geom) {
+          coordinates = geom.coordinates as [number, number];
+        }
+
+        return {
+          type: 'Feature',
+          geometry: geom
+            ? {
+                type: geom.type,
+                coordinates:
+                  'coordinates' in geom ? geom.coordinates : undefined
+              }
+            : null,
+          properties: {
+            name: props.name,
+            full_address: props.full_address,
+            place_formatted: props.place_formatted,
+            feature_type: props.feature_type,
+            coordinates: coordinates
+              ? {
+                  longitude: coordinates[0],
+                  latitude: coordinates[1]
+                }
+              : undefined,
+            poi_category: props.poi_category,
+            brand: props.brand,
+            maki: props.maki,
+            address: context.address?.name,
+            street: context.street?.name,
+            postcode: context.postcode?.name,
+            place: context.place?.name,
+            district: context.district?.name,
+            region: context.region?.name,
+            country: context.country?.name
+          }
+        };
+      })
+    };
+  }
+
   protected async execute(
     input: z.infer<typeof CategorySearchInputSchema>,
     accessToken: string
@@ -175,16 +231,23 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       data = rawData as MapboxFeatureCollection;
     }
 
+    // Determine which structured content to return
+    const structuredContent = input.compact
+      ? this.compactGeoJsonResponse(data)
+      : (data as unknown as Record<string, unknown>);
+
     if (input.format === 'json_string') {
       return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data as unknown as Record<string, unknown>,
+        content: [
+          { type: 'text', text: JSON.stringify(structuredContent, null, 2) }
+        ],
+        structuredContent,
         isError: false
       };
     } else {
       return {
         content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
-        structuredContent: data as unknown as Record<string, unknown>,
+        structuredContent,
         isError: false
       };
     }
