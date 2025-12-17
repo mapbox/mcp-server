@@ -21,8 +21,31 @@ export class DirectionsTool extends MapboxApiBasedTool<
   typeof DirectionsResponseSchema
 > {
   name = 'directions_tool';
-  description =
-    'Fetches directions from Mapbox API based on provided coordinates and direction method.';
+  description = `Calculate optimal routes and turn-by-turn directions (navigation) between two or more locations. Returns detailed driving, walking, or cycling instructions with route geometry (path), distance, duration, and estimated travel time (ETA).
+
+  Supports multiple routing modes:
+    - Driving routes with real-time traffic (car navigation, auto routing)
+    - Walking directions (pedestrian routes, on foot)
+    - Cycling routes (bike paths, bicycle-friendly roads)
+    - Multiple waypoints (road trip planning, multi-stop routes)
+
+  Common use cases:
+    - Get driving directions from point A to B: "How do I drive from LAX to Hollywood?"
+    - Calculate travel time and distance: "How long to walk from Central Park to Times Square?"
+    - Plan multi-stop routes: "Route from hotel to museum to restaurant to hotel"
+    - Compare route options: "Show me the fastest route avoiding tolls"
+    - Navigation with traffic: "Driving directions with current traffic conditions"
+
+  Returns:
+    - Turn-by-turn instructions
+    - Route geometry (GeoJSON path for mapping)
+    - Total distance and duration
+    - Step-by-step maneuvers
+
+  Related tools:
+    - Use matrix_tool for travel times between many locations
+    - Use isochrone_tool to see areas reachable within a time limit
+    - Use search_and_geocode_tool to convert addresses to coordinates first`;
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
