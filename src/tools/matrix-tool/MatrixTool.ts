@@ -19,8 +19,29 @@ export class MatrixTool extends MapboxApiBasedTool<
   typeof MatrixResponseSchema
 > {
   name = 'matrix_tool';
-  description =
-    'Calculates travel times and distances between multiple points using Mapbox Matrix API.';
+  description = `Calculate travel times and distances between multiple origin and destination points (one-to-many, many-to-one, or many-to-many routing). Returns a distance/duration matrix showing travel time (ETA) and distance from each origin to each destination.
+
+  Common use cases:
+    - Logistics and route optimization: "Calculate travel times from warehouse to 10 delivery addresses"
+    - Find nearest location: "Which store location is closest to this customer?"
+    - Delivery time estimates: "How long to deliver from restaurant to multiple addresses?"
+    - Service area analysis: "Calculate distances from office to all branch locations"
+    - Multi-point comparison: "Compare travel times between 5 hotels and 3 attractions"
+
+  Supports:
+    - One-to-many: Single origin to multiple destinations
+    - Many-to-one: Multiple origins to single destination
+    - Many-to-many: Multiple origins to multiple destinations
+    - Different travel modes: driving (with traffic), walking, cycling
+
+  Returns:
+    - Matrix of travel times (durations) between all point pairs
+    - Matrix of distances between all point pairs
+    - Efficient bulk calculations for route optimization
+
+  Related tools:
+    - Use directions_tool for turn-by-turn directions for a single route
+    - Use isochrone_tool to visualize all areas reachable within a time limit`;
   annotations = {
     title: 'Matrix Tool',
     readOnlyHint: true,

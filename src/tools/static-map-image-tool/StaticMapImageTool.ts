@@ -14,8 +14,33 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
 > {
   name = 'static_map_image_tool';
-  description =
-    'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns PNG for vector styles, JPEG for raster-only styles.';
+  description = `Generate a static map image URL from Mapbox Static Images API. Creates a snapshot/thumbnail of a map location with optional markers, paths, and overlays. Returns a direct URL to the image (PNG or JPEG format), not an embedded image.
+
+  Common use cases:
+    - Create shareable map snapshots for reports or documentation
+    - Generate thumbnail previews of locations for listings or search results
+    - Embed map images in emails, PDFs, or presentations
+    - Show route overview as static image
+    - Create before/after comparison maps
+    - Display location context in non-interactive formats
+
+  Supports:
+    - Custom center coordinates and zoom level (0-22)
+    - Image dimensions up to 1280x1280 pixels
+    - Multiple map styles (streets, satellite, outdoors, dark, light, etc.)
+    - Markers with custom colors and labels
+    - Paths and polylines (routes, boundaries)
+    - GeoJSON overlays for complex shapes
+
+  Output format:
+    - Returns direct URL string to image file
+    - PNG format for vector styles
+    - JPEG format for raster/satellite styles
+    - URL can be embedded in HTML, shared, or downloaded
+
+  Related tools:
+    - Use directions_tool to get route geometry to display on static map
+    - Use search_and_geocode_tool to get coordinates for map center`;
   annotations = {
     title: 'Static Map Image Tool',
     readOnlyHint: true,
