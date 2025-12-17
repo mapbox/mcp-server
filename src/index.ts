@@ -11,9 +11,14 @@ import { SpanStatusCode } from '@opentelemetry/api';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema
+} from '@modelcontextprotocol/sdk/types.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import { getAllTools } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
+import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import {
   initializeTracing,
@@ -66,7 +71,8 @@ const server = new McpServer(
   {
     capabilities: {
       tools: {},
-      resources: {}
+      resources: {},
+      prompts: {}
     }
   }
 );
@@ -79,6 +85,37 @@ enabledTools.forEach((tool) => {
 // Register all resources to the server
 allResources.forEach((resource) => {
   resource.installTo(server);
+});
+
+// Register prompt handlers
+server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  const allPrompts = getAllPrompts();
+  return {
+    prompts: allPrompts.map((prompt) => prompt.getMetadata())
+  };
+});
+
+server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  const prompt = getPromptByName(name);
+  if (!prompt) {
+    throw new Error(`Prompt not found: ${name}`);
+  }
+
+  // Convert args to object for easier access
+  const argsObj: Record<string, string> = {};
+  if (args && typeof args === 'object') {
+    Object.assign(argsObj, args);
+  }
+
+  // Get the prompt messages with filled-in arguments
+  const messages = prompt.getMessages(argsObj);
+
+  return {
+    description: prompt.description,
+    messages
+  };
 });
 
 async function main() {
