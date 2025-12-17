@@ -44,5 +44,12 @@ export const CategorySearchInputSchema = z.object({
     .default('formatted_text')
     .describe(
       'Output format: "json_string" returns raw GeoJSON data as a JSON string that can be parsed; "formatted_text" returns human-readable text with place names, addresses, and coordinates. Both return as text content but json_string contains parseable JSON data while formatted_text is for display.'
+    ),
+  compact: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'When true (default), returns simplified GeoJSON with only essential fields (name, address, coordinates, categories, brand). When false, returns full verbose Mapbox API response with all metadata. Only applies to structured content output.'
     )
 });

@@ -389,7 +389,8 @@ describe('CategorySearchTool', () => {
 
     const result = await new CategorySearchTool({ httpRequest }).run({
       category: 'restaurant',
-      format: 'json_string'
+      format: 'json_string',
+      compact: false // Use verbose format to match exact mockResponse
     });
 
     expect(result.isError).toBe(false);
@@ -430,6 +431,112 @@ describe('CategorySearchTool', () => {
     expect(
       (result.content[0] as { type: 'text'; text: string }).text
     ).toContain('1. Test Cafe');
+  });
+
+  it('returns compact JSON by default', async () => {
+    const mockResponse = {
+      type: 'FeatureCollection',
+      attribution: 'Some attribution text',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            name: 'Starbucks',
+            full_address: '123 Main St, New York, NY 10001',
+            feature_type: 'poi',
+            poi_category: ['coffee', 'restaurant'],
+            brand: 'Starbucks',
+            maki: 'cafe',
+            context: {
+              address: { name: '123 Main St' },
+              street: { name: 'Main Street' },
+              postcode: { name: '10001' },
+              place: { name: 'New York' },
+              region: { name: 'New York' },
+              country: { name: 'United States' }
+            },
+            mapbox_id: 'some-mapbox-id',
+            external_ids: { foursquare: '123' },
+            metadata: { iso_3166_1: 'US' }
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [-74.006, 40.7128]
+          }
+        }
+      ]
+    };
+
+    const { httpRequest } = setupHttpRequest({
+      json: async () => mockResponse
+    });
+
+    const result = await new CategorySearchTool({ httpRequest }).run({
+      category: 'coffee'
+      // compact defaults to true
+    });
+
+    expect(result.isError).toBe(false);
+
+    const compactResult = result.structuredContent as Record<string, any>;
+
+    // Should be compact (no attribution, flattened context)
+    expect(compactResult.attribution).toBeUndefined();
+    expect(compactResult.features[0].properties.address).toBe('123 Main St');
+    expect(compactResult.features[0].properties.street).toBe('Main Street');
+    expect(compactResult.features[0].properties.postcode).toBe('10001');
+    expect(compactResult.features[0].properties.place).toBe('New York');
+    expect(compactResult.features[0].properties.region).toBe('New York');
+    expect(compactResult.features[0].properties.country).toBe('United States');
+    expect(compactResult.features[0].properties.coordinates).toEqual({
+      longitude: -74.006,
+      latitude: 40.7128
+    });
+    // Should not have nested context object or verbose fields
+    expect(compactResult.features[0].properties.context).toBeUndefined();
+    expect(compactResult.features[0].properties.mapbox_id).toBeUndefined();
+    expect(compactResult.features[0].properties.external_ids).toBeUndefined();
+    expect(compactResult.features[0].properties.metadata).toBeUndefined();
+    // Should keep essential fields
+    expect(compactResult.features[0].properties.name).toBe('Starbucks');
+    expect(compactResult.features[0].properties.poi_category).toEqual([
+      'coffee',
+      'restaurant'
+    ]);
+    expect(compactResult.features[0].properties.brand).toBe('Starbucks');
+    expect(compactResult.features[0].properties.maki).toBe('cafe');
+  });
+
+  it('returns verbose JSON when compact is false', async () => {
+    const mockResponse = {
+      type: 'FeatureCollection',
+      attribution: 'Some attribution text',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            name: 'Starbucks',
+            full_address: '123 Main St, New York, NY 10001'
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [-74.006, 40.7128]
+          }
+        }
+      ]
+    };
+
+    const { httpRequest } = setupHttpRequest({
+      json: async () => mockResponse
+    });
+
+    const result = await new CategorySearchTool({ httpRequest }).run({
+      category: 'coffee',
+      compact: false // Use verbose format to match exact mockResponse
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toEqual(mockResponse);
   });
 
   it('should have output schema defined', () => {
