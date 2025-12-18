@@ -19,8 +19,30 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
   typeof GeocodingResponseSchema
 > {
   name = 'reverse_geocode_tool';
-  description =
-    'Find addresses, cities, towns, neighborhoods, postcodes, districts, regions, and countries around a specified geographic coordinate pair. Converts geographic coordinates (longitude, latitude) into human-readable addresses or place names. Use limit=1 for best results. This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest that are not of the types mentioned. Supports both JSON and text output formats.';
+  description = `Convert geographic coordinates (longitude, latitude) into human-readable addresses or place names (reverse geocoding). Returns addresses, cities, towns, neighborhoods, postal codes (zip codes), districts, regions, and countries for a specific coordinate pair.
+
+  Common use cases:
+    - "What address is at these coordinates?" - Get street address from GPS location
+    - "Where am I?" - Convert device location to readable address
+    - "What city is this?" - Identify city/town from coordinates
+    - "Get postal code for location" - Find zip code or postal code
+    - "Reverse geocode map click" - Display address when user clicks on map
+
+  Returns information about:
+    - Street addresses (house number and street name)
+    - Neighborhoods and districts
+    - Cities, towns, and villages
+    - Postal codes and zip codes
+    - States, provinces, and regions
+    - Countries
+
+  Note: Use limit=1 for best results (most relevant match). This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest - it only returns administrative locations and addresses.
+
+  Related tools:
+    - Use search_and_geocode_tool for the opposite: convert addresses to coordinates (forward geocoding)
+    - Use search_and_geocode_tool to find businesses or POIs by name
+
+  Supports both JSON and text output formats.`;
   annotations = {
     title: 'Reverse Geocode Tool',
     readOnlyHint: true,
