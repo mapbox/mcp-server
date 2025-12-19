@@ -22,25 +22,8 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   typeof SearchBoxResponseSchema
 > {
   name = 'search_and_geocode_tool';
-  description = `Search for specific points of interest (POIs), businesses, brands, landmarks, and convert addresses or place names to coordinates (geocoding). Returns detailed location information including coordinates (latitude/longitude), addresses, and place metadata.
-
-  Use this when:
-    - User specifies a particular place name, brand, or business (e.g., "Starbucks on 5th Avenue", "Empire State Building")
-    - Converting addresses to coordinates for mapping or routing
-    - Looking up specific landmarks, buildings, or locations by name
-    - Need precise location details for a named place
-
-  Common use cases:
-    - Geocode an address: "123 Main Street, Seattle, WA" → coordinates
-    - Find a specific business: "Find the nearest Tesla showroom"
-    - Locate landmarks: "Where is the Statue of Liberty?"
-    - Get coordinates for routing: "Get directions from Central Park to Times Square"
-
-  Related tools:
-    - Use category_search_tool for browsing all places by type (e.g., "all restaurants nearby", "show me gas stations")
-    - Use reverse_geocode_tool to convert coordinates back to addresses
-
-  Note: Do not use for generic place types like 'museums', 'coffee shops', 'tacos' - category_search_tool is better for that. Setting a proximity point is strongly encouraged for more local results.`;
+  description =
+    "Search for POIs, brands, chains, geocode cities, towns, addresses. Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc, because category_search_tool is better for that. Setting a proximity point is strongly encouraged for more local results.";
   annotations = {
     title: 'Search and Geocode Tool',
     readOnlyHint: true,
