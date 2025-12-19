@@ -463,8 +463,7 @@ describe('ReverseGeocodeTool', () => {
     const result = await new ReverseGeocodeTool({ httpRequest }).run({
       longitude: -122.676,
       latitude: 45.515,
-      format: 'json_string',
-      compact: false // Use verbose format to match exact mockResponse
+      format: 'json_string'
     });
 
     expect(result.isError).toBe(false);
@@ -473,63 +472,6 @@ describe('ReverseGeocodeTool', () => {
     const jsonContent = (result.content[0] as { type: 'text'; text: string })
       .text;
     expect(JSON.parse(jsonContent)).toEqual(mockResponse);
-  });
-
-  it('returns compact JSON by default', async () => {
-    const mockResponse = {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          properties: {
-            name: 'Test Address',
-            full_address: '123 Test St, Test City, TC 12345',
-            feature_type: 'address',
-            context: {
-              address: { name: '123 Test St' },
-              place: { name: 'Test City' },
-              region: { name: 'Test Region' },
-              country: { name: 'Test Country' }
-            }
-          },
-          geometry: {
-            type: 'Point',
-            coordinates: [-122.676, 45.515]
-          }
-        }
-      ],
-      attribution: 'Some attribution text'
-    };
-
-    const { httpRequest } = setupHttpRequest({
-      json: async () => mockResponse
-    });
-
-    const result = await new ReverseGeocodeTool({ httpRequest }).run({
-      longitude: -122.676,
-      latitude: 45.515,
-      format: 'json_string'
-      // compact defaults to true
-    });
-
-    expect(result.isError).toBe(false);
-
-    const compactResult = JSON.parse(
-      (result.content[0] as { type: 'text'; text: string }).text
-    );
-
-    // Should be compact (no attribution, flattened context)
-    expect(compactResult.attribution).toBeUndefined();
-    expect(compactResult.features[0].properties.address).toBe('123 Test St');
-    expect(compactResult.features[0].properties.place).toBe('Test City');
-    expect(compactResult.features[0].properties.region).toBe('Test Region');
-    expect(compactResult.features[0].properties.country).toBe('Test Country');
-    expect(compactResult.features[0].properties.coordinates).toEqual({
-      longitude: -122.676,
-      latitude: 45.515
-    });
-    // Should not have nested context object
-    expect(compactResult.features[0].properties.context).toBeUndefined();
   });
 
   it('defaults to formatted_text format when format not specified', async () => {

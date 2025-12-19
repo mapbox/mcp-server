@@ -61,12 +61,5 @@ export const SearchAndGeocodeInputSchema = z.object({
       longitude: z.number().min(-180).max(180),
       latitude: z.number().min(-90).max(90)
     })
-    .optional(),
-  compact: z
-    .boolean()
     .optional()
-    .default(true)
-    .describe(
-      'When true (default), returns simplified GeoJSON with only essential fields (name, address, coordinates, categories, brand). When false, returns full verbose Mapbox API response with all metadata. Only applies to structured content output.'
-    )
 });
