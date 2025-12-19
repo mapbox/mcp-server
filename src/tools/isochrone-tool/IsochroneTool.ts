@@ -16,20 +16,11 @@ export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneResponseSchema
 > {
   name = 'isochrone_tool';
-  description = `Computes areas that are reachable within a specified amount of time or distance from a location (reachability analysis, coverage area, service area). Returns the reachable regions as contours of Polygons or LineStrings in GeoJSON format that you can display on a map.
-
+  description = `Computes areas that are reachable within a specified amount of time from a location, and returns the reachable regions as contours of Polygons or LineStrings in GeoJSON format that you can display on a map.
   Common use cases:
     - Show a user how far they can travel in X minutes from their current location
     - Determine whether a destination is within a certain travel time threshold
-    - Compare travel ranges for different modes of transportation (driving, walking, cycling)
-    - Visualize service coverage areas for businesses or facilities
-    - Analyze accessibility and reachability for logistics planning
-    - Find all areas within 30-minute drive time for delivery zones
-
-  Returns:
-    - GeoJSON contours showing reachable areas
-    - Multiple time/distance bands (e.g., 10, 20, 30 minutes)
-    - Visualizable polygons for mapping coverage`;
+    - Compare travel ranges for different modes of transportation'`;
   annotations = {
     title: 'Isochrone Tool',
     readOnlyHint: true,

@@ -19,26 +19,8 @@ export class CategorySearchTool extends MapboxApiBasedTool<
   typeof CategorySearchResponseSchema
 > {
   name = 'category_search_tool';
-  description = `Search for points of interest by category or type (restaurants, gas stations, hotels, ATMs, parking, coffee shops, pharmacies, museums, hospitals, etc.). Returns a list of nearby places matching the category with coordinates, names, addresses, and details.
-
-  Use this when:
-    - User asks for a type or category of place (plural/generic): "Where are the restaurants nearby?", "Show me all coffee shops"
-    - Browsing options: "What hotels are available downtown?", "Find gas stations along this route"
-    - Discovery queries: "What's around here?", "Show me all ATMs in this neighborhood"
-    - Generic searches with keywords like 'any', 'all', 'nearby', 'around', 'in this area'
-
-  Common use cases:
-    - Find all POIs by type: "Show me all pharmacies within 5 miles"
-    - Browse options: "What restaurants are near Times Square?"
-    - Amenity search: "Find EV charging stations nearby"
-    - Service discovery: "Where are the nearest hospitals?"
-    - Shopping: "Show me all grocery stores in downtown Seattle"
-
-  Difference from search_and_geocode_tool:
-    - Use category_search_tool for types/categories (e.g., "all restaurants", "coffee shops")
-    - Use search_and_geocode_tool for specific names/brands (e.g., "Starbucks on 5th Ave", "Empire State Building")
-
-  Supports both JSON and text output formats.`;
+  description =
+    "Return all places that match a category (industry, amenity, or NAICS‑style code). Use when the user asks for a type of place, plural or generic terms like 'museums', 'coffee shops', 'electric‑vehicle chargers', or when the query includes is‑a phrases such as 'any', 'all', 'nearby'. Do not use when a unique name or brand is provided. Supports both JSON and text output formats.";
   annotations = {
     title: 'Category Search Tool',
     readOnlyHint: true,
