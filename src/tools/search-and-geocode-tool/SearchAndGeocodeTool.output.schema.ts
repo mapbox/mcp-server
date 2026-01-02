@@ -93,6 +93,20 @@ const SearchBoxFeaturePropertiesSchema = z
       .optional(),
     bbox: z.array(z.number()).length(4).optional(),
 
+    // Metadata schema for additional feature information
+    metadata: z
+      .object({
+        // API sometimes returns string, sometimes array - accept both
+        primary_photo: z.union([z.string(), z.array(z.string())]).optional(),
+        reading: z
+          .object({
+            ja_kana: z.string().optional(),
+            ja_latin: z.string().optional()
+          })
+          .optional()
+      })
+      .optional(),
+
     // POI specific fields
     poi_category: z.array(z.string()).optional(),
     poi_category_ids: z.array(z.string()).optional(),
