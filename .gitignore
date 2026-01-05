@@ -151,3 +151,6 @@ dist
 
 # Test results
 test-results.xml
+
+# API monitoring failures
+test/failures/
