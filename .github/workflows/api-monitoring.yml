@@ -10,6 +10,10 @@ on:
 jobs:
   monitor-apis:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
 
     steps:
       - name: Checkout code
