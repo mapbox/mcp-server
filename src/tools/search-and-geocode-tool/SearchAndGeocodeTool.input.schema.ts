@@ -53,7 +53,7 @@ export const SearchAndGeocodeInputSchema = z.object({
     .optional()
     .describe('Request estimated time of arrival (ETA) to results'),
   navigation_profile: z
-    .enum(['driving', 'walking', 'cycling', 'driving-traffic'])
+    .enum(['driving', 'walking', 'cycling'])
     .optional()
     .describe('Routing profile for ETA calculations'),
   origin: z
