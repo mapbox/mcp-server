@@ -100,6 +100,20 @@ const SearchBoxFeaturePropertiesSchema = z
     brand_id: z.union([z.string(), z.array(z.string())]).optional(),
     external_ids: z.record(z.string()).optional(),
 
+    // Metadata schema for additional feature information
+    metadata: z
+      .object({
+        // API sometimes returns string, sometimes array - accept both
+        primary_photo: z.union([z.string(), z.array(z.string())]).optional(),
+        reading: z
+          .object({
+            ja_kana: z.string().optional(),
+            ja_latin: z.string().optional()
+          })
+          .optional()
+      })
+      .optional(),
+
     // Additional metadata
     maki: z.string().optional(),
     operational_status: z.string().optional(),
