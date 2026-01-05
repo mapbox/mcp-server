@@ -1,3 +1,9 @@
+## 0.8.0
+
+### Bug Fixes
+
+- Removed an invalid option in input schema of `search_and_geocode_tool`. The `navigation_profile` used to have invalid `driving-traffic` option.
+
 ## 0.7.0
 
 ### Features Added
