@@ -315,4 +315,62 @@ describe('SearchAndGeocodeTool output schema registration', () => {
       }
     }).toThrow();
   });
+
+  it('should validate brand_id as a string', () => {
+    const responseWithStringBrandId = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-122.4194, 37.7749]
+          },
+          properties: {
+            name: 'Starbucks',
+            brand: ['Starbucks'],
+            brand_id: 'starbucks-123'
+          }
+        }
+      ]
+    };
+
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
+
+    expect(() => {
+      if (tool.outputSchema) {
+        tool.outputSchema.parse(responseWithStringBrandId);
+      }
+    }).not.toThrow();
+  });
+
+  it('should validate brand_id as an array of strings', () => {
+    const responseWithArrayBrandId = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-122.4194, 37.7749]
+          },
+          properties: {
+            name: 'Multi-Brand Store',
+            brand: ['Brand A', 'Brand B'],
+            brand_id: ['brand-a-123', 'brand-b-456']
+          }
+        }
+      ]
+    };
+
+    const { httpRequest } = setupHttpRequest();
+    const tool = new SearchAndGeocodeTool({ httpRequest });
+
+    expect(() => {
+      if (tool.outputSchema) {
+        tool.outputSchema.parse(responseWithArrayBrandId);
+      }
+    }).not.toThrow();
+  });
 });

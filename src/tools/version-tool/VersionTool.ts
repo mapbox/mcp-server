@@ -41,7 +41,12 @@ export class VersionTool extends BaseTool<
         try {
           const versionInfo = getVersionInfo();
           const versionText = `MCP Server Version Information:\n- Name: ${versionInfo.name}\n- Version: ${versionInfo.version}\n- SHA: ${versionInfo.sha}\n- Tag: ${versionInfo.tag}\n- Branch: ${versionInfo.branch}`;
-          const validatedVersionInfo = VersionResponseSchema.parse(versionInfo);
+
+          // Validate with graceful fallback
+          const validatedVersionInfo = this.validateOutput(
+            versionInfo
+          ) as Record<string, unknown>;
+
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
           return {
@@ -49,24 +54,23 @@ export class VersionTool extends BaseTool<
             structuredContent: validatedVersionInfo,
             isError: false
           };
-        } catch (validationError) {
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           toolContext.span.setStatus({
             code: SpanStatusCode.ERROR,
-            message:
-              validationError instanceof Error
-                ? validationError.message
-                : 'Unknown validation error'
+            message: errorMessage
           });
           toolContext.span.end();
           this.log(
             'error',
-            `Output schema validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`
+            `${this.name}: Error during execution: ${errorMessage}`
           );
           return {
             content: [
               {
                 type: 'text' as const,
-                text: 'VersionTool: Output schema validation failed.'
+                text: `VersionTool: Error during execution: ${errorMessage}`
               }
             ],
             isError: true

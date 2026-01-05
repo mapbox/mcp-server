@@ -1,57 +1,57 @@
-# GitHub Copilot Usage & Standards for Mapbox MCP Server
+# GitHub Copilot Guidelines for Mapbox MCP Server
 
-This document defines how to use GitHub Copilot effectively and responsibly in the Mapbox MCP server repository. Following these guidelines ensures Copilot is a productive tool that supports, but does not replace, our engineering standards.
+This document defines responsible use of GitHub Copilot in this repository. Copilot is a productivity tool that must work within our engineering standards.
 
----
+## Core Principles
 
-## 1. Copilot as an Assistant, Not an Authority
+### 1. Review, Don't Auto-Accept
 
-- **Review All Suggestions:** Never accept Copilot code without reviewing it for correctness, security, and style.
-- **Understand Before You Use:** Only use Copilot suggestions you fully understand. If unsure, ask for clarification or write it yourself.
-- **No Blind Copy-Paste:** Do not copy-paste large blocks of Copilot code without adapting to project context.
+- **Always review** Copilot suggestions before accepting
+- **Understand first** - only use code you fully comprehend
+- **No blind copy-paste** - adapt suggestions to project context
+- **Iterate** - use suggestions as starting points, not final solutions
 
----
+### 2. Security First
 
-## 2. Code Quality & Consistency
+- **Never accept** suggestions with hardcoded secrets, tokens, or credentials
+- **Review carefully** any code handling sensitive data
+- **Environment variables** - ensure secrets use `.env` files, never committed
 
-- **Follow Project Standards:** All Copilot-generated code must comply with the standards in `CLAUDE.md` and our linting, typing, and testing requirements.
-- **TypeScript Only:** Copilot suggestions must be in TypeScript for all code in `src/` and `test/`.
-- **No Global Pollution:** Do not accept suggestions that patch or override global objects (e.g., `global.fetch`).
+### 3. Quality Standards
 
----
+- All Copilot code must comply with standards in **CLAUDE.md** and **docs/engineering_standards.md**
+- Pre-commit hooks will enforce linting, formatting, and TypeScript strictness
+- If Copilot suggests patterns inconsistent with the codebase, reject and write manually
 
-## 3. Testing & Documentation
+### 4. Testing & Documentation
 
-- **Tests Required:** All Copilot-generated features or fixes must include appropriate unit tests.
-- **JSDoc & Comments:** Add or edit documentation/comments for Copilot code as you would for hand-written code.
+- Include unit tests for all Copilot-generated features or fixes
+- Add or update JSDoc comments as you would for hand-written code
+- Update README.md or CHANGELOG.md if user-facing changes
 
----
+### 5. Collaboration
 
-## 4. Security & Privacy
+- All Copilot code goes through standard PR review process
+- Mention in PR description if significant portion is Copilot-generated
+- Provide feedback if Copilot produces poor/unsafe suggestions
 
-- **No Secrets:** Never accept suggestions that include hardcoded secrets, tokens, or credentials.
-- **Sensitive Data:** Do not use Copilot to generate or handle sensitive data without review.
+## When to Avoid Copilot
 
----
+- **Critical business logic** - prefer hand-written code with thorough review
+- **Security-sensitive code** - authentication, authorization, data validation
+- **Legal/compliance code** - licensing, terms of service, privacy policies
+- **Architecture decisions** - let humans make strategic choices
 
-## 5. Collaboration & Review
+## Learning from the Codebase
 
-- **Pull Requests:** All Copilot-generated code must go through the standard PR review process.
-- **Attribution:** If a significant portion of a PR is Copilot-generated, mention it in the PR description.
-- **Feedback:** If Copilot produces poor or unsafe suggestions, provide feedback to improve future results.
+Copilot learns patterns from existing code. This codebase has strong conventions:
 
----
+- Dependency injection for testability (see src/tools/)
+- HttpPipeline for all HTTP requests (see src/utils/httpPipeline.ts)
+- Consistent tool structure extending MapboxApiBasedTool
 
-## 6. When Not to Use Copilot
-
-- **Complex Business Logic:** For critical or complex business logic, prefer hand-written code and thorough review.
-- **Legal/Compliance Code:** Do not use Copilot for code with legal, licensing, or compliance implications without explicit review.
-
----
-
-## 7. Continuous Improvement
-
-- **Iterate:** Use Copilot to explore solutions, but always iterate and refine.
-- **Propose Improvements:** Suggest updates to this document as Copilot and our practices evolve.
+Let Copilot learn these patterns rather than explicitly re-teaching them.
 
 ---
+
+**Remember**: Copilot is an assistant, not an authority. You own the code you commit.
