@@ -34,7 +34,7 @@ jobs:
           MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
           RUN_API_MONITORING: 'true'
         run: |
-          npm test -- test/integration/live-api-monitoring.test.ts --reporter=verbose 2>&1 | tee test-output.log
+          npm test -- test/integration/live-api-monitoring.test.ts
         continue-on-error: true
 
       - name: Check for failures
