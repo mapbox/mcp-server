@@ -19,7 +19,7 @@
     "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" --fix",
     "postinstall": "patch-package",
-    "prepare": "husky && node .husky/setup-hooks.js",
+    "prepare": "node -e \"try { require('fs').accessSync('.git'); require('child_process').execSync('husky && node .husky/setup-hooks.js', {stdio:'inherit'}) } catch { }\"",
     "spellcheck": "cspell \"*.md\" \"src/**/*.ts\" \"test/**/*.ts\"",
     "sync-manifest": "node scripts/sync-manifest-version.cjs",
     "test": "vitest",
@@ -76,7 +76,7 @@
   ],
   "dependencies": {
     "@mcp-ui/server": "^5.13.1",
-    "@modelcontextprotocol/sdk": "^1.21.1",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.56.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
