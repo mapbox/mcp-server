@@ -4,6 +4,8 @@
 import { FindPlacesNearbyPrompt } from './FindPlacesNearbyPrompt.js';
 import { GetDirectionsPrompt } from './GetDirectionsPrompt.js';
 import { ShowReachableAreasPrompt } from './ShowReachableAreasPrompt.js';
+import { OptimizeDeliveriesPrompt } from './OptimizeDeliveriesPrompt.js';
+import { CleanGpsTracePrompt } from './CleanGpsTracePrompt.js';
 
 /**
  * Central registry of all available prompts.
@@ -16,7 +18,9 @@ import { ShowReachableAreasPrompt } from './ShowReachableAreasPrompt.js';
 const ALL_PROMPTS = [
   new FindPlacesNearbyPrompt(),
   new GetDirectionsPrompt(),
-  new ShowReachableAreasPrompt()
+  new ShowReachableAreasPrompt(),
+  new OptimizeDeliveriesPrompt(),
+  new CleanGpsTracePrompt()
 ] as const;
 
 /**
