@@ -18,7 +18,7 @@
     "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" npx -y tsx src/index.ts",
     "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" --fix",
-    "postinstall": "patch-package",
+    "postinstall": "cd ../../.. && node ./node_modules/patch-package/index.js --patch-dir ./node_modules/@mapbox/mcp-server/patches || true",
     "prepare": "node -e \"try { require('fs').accessSync('.husky/setup-hooks.js'); require('child_process').execSync('husky && node .husky/setup-hooks.js', {stdio:'inherit'}) } catch { }\"",
     "spellcheck": "cspell \"*.md\" \"src/**/*.ts\" \"test/**/*.ts\"",
     "sync-manifest": "node scripts/sync-manifest-version.cjs",
