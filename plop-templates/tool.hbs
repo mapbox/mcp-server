@@ -16,6 +16,13 @@ export class {{pascalCase name}}Tool extends MapboxApiBasedTool<
 > {
   name = '{{toolName}}';
   description = 'TODO: Add tool description here.';
+  annotations = {
+    title: '{{pascalCase name}} Tool',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true
+  };
 
   constructor({ httpRequest }: { httpRequest: HttpRequest }) {
     super({
@@ -28,16 +35,29 @@ export class {{pascalCase name}}Tool extends MapboxApiBasedTool<
   /**
    * Execute the tool logic
    * @param input - Validated input from {{pascalCase name}}InputSchema
+   * @param accessToken - Mapbox access token
    * @returns CallToolResult with structured output
    */
   protected async execute(
-    input: z.infer<typeof {{pascalCase name}}InputSchema>
+    input: z.infer<typeof {{pascalCase name}}InputSchema>,
+    accessToken: string
   ): Promise<any> {
-    ... write your logic here ...
-    // e.g.:
-    // const url = `${MapboxApiBasedTool.MAPBOX_API_ENDPOINT}...?access_token=${MapboxApiBasedTool.MAPBOX_ACCESS_TOKEN}`;
-    // const response = await fetch(url);
-    // const data = await response.json();
-    // return data;
+    // TODO: Implement your tool logic here
+    // Example:
+    // const url = `${MapboxApiBasedTool.mapboxApiEndpoint}your-api-endpoint?access_token=${accessToken}`;
+    // const response = await this.httpRequest(url);
+    // if (!response.ok) {
+    //   return {
+    //     content: [{ type: 'text', text: `Error: ${response.statusText}` }],
+    //     isError: true
+    //   };
+    // }
+    // const data = (await response.json()) as {{pascalCase name}}Output;
+    // return {
+    //   content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+    //   structuredContent: data,
+    //   isError: false
+    // };
+    throw new Error('Not implemented');
   }
 }
