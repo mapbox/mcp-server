@@ -1,13 +1,24 @@
-import { context, SpanStatusCode, trace } from '@opentelemetry/api';
-import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { context, SpanStatusCode, trace } from '@opentelemetry/api';
+import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { getVersionInfo } from '../../utils/versionUtils.js';
 import { VersionSchema } from './VersionTool.input.schema.js';
 import { VersionResponseSchema } from './VersionTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, Icon } from '@modelcontextprotocol/sdk/types.js';
+
+/**
+ * Default Mapbox icon
+ */
+const MAPBOX_ICON: Icon[] = [
+  {
+    src: 'https://avatars.githubusercontent.com/u/600935?s=200&v=4',
+    mimeType: 'image/png',
+    sizes: ['200x200']
+  }
+];
 
 export class VersionTool extends BaseTool<
   typeof VersionSchema,
@@ -27,7 +38,8 @@ export class VersionTool extends BaseTool<
   constructor() {
     super({
       inputSchema: VersionSchema,
-      outputSchema: VersionResponseSchema
+      outputSchema: VersionResponseSchema,
+      icons: MAPBOX_ICON
     });
   }
 

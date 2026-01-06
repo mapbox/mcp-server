@@ -7,7 +7,8 @@ import type {
 } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type {
   ToolAnnotations,
-  CallToolResult
+  CallToolResult,
+  Icon
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny } from 'zod';
@@ -23,14 +24,17 @@ export abstract class BaseTool<
 
   readonly inputSchema: InputSchema;
   readonly outputSchema?: OutputSchema;
+  readonly icons?: Icon[];
   protected server: McpServer | null = null;
 
   constructor(params: {
     inputSchema: InputSchema;
     outputSchema?: OutputSchema;
+    icons?: Icon[];
   }) {
     this.inputSchema = params.inputSchema;
     this.outputSchema = params.outputSchema;
+    this.icons = params.icons;
   }
 
   /**
@@ -47,6 +51,7 @@ export abstract class BaseTool<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       outputSchema?: any;
       annotations?: ToolAnnotations;
+      icons?: Icon[];
     } = {
       title: this.annotations.title,
       description: this.description,
@@ -62,9 +67,15 @@ export abstract class BaseTool<
         (this.outputSchema as unknown as z.ZodObject<any>).shape;
     }
 
+    // Add icons if provided
+    if (this.icons) {
+      config.icons = this.icons;
+    }
+
     return server.registerTool(
       this.name,
-      config,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      config as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (args: any, extra: any) => this.run(args, extra)
     );

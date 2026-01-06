@@ -6,12 +6,24 @@ import type { ZodTypeAny } from 'zod';
 import { BaseTool } from './BaseTool.js';
 import type {
   CallToolResult,
-  ToolAnnotations
+  ToolAnnotations,
+  Icon
 } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../utils/types.js';
 import { context, trace, SpanStatusCode } from '@opentelemetry/api';
 import type { ToolExecutionContext } from '../utils/tracing.js';
 import { createToolExecutionContext } from '../utils/tracing.js';
+
+/**
+ * Default Mapbox icon for all Mapbox tools
+ */
+const MAPBOX_ICON: Icon[] = [
+  {
+    src: 'https://avatars.githubusercontent.com/u/600935?s=200&v=4',
+    mimeType: 'image/png',
+    sizes: ['200x200']
+  }
+];
 
 export abstract class MapboxApiBasedTool<
   InputSchema extends ZodTypeAny,
@@ -36,7 +48,10 @@ export abstract class MapboxApiBasedTool<
     outputSchema?: OutputSchema;
     httpRequest: HttpRequest;
   }) {
-    super(params);
+    super({
+      ...params,
+      icons: MAPBOX_ICON
+    });
     this.httpRequest = params.httpRequest;
   }
 
