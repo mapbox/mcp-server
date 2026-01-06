@@ -62,8 +62,11 @@ export abstract class BaseTool<
         (this.outputSchema as unknown as z.ZodObject<any>).shape;
     }
 
-    return server.registerTool(this.name, config, (args, extra) =>
-      this.run(args, extra)
+    return server.registerTool(
+      this.name,
+      config,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (args: any, extra: any) => this.run(args, extra)
     );
   }
 

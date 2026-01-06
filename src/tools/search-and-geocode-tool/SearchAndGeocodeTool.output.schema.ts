@@ -118,12 +118,15 @@ const SearchBoxFeaturePropertiesSchema = z
     maki: z.string().optional(),
     operational_status: z.string().optional(),
 
-    // ETA information (when requested)
+    // ETA information (when requested) - can be a number (seconds) or an object
     eta: z
-      .object({
-        duration: z.number().optional(),
-        distance: z.number().optional()
-      })
+      .union([
+        z.number(),
+        z.object({
+          duration: z.number().optional(),
+          distance: z.number().optional()
+        })
+      ])
       .optional(),
 
     // Top-level country field (in addition to context.country)

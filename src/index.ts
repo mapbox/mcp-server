@@ -95,28 +95,35 @@ server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
   };
 });
 
-server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+// Type assertion to avoid "Type instantiation is excessively deep" error
+// This is a known issue in MCP SDK 1.25.1: https://github.com/modelcontextprotocol/typescript-sdk/issues/985
+// TODO: Remove this workaround when SDK fixes their type definitions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(server.server as any).setRequestHandler(
+  GetPromptRequestSchema,
+  async (request: any) => {
+    const { name, arguments: args } = request.params;
 
-  const prompt = getPromptByName(name);
-  if (!prompt) {
-    throw new Error(`Prompt not found: ${name}`);
+    const prompt = getPromptByName(name);
+    if (!prompt) {
+      throw new Error(`Prompt not found: ${name}`);
+    }
+
+    // Convert args to object for easier access
+    const argsObj: Record<string, string> = {};
+    if (args && typeof args === 'object') {
+      Object.assign(argsObj, args);
+    }
+
+    // Get the prompt messages with filled-in arguments
+    const messages = prompt.getMessages(argsObj);
+
+    return {
+      description: prompt.description,
+      messages
+    };
   }
-
-  // Convert args to object for easier access
-  const argsObj: Record<string, string> = {};
-  if (args && typeof args === 'object') {
-    Object.assign(argsObj, args);
-  }
-
-  // Get the prompt messages with filled-in arguments
-  const messages = prompt.getMessages(argsObj);
-
-  return {
-    description: prompt.description,
-    messages
-  };
-});
+);
 
 async function main() {
   // Initialize OpenTelemetry tracing if not in test mode
