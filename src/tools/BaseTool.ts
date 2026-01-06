@@ -43,16 +43,7 @@ export abstract class BaseTool<
   installTo(server: McpServer): RegisteredTool {
     this.server = server;
 
-    const config: {
-      title?: string;
-      description?: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      inputSchema?: any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      outputSchema?: any;
-      annotations?: ToolAnnotations;
-      icons?: Icon[];
-    } = {
+    const config = {
       title: this.annotations.title,
       description: this.description,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,20 +53,21 @@ export abstract class BaseTool<
 
     // Add outputSchema if provided
     if (this.outputSchema) {
-      config.outputSchema =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (config as any).outputSchema =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (this.outputSchema as unknown as z.ZodObject<any>).shape;
     }
 
-    // Add icons if provided
+    // Add icons if provided (not yet in SDK type definition)
     if (this.icons) {
-      config.icons = this.icons;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (config as any).icons = this.icons;
     }
 
     return server.registerTool(
       this.name,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      config as any,
+      config,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (args: any, extra: any) => this.run(args, extra)
     );
