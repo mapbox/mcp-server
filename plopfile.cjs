@@ -1,3 +1,24 @@
+/**
+ * Plop generator for creating new MCP tools.
+ *
+ * Usage:
+ *   Interactive mode (requires TTY):
+ *     npx plop create-tool
+ *
+ *   Non-interactive mode (for CI, scripts, or non-TTY environments):
+ *     npx plop create-tool "ToolName" "tool_name_tool"
+ *
+ * Example:
+ *   npx plop create-tool "Search" "search_tool"
+ *
+ * This generates:
+ *   - src/tools/search-tool/SearchTool.ts
+ *   - src/tools/search-tool/SearchTool.input.schema.ts
+ *   - src/tools/search-tool/SearchTool.output.schema.ts
+ *   - test/tools/search-tool/SearchTool.test.ts
+ *   - Updates src/tools/toolRegistry.ts
+ *   - Updates README.md
+ */
 module.exports = function (plop) {
     plop.setGenerator('create-tool', {
         description: 'Generate a TypeScript class and its test',
@@ -6,7 +27,7 @@ module.exports = function (plop) {
                 type: 'input',
                 name: 'name',
                 message: 'Tool class name without suffix using PascalCase e.g. Search:',
-            },            
+            },
             {
                 type: 'input',
                 name: 'toolName',
@@ -44,7 +65,7 @@ module.exports = function (plop) {
                 type: 'append',
                 path: 'src/tools/toolRegistry.ts',
                 pattern: /(\/\/ INSERT NEW TOOL INSTANCE HERE)/,
-                template: '  new {{pascalCase name}}Tool(),',
+                template: '  new {{pascalCase name}}Tool({ httpRequest }),',
             },
             {
                 type: 'append',
