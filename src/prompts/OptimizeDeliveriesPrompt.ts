@@ -8,18 +8,19 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 
 /**
- * Prompt for optimizing delivery routes using the Optimization API.
+ * Prompt for optimizing delivery routes using the Optimization API v1.
  *
  * This prompt guides the agent through:
- * 1. Collecting delivery locations and requirements
- * 2. Starting an optimization task (async operation)
- * 3. Polling for results
- * 4. Presenting the optimized route with ETAs and sequence
+ * 1. Geocoding delivery locations (if needed)
+ * 2. Using optimization_tool to find optimal route (2-12 locations)
+ * 3. Presenting the optimized waypoint sequence with trip statistics
  *
  * Example queries:
- * - "Optimize my delivery route for these 10 addresses"
+ * - "Optimize my delivery route for these addresses"
  * - "Find the best order to visit these locations"
  * - "Plan the most efficient route for my deliveries today"
+ *
+ * Note: Limited to 12 coordinates per request (Optimization API v1 constraint)
  */
 export class OptimizeDeliveriesPrompt extends BasePrompt {
   readonly name = 'optimize-deliveries';
@@ -60,21 +61,26 @@ export class OptimizeDeliveriesPrompt extends BasePrompt {
 
 Please follow these steps:
 1. Geocode all locations to get coordinates (if they're addresses)
+   - IMPORTANT: The Optimization API v1 supports 2-12 coordinates maximum
+   - If you have more than 12 locations, inform the user and ask which locations to prioritize
+
 2. Use optimization_tool to find the optimal route:
-   - Pass coordinates array
+   - Pass coordinates array (2-12 coordinates)
    - Set profile to mapbox/${mode}
-   - The tool will process the optimization (this may take 5-10 seconds for complex routes)
-3. Once results are available, display:
-   - Optimized sequence of stops (which location to visit in what order)
-   - Total distance and estimated travel time
-   - Estimated arrival time at each stop
-   - Map visualization showing the optimized route
-   - Any locations that couldn't be included (dropped items)
+   - Optionally set geometries to "geojson" for map visualization
+   - Consider using roundtrip:false for one-way trips
+   - The tool returns results immediately (synchronous)
+
+3. Display the optimized route:
+   - Show the waypoints in optimal visiting order (use waypoint_index to show original positions)
+   - Total distance (from trips[0].distance) and duration (from trips[0].duration)
+   - Map visualization if geometry was requested
+   - Individual leg details if relevant
 
 Format the output to be clear with:
-- Numbered list of stops in optimal order
-- ETAs at each location
-- Total trip statistics`
+- Numbered list of stops in optimal order (e.g., "1. Stop 3 (original position 2) → 2. Stop 1 (original position 0)")
+- Total trip statistics (distance in km, duration in minutes)
+- Map showing the complete route if geometry is available`
         }
       }
     ];

@@ -4,134 +4,127 @@
 import { z } from 'zod';
 
 /**
- * Stop schema for route stops
- * Made flexible to handle various API response formats
+ * Waypoint schema for optimized trips
  */
-const stopSchema = z
+const waypointSchema = z
   .object({
-    type: z
-      .string()
-      .describe(
-        'Type of stop. Known values include "start" (vehicle begins), "service" (perform service), "pickup"/"dropoff" (shipment handling), "break" (vehicle break), "end" (vehicle finishes). Additional values may be returned as the API evolves.'
-      ),
+    name: z.string().optional().describe('Street or location name'),
     location: z
-      .string()
-      .describe(
-        'Location name for this stop (e.g., "location-0", "location-1")'
-      ),
-    eta: z
-      .string()
-      .optional()
-      .describe(
-        'Estimated time of arrival in ISO 8601 format (e.g., "2023-07-22T14:29:23-07:00")'
-      ),
-    odometer: z
+      .tuple([z.number(), z.number()])
+      .describe('Coordinates as [longitude, latitude]'),
+    waypoint_index: z
       .number()
-      .optional()
-      .describe('Total distance traveled to reach this stop in meters'),
-    wait: z
+      .int()
+      .describe('Index in the original coordinates array'),
+    trips_index: z
       .number()
-      .optional()
-      .describe('Wait time at this stop in seconds before proceeding'),
+      .int()
+      .describe('Index of the trip this waypoint belongs to')
+  })
+  .passthrough();
+
+/**
+ * Leg annotation schema
+ */
+const annotationSchema = z
+  .object({
     duration: z
-      .number()
+      .array(z.number())
       .optional()
-      .describe('Duration of service/activity at this stop in seconds'),
-    services: z
-      .array(z.string())
+      .describe('Duration of each segment in seconds'),
+    distance: z
+      .array(z.number())
       .optional()
-      .describe('Array of service names fulfilled at this stop'),
-    pickups: z
-      .array(z.string())
+      .describe('Distance of each segment in meters'),
+    speed: z
+      .array(z.number())
       .optional()
-      .describe('Array of shipment names picked up at this stop'),
-    dropoffs: z
-      .array(z.string())
-      .optional()
-      .describe('Array of shipment names dropped off at this stop')
+      .describe('Speed of each segment in meters per second')
   })
-  .passthrough(); // Allow additional fields from API
+  .passthrough();
 
 /**
- * Route schema
+ * Step schema for turn-by-turn instructions
  */
-const routeSchema = z
+const stepSchema = z
   .object({
-    vehicle: z
-      .string()
-      .describe(
-        'Vehicle name for this route (matches the vehicle name from input)'
-      ),
-    stops: z
-      .array(stopSchema)
-      .describe(
-        'Ordered sequence of stops for this vehicle, from start to end. Includes all services, pickups, dropoffs, and breaks in optimized order.'
-      )
+    distance: z.number().describe('Distance for this step in meters'),
+    duration: z.number().describe('Duration for this step in seconds'),
+    geometry: z
+      .union([z.string(), z.object({})])
+      .optional()
+      .describe('Step geometry'),
+    name: z.string().optional().describe('Street name'),
+    mode: z.string().optional().describe('Mode of travel'),
+    maneuver: z
+      .object({})
+      .passthrough()
+      .optional()
+      .describe('Maneuver details'),
+    intersections: z
+      .array(z.object({}).passthrough())
+      .optional()
+      .describe('Intersection details')
   })
-  .passthrough(); // Allow additional fields from API
+  .passthrough();
 
 /**
- * Dropped items schema
+ * Leg schema - represents travel between two waypoints
  */
-const droppedSchema = z
+const legSchema = z
   .object({
-    services: z
-      .array(z.string())
+    distance: z.number().describe('Distance for this leg in meters'),
+    duration: z.number().describe('Duration for this leg in seconds'),
+    weight: z.number().optional().describe('Weight for this leg'),
+    weight_name: z.string().optional().describe('Name of the weight metric'),
+    steps: z.array(stepSchema).optional().describe('Turn-by-turn instructions'),
+    annotation: annotationSchema
       .optional()
-      .describe(
-        'Array of service names that could not be fulfilled due to constraints (e.g., time windows, capacity, capabilities)'
-      ),
-    shipments: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Array of shipment names that could not be fulfilled due to constraints (e.g., time windows, capacity, capabilities)'
-      )
+      .describe('Detailed annotations for this leg')
   })
-  .passthrough(); // Allow additional fields from API
+  .passthrough();
 
 /**
- * Output schema for OptimizationTool
- * Uses passthrough to be flexible with API response variations
+ * Trip schema - represents one complete optimized route
+ */
+const tripSchema = z
+  .object({
+    geometry: z
+      .union([z.string(), z.object({}).passthrough()])
+      .optional()
+      .describe('Route geometry (polyline, polyline6, or GeoJSON)'),
+    legs: z.array(legSchema).describe('Array of legs between waypoints'),
+    weight: z.number().optional().describe('Total weight for the trip'),
+    weight_name: z.string().optional().describe('Name of the weight metric'),
+    duration: z.number().describe('Total duration in seconds'),
+    distance: z.number().describe('Total distance in meters')
+  })
+  .passthrough();
+
+/**
+ * Output schema for OptimizationTool (Mapbox Optimization API v1)
  */
 export const OptimizationOutputSchema = z
   .object({
-    version: z
-      .number()
-      .optional()
-      .describe('API version number (always 1 for Optimization API v2)'),
-    dropped: droppedSchema
-      .optional()
-      .describe(
-        'Items that could not be fulfilled in the optimization. If present, contains arrays of service/shipment names that were dropped.'
-      ),
-    routes: z
-      .array(routeSchema)
-      .optional()
-      .describe(
-        'Array of optimized routes, one per vehicle. Each route contains the vehicle name and an ordered sequence of stops. May be undefined if optimization fails completely.'
-      ),
-    // Error response fields from API
     code: z
       .string()
-      .optional()
       .describe(
-        'Error code from API (e.g., "internal_error"). Present only when the API returns an error response.'
+        'Response code: "Ok" for success, "NoRoute" if no route found, error codes for failures'
       ),
-    message: z
-      .string()
+    waypoints: z
+      .array(waypointSchema)
+      .optional()
+      .describe('Array of waypoints in the optimized order'),
+    trips: z
+      .array(tripSchema)
       .optional()
       .describe(
-        'Human-readable error message from API. Present only when the API returns an error response.'
+        'Array of optimized trips (typically one trip with all waypoints)'
       ),
-    ref: z
-      .string()
-      .optional()
-      .describe(
-        'Reference ID for the error from API. Present only when the API returns an error response.'
-      )
+    // Error response fields
+    message: z.string().optional().describe('Error message if code is not "Ok"')
   })
-  .passthrough(); // Allow additional fields from API
+  .passthrough();
 
 /**
  * Type inference for OptimizationOutput
