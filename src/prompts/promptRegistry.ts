@@ -1,8 +1,10 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { CleanGpsTracePrompt } from './CleanGpsTracePrompt.js';
 import { FindPlacesNearbyPrompt } from './FindPlacesNearbyPrompt.js';
 import { GetDirectionsPrompt } from './GetDirectionsPrompt.js';
+import { OptimizeDeliveriesPrompt } from './OptimizeDeliveriesPrompt.js';
 import { ShowReachableAreasPrompt } from './ShowReachableAreasPrompt.js';
 
 /**
@@ -14,8 +16,10 @@ import { ShowReachableAreasPrompt } from './ShowReachableAreasPrompt.js';
 
 // Instantiate all prompts
 const ALL_PROMPTS = [
+  new CleanGpsTracePrompt(),
   new FindPlacesNearbyPrompt(),
   new GetDirectionsPrompt(),
+  new OptimizeDeliveriesPrompt(),
   new ShowReachableAreasPrompt()
 ] as const;
 

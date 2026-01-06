@@ -76,6 +76,8 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 - "Show me areas reachable within 30 minutes of downtown Portland by car"
 - "Calculate a travel time matrix between these 3 hotel locations (Marriott, Sheraton and Hilton) and the convention center in Denver"
 - "Find the optimal route visiting these 3 tourist attractions (Golden Gate, Musical Stairs and Fisherman's Wharf) in San Francisco"
+- "Clean up this GPS trace from my bike ride and snap it to actual roads"
+- "Optimize my delivery route for these 10 addresses: [list of addresses]"
 
 ### Tips for Better Results
 

@@ -12,13 +12,15 @@ describe('Prompt Registry', () => {
     test('returns all registered prompts', () => {
       const prompts = getAllPrompts();
 
-      // Should have at least the 3 initial prompts
-      expect(prompts.length).toBeGreaterThanOrEqual(3);
+      // Should have at least the 5 prompts
+      expect(prompts.length).toBeGreaterThanOrEqual(5);
 
       // Verify expected prompts are present
       const promptNames = prompts.map((p) => p.name);
+      expect(promptNames).toContain('clean-gps-trace');
       expect(promptNames).toContain('find-places-nearby');
       expect(promptNames).toContain('get-directions');
+      expect(promptNames).toContain('optimize-deliveries');
       expect(promptNames).toContain('show-reachable-areas');
     });
 
@@ -83,8 +85,10 @@ describe('Prompt Registry', () => {
 
     test('returns correct prompt instances', () => {
       const promptNames = [
+        'clean-gps-trace',
         'find-places-nearby',
         'get-directions',
+        'optimize-deliveries',
         'show-reachable-areas'
       ];
 
@@ -184,6 +188,70 @@ describe('Prompt Registry', () => {
 
       const modeArg = metadata.arguments?.find((a) => a.name === 'mode');
       expect(modeArg?.required).toBe(false);
+    });
+
+    test('clean-gps-trace has correct metadata', () => {
+      const prompt = getPromptByName('clean-gps-trace');
+      expect(prompt).toBeDefined();
+
+      const metadata = prompt!.getMetadata();
+
+      expect(metadata.name).toBe('clean-gps-trace');
+      expect(metadata.description).toContain('GPS');
+
+      // Should have coordinates, mode, timestamps arguments
+      const argNames = metadata.arguments?.map((a) => a.name) || [];
+      expect(argNames).toContain('coordinates');
+      expect(argNames).toContain('mode');
+      expect(argNames).toContain('timestamps');
+
+      // coordinates should be required
+      const coordinatesArg = metadata.arguments?.find(
+        (a) => a.name === 'coordinates'
+      );
+      expect(coordinatesArg?.required).toBe(true);
+
+      // mode and timestamps should be optional
+      const modeArg = metadata.arguments?.find((a) => a.name === 'mode');
+      expect(modeArg?.required).toBe(false);
+
+      const timestampsArg = metadata.arguments?.find(
+        (a) => a.name === 'timestamps'
+      );
+      expect(timestampsArg?.required).toBe(false);
+    });
+
+    test('optimize-deliveries has correct metadata', () => {
+      const prompt = getPromptByName('optimize-deliveries');
+      expect(prompt).toBeDefined();
+
+      const metadata = prompt!.getMetadata();
+
+      expect(metadata.name).toBe('optimize-deliveries');
+      expect(metadata.description).toContain('optimal');
+
+      // Should have stops, profile, start_location, end_location arguments
+      const argNames = metadata.arguments?.map((a) => a.name) || [];
+      expect(argNames).toContain('stops');
+      expect(argNames).toContain('profile');
+      expect(argNames).toContain('start_location');
+      expect(argNames).toContain('end_location');
+
+      // stops should be required
+      const stopsArg = metadata.arguments?.find((a) => a.name === 'stops');
+      expect(stopsArg?.required).toBe(true);
+
+      // profile, start_location, end_location should be optional
+      const profileArg = metadata.arguments?.find((a) => a.name === 'profile');
+      expect(profileArg?.required).toBe(false);
+
+      const startArg = metadata.arguments?.find(
+        (a) => a.name === 'start_location'
+      );
+      expect(startArg?.required).toBe(false);
+
+      const endArg = metadata.arguments?.find((a) => a.name === 'end_location');
+      expect(endArg?.required).toBe(false);
     });
   });
 });
