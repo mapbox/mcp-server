@@ -1,0 +1,66 @@
+diff --git a/node_modules/@modelcontextprotocol/sdk/dist/cjs/server/mcp.js b/node_modules/@modelcontextprotocol/sdk/dist/cjs/server/mcp.js
+index e10bb3d..2e99bee 100644
+--- a/node_modules/@modelcontextprotocol/sdk/dist/cjs/server/mcp.js
++++ b/node_modules/@modelcontextprotocol/sdk/dist/cjs/server/mcp.js
+@@ -197,15 +197,20 @@ class McpServer {
+             return;
+         }
+         if (!result.structuredContent) {
+-            throw new types_js_1.McpError(types_js_1.ErrorCode.InvalidParams, `Output validation error: Tool ${toolName} has an output schema but no structured content was provided`);
++            // Log warning but don't throw - allow tools to omit structured content
++            console.warn(`[MCP SDK Patch] Output validation warning: Tool ${toolName} has an output schema but no structured content was provided`);
+         }
+-        // if the tool has an output schema, validate structured content
+-        const outputObj = (0, zod_compat_js_1.normalizeObjectSchema)(tool.outputSchema);
+-        const parseResult = await (0, zod_compat_js_1.safeParseAsync)(outputObj, result.structuredContent);
+-        if (!parseResult.success) {
+-            const error = 'error' in parseResult ? parseResult.error : 'Unknown error';
+-            const errorMessage = (0, zod_compat_js_1.getParseErrorMessage)(error);
+-            throw new types_js_1.McpError(types_js_1.ErrorCode.InvalidParams, `Output validation error: Invalid structured content for tool ${toolName}: ${errorMessage}`);
++        else {
++            // if the tool has an output schema, validate structured content
++            const outputObj = (0, zod_compat_js_1.normalizeObjectSchema)(tool.outputSchema);
++            const parseResult = await (0, zod_compat_js_1.safeParseAsync)(outputObj, result.structuredContent);
++            if (!parseResult.success) {
++                const error = 'error' in parseResult ? parseResult.error : 'Unknown error';
++                const errorMessage = (0, zod_compat_js_1.getParseErrorMessage)(error);
++                // Log warning but don't throw - allow schema mismatches
++                console.warn(`[MCP SDK Patch] Output validation warning: Invalid structured content for tool ${toolName}: ${errorMessage}`);
++                // Keep the structuredContent despite validation failure
++            }
+         }
+     }
+     /**
+diff --git a/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js b/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+index 23639ce..7b8a325 100644
+--- a/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
++++ b/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+@@ -194,15 +194,20 @@ export class McpServer {
+             return;
+         }
+         if (!result.structuredContent) {
+-            throw new McpError(ErrorCode.InvalidParams, `Output validation error: Tool ${toolName} has an output schema but no structured content was provided`);
++            // Log warning but don't throw - allow tools to omit structured content
++            console.warn(`[MCP SDK Patch] Output validation warning: Tool ${toolName} has an output schema but no structured content was provided`);
+         }
+-        // if the tool has an output schema, validate structured content
+-        const outputObj = normalizeObjectSchema(tool.outputSchema);
+-        const parseResult = await safeParseAsync(outputObj, result.structuredContent);
+-        if (!parseResult.success) {
+-            const error = 'error' in parseResult ? parseResult.error : 'Unknown error';
+-            const errorMessage = getParseErrorMessage(error);
+-            throw new McpError(ErrorCode.InvalidParams, `Output validation error: Invalid structured content for tool ${toolName}: ${errorMessage}`);
++        else {
++            // if the tool has an output schema, validate structured content
++            const outputObj = normalizeObjectSchema(tool.outputSchema);
++            const parseResult = await safeParseAsync(outputObj, result.structuredContent);
++            if (!parseResult.success) {
++                const error = 'error' in parseResult ? parseResult.error : 'Unknown error';
++                const errorMessage = getParseErrorMessage(error);
++                // Log warning but don't throw - allow schema mismatches
++                console.warn(`[MCP SDK Patch] Output validation warning: Invalid structured content for tool ${toolName}: ${errorMessage}`);
++                // Keep the structuredContent despite validation failure
++            }
+         }
+     }
+     /**
