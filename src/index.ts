@@ -15,17 +15,11 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
-import {
-  InMemoryTaskStore,
-  InMemoryTaskMessageQueue
-} from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import { getAllTools } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
-import { registerOptimizationTask } from './tools/optimization-tool/OptimizationTask.js';
-import { httpRequest } from './utils/httpPipeline.js';
 import {
   initializeTracing,
   shutdownTracing,
@@ -68,9 +62,6 @@ const enabledTools = filterTools(allTools, config);
 // Get all resources
 const allResources = getAllResources();
 
-// Create task store for async operations
-const taskStore = new InMemoryTaskStore();
-
 // Create an MCP server
 const server = new McpServer(
   {
@@ -81,25 +72,15 @@ const server = new McpServer(
     capabilities: {
       tools: {},
       resources: {},
-      prompts: {},
-      tasks: { requests: { tools: { call: {} } } }
-    },
-    taskStore,
-    taskMessageQueue: new InMemoryTaskMessageQueue()
+      prompts: {}
+    }
   }
 );
 
 // Register enabled tools to the server
 enabledTools.forEach((tool) => {
-  // Skip OptimizationTool as it's registered as a task instead
-  if (tool.name === 'optimization_tool') {
-    return;
-  }
   tool.installTo(server);
 });
-
-// Register task-based tools
-registerOptimizationTask(server, httpRequest);
 
 // Register all resources to the server
 allResources.forEach((resource) => {

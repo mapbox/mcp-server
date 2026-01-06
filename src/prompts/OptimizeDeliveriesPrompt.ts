@@ -63,16 +63,13 @@ Please follow these steps:
 2. Use optimization_tool to find the optimal route:
    - Pass coordinates array
    - Set profile to mapbox/${mode}
-   - The tool will run as an async task - you'll get a task ID immediately
-3. Poll the task until it completes (the tool handles this automatically)
-4. Once results are available, display:
+   - The tool will process the optimization (this may take 5-10 seconds for complex routes)
+3. Once results are available, display:
    - Optimized sequence of stops (which location to visit in what order)
    - Total distance and estimated travel time
    - Estimated arrival time at each stop
    - Map visualization showing the optimized route
    - Any locations that couldn't be included (dropped items)
-
-IMPORTANT: The optimization_tool is task-based and runs asynchronously. The tool will submit the job and poll for results in the background. Present the results once the task completes.
 
 Format the output to be clear with:
 - Numbered list of stops in optimal order
