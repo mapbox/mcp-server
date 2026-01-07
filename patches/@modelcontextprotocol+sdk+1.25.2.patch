@@ -32,20 +32,10 @@ index e10bb3d..2e99bee 100644
      }
      /**
 diff --git a/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js b/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
-index 23639ce..75f18b5 100644
+index 23639ce..7b8a325 100644
 --- a/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
 +++ b/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
-@@ -85,6 +85,9 @@ export class McpServer {
-                     execution: tool.execution,
-                     _meta: tool._meta
-                 };
-+                if (tool.icons) {
-+                    toolDefinition.icons = tool.icons;
-+                }
-                 if (tool.outputSchema) {
-                     const obj = normalizeObjectSchema(tool.outputSchema);
-                     if (obj) {
-@@ -194,15 +197,20 @@ export class McpServer {
+@@ -194,15 +194,20 @@ export class McpServer {
              return;
          }
          if (!result.structuredContent) {
@@ -74,49 +64,3 @@ index 23639ce..75f18b5 100644
          }
      }
      /**
-@@ -602,7 +610,7 @@ export class McpServer {
-         }
-         return registeredPrompt;
-     }
--    _createRegisteredTool(name, title, description, inputSchema, outputSchema, annotations, execution, _meta, handler) {
-+    _createRegisteredTool(name, title, description, inputSchema, outputSchema, annotations, execution, _meta, icons, handler) {
-         // Validate tool name according to SEP specification
-         validateAndWarnToolName(name);
-         const registeredTool = {
-@@ -613,6 +621,7 @@ export class McpServer {
-             annotations,
-             execution,
-             _meta,
-+            icons,
-             handler: handler,
-             enabled: true,
-             disable: () => registeredTool.update({ enabled: false }),
-@@ -641,6 +650,8 @@ export class McpServer {
-                     registeredTool.annotations = updates.annotations;
-                 if (typeof updates._meta !== 'undefined')
-                     registeredTool._meta = updates._meta;
-+                if (typeof updates.icons !== 'undefined')
-+                    registeredTool.icons = updates.icons;
-                 if (typeof updates.enabled !== 'undefined')
-                     registeredTool.enabled = updates.enabled;
-                 this.sendToolListChanged();
-@@ -690,7 +701,7 @@ export class McpServer {
-             }
-         }
-         const callback = rest[0];
--        return this._createRegisteredTool(name, undefined, description, inputSchema, outputSchema, annotations, { taskSupport: 'forbidden' }, undefined, callback);
-+        return this._createRegisteredTool(name, undefined, description, inputSchema, outputSchema, annotations, { taskSupport: 'forbidden' }, undefined, undefined, callback);
-     }
-     /**
-      * Registers a tool with a config object and callback.
-@@ -699,8 +710,8 @@ export class McpServer {
-         if (this._registeredTools[name]) {
-             throw new Error(`Tool ${name} is already registered`);
-         }
--        const { title, description, inputSchema, outputSchema, annotations, _meta } = config;
--        return this._createRegisteredTool(name, title, description, inputSchema, outputSchema, annotations, { taskSupport: 'forbidden' }, _meta, cb);
-+        const { title, description, inputSchema, outputSchema, annotations, _meta, icons } = config;
-+        return this._createRegisteredTool(name, title, description, inputSchema, outputSchema, annotations, { taskSupport: 'forbidden' }, _meta, icons, cb);
-     }
-     prompt(name, ...rest) {
-         if (this._registeredPrompts[name]) {
