@@ -62,18 +62,23 @@ describe('Tool Annotations', () => {
     const tools = getAllTools();
 
     // Most Mapbox API tools interact with external services (open world)
-    const apiTools = tools.filter((tool) => tool.name !== 'version_tool');
+    // Exclude offline/local tools that don't make external API calls
+    const offlineTools = ['version_tool', 'distance_tool'];
+    const apiTools = tools.filter((tool) => !offlineTools.includes(tool.name));
 
     apiTools.forEach((tool) => {
       expect(tool.annotations.openWorldHint).toBe(true);
     });
   });
 
-  it('should have closed world hint for version tool', () => {
+  it('should have closed world hint for offline tools', () => {
     const tools = getAllTools();
-    const versionTool = tools.find((tool) => tool.name === 'version_tool');
+    const offlineTools = tools.filter((tool) =>
+      ['version_tool', 'distance_tool'].includes(tool.name)
+    );
 
-    expect(versionTool).toBeDefined();
-    expect(versionTool!.annotations.openWorldHint).toBe(false);
+    offlineTools.forEach((tool) => {
+      expect(tool.annotations.openWorldHint).toBe(false);
+    });
   });
 });

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 // INSERT NEW TOOL IMPORT HERE
+import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
@@ -19,6 +20,7 @@ import { httpRequest } from '../utils/httpPipeline.js';
 // Central registry of all tools
 export const ALL_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
+  new DistanceTool(),
   new VersionTool(),
   new ResourceReaderTool(),
   new CategoryListTool({ httpRequest }),
