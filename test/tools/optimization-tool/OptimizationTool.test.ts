@@ -157,6 +157,9 @@ describe('OptimizationTool', () => {
     const firstCall = mockHttpRequest.mock.calls[0];
     const postBody = JSON.parse((firstCall[1] as { body: string }).body);
 
+    // Verify using V1 API format
+    expect(postBody.version).toBe(1);
+
     expect(postBody.locations).toHaveLength(3);
     expect(postBody.locations[0].name).toBe('location-0');
     expect(postBody.vehicles).toHaveLength(1);
