@@ -9,13 +9,29 @@ import type {
   CreateTaskRequestHandlerExtra,
   TaskRequestHandlerExtra
 } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
-import { OptimizationInputSchema } from './OptimizationTool.input.schema.js';
+import { OptimizationV2InputSchema } from './OptimizationV2Tool.input.schema.js';
 import {
-  OptimizationOutputSchema,
-  type OptimizationOutput
-} from './OptimizationTool.output.schema.js';
+  OptimizationV2OutputSchema,
+  type OptimizationV2Output
+} from './OptimizationV2Tool.output.schema.js';
 
-// API documentation: https://docs.mapbox.com/api/navigation/optimization/
+/**
+ * OptimizationV2Tool - Advanced route optimization using Mapbox Optimization API V2 (BETA)
+ *
+ * ⚠️ IMPORTANT: This tool uses the V2 API which is currently in beta and requires early access.
+ * The tool is not registered by default. To enable it, add it to the toolRegistry.
+ *
+ * V2 Features:
+ * - Time window constraints for services and shipments
+ * - Vehicle capacity limits for multiple resource types
+ * - Driver shifts with earliest start and latest end times
+ * - Pickup and dropoff constraints for shipment handling
+ * - Vehicle capabilities requirements (e.g., refrigeration, ladder)
+ * - Loading policies (FIFO, LIFO, or any order)
+ * - Mandated breaks for vehicles
+ *
+ * API documentation: https://docs.mapbox.com/api/navigation/optimization/
+ */
 
 /**
  * Helper function to validate JWT format
@@ -37,7 +53,7 @@ function getMapboxApiEndpoint(): string {
  * Core function to submit optimization job to Mapbox API
  */
 async function submitOptimizationJob(
-  input: z.infer<typeof OptimizationInputSchema>,
+  input: z.infer<typeof OptimizationV2InputSchema>,
   accessToken: string,
   httpRequest: HttpRequest
 ): Promise<{ jobId: string; status: string }> {
@@ -153,7 +169,7 @@ async function pollOptimizationJob(
   jobId: string,
   accessToken: string,
   httpRequest: HttpRequest
-): Promise<{ status: number; data?: OptimizationOutput; error?: string }> {
+): Promise<{ status: number; data?: OptimizationV2Output; error?: string }> {
   const getUrl = `${getMapboxApiEndpoint()}optimized-trips/v2/${jobId}?access_token=${accessToken}`;
   const getResponse = await httpRequest(getUrl);
 
@@ -173,7 +189,7 @@ async function pollOptimizationJob(
 
   // HTTP 200 means the optimization is complete
   if (getResponse.status === 200) {
-    const result = (await getResponse.json()) as OptimizationOutput;
+    const result = (await getResponse.json()) as OptimizationV2Output;
     return {
       status: 200,
       data: result
@@ -211,7 +227,9 @@ async function backgroundPollOptimizationJob(
       if (pollResult.status === 200 && pollResult.data) {
         // Job completed successfully
         try {
-          const validatedData = OptimizationOutputSchema.parse(pollResult.data);
+          const validatedData = OptimizationV2OutputSchema.parse(
+            pollResult.data
+          );
 
           await taskStore.storeTaskResult(taskId, 'completed', {
             content: [
@@ -276,18 +294,21 @@ async function backgroundPollOptimizationJob(
 }
 
 /**
- * Register the Optimization tool as a task-based tool
+ * Register the Optimization V2 tool as a task-based tool
+ *
+ * ⚠️ BETA: This tool uses the V2 API which requires early access.
+ * Not registered by default - call this function manually to enable.
  */
-export function registerOptimizationTask(
+export function registerOptimizationV2Task(
   server: McpServer,
   httpRequest: HttpRequest
 ): void {
   server.experimental.tasks.registerToolTask(
-    'optimization_tool',
+    'optimization_v2_tool',
     {
-      title: 'Optimization Tool',
+      title: 'Optimization Tool V2 (Beta)',
       description:
-        'Solves vehicle routing problems using the Mapbox Optimization API v2. ' +
+        'Solves vehicle routing problems using the Mapbox Optimization API v2 (Beta). ' +
         'This is a long-running async task that submits an optimization job and polls for results. ' +
         'Supports up to 1000 coordinates in {longitude, latitude} format. ' +
         'Returns optimized routes with stops, ETAs, and dropped items. ' +
@@ -315,8 +336,8 @@ export function registerOptimizationTask(
         '✗ WRONG: service.location = 2 (integer)\n' +
         '\n' +
         'IMPORTANT: This is an async task. The task will start immediately but results will be available later via task polling.',
-      inputSchema: OptimizationInputSchema,
-      outputSchema: OptimizationOutputSchema,
+      inputSchema: OptimizationV2InputSchema,
+      outputSchema: OptimizationV2OutputSchema,
       annotations: {
         title: 'Optimization Tool',
         readOnlyHint: true,
@@ -328,7 +349,7 @@ export function registerOptimizationTask(
     {
       async createTask(args: unknown, extra: CreateTaskRequestHandlerExtra) {
         // Validate input
-        const input = OptimizationInputSchema.parse(args);
+        const input = OptimizationV2InputSchema.parse(args);
 
         // Get and validate access token (from environment only for now)
         const accessToken =
