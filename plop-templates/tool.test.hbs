@@ -1,31 +1,69 @@
-import { {{pascalCase name}}Tool } from '../{{kebabCase name}}-tool/{{pascalCase name}}Tool.js';
-import { setupFetch, assertHeadersSent } from '../../utils/requestUtils.test-helpers.js';
+// Copyright (c) Mapbox, Inc.
+// Licensed under the MIT License.
+
+process.env.MAPBOX_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
+
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import {
+  setupHttpRequest,
+  assertHeadersSent
+} from '../../utils/httpPipelineUtils.js';
+import { {{pascalCase name}}Tool } from '../../../src/tools/{{kebabCase name}}-tool/{{pascalCase name}}Tool.js';
+
+// TODO: Add sample response data
+const sampleResponse = {
+  // Add expected API response structure here
+};
 
 describe('{{pascalCase name}}Tool', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('sends custom header', async () => {
-    const mockFetch = setupFetch();
-    await new {{pascalCase name}}Tool().run({...});
-    assertHeadersSent(mockFetch);
-  });
-
-  it('handles fetch errors gracefully', async () => {
-    const mockFetch = setupFetch({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found'
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      json: async () => sampleResponse
     });
 
-    const result = await new {{pascalCase name}}Tool().run({...});
+    await new {{pascalCase name}}Tool({ httpRequest }).run({
+      // TODO: Add required input parameters
+    });
+
+    assertHeadersSent(mockHttpRequest);
+  });
+
+  it('returns structured content for valid input', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => sampleResponse
+    });
+
+    const tool = new {{pascalCase name}}Tool({ httpRequest });
+    const result = await tool.run({
+      // TODO: Add required input parameters
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toBeDefined();
+  });
+
+  it('handles API errors gracefully', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      text: async () => JSON.stringify({ message: 'Invalid parameters' })
+    });
+
+    const tool = new {{pascalCase name}}Tool({ httpRequest });
+    const result = await tool.run({
+      // TODO: Add required input parameters
+    });
 
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Request failed with status 404: Not Found'
+      text: expect.stringContaining('Invalid parameters')
     });
-    assertHeadersSent(mockFetch);
   });
 });

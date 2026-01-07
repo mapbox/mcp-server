@@ -64,9 +64,18 @@ npm run inspect:build    # Test with MCP inspector
 ### Creating a New Tool
 
 ```bash
-npx plop create-tool     # Interactive tool scaffolding
-# Provide tool name without suffix (e.g., "Search" creates "SearchTool")
+# Interactive mode (requires TTY - use in terminal):
+npx plop create-tool
+
+# Non-interactive mode (for AI agents, CI, or scripts):
+npx plop create-tool "ToolName" "tool_name_tool"
+
+# Example:
+npx plop create-tool "Search" "search_tool"
+# Creates SearchTool in src/tools/search-tool/ with schemas and tests
 ```
+
+**Note**: When running from AI agents or non-TTY environments (like Claude Code), always use non-interactive mode with command-line arguments to avoid readline errors.
 
 ### Pre-commit
 
