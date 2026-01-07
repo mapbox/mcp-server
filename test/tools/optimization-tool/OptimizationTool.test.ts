@@ -6,139 +6,67 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
-import {
-  HttpPipeline,
-  UserAgentPolicy
-} from '../../../src/utils/httpPipeline.js';
+
 import { OptimizationTool } from '../../../src/tools/optimization-tool/OptimizationTool.js';
 
-const sampleOptimizationJobResponse = {
-  id: 'test-job-123',
-  status: 'processing'
-};
-
-const sampleOptimizationResultResponse = {
-  routes: [
+// Sample V1 API response
+const sampleV1Response = {
+  code: 'Ok',
+  waypoints: [
     {
-      vehicle: 'vehicle-1',
-      stops: [
-        {
-          type: 'start',
-          location: 'location-0',
-          eta: '2024-01-01T10:00:00Z',
-          odometer: 0,
-          wait: 0,
-          duration: 0
-        },
-        {
-          type: 'service',
-          location: 'location-1',
-          eta: '2024-01-01T10:05:00Z',
-          odometer: 1500,
-          wait: 0,
-          duration: 300,
-          services: ['service-1']
-        },
-        {
-          type: 'service',
-          location: 'location-2',
-          eta: '2024-01-01T10:12:00Z',
-          odometer: 3200,
-          wait: 0,
-          duration: 300,
-          services: ['service-2']
-        },
-        {
-          type: 'end',
-          location: 'location-0',
-          eta: '2024-01-01T10:20:00Z',
-          odometer: 5000,
-          wait: 0,
-          duration: 0
-        }
-      ]
+      name: 'Market Street',
+      location: [-122.4194, 37.7749],
+      trips_index: 0,
+      waypoint_index: 0
+    },
+    {
+      name: 'Mission Street',
+      location: [-122.4195, 37.775],
+      trips_index: 0,
+      waypoint_index: 1
+    },
+    {
+      name: 'Valencia Street',
+      location: [-122.4197, 37.7751],
+      trips_index: 0,
+      waypoint_index: 2
     }
   ],
-  dropped: {
-    services: [],
-    shipments: []
-  }
+  trips: [
+    {
+      geometry: {
+        coordinates: [
+          [-122.4194, 37.7749],
+          [-122.4195, 37.775],
+          [-122.4197, 37.7751],
+          [-122.4194, 37.7749]
+        ],
+        type: 'LineString'
+      },
+      legs: [
+        { distance: 150.2, duration: 45.1 },
+        { distance: 200.3, duration: 60.2 },
+        { distance: 250.4, duration: 75.3 }
+      ],
+      weight: 180.6,
+      weight_name: 'routability',
+      duration: 180.6,
+      distance: 600.9
+    }
+  ]
 };
 
-// Helper function to create mock httpRequest with polling behavior
-function createMockWithPolling(
-  postResponse: unknown,
-  getResponse: unknown | ((callNum: number) => unknown)
-) {
-  const mockHttpRequest = vi.fn();
-  let callCount = 0;
-
-  mockHttpRequest.mockImplementation(() => {
-    callCount++;
-    // First call: POST to create job
-    if (callCount === 1) {
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => postResponse
-      });
-    }
-    // Subsequent calls: GET polling
-    const response =
-      typeof getResponse === 'function' ? getResponse(callCount) : getResponse;
-    return Promise.resolve(response);
-  });
-
-  const pipeline = new HttpPipeline(mockHttpRequest);
-  const userAgent = 'TestServer/1.0.0 (default, no-tag, abcdef)';
-  pipeline.usePolicy(new UserAgentPolicy(userAgent));
-
-  return {
-    httpRequest: pipeline.execute.bind(pipeline),
-    mockHttpRequest
-  };
-}
-
-describe('OptimizationTool', () => {
+describe('OptimizationTool V1 API', () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
-  it('sends custom header', async () => {
-    const { httpRequest, mockHttpRequest } = createMockWithPolling(
-      sampleOptimizationJobResponse,
-      {
-        ok: true,
-        status: 200,
-        json: async () => sampleOptimizationResultResponse
-      }
-    );
-
-    await new OptimizationTool({ httpRequest }).run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 },
-        { longitude: -122.4197, latitude: 37.7751 }
-      ]
+  it('should successfully optimize route with minimal input', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
     });
-
-    // OptimizationTool makes 2 calls (POST + GET polling), verify headers on both
-    expect(mockHttpRequest).toHaveBeenCalledTimes(2);
-    const firstCallArgs = mockHttpRequest.mock.calls[0];
-    expect(firstCallArgs[1]?.headers).toMatchObject({
-      'User-Agent': expect.any(String)
-    });
-  });
-
-  it('works in simplified mode with default vehicle', async () => {
-    const { httpRequest, mockHttpRequest } = createMockWithPolling(
-      sampleOptimizationJobResponse,
-      {
-        ok: true,
-        status: 200,
-        json: async () => sampleOptimizationResultResponse
-      }
-    );
 
     const tool = new OptimizationTool({ httpRequest });
     const result = await tool.run({
@@ -146,285 +74,30 @@ describe('OptimizationTool', () => {
         { longitude: -122.4194, latitude: 37.7749 },
         { longitude: -122.4195, latitude: 37.775 },
         { longitude: -122.4197, latitude: 37.7751 }
-      ],
-      profile: 'mapbox/driving'
-    });
-
-    expect(result.isError).toBe(false);
-    expect(result.structuredContent).toBeDefined();
-
-    // Verify POST request body includes auto-generated locations and vehicle
-    const firstCall = mockHttpRequest.mock.calls[0];
-    const postBody = JSON.parse((firstCall[1] as { body: string }).body);
-
-    expect(postBody.locations).toHaveLength(3);
-    expect(postBody.locations[0].name).toBe('location-0');
-    expect(postBody.vehicles).toHaveLength(1);
-    expect(postBody.vehicles[0].name).toBe('vehicle-1');
-    expect(postBody.vehicles[0].start_location).toBe('location-0');
-    expect(postBody.vehicles[0].end_location).toBe('location-0');
-
-    // In simplified mode, services are created for all locations except first
-    expect(postBody.services).toHaveLength(2);
-    expect(postBody.services[0].name).toBe('service-1');
-    expect(postBody.services[0].location).toBe('location-1');
-  });
-
-  it('works in advanced mode with custom vehicles and services', async () => {
-    const { httpRequest, mockHttpRequest } = createMockWithPolling(
-      sampleOptimizationJobResponse,
-      {
-        ok: true,
-        status: 200,
-        json: async () => sampleOptimizationResultResponse
-      }
-    );
-
-    const tool = new OptimizationTool({ httpRequest });
-    const result = await tool.run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 }
-      ],
-      vehicles: [
-        {
-          name: 'custom-vehicle',
-          routing_profile: 'mapbox/driving',
-          start_location: 'location-0',
-          end_location: 'location-0'
-        }
-      ],
-      services: [
-        {
-          name: 'custom-service',
-          location: 'location-1',
-          duration: 300
-        }
       ]
     });
 
     expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      code: 'Ok',
+      waypoints: expect.any(Array),
+      trips: expect.any(Array)
+    });
 
-    const firstCall = mockHttpRequest.mock.calls[0];
-    const postBody = JSON.parse((firstCall[1] as { body: string }).body);
-
-    expect(postBody.vehicles[0].name).toBe('custom-vehicle');
-    expect(postBody.services[0].name).toBe('custom-service');
-  });
-
-  it('works with shipments instead of services', async () => {
-    const shipmentResponse = {
-      ...sampleOptimizationResultResponse,
-      routes: [
-        {
-          vehicle: 'vehicle-1',
-          stops: [
-            {
-              type: 'start',
-              location: 'location-0',
-              eta: '2024-01-01T10:00:00Z',
-              odometer: 0,
-              wait: 0,
-              duration: 0
-            },
-            {
-              type: 'pickup',
-              location: 'location-1',
-              eta: '2024-01-01T10:05:00Z',
-              odometer: 1500,
-              wait: 0,
-              duration: 300,
-              pickups: ['shipment-1']
-            },
-            {
-              type: 'dropoff',
-              location: 'location-2',
-              eta: '2024-01-01T10:12:00Z',
-              odometer: 3200,
-              wait: 0,
-              duration: 300,
-              dropoffs: ['shipment-1']
-            },
-            {
-              type: 'end',
-              location: 'location-0',
-              eta: '2024-01-01T10:20:00Z',
-              odometer: 5000,
-              wait: 0,
-              duration: 0
-            }
-          ]
-        }
-      ]
-    };
-
-    const { httpRequest, mockHttpRequest } = createMockWithPolling(
-      sampleOptimizationJobResponse,
-      {
-        ok: true,
-        status: 200,
-        json: async () => shipmentResponse
-      }
+    // Verify URL format: GET /optimized-trips/v1/{profile}/{coordinates}
+    const callUrl = mockHttpRequest.mock.calls[0][0] as string;
+    expect(callUrl).toContain('optimized-trips/v1/mapbox/driving/');
+    expect(callUrl).toContain(
+      '-122.4194,37.7749;-122.4195,37.775;-122.4197,37.7751'
     );
-
-    const tool = new OptimizationTool({ httpRequest });
-    const result = await tool.run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 },
-        { longitude: -122.4197, latitude: 37.7751 }
-      ],
-      vehicles: [
-        {
-          name: 'delivery-vehicle',
-          routing_profile: 'mapbox/driving',
-          start_location: 'location-0',
-          end_location: 'location-0'
-        }
-      ],
-      shipments: [
-        {
-          name: 'shipment-1',
-          from: 'location-1',
-          to: 'location-2',
-          pickup_duration: 300,
-          dropoff_duration: 300
-        }
-      ]
-    });
-
-    expect(result.isError).toBe(false);
-
-    const firstCall = mockHttpRequest.mock.calls[0];
-    const postBody = JSON.parse((firstCall[1] as { body: string }).body);
-
-    expect(postBody.shipments).toHaveLength(1);
-    expect(postBody.shipments[0].name).toBe('shipment-1');
-    expect(postBody.shipments[0].from).toBe('location-1');
-    expect(postBody.shipments[0].to).toBe('location-2');
+    expect(callUrl).toContain('roundtrip=true');
   });
 
-  it('returns error when vehicles provided without services or shipments', async () => {
-    const { httpRequest } = setupHttpRequest();
-
-    const tool = new OptimizationTool({ httpRequest });
-    const result = await tool.run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 }
-      ],
-      vehicles: [
-        {
-          name: 'vehicle-1',
-          routing_profile: 'mapbox/driving',
-          start_location: 'location-0',
-          end_location: 'location-0'
-        }
-      ]
-      // Missing services or shipments
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0]).toMatchObject({
-      type: 'text',
-      text: expect.stringContaining(
-        'at least one service or shipment is required'
-      )
-    });
-  });
-
-  it('handles polling timeout', async () => {
-    const { httpRequest } = createMockWithPolling(
-      sampleOptimizationJobResponse,
-      {
-        ok: true,
-        status: 202,
-        json: async () => ({ status: 'processing' })
-      }
-    );
-
-    const tool = new OptimizationTool({ httpRequest });
-    const result = await tool.run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 }
-      ],
-      max_polling_attempts: 2,
-      polling_interval_ms: 10
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0]).toMatchObject({
-      type: 'text',
-      text: expect.stringContaining('timed out after 2 attempts')
-    });
-  });
-
-  it('handles API error on POST', async () => {
-    const { httpRequest } = setupHttpRequest({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      text: async () =>
-        JSON.stringify({ message: 'Invalid coordinates provided' })
-    });
-
-    const tool = new OptimizationTool({ httpRequest });
-    const result = await tool.run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 }
-      ]
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0]).toMatchObject({
-      type: 'text',
-      text: expect.stringContaining('Invalid coordinates provided')
-    });
-  });
-
-  it('handles 404 on polling GET', async () => {
-    const { httpRequest } = createMockWithPolling(
-      sampleOptimizationJobResponse,
-      {
-        ok: false,
-        status: 404,
-        statusText: 'Not Found'
-      }
-    );
-
-    const tool = new OptimizationTool({ httpRequest });
-    const result = await tool.run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 }
-      ]
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0]).toMatchObject({
-      type: 'text',
-      text: expect.stringContaining('not found')
-    });
-  });
-
-  it('uses correct routing profile', async () => {
-    let callCount = 0;
-    const { httpRequest, mockHttpRequest } = setupHttpRequest(() => {
-      callCount++;
-      if (callCount === 1) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => sampleOptimizationJobResponse
-        };
-      }
-      return {
-        ok: true,
-        status: 200,
-        json: async () => sampleOptimizationResultResponse
-      };
+  it('should handle custom profile', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
     });
 
     const tool = new OptimizationTool({ httpRequest });
@@ -436,21 +109,108 @@ describe('OptimizationTool', () => {
       profile: 'mapbox/cycling'
     });
 
-    const firstCall = mockHttpRequest.mock.calls[0];
-    const postBody = JSON.parse((firstCall[1] as { body: string }).body);
-
-    expect(postBody.vehicles[0].routing_profile).toBe('mapbox/cycling');
+    const callUrl = mockHttpRequest.mock.calls[0][0] as string;
+    expect(callUrl).toContain('optimized-trips/v1/mapbox/cycling/');
   });
 
-  it('includes structured content in successful response', async () => {
-    const { httpRequest } = createMockWithPolling(
-      sampleOptimizationJobResponse,
-      {
-        ok: true,
-        status: 200,
-        json: async () => sampleOptimizationResultResponse
-      }
+  it('should handle source and destination options', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
+    });
+
+    const tool = new OptimizationTool({ httpRequest });
+    await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 },
+        { longitude: -122.4197, latitude: 37.7751 }
+      ],
+      source: 'first',
+      destination: 'last',
+      roundtrip: false
+    });
+
+    const callUrl = mockHttpRequest.mock.calls[0][0] as string;
+    expect(callUrl).toContain('source=first');
+    expect(callUrl).toContain('destination=last');
+    expect(callUrl).toContain('roundtrip=false');
+  });
+
+  it('should handle optional parameters (geometries, overview, steps)', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
+    });
+
+    const tool = new OptimizationTool({ httpRequest });
+    await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      geometries: 'polyline',
+      overview: 'full',
+      steps: true,
+      annotations: ['duration', 'distance']
+    });
+
+    const callUrl = mockHttpRequest.mock.calls[0][0] as string;
+    expect(callUrl).toContain('geometries=polyline');
+    expect(callUrl).toContain('overview=full');
+    expect(callUrl).toContain('steps=true');
+    expect(callUrl).toContain('annotations=duration%2Cdistance');
+  });
+
+  it('should validate minimum coordinates (2)', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
+    });
+
+    const tool = new OptimizationTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [{ longitude: -122.4194, latitude: 37.7749 }]
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'At least 2 coordinates are required'
     );
+  });
+
+  it('should validate maximum coordinates (12)', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
+    });
+
+    const tool = new OptimizationTool({ httpRequest });
+    const coords = Array.from({ length: 13 }, (_, i) => ({
+      longitude: -122.4194 + i * 0.01,
+      latitude: 37.7749 + i * 0.01
+    }));
+
+    const result = await tool.run({ coordinates: coords });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Maximum 12 coordinates allowed');
+  });
+
+  it('should handle API errors gracefully', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      text: async () =>
+        JSON.stringify({
+          message: 'Invalid coordinates'
+        })
+    });
 
     const tool = new OptimizationTool({ httpRequest });
     const result = await tool.run({
@@ -460,19 +220,55 @@ describe('OptimizationTool', () => {
       ]
     });
 
-    expect(result.isError).toBe(false);
-    expect(result.structuredContent).toBeDefined();
-    expect(result.structuredContent).toMatchObject({
-      routes: expect.arrayContaining([
-        expect.objectContaining({
-          vehicle: expect.any(String),
-          stops: expect.any(Array)
-        })
-      ]),
-      dropped: expect.objectContaining({
-        services: expect.any(Array),
-        shipments: expect.any(Array)
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('422');
+    expect(result.content[0].text).toContain('Invalid coordinates');
+  });
+
+  it('should handle API error codes in response', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        code: 'NoRoute',
+        message: 'No route found between coordinates'
       })
     });
+
+    const tool = new OptimizationTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ]
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('No route found');
+  });
+
+  it('should format output text with duration and distance', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
+    });
+
+    const tool = new OptimizationTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 },
+        { longitude: -122.4197, latitude: 37.7751 }
+      ]
+    });
+
+    expect(result.isError).toBe(false);
+    const text = result.content[0].text;
+    expect(text).toContain('Optimized route');
+    expect(text).toContain('3 waypoints');
+    expect(text).toContain('minutes');
+    expect(text).toContain('km');
+    expect(text).toContain('0 → 1 → 2');
   });
 });
