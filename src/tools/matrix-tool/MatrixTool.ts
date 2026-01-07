@@ -42,7 +42,10 @@ export class MatrixTool extends MapboxApiBasedTool<
     accessToken: string
   ): Promise<CallToolResult> {
     // Validate input based on profile type
-    if (input.profile === 'driving-traffic' && input.coordinates.length > 10) {
+    if (
+      input.profile === 'mapbox/driving-traffic' &&
+      input.coordinates.length > 10
+    ) {
       return {
         content: [
           {
@@ -273,7 +276,7 @@ export class MatrixTool extends MapboxApiBasedTool<
     }
 
     // Construct the URL for the Matrix API request
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions-matrix/v1/mapbox/${input.profile}/${joined}?${queryParams.toString()}`;
+    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions-matrix/v1/${input.profile}/${joined}?${queryParams.toString()}`;
 
     // Make the request
     const response = await this.httpRequest(url);

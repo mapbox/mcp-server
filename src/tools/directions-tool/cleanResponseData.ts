@@ -83,11 +83,10 @@ interface RawDirectionsResponse {
 }
 
 // Cleaned response types (after cleaning)
-interface CleanedRoute
-  extends Omit<
-    RawRoute,
-    'legs' | 'weight_name' | 'weight' | 'duration_typical' | 'weight_typical'
-  > {
+interface CleanedRoute extends Omit<
+  RawRoute,
+  'legs' | 'weight_name' | 'weight' | 'duration_typical' | 'weight_typical'
+> {
   leg_summaries?: string[];
   intersecting_admins?: string[];
   notifications_summary?: string[];
@@ -116,11 +115,10 @@ interface CleanedWaypoint extends Omit<RawWaypoint, 'location' | 'distance'> {
   snap_distance?: number;
 }
 
-interface CleanedDirectionsResponse
-  extends Omit<
-    RawDirectionsResponse,
-    'uuid' | 'code' | 'waypoints' | 'routes'
-  > {
+interface CleanedDirectionsResponse extends Omit<
+  RawDirectionsResponse,
+  'uuid' | 'code' | 'waypoints' | 'routes'
+> {
   waypoints?: CleanedWaypoint[];
   routes?: CleanedRoute[];
 }

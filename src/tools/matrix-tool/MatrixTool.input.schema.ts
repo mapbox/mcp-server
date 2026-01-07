@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { z } from 'zod';
-import { coordinateSchema } from '../../schemas/shared.js';
+import { coordinateSchema, profileSchema } from '../../schemas/shared.js';
 
 export const MatrixInputSchema = z.object({
   coordinates: z
@@ -17,15 +17,13 @@ export const MatrixInputSchema = z.object({
         'Must include at least 2 coordinate pairs. ' +
         'Up to 25 coordinates total are supported for most profiles (10 for driving-traffic).'
     ),
-  profile: z
-    .enum(['driving-traffic', 'driving', 'walking', 'cycling'])
-    .describe(
-      'Routing profile for different modes of transport. Options: \n' +
-        '- driving-traffic: automotive with current traffic conditions (limited to 10 coordinates)\n' +
-        '- driving: automotive based on typical traffic\n' +
-        '- walking: pedestrian/hiking\n' +
-        '- cycling: bicycle'
-    ),
+  profile: profileSchema.describe(
+    'Routing profile for different modes of transport. Options: \n' +
+      '- mapbox/driving-traffic (default): automotive with current traffic conditions (limited to 10 coordinates)\n' +
+      '- mapbox/driving: automotive based on typical traffic\n' +
+      '- mapbox/walking: pedestrian/hiking\n' +
+      '- mapbox/cycling: bicycle'
+  ),
   annotations: z
     .enum(['duration', 'distance', 'duration,distance', 'distance,duration'])
     .optional()

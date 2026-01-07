@@ -76,7 +76,7 @@ describe('MatrixTool', () => {
         { longitude: -74.102094, latitude: 40.692815 },
         { longitude: -74.1022094, latitude: 40.792815 }
       ],
-      profile: 'walking'
+      profile: 'mapbox/walking'
     });
 
     assertHeadersSent(mockHttpRequest);
@@ -94,7 +94,7 @@ describe('MatrixTool', () => {
         { longitude: -122.45, latitude: 37.91 },
         { longitude: -122.48, latitude: 37.73 }
       ],
-      profile: 'driving'
+      profile: 'mapbox/driving'
     });
 
     expect(result.isError).toBe(false);
@@ -121,7 +121,7 @@ describe('MatrixTool', () => {
         { longitude: -122.42, latitude: 37.78 },
         { longitude: -122.45, latitude: 37.91 }
       ],
-      profile: 'driving',
+      profile: 'mapbox/driving',
       annotations: 'duration,distance'
     });
 
@@ -141,7 +141,7 @@ describe('MatrixTool', () => {
         { longitude: -122.45, latitude: 37.91 },
         { longitude: -122.48, latitude: 37.73 }
       ],
-      profile: 'driving',
+      profile: 'mapbox/driving',
       approaches: 'curb;unrestricted;curb'
     });
 
@@ -160,7 +160,7 @@ describe('MatrixTool', () => {
         { longitude: -122.42, latitude: 37.78 },
         { longitude: -122.45, latitude: 37.91 }
       ],
-      profile: 'driving',
+      profile: 'mapbox/driving',
       bearings: '45,90;120,45'
     });
 
@@ -180,7 +180,7 @@ describe('MatrixTool', () => {
         { longitude: -122.45, latitude: 37.91 },
         { longitude: -122.48, latitude: 37.73 }
       ],
-      profile: 'cycling',
+      profile: 'mapbox/cycling',
       destinations: '0;2'
     });
 
@@ -200,7 +200,7 @@ describe('MatrixTool', () => {
         { longitude: -122.45, latitude: 37.91 },
         { longitude: -122.48, latitude: 37.73 }
       ],
-      profile: 'walking',
+      profile: 'mapbox/walking',
       sources: '1'
     });
 
@@ -220,7 +220,7 @@ describe('MatrixTool', () => {
         { longitude: -122.45, latitude: 37.91 },
         { longitude: -122.48, latitude: 37.73 }
       ],
-      profile: 'driving',
+      profile: 'mapbox/driving',
       annotations: 'distance,duration',
       approaches: 'curb;unrestricted;curb',
       bearings: '45,90;120,45;180,90',
@@ -250,7 +250,7 @@ describe('MatrixTool', () => {
         { longitude: -122.42, latitude: 37.78 },
         { longitude: -122.45, latitude: 37.91 }
       ],
-      profile: 'walking'
+      profile: 'mapbox/walking'
     });
 
     expect(result.isError).toBe(true);
@@ -270,7 +270,7 @@ describe('MatrixTool', () => {
 
     const result = await tool.run({
       coordinates,
-      profile: 'driving-traffic'
+      profile: 'mapbox/driving-traffic'
     });
 
     expect(result.isError).toBe(true);
@@ -280,7 +280,7 @@ describe('MatrixTool', () => {
     const errorResult = await tool['execute'](
       {
         coordinates,
-        profile: 'driving-traffic'
+        profile: 'mapbox/driving-traffic'
       },
       'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
     );
@@ -306,7 +306,7 @@ describe('MatrixTool', () => {
     it('validates coordinates - minimum count', async () => {
       const result = await tool.run({
         coordinates: [{ longitude: -122.42, latitude: 37.78 }],
-        profile: 'driving'
+        profile: 'mapbox/driving'
       });
 
       expect(result.isError).toBe(true);
@@ -315,7 +315,7 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['inputSchema'].parseAsync({
           coordinates: [{ longitude: -122.42, latitude: 37.78 }],
-          profile: 'driving'
+          profile: 'mapbox/driving'
         });
       }).rejects.toThrow('At least two coordinate pairs are required.');
     });
@@ -327,7 +327,7 @@ describe('MatrixTool', () => {
       });
       const result = await tool.run({
         coordinates,
-        profile: 'driving'
+        profile: 'mapbox/driving'
       });
 
       expect(result.isError).toBe(true);
@@ -336,7 +336,7 @@ describe('MatrixTool', () => {
       await expect(async () => {
         await tool['inputSchema'].parseAsync({
           coordinates,
-          profile: 'driving'
+          profile: 'mapbox/driving'
         });
       }).rejects.toThrow(
         'Up to 25 coordinate pairs are supported for most profiles (10 for driving-traffic).'
@@ -349,7 +349,7 @@ describe('MatrixTool', () => {
           { longitude: -190, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving'
+        profile: 'mapbox/driving'
       });
       expect(invalidLongitude.isError).toBe(true);
 
@@ -358,7 +358,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 95 }
         ],
-        profile: 'driving'
+        profile: 'mapbox/driving'
       });
       expect(invalidLatitude.isError).toBe(true);
 
@@ -369,7 +369,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 95 }
           ],
-          profile: 'driving'
+          profile: 'mapbox/driving'
         });
       }).rejects.toThrow('Latitude must be between -90 and 90 degrees');
     });
@@ -381,7 +381,7 @@ describe('MatrixTool', () => {
           { longitude: -122.45, latitude: 37.91 },
           { longitude: -122.48, latitude: 37.73 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         approaches: 'curb;unrestricted' // Only 2 for 3 coordinates
       });
 
@@ -395,7 +395,7 @@ describe('MatrixTool', () => {
             { longitude: -122.45, latitude: 37.91 },
             { longitude: -122.48, latitude: 37.73 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           approaches: 'curb;unrestricted'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -416,7 +416,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         approaches: 'curb;invalid' // 'invalid' is not allowed
       });
 
@@ -429,7 +429,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 37.91 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           approaches: 'curb;invalid'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -451,7 +451,7 @@ describe('MatrixTool', () => {
           { longitude: -122.45, latitude: 37.91 },
           { longitude: -122.48, latitude: 37.73 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         bearings: '45,90;120,45' // Only 2 for 3 coordinates
       });
 
@@ -465,7 +465,7 @@ describe('MatrixTool', () => {
             { longitude: -122.45, latitude: 37.91 },
             { longitude: -122.48, latitude: 37.73 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           bearings: '45,90;120,45'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -486,7 +486,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         bearings: '45,90;invalid'
       });
 
@@ -499,7 +499,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 37.91 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           bearings: '45,90;invalid'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -520,7 +520,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         bearings: '400,90;120,45' // 400 is > 360
       });
 
@@ -533,7 +533,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 37.91 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           bearings: '400,90;120,45'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -554,7 +554,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         bearings: '45,200;120,45' // 200 is > 180
       });
 
@@ -567,7 +567,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 37.91 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           bearings: '45,200;120,45'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -588,7 +588,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         sources: '0;2' // 2 is out of bounds
       });
 
@@ -601,7 +601,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 37.91 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           sources: '0;2'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -622,7 +622,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         destinations: '3' // 3 is out of bounds
       });
 
@@ -635,7 +635,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 37.91 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           destinations: '3'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -656,7 +656,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         destinations: '-1'
       });
 
@@ -669,7 +669,7 @@ describe('MatrixTool', () => {
             { longitude: -122.42, latitude: 37.78 },
             { longitude: -122.45, latitude: 37.91 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           destinations: '-1'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
@@ -696,7 +696,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         sources: 'all'
       });
 
@@ -716,7 +716,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         destinations: 'all'
       });
 
@@ -738,7 +738,7 @@ describe('MatrixTool', () => {
           { longitude: -122.46, latitude: 37.9 },
           { longitude: -122.48, latitude: 37.73 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         approaches: 'curb;;unrestricted'
       });
 
@@ -760,7 +760,7 @@ describe('MatrixTool', () => {
           { longitude: -122.46, latitude: 37.9 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         bearings: '45,90;;120,45'
       });
 
@@ -782,7 +782,7 @@ describe('MatrixTool', () => {
           { longitude: -122.45, latitude: 37.91 },
           { longitude: -122.48, latitude: 37.73 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         approaches: 'curb;;unrestricted'
       });
 
@@ -793,7 +793,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         approaches: 'curb;'
       });
 
@@ -811,7 +811,7 @@ describe('MatrixTool', () => {
           { longitude: -122.45, latitude: 37.91 },
           { longitude: -122.48, latitude: 37.73 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         sources: '1',
         destinations: '2'
       });
@@ -826,7 +826,7 @@ describe('MatrixTool', () => {
             { longitude: -122.45, latitude: 37.91 },
             { longitude: -122.48, latitude: 37.73 }
           ],
-          profile: 'driving',
+          profile: 'mapbox/driving',
           sources: '1',
           destinations: '2'
         },
@@ -852,7 +852,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         sources: '0',
         destinations: '1'
       });
@@ -872,7 +872,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         annotations: 'duration,distance'
       });
       const url1 = mockHttpRequest1.mock.calls[0][0];
@@ -888,7 +888,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving',
+        profile: 'mapbox/driving',
         annotations: 'distance,duration'
       });
       const url2 = mockHttpRequest2.mock.calls[0][0];
@@ -913,7 +913,7 @@ describe('MatrixTool', () => {
       );
       const result = await tool.run({
         coordinates,
-        profile: 'driving'
+        profile: 'mapbox/driving'
       });
       expect(result.isError).toBe(false);
       expect(mockHttpRequest).toHaveBeenCalled();
@@ -933,7 +933,7 @@ describe('MatrixTool', () => {
       );
       const result = await tool.run({
         coordinates,
-        profile: 'driving-traffic'
+        profile: 'mapbox/driving-traffic'
       });
       expect(result.isError).toBe(false);
       expect(mockHttpRequest).toHaveBeenCalled();
@@ -951,7 +951,7 @@ describe('MatrixTool', () => {
       );
       const result = await tool.run({
         coordinates,
-        profile: 'driving-traffic'
+        profile: 'mapbox/driving-traffic'
       });
       expect(result.isError).toBe(true);
       expect(mockHttpRequest).not.toHaveBeenCalled();
@@ -960,7 +960,7 @@ describe('MatrixTool', () => {
       const trafficErrorResult = await tool['execute'](
         {
           coordinates,
-          profile: 'driving-traffic'
+          profile: 'mapbox/driving-traffic'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
@@ -988,7 +988,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving-traffic'
+        profile: 'mapbox/driving-traffic'
       });
 
       expect(result.isError).toBe(false);
@@ -1008,7 +1008,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'driving'
+        profile: 'mapbox/driving'
       });
 
       expect(result.isError).toBe(false);
@@ -1028,7 +1028,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'walking'
+        profile: 'mapbox/walking'
       });
 
       expect(result.isError).toBe(false);
@@ -1048,7 +1048,7 @@ describe('MatrixTool', () => {
           { longitude: -122.42, latitude: 37.78 },
           { longitude: -122.45, latitude: 37.91 }
         ],
-        profile: 'cycling'
+        profile: 'mapbox/cycling'
       });
 
       expect(result.isError).toBe(false);

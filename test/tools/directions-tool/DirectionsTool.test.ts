@@ -63,7 +63,7 @@ describe('DirectionsTool', () => {
         { longitude: -122.4, latitude: 37.79 },
         { longitude: -122.39, latitude: 37.77 }
       ],
-      routing_profile: 'walking',
+      routing_profile: 'mapbox/walking',
       geometries: 'geojson',
       alternatives: true,
       exclude: 'ferry'
@@ -259,7 +259,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           exclude: 'toll,motorway,unpaved'
         })
       ).resolves.not.toMatchObject({
@@ -273,7 +273,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving-traffic',
+          routing_profile: 'mapbox/driving-traffic',
           exclude: 'tunnel,country_border,state_border'
         })
       ).resolves.not.toMatchObject({
@@ -292,7 +292,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'walking',
+          routing_profile: 'mapbox/walking',
           exclude: 'toll'
         })
       ).resolves.toMatchObject({
@@ -306,7 +306,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'cycling',
+          routing_profile: 'mapbox/cycling',
           exclude: 'motorway'
         })
       ).resolves.toMatchObject({
@@ -325,7 +325,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           exclude: 'ferry'
         })
       ).resolves.not.toMatchObject({
@@ -339,7 +339,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'walking',
+          routing_profile: 'mapbox/walking',
           exclude: 'ferry'
         })
       ).resolves.not.toMatchObject({
@@ -353,7 +353,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'cycling',
+          routing_profile: 'mapbox/cycling',
           exclude: 'cash_only_tolls'
         })
       ).resolves.not.toMatchObject({
@@ -372,7 +372,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           exclude: 'point(-73.95 40.75)'
         })
       ).resolves.not.toMatchObject({
@@ -386,7 +386,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'walking',
+          routing_profile: 'mapbox/walking',
           exclude: 'point(-73.95 40.75)'
         })
       ).resolves.toMatchObject({
@@ -400,7 +400,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'cycling',
+          routing_profile: 'mapbox/cycling',
           exclude: 'point(-73.95 40.75)'
         })
       ).resolves.toMatchObject({
@@ -419,7 +419,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           exclude: 'toll,motorway,ferry,cash_only_tolls,point(-73.95 40.75)'
         })
       ).resolves.not.toMatchObject({
@@ -433,7 +433,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'walking',
+          routing_profile: 'mapbox/walking',
           exclude: 'ferry,toll'
         })
       ).resolves.toMatchObject({
@@ -447,7 +447,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'cycling',
+          routing_profile: 'mapbox/cycling',
           exclude: 'ferry,cash_only_tolls'
         })
       ).resolves.not.toMatchObject({
@@ -469,7 +469,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           depart_at: validDateTime
         })
       ).resolves.not.toMatchObject({
@@ -488,7 +488,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving-traffic',
+          routing_profile: 'mapbox/driving-traffic',
           depart_at: validDateTime
         })
       ).resolves.not.toMatchObject({
@@ -513,7 +513,7 @@ describe('DirectionsTool', () => {
               { longitude: -73.989, latitude: 40.733 },
               { longitude: -73.979, latitude: 40.743 }
             ],
-            routing_profile: 'driving',
+            routing_profile: 'mapbox/driving',
             max_height: 4.5,
             max_width: 2.5,
             max_weight: 7.8
@@ -534,7 +534,7 @@ describe('DirectionsTool', () => {
               { longitude: -73.989, latitude: 40.733 },
               { longitude: -73.979, latitude: 40.743 }
             ],
-            routing_profile: 'driving-traffic',
+            routing_profile: 'mapbox/driving-traffic',
             max_height: 3.2
           })
         ).resolves.not.toMatchObject({
@@ -556,7 +556,7 @@ describe('DirectionsTool', () => {
               { longitude: -73.989, latitude: 40.733 },
               { longitude: -73.979, latitude: 40.743 }
             ],
-            routing_profile: 'walking',
+            routing_profile: 'mapbox/walking',
             max_height: 4.5
           })
         ).resolves.toMatchObject({
@@ -570,7 +570,7 @@ describe('DirectionsTool', () => {
               { longitude: -73.989, latitude: 40.733 },
               { longitude: -73.979, latitude: 40.743 }
             ],
-            routing_profile: 'cycling',
+            routing_profile: 'mapbox/cycling',
             max_width: 2.0
           })
         ).resolves.toMatchObject({
@@ -589,7 +589,7 @@ describe('DirectionsTool', () => {
               { longitude: -73.989, latitude: 40.733 },
               { longitude: -73.979, latitude: 40.743 }
             ],
-            routing_profile: 'driving',
+            routing_profile: 'mapbox/driving',
             max_height: 15.0
           })
         ).resolves.toMatchObject({
@@ -603,7 +603,7 @@ describe('DirectionsTool', () => {
               { longitude: -73.989, latitude: 40.733 },
               { longitude: -73.979, latitude: 40.743 }
             ],
-            routing_profile: 'driving',
+            routing_profile: 'mapbox/driving',
             max_width: -1.0
           })
         ).resolves.toMatchObject({
@@ -617,7 +617,7 @@ describe('DirectionsTool', () => {
               { longitude: -73.989, latitude: 40.733 },
               { longitude: -73.979, latitude: 40.743 }
             ],
-            routing_profile: 'driving',
+            routing_profile: 'mapbox/driving',
             max_weight: 150.0
           })
         ).resolves.toMatchObject({
@@ -638,7 +638,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'walking',
+          routing_profile: 'mapbox/walking',
           depart_at: validDateTime
         })
       ).resolves.toMatchObject({
@@ -652,7 +652,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'cycling',
+          routing_profile: 'mapbox/cycling',
           depart_at: validDateTime
         })
       ).resolves.toMatchObject({
@@ -803,7 +803,7 @@ describe('DirectionsTool', () => {
             { longitude: -73.989, latitude: 40.733 },
             { longitude: -73.979, latitude: 40.743 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           arrive_by: dateTimeWithSeconds
         })
       ).resolves.not.toMatchObject({
@@ -832,7 +832,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'driving',
+        routing_profile: 'mapbox/driving',
         arrive_by: validDateTime
       });
 
@@ -854,7 +854,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'driving-traffic',
+        routing_profile: 'mapbox/driving-traffic',
         arrive_by: validDateTime
       });
 
@@ -866,7 +866,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'walking',
+        routing_profile: 'mapbox/walking',
         arrive_by: validDateTime
       });
 
@@ -878,7 +878,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'cycling',
+        routing_profile: 'mapbox/cycling',
         arrive_by: validDateTime
       });
 
@@ -892,7 +892,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'driving',
+        routing_profile: 'mapbox/driving',
         depart_at: '2025-06-05T09:30:00Z',
         arrive_by: '2025-06-05T10:30:00Z'
       });
@@ -908,7 +908,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'driving',
+        routing_profile: 'mapbox/driving',
         arrive_by: '2025-06-05T10:30:00Z'
       });
 
@@ -921,7 +921,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'driving',
+        routing_profile: 'mapbox/driving',
         arrive_by: '2025-06-05T10:30:00+02:00'
       });
 
@@ -934,7 +934,7 @@ describe('DirectionsTool', () => {
           { longitude: -74.1, latitude: 40.7 },
           { longitude: -74.2, latitude: 40.8 }
         ],
-        routing_profile: 'driving',
+        routing_profile: 'mapbox/driving',
         arrive_by: '2025-06-05T10:30'
       });
 
@@ -968,7 +968,7 @@ describe('DirectionsTool', () => {
             { longitude: -74.1, latitude: 40.7 },
             { longitude: -74.2, latitude: 40.8 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           arrive_by: format
         });
 
@@ -993,7 +993,7 @@ describe('DirectionsTool', () => {
             { longitude: -74.1, latitude: 40.7 },
             { longitude: -74.2, latitude: 40.8 }
           ],
-          routing_profile: 'driving',
+          routing_profile: 'mapbox/driving',
           arrive_by: date
         });
 
