@@ -38,3 +38,14 @@ export const bboxSchema = z.object({
   maxLongitude: z.number().min(-180).max(180),
   maxLatitude: z.number().min(-90).max(90)
 });
+
+/**
+ * Zod schema for Mapbox routing profiles.
+ * Uses the fully-qualified format (e.g., 'mapbox/driving-traffic').
+ */
+export const profileSchema = z.enum([
+  'mapbox/driving-traffic',
+  'mapbox/driving',
+  'mapbox/walking',
+  'mapbox/cycling'
+]);

@@ -56,8 +56,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
       ];
 
       const isDrivingProfile =
-        input.routing_profile === 'driving-traffic' ||
-        input.routing_profile === 'driving';
+        input.routing_profile === 'mapbox/driving-traffic' ||
+        input.routing_profile === 'mapbox/driving';
       const items = input.exclude.split(',').map((item) => item.trim());
 
       for (const item of items) {
@@ -112,8 +112,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
     }
 
     const isDrivingProfile =
-      input.routing_profile === 'driving-traffic' ||
-      input.routing_profile === 'driving';
+      input.routing_profile === 'mapbox/driving-traffic' ||
+      input.routing_profile === 'mapbox/driving';
 
     // Validate depart_at is only used with driving profiles
     if (input.depart_at && !isDrivingProfile) {
@@ -129,7 +129,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
     }
 
     // Validate arrive_by is only used with driving profile (not driving-traffic)
-    if (input.arrive_by && input.routing_profile !== 'driving') {
+    if (input.arrive_by && input.routing_profile !== 'mapbox/driving') {
       return {
         content: [
           {
@@ -187,7 +187,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
     queryParams.append('alternatives', input.alternatives.toString());
 
     // Add annotations parameter
-    if (input.routing_profile === 'driving-traffic') {
+    if (input.routing_profile === 'mapbox/driving-traffic') {
       // congestion is available only when driving
       queryParams.append('annotations', 'distance,congestion,speed');
     } else {
@@ -236,7 +236,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
       queryString += `&exclude=${excludeEncoded}`;
     }
 
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions/v5/mapbox/${input.routing_profile}/${encodedCoords}?${queryString}`;
+    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions/v5/${input.routing_profile}/${encodedCoords}?${queryString}`;
 
     const response = await this.httpRequest(url);
 

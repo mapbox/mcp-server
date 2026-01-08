@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { z } from 'zod';
-import { coordinateSchema } from '../../schemas/shared.js';
+import { coordinateSchema, profileSchema } from '../../schemas/shared.js';
 
 /**
  * Validates ISO 8601 date-time formats used by Mapbox Directions API
@@ -127,16 +127,15 @@ export const DirectionsInputSchema = z.object({
         'Must include at least 2 coordinate pairs (starting and ending points). ' +
         'Up to 25 coordinates total are supported.'
     ),
-  routing_profile: z
-    .enum(['driving-traffic', 'driving', 'walking', 'cycling'])
+  routing_profile: profileSchema
     .optional()
-    .default('driving-traffic')
+    .default('mapbox/driving-traffic')
     .describe(
       'Routing profile for different modes of transport. Options: \n' +
-        '- driving-traffic (default): automotive with current traffic conditions\n' +
-        '- driving: automotive based on typical traffic\n' +
-        '- walking: pedestrian/hiking\n' +
-        '- cycling: bicycle'
+        '- mapbox/driving-traffic (default): automotive with current traffic conditions\n' +
+        '- mapbox/driving: automotive based on typical traffic\n' +
+        '- mapbox/walking: pedestrian/hiking\n' +
+        '- mapbox/cycling: bicycle'
     ),
   geometries: z
     .enum(['none', 'geojson'])
