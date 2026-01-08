@@ -2,12 +2,23 @@
 // Licensed under the MIT License.
 
 import { BaseTool } from '../BaseTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, Icon } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ResourceReaderToolInput } from './ResourceReaderTool.input.schema.js';
 import { ResourceReaderToolInputSchema } from './ResourceReaderTool.input.schema.js';
 import { ResourceReaderToolOutputSchema } from './ResourceReaderTool.output.schema.js';
 import { getResourceByUri } from '../../resources/resourceRegistry.js';
+
+/**
+ * Default Mapbox icon
+ */
+const MAPBOX_ICON: Icon[] = [
+  {
+    src: 'https://avatars.githubusercontent.com/u/600935?s=200&v=4',
+    mimeType: 'image/png',
+    sizes: ['200x200']
+  }
+];
 
 /**
  * Tool for reading MCP resources via the tool interface.
@@ -31,7 +42,8 @@ export class ResourceReaderTool extends BaseTool<
   constructor() {
     super({
       inputSchema: ResourceReaderToolInputSchema,
-      outputSchema: ResourceReaderToolOutputSchema
+      outputSchema: ResourceReaderToolOutputSchema,
+      icons: MAPBOX_ICON
     });
   }
 

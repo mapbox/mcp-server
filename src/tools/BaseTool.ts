@@ -7,7 +7,8 @@ import type {
 } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type {
   ToolAnnotations,
-  CallToolResult
+  CallToolResult,
+  Icon
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { ZodTypeAny } from 'zod';
@@ -23,14 +24,17 @@ export abstract class BaseTool<
 
   readonly inputSchema: InputSchema;
   readonly outputSchema?: OutputSchema;
+  readonly icons?: Icon[];
   protected server: McpServer | null = null;
 
   constructor(params: {
     inputSchema: InputSchema;
     outputSchema?: OutputSchema;
+    icons?: Icon[];
   }) {
     this.inputSchema = params.inputSchema;
     this.outputSchema = params.outputSchema;
+    this.icons = params.icons;
   }
 
   /**
@@ -39,15 +43,7 @@ export abstract class BaseTool<
   installTo(server: McpServer): RegisteredTool {
     this.server = server;
 
-    const config: {
-      title?: string;
-      description?: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      inputSchema?: any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      outputSchema?: any;
-      annotations?: ToolAnnotations;
-    } = {
+    const config = {
       title: this.annotations.title,
       description: this.description,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,9 +53,16 @@ export abstract class BaseTool<
 
     // Add outputSchema if provided
     if (this.outputSchema) {
-      config.outputSchema =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (config as any).outputSchema =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (this.outputSchema as unknown as z.ZodObject<any>).shape;
+    }
+
+    // Add icons if provided (not yet in SDK type definition)
+    if (this.icons) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (config as any).icons = this.icons;
     }
 
     return server.registerTool(
