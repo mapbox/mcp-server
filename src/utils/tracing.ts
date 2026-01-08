@@ -181,9 +181,8 @@ export async function initializeTracing(): Promise<void> {
 
     // Console exporter for development (avoid in stdio transport)
     if (process.env.OTEL_EXPORTER_CONSOLE_ENABLED === 'true') {
-      const { ConsoleSpanExporter } = await import(
-        '@opentelemetry/sdk-trace-base'
-      );
+      const { ConsoleSpanExporter } =
+        await import('@opentelemetry/sdk-trace-base');
       exporters.push(new ConsoleSpanExporter());
     }
 

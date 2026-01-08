@@ -159,9 +159,8 @@ export class ResourceReaderTool extends BaseTool<
    * Lists all available resource URIs for error messages
    */
   private async listAvailableResources(): Promise<string> {
-    const { getAllResources } = await import(
-      '../../resources/resourceRegistry.js'
-    );
+    const { getAllResources } =
+      await import('../../resources/resourceRegistry.js');
     const resources = getAllResources();
     return resources.map((r: { uri: string }) => r.uri).join(', ');
   }
