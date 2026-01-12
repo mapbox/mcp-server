@@ -2,6 +2,15 @@
 // Licensed under the MIT License.
 
 // INSERT NEW TOOL IMPORT HERE
+import { SimplifyTool } from './simplify-tool/SimplifyTool.js';
+import { BoundingBoxTool } from './bounding-box-tool/BoundingBoxTool.js';
+import { CentroidTool } from './centroid-tool/CentroidTool.js';
+import { MidpointTool } from './midpoint-tool/MidpointTool.js';
+import { BearingTool } from './bearing-tool/BearingTool.js';
+import { AreaTool } from './area-tool/AreaTool.js';
+import { BufferTool } from './buffer-tool/BufferTool.js';
+import { PointInPolygonTool } from './point-in-polygon-tool/PointInPolygonTool.js';
+import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
@@ -17,6 +26,15 @@ import { httpRequest } from '../utils/httpPipeline.js';
 // Central registry of all tools
 export const ALL_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
+  new SimplifyTool(),
+  new BoundingBoxTool(),
+  new CentroidTool(),
+  new MidpointTool(),
+  new BearingTool(),
+  new AreaTool(),
+  new BufferTool(),
+  new PointInPolygonTool(),
+  new DistanceTool(),
   new VersionTool(),
   new ResourceReaderTool(),
   new CategoryListTool({ httpRequest }),
