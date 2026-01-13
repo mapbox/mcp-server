@@ -12,6 +12,8 @@ The Mapbox MCP Server transforms any AI agent or application into a geospatially
 - **Points of interest (POI) search** across millions of businesses, landmarks, and places worldwide
 - **Multi-modal routing** for driving, walking, and cycling with real-time traffic
 - **Travel time matrices** to analyze accessibility and optimize logistics
+- **Route optimization** to find the optimal visiting order for multiple stops (traveling salesman problem)
+- **Map matching** to snap GPS traces to the road network for clean route visualization
 - **Isochrone generation** to visualize areas reachable within specific time or distance constraints
 - **Static map images** to create visual representations of locations, routes, and geographic data
 - **Offline geospatial calculations** for distance, area, bearing, buffers, and spatial analysis without requiring API calls
@@ -77,6 +79,13 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 - "Show me areas reachable within 30 minutes of downtown Portland by car"
 - "Calculate a travel time matrix between these 3 hotel locations (Marriott, Sheraton and Hilton) and the convention center in Denver"
 - "Find the optimal route visiting these 3 tourist attractions (Golden Gate, Musical Stairs and Fisherman's Wharf) in San Francisco"
+- "Optimize a delivery route for these 8 addresses: [list of addresses]"
+
+### GPS & Route Matching
+
+- "Clean up this GPS trace and show the actual route on roads: [list of coordinates with timestamps]"
+- "Snap this recorded bicycle ride to the cycling network: [GPS coordinates]"
+- "Match this driving route to the road network and show traffic congestion levels"
 
 ### Offline Geospatial Calculations
 
@@ -385,6 +394,36 @@ Computes areas that are reachable within a specified amount of times from a loca
 
 Uses the [Mapbox Search Box Text Search API](https://docs.mapbox.com/api/search/search-box/#search-request) endpoint to power searching for and geocoding POIs, addresses, places, and any other types supported by that API.
 This tool consolidates the functionality that was previously provided by the ForwardGeocodeTool and PoiSearchTool (from earlier versions of this MCP server) into a single tool.
+
+#### Map matching tool
+
+Snaps GPS traces to the road network using the [Mapbox Map Matching API](https://docs.mapbox.com/api/navigation/map-matching/). Features include:
+
+- Convert noisy GPS traces to clean routes on the road network
+- Support for different travel profiles (driving, driving-traffic, walking, cycling)
+- Handle up to 100 coordinate pairs per request
+- Optional timestamps for improved accuracy based on speed
+- Configurable snap radiuses for different GPS quality levels
+- Route annotations (speed limits, distance, duration, traffic congestion)
+- Multiple geometry output formats (GeoJSON, polyline)
+
+**Example Usage**: "Clean up this GPS trace and snap it to roads: [coordinates with timestamps]"
+
+#### Optimization tool
+
+Finds the optimal route through multiple locations using the [Mapbox Optimization API](https://docs.mapbox.com/api/navigation/optimization/). Features include:
+
+- Solve traveling salesman problem (TSP) for 2-12 locations
+- Support for different travel profiles (driving, driving-traffic, walking, cycling)
+- Flexible start and end point configuration
+- Roundtrip or one-way trip optimization
+- Turn-by-turn navigation instructions (optional)
+- Route annotations (distance, duration, speed)
+- Multiple geometry output formats (GeoJSON, polyline)
+
+**Example Usage**: "Find the optimal route to visit these 5 stops: [list of addresses or coordinates]"
+
+**Note**: A V2 API with advanced features (time windows, capacity constraints, multiple vehicles) is available but requires beta access. The V2 implementation is included in the codebase but not registered by default.
 
 # Development
 

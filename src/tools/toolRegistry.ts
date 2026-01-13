@@ -15,7 +15,9 @@ import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
+import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
 import { MatrixTool } from './matrix-tool/MatrixTool.js';
+import { OptimizationTool } from './optimization-tool/OptimizationTool.js';
 import { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js';
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
@@ -41,7 +43,9 @@ export const ALL_TOOLS = [
   new CategorySearchTool({ httpRequest }),
   new DirectionsTool({ httpRequest }),
   new IsochroneTool({ httpRequest }),
+  new MapMatchingTool({ httpRequest }),
   new MatrixTool({ httpRequest }),
+  new OptimizationTool({ httpRequest }),
   new ReverseGeocodeTool({ httpRequest }),
   new StaticMapImageTool({ httpRequest }),
   new SearchAndGeocodeTool({ httpRequest })
