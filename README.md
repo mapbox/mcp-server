@@ -12,8 +12,11 @@ The Mapbox MCP Server transforms any AI agent or application into a geospatially
 - **Points of interest (POI) search** across millions of businesses, landmarks, and places worldwide
 - **Multi-modal routing** for driving, walking, and cycling with real-time traffic
 - **Travel time matrices** to analyze accessibility and optimize logistics
+- **Route optimization** to find the optimal visiting order for multiple stops (traveling salesman problem)
+- **Map matching** to snap GPS traces to the road network for clean route visualization
 - **Isochrone generation** to visualize areas reachable within specific time or distance constraints
 - **Static map images** to create visual representations of locations, routes, and geographic data
+- **Offline geospatial calculations** for distance, area, bearing, buffers, and spatial analysis without requiring API calls
 
 Whether you're building an AI travel assistant, logistics optimizer, location-based recommender, or any application that needs to understand "where", the Mapbox MCP Server provides the spatial intelligence to make it possible. You can also enable it on popular clients like Claude Desktop and VS Code. See below for details
 
@@ -76,6 +79,25 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 - "Show me areas reachable within 30 minutes of downtown Portland by car"
 - "Calculate a travel time matrix between these 3 hotel locations (Marriott, Sheraton and Hilton) and the convention center in Denver"
 - "Find the optimal route visiting these 3 tourist attractions (Golden Gate, Musical Stairs and Fisherman's Wharf) in San Francisco"
+- "Optimize a delivery route for these 8 addresses: [list of addresses]"
+
+### GPS & Route Matching
+
+- "Clean up this GPS trace and show the actual route on roads: [list of coordinates with timestamps]"
+- "Snap this recorded bicycle ride to the cycling network: [GPS coordinates]"
+- "Match this driving route to the road network and show traffic congestion levels"
+
+### Offline Geospatial Calculations
+
+- "What's the distance in miles between these two coordinates?"
+- "Calculate the area of this polygon in square kilometers"
+- "Is the point at 37.7749°N, 122.4194°W inside this service area polygon?"
+- "What's the bearing from San Francisco to New York?"
+- "Find the midpoint between London and Paris"
+- "Create a 5-mile buffer zone around this location"
+- "Calculate the centroid of this neighborhood boundary"
+- "What's the bounding box for these route coordinates?"
+- "Simplify this complex polygon to reduce the number of points"
 
 ### Tips for Better Results
 
@@ -178,6 +200,119 @@ Provides access to MCP resources for clients that don't support the native MCP r
 
 **Note**: If your MCP client supports native resources, prefer using the resource API directly for better performance.
 
+### Offline Geospatial Tools
+
+These tools perform geospatial calculations completely offline without requiring Mapbox API calls. They use [Turf.js](https://turfjs.org/) for accurate geographic computations and work anywhere, even without internet connectivity.
+
+#### Distance Tool
+
+Calculate the distance between two geographic coordinates using the Haversine formula.
+
+**Features**:
+
+- Supports multiple units: kilometers, miles, meters, feet, nautical miles
+- Accurate great-circle distance calculation
+- No API calls required
+
+**Example Usage**: "What's the distance between San Francisco (37.7749°N, 122.4194°W) and New York (40.7128°N, 74.0060°W)?"
+
+#### Point in Polygon Tool
+
+Test whether a point is inside a polygon or multipolygon.
+
+**Features**:
+
+- Works with complex polygons including holes
+- Supports multipolygons
+- Useful for geofencing and service area checks
+
+**Example Usage**: "Is this delivery address inside our service area?"
+
+#### Bearing Tool
+
+Calculate the compass direction (bearing) from one coordinate to another.
+
+**Features**:
+
+- Returns bearing in degrees (0-360°)
+- Provides cardinal direction (N, NE, E, SE, S, SW, W, NW)
+- Useful for navigation and directional queries
+
+**Example Usage**: "What direction should I head to go from here to the airport?"
+
+#### Midpoint Tool
+
+Find the geographic midpoint between two coordinates along the great circle path.
+
+**Features**:
+
+- Calculates true midpoint on Earth's curved surface
+- Useful for meeting point suggestions
+- Handles long-distance calculations correctly
+
+**Example Usage**: "What's halfway between San Francisco and New York?"
+
+#### Centroid Tool
+
+Calculate the geometric center (centroid) of a polygon or multipolygon.
+
+**Features**:
+
+- Works with complex shapes
+- Returns arithmetic mean of all points
+- Useful for placing labels or markers
+
+**Example Usage**: "Where should I place a marker for this neighborhood boundary?"
+
+#### Area Tool
+
+Calculate the area of a polygon.
+
+**Features**:
+
+- Supports multiple units: square meters, square kilometers, acres, hectares, square miles, square feet
+- Accurate area calculation on Earth's surface
+- Works with polygons of any size
+
+**Example Usage**: "What's the area of this park in acres?"
+
+#### Bounding Box Tool
+
+Calculate the minimum bounding box (bbox) that contains a geometry.
+
+**Features**:
+
+- Works with points, lines, polygons, and multipolygons
+- Returns [minLongitude, minLatitude, maxLongitude, maxLatitude]
+- Useful for viewport calculations and spatial indexing
+
+**Example Usage**: "What's the bounding box for this route?"
+
+#### Buffer Tool
+
+Create a buffer zone (polygon) around a point, line, or polygon.
+
+**Features**:
+
+- Supports multiple distance units
+- Creates circular buffers around points
+- Useful for proximity analysis and creating zones of influence
+
+**Example Usage**: "Show me a 5km buffer zone around this location"
+
+#### Simplify Tool
+
+Reduce the number of vertices in a line or polygon using the Douglas-Peucker algorithm.
+
+**Features**:
+
+- Configurable tolerance for detail level
+- Preserves overall shape while reducing complexity
+- Useful for reducing file sizes and improving rendering performance
+- Option to maintain topology (prevent self-intersections)
+
+**Example Usage**: "Simplify this complex boundary to reduce the number of points"
+
 ### Mapbox API Tools
 
 #### Category List Tool (Deprecated)
@@ -259,6 +394,36 @@ Computes areas that are reachable within a specified amount of times from a loca
 
 Uses the [Mapbox Search Box Text Search API](https://docs.mapbox.com/api/search/search-box/#search-request) endpoint to power searching for and geocoding POIs, addresses, places, and any other types supported by that API.
 This tool consolidates the functionality that was previously provided by the ForwardGeocodeTool and PoiSearchTool (from earlier versions of this MCP server) into a single tool.
+
+#### Map matching tool
+
+Snaps GPS traces to the road network using the [Mapbox Map Matching API](https://docs.mapbox.com/api/navigation/map-matching/). Features include:
+
+- Convert noisy GPS traces to clean routes on the road network
+- Support for different travel profiles (driving, driving-traffic, walking, cycling)
+- Handle up to 100 coordinate pairs per request
+- Optional timestamps for improved accuracy based on speed
+- Configurable snap radiuses for different GPS quality levels
+- Route annotations (speed limits, distance, duration, traffic congestion)
+- Multiple geometry output formats (GeoJSON, polyline)
+
+**Example Usage**: "Clean up this GPS trace and snap it to roads: [coordinates with timestamps]"
+
+#### Optimization tool
+
+Finds the optimal route through multiple locations using the [Mapbox Optimization API](https://docs.mapbox.com/api/navigation/optimization/). Features include:
+
+- Solve traveling salesman problem (TSP) for 2-12 locations
+- Support for different travel profiles (driving, driving-traffic, walking, cycling)
+- Flexible start and end point configuration
+- Roundtrip or one-way trip optimization
+- Turn-by-turn navigation instructions (optional)
+- Route annotations (distance, duration, speed)
+- Multiple geometry output formats (GeoJSON, polyline)
+
+**Example Usage**: "Find the optimal route to visit these 5 stops: [list of addresses or coordinates]"
+
+**Note**: A V2 API with advanced features (time windows, capacity constraints, multiple vehicles) is available but requires beta access. The V2 implementation is included in the codebase but not registered by default.
 
 # Development
 
