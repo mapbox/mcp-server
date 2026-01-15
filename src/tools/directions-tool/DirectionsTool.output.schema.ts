@@ -284,8 +284,8 @@ const RouteStepSchema = z.object({
   distance: z.number(),
   duration: z.number(),
   weight: z.number(),
-  duration_typical: z.number().optional(),
-  weight_typical: z.number().optional(),
+  duration_typical: z.number().nullable().optional(),
+  weight_typical: z.number().nullable().optional(),
   geometry: z.union([z.string(), GeoJSONLineStringSchema]),
   name: z.string(),
   ref: z.string().optional(),
@@ -315,8 +315,8 @@ const RouteLegSchema = z.object({
   distance: z.number(),
   duration: z.number(),
   weight: z.number(),
-  duration_typical: z.number().optional(),
-  weight_typical: z.number().optional(),
+  duration_typical: z.number().nullable().optional(),
+  weight_typical: z.number().nullable().optional(),
   steps: z.array(RouteStepSchema),
   summary: z.string(),
   admins: z.array(AdminSchema),
@@ -333,8 +333,8 @@ const RouteSchema = z.object({
   distance: z.number(),
   weight_name: z.enum(['auto', 'pedestrian']).optional(), // Removed by cleanResponseData
   weight: z.number().optional(), // Removed by cleanResponseData
-  duration_typical: z.number().optional(),
-  weight_typical: z.number().optional(),
+  duration_typical: z.number().nullable().optional(),
+  weight_typical: z.number().nullable().optional(),
   geometry: z.union([z.string(), GeoJSONLineStringSchema]).optional(), // Can be removed when geometries='none'
   legs: z.array(RouteLegSchema).optional(), // Removed by cleanResponseData, replaced with leg_summaries
   voiceLocale: z.string().optional(),
