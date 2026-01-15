@@ -276,13 +276,20 @@ These tools perform calculations locally using Turf.js - no API calls, no intern
 - Road closures
 - Unique for safety-critical applications
 
-#### 🗺️ Dynamic Map Rendering
+#### 🗺️ Self-Contained Map Rendering
 
-**Advanced visualization**:
+**Architectural philosophy - embedding vs API**:
 
-- Custom overlays beyond static images
-- Real-time traffic visualization
-- Most sophisticated map generation
+TomTom embeds MapLibre GL Native directly in their MCP server for sophisticated server-side rendering:
+
+- **Self-contained**: No external Static Images API needed
+- **Advanced rendering**: Uses same engine as their interactive maps
+- **Custom overlays**: Complex geometries and styling beyond basic markers
+- **Real-time traffic visualization**: Render traffic data directly
+
+**Trade-off**: Requires native dependencies (Cairo, Pango, Canvas) making local installation complex. Disabled by default (`ENABLE_DYNAMIC_MAPS=true` required).
+
+**vs Mapbox**: Calls hosted Static Images API - simpler installation but API-dependent.
 
 #### 🔍 Explicit Fuzzy Search
 
@@ -584,11 +591,18 @@ const tool = new DirectionsTool({ httpRequest: mockHttpRequest });
 - `pino`: Logging
 - `canvas` + `@maplibre/maplibre-gl-native`: Optional for dynamic maps (heavy native dependencies)
 
-**Native Dependencies**: Complex setup for MapLibre + Canvas
+**Native Dependencies for Self-Contained Rendering**:
 
-- Requires system-level dependencies (cairo, pango, etc.)
-- Docker setup documented extensively
-- Graceful degradation if unavailable
+TomTom's architectural choice to embed map rendering requires:
+
+- System-level dependencies (cairo, pango, pixman, etc.)
+- Platform-specific compilation (different for Linux/macOS/Windows)
+- Docker setup documented extensively for consistent builds
+- Optional and disabled by default (graceful degradation)
+
+**Local Installation Impact**: Complex for Claude Desktop/VS Code users - many will encounter native compilation errors.
+
+**Philosophy**: Self-contained (no external API) vs Mapbox's API-dependent (simpler install)
 
 ### 4.6 Documentation Quality
 
@@ -627,39 +641,41 @@ const tool = new DirectionsTool({ httpRequest: mockHttpRequest });
 
 ### 4.7 Code Maturity Assessment
 
-| Aspect                 | Mapbox                         | TomTom                                |
-| ---------------------- | ------------------------------ | ------------------------------------- |
-| **Architecture**       | 🥇 Modern (DI, class-based)    | ✅ Enterprise (3-tier, service layer) |
-| **Token Optimization** | 🥇 Aggressive (~67% reduction) | ❌ None                               |
-| **Error Messages**     | ✅ Basic                       | 🥇 Detailed with guidance             |
-| **Testing**            | ✅ Comprehensive unit tests    | ✅ Unit + live API tests              |
-| **Dependencies**       | 🥇 Lightweight (native fetch)  | ✅ Standard (Axios)                   |
-| **Type Safety**        | 🥇 Strict TypeScript           | ✅ TypeScript                         |
-| **HTTP Abstraction**   | 🥇 Policy-based pipeline       | ✅ Axios interceptors                 |
-| **Response Format**    | 🥇 Structured + text           | ❌ Text only                          |
-| **Documentation**      | 🥇 Comprehensive (8 guides)    | ✅ Good                               |
-| **Native Deps**        | 🥇 None required               | ⚠️ Complex (MapLibre/Canvas)          |
-| **License**            | 🥇 MIT                         | ✅ Apache 2.0                         |
-| **Status**             | 🥇 Production                  | ⚠️ Alpha                              |
+| Aspect                 | Mapbox                         | TomTom                                   |
+| ---------------------- | ------------------------------ | ---------------------------------------- |
+| **Architecture**       | 🥇 Modern (DI, class-based)    | ✅ Enterprise (3-tier, service layer)    |
+| **Token Optimization** | 🥇 Aggressive (~67% reduction) | ❌ None                                  |
+| **Error Messages**     | ✅ Basic                       | 🥇 Detailed with guidance                |
+| **Testing**            | ✅ Comprehensive unit tests    | ✅ Unit + live API tests                 |
+| **Dependencies**       | 🥇 Lightweight (native fetch)  | ✅ Standard (Axios)                      |
+| **Type Safety**        | 🥇 Strict TypeScript           | ✅ TypeScript                            |
+| **HTTP Abstraction**   | 🥇 Policy-based pipeline       | ✅ Axios interceptors                    |
+| **Response Format**    | 🥇 Structured + text           | ❌ Text only                             |
+| **Documentation**      | 🥇 Comprehensive (8 guides)    | ✅ Good                                  |
+| **Native Deps**        | 🥇 None required (API-based)   | ⚠️ Required for self-contained rendering |
+| **License**            | 🥇 MIT                         | ✅ Apache 2.0                            |
+| **Status**             | 🥇 Production                  | ⚠️ Alpha                                 |
 
 ### 4.8 Key Architectural Takeaways
 
 #### Mapbox Advantages
 
 1. **Token optimization** - Major competitive advantage, critical for LLM costs
-2. **Dependency injection** - More testable architecture
-3. **Lightweight dependencies** - No native compilation required
-4. **Policy-based HTTP** - Cleaner than global fetch patching or interceptors
-5. **Centralized registry** - Easier to see all tools at once
-6. **Structured content** - Better MCP protocol usage
+2. **API-based architecture** - Simpler installation, works immediately in Claude Desktop/VS Code
+3. **Dependency injection** - More testable architecture
+4. **Lightweight dependencies** - No native compilation required
+5. **Policy-based HTTP** - Cleaner than global fetch patching or interceptors
+6. **Centralized registry** - Easier to see all tools at once
+7. **Structured content** - Better MCP protocol usage
 
 #### TomTom Advantages
 
-1. **More detailed error messages** - Better user guidance
-2. **Three-tier architecture** - Better separation of concerns for large teams
-3. **Live API tests** - Better integration coverage
-4. **Dual backend support** - More flexible for different API versions
-5. **Adding_new_tools.md** - Excellent contributor documentation
+1. **Self-contained rendering** - No external Static Images API dependency (trade-off: complex install)
+2. **More detailed error messages** - Better user guidance
+3. **Three-tier architecture** - Better separation of concerns for large teams
+4. **Live API tests** - Better integration coverage
+5. **Dual backend support** - More flexible for different API versions
+6. **Adding_new_tools.md** - Excellent contributor documentation
 
 #### Recommendations for Mapbox
 
@@ -1282,7 +1298,7 @@ All servers support:
 | **Offline Capabilities**   | 🥇 **Mapbox** (9 tools) | Only server with offline geospatial toolkit                              |
 | **Traffic Data**           | 🥇 **TomTom**           | Only server with real-time incident data                                 |
 | **Weather Data**           | 🥇 **Google Grounding** | Only server with weather integration                                     |
-| **Map Visualization**      | 🥇 **TomTom**           | Most advanced with dynamic rendering                                     |
+| **Map Visualization**      | 🥇 **TomTom**           | Self-contained rendering (trade-off: complex local install)              |
 | **GPS Trace Processing**   | 🥇 **Mapbox**           | Only server with map matching                                            |
 | **Token Optimization**     | 🥇 **Mapbox**           | ~67% token reduction via cleanResponseData, unique among all MCP servers |
 | **Code Architecture**      | 🥇 **Mapbox**           | Modern DI pattern, lightweight dependencies, no native compilation       |
