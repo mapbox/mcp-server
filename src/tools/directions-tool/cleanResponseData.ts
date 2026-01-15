@@ -67,8 +67,8 @@ interface RawRoute {
   distance?: number;
   weight_name?: string;
   weight?: number;
-  duration_typical?: number;
-  weight_typical?: number;
+  duration_typical?: number | null;
+  weight_typical?: number | null;
   geometry?: unknown;
   legs?: RawLeg[];
   [key: string]: unknown;
