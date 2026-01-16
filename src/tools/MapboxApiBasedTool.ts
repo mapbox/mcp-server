@@ -56,6 +56,26 @@ export abstract class MapboxApiBasedTool<
   }
 
   /**
+   * Extracts error message from Mapbox API response.
+   * If the response contains a JSON body with a 'message' field, returns that.
+   * Otherwise falls back to the response status text.
+   * @param response The HTTP response object
+   * @returns The error message string
+   */
+  protected async getErrorMessage(response: Response): Promise<string> {
+    try {
+      const errorBody = await response.text();
+      const errorJson = JSON.parse(errorBody);
+      if (errorJson.message) {
+        return errorJson.message;
+      }
+    } catch {
+      // If parsing fails, fall back to status text
+    }
+    return response.statusText;
+  }
+
+  /**
    * Validates and runs the tool logic.
    */
   async run(

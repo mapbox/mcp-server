@@ -105,22 +105,14 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `Request failed with status ${response.status}: ${response.statusText}`;
-
-      try {
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.message) {
-          errorMessage = `${errorMessage} - ${errorJson.message}`;
-        }
-      } catch {
-        if (errorText) {
-          errorMessage = `${errorMessage} - ${errorText}`;
-        }
-      }
-
+      const errorMessage = await this.getErrorMessage(response);
       return {
-        content: [{ type: 'text', text: errorMessage }],
+        content: [
+          {
+            type: 'text',
+            text: `Map Matching API error: ${errorMessage}`
+          }
+        ],
         isError: true
       };
     }

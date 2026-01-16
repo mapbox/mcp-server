@@ -160,7 +160,7 @@ describe('DirectionsTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Request failed with status 404: Not Found'
+      text: 'Directions API error: Not Found'
     });
     assertHeadersSent(mockHttpRequest);
   });

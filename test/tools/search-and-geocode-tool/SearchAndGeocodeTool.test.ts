@@ -123,7 +123,7 @@ describe('SearchAndGeocodeTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Failed to search: 404 Not Found'
+      text: 'Search API error: Not Found'
     });
   });
 

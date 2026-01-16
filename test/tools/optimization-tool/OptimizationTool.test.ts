@@ -221,7 +221,7 @@ describe('OptimizationTool V1 API', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('422');
+    expect(result.content[0].text).toContain('Optimization API error');
     expect(result.content[0].text).toContain('Invalid coordinates');
   });
 

@@ -241,11 +241,12 @@ export class DirectionsTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url);
 
     if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
       return {
         content: [
           {
             type: 'text',
-            text: `Request failed with status ${response.status}: ${response.statusText}`
+            text: `Directions API error: ${errorMessage}`
           }
         ],
         isError: true
