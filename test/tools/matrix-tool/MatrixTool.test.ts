@@ -256,7 +256,7 @@ describe('MatrixTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Matrix API error: Not Found'
+      text: 'Matrix API error: 404: Not Found'
     });
 
     assertHeadersSent(mockHttpRequest);

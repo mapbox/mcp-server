@@ -60,19 +60,19 @@ export abstract class MapboxApiBasedTool<
    * If the response contains a JSON body with a 'message' field, returns that.
    * Otherwise falls back to the response status text.
    * @param response The HTTP response object
-   * @returns The error message string
+   * @returns The error message string in format "statusCode: message"
    */
   protected async getErrorMessage(response: Response): Promise<string> {
     try {
       const errorBody = await response.text();
       const errorJson = JSON.parse(errorBody);
       if (errorJson.message) {
-        return errorJson.message;
+        return `${response.status}: ${errorJson.message}`;
       }
     } catch {
       // If parsing fails, fall back to status text
     }
-    return response.statusText;
+    return `${response.status}: ${response.statusText}`;
   }
 
   /**

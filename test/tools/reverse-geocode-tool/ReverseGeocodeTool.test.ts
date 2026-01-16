@@ -224,7 +224,7 @@ describe('ReverseGeocodeTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Reverse Geocode API error: Not Found'
+      text: 'Reverse Geocode API error: 404: Not Found'
     });
   });
 

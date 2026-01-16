@@ -116,7 +116,7 @@ describe('StaticMapImageTool', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: 'Static Map API error: Not Found'
+      text: 'Static Map API error: 404: Not Found'
     });
   });
 
