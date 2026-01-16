@@ -71,11 +71,12 @@ export class CategoryListTool extends MapboxApiBasedTool<
     });
 
     if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
       return {
         content: [
           {
             type: 'text',
-            text: `Mapbox API request failed: ${response.status} ${response.statusText}`
+            text: `Category List API error: ${errorMessage}`
           }
         ],
         isError: true

@@ -103,11 +103,12 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url);
 
     if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to fetch map image: ${response.status} ${response.statusText}`
+            text: `Static Map API error: ${errorMessage}`
           }
         ],
         isError: true

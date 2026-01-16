@@ -136,11 +136,12 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to reverse geocode: ${response.status} ${response.statusText}`
+            text: `Reverse Geocode API error: ${errorMessage}`
           }
         ],
         isError: true

@@ -101,19 +101,7 @@ export class OptimizationTool extends MapboxApiBasedTool<
       const response = await this.httpRequest(url);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = `Request failed with status ${response.status}: ${response.statusText}`;
-
-        try {
-          const errorJson = JSON.parse(errorText);
-          if (errorJson.message) {
-            errorMessage = `${errorMessage} - ${errorJson.message}`;
-          }
-        } catch {
-          if (errorText) {
-            errorMessage = `${errorMessage} - ${errorText}`;
-          }
-        }
+        const errorMessage = await this.getErrorMessage(response);
 
         toolContext.span.setStatus({
           code: SpanStatusCode.ERROR,
@@ -121,7 +109,12 @@ export class OptimizationTool extends MapboxApiBasedTool<
         });
 
         return {
-          content: [{ type: 'text' as const, text: errorMessage }],
+          content: [
+            {
+              type: 'text' as const,
+              text: `Optimization API error: ${errorMessage}`
+            }
+          ],
           isError: true
         };
       }
