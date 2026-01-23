@@ -123,8 +123,26 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
-    // Build content array with image data
+    // Build descriptive text for clients that don't support image content type
+    // This ensures all MCP clients can display meaningful information (Issue #103)
+    const textDescription = [
+      'Static map image generated successfully.',
+      `Center: ${lat}, ${lng}`,
+      `Zoom: ${input.zoom}`,
+      `Size: ${width}x${height}${input.highDensity ? ' @2x' : ''}`,
+      `Style: ${input.style}`,
+      input.overlays?.length ? `Overlays: ${input.overlays.length}` : null
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    // Build content array with text first (for compatibility), then image
+    // Text content provides fallback for clients that don't support image type
     const content: CallToolResult['content'] = [
+      {
+        type: 'text',
+        text: textDescription
+      },
       {
         type: 'image',
         data: base64Data,
