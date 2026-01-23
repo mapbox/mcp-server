@@ -87,18 +87,18 @@ The `static_map_image_tool` returns a response with multiple content items, foll
 {
   content: [
     {
-      // Text description for clients that don't support image content type
+      // Text description with map metadata
       type: 'text',
       text: 'Static map image generated successfully.\nCenter: 37.7749, -122.4194\nZoom: 13\nSize: 800x600\nStyle: mapbox/streets-v12'
     },
     {
-      // Base64-encoded image for clients that support image content
+      // Base64-encoded image
       type: 'image',
       data: '<base64-encoded-image>',
       mimeType: 'image/png'
     },
     {
-      // MCP-UI resource for clients that support interactive iframes (only when enabled)
+      // MCP-UI resource for interactive iframes (only when enabled)
       type: 'resource',
       resource: {
         uri: 'ui://mapbox/static-map/...',
@@ -113,9 +113,7 @@ The `static_map_image_tool` returns a response with multiple content items, foll
 }
 ```
 
-**Text-only clients** (like LibreChat) display the text description with map metadata.
-
-**Image-capable clients** (like Claude Desktop) render the base64 image and may ignore the text.
+**Standard clients** (Claude Desktop, LibreChat, VS Code, Cursor) render the base64 image. The text content provides additional metadata about the generated map.
 
 **MCP-UI clients** (like Goose) can render the interactive iframe resource for the richest experience.
 
@@ -214,7 +212,7 @@ The Mapbox MCP Server uses the `@mcp-ui/server` package (v5.13.1+) to create UIR
 import { createUIResource } from '@mcp-ui/server';
 import { isMcpUiEnabled } from '../../config/toolConfig.js';
 
-// Build descriptive text for clients that don't support image content type
+// Build descriptive text with map metadata
 const textDescription = [
   'Static map image generated successfully.',
   `Center: ${lat}, ${lng}`,
@@ -223,7 +221,7 @@ const textDescription = [
   `Style: ${input.style}`
 ].join('\n');
 
-// Build content array with text first (for compatibility), then image
+// Build content array with text first, then image
 const content: CallToolResult['content'] = [
   {
     type: 'text',
