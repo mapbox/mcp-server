@@ -88,52 +88,55 @@ Please follow these steps:
    - Extract the route LineString geometry from the response
    - Note the total route distance
 
-3. **Create search corridor** (choose approach based on route length):
+3. **Create search corridor and find places** (choose approach based on route length):
 
-   **For routes < 100km or < 200 coordinate points:**
+   **For SHORT routes (< 50km):** [RECOMMENDED - Most accurate]
    - Use buffer_tool on the full route geometry with distance=${buffer_meters} meters
-   - This creates a polygon corridor around the entire route
+   - Use category_search_tool or search_and_geocode_tool within the buffer's bounding box
+   - Use point_in_polygon_tool to filter results to the corridor
+   - This gives precise corridor filtering
 
-   **For longer routes (≥ 100km or ≥ 200 points):**
-   - Sample points along the route (every 10-20km)
-   - Create small circular buffers around each sample point using buffer_tool
-   - OR divide the route into 3-5 segments and buffer each segment separately
-   - This prevents buffer_tool from failing on very long LineStrings
+   **For LONG routes (≥ 50km):** [PRAGMATIC - Simpler]
+   - Calculate the route's bounding box (min/max lat/lon)
+   - Use category_search_tool or search_and_geocode_tool with bbox parameter
+   - Filter results by calculating distance to the route line
+   - Keep only results within ${buffer_meters}m of the route (use distance_tool)
+   - Accept that some results may be included that are off-route but within bbox
+   - Note to user: "For this long route, results are filtered to the general corridor"
 
-4. **Search for places**:
-   - Use category_search_tool or search_and_geocode_tool to find "${search_for}"
-   - Use the buffer polygon's bounding box as the search area
-   - For segmented approaches, search within each segment's bounding box
+   **Why this approach:**
+   - Short routes: Full corridor filtering is manageable and precise
+   - Long routes: Avoid token/complexity issues by using simpler bbox + distance filtering
+   - This keeps the workflow practical for all route lengths
 
-5. **Filter results**:
-   - Use point_in_polygon_tool to confirm each result is actually within the buffer corridor(s)
-   - Use distance_tool to calculate distance from each POI to the nearest route point
-   - Order results by their position along the route (calculate distance from start point)
-   - Remove duplicates if using overlapping segments
+4. **Order and present results**:
+   - Use distance_tool to calculate each POI's distance from the start point
+   - Order results by distance from start (approximate route progress)
+   - For short routes with precise corridor: results should all be on/near route
+   - For long routes with bbox filtering: results are approximate corridor
 
-6. **Visualize and present**:
+5. **Visualize and present**:
    - Display a map showing:
      * The route line
      * Start and end markers
-     * All found locations as markers (limit to top 15-20 if many results)
-     * Optionally, the buffer corridor (semi-transparent)
+     * All found locations as markers (limit to top 15 if many results)
    - Provide a list of results including:
      * Name and address of each place
-     * Distance from route (perpendicular distance)
-     * Approximate position along route (e.g., "45 miles into your trip")
+     * Distance from start of route (e.g., "45 miles into your trip")
+     * Distance from route line (e.g., "0.3 miles off route")
      * Total results found
 
-7. **Additional context**:
+6. **Additional context**:
    - Mention the total route distance and estimated travel time
-   - Note if no results were found and suggest widening the search corridor
-   - If many results (>20), show top 15-20 and mention there are more
-   - If you used segmentation, mention this approach was used for a long route
+   - Note which approach was used (short route corridor vs long route bbox)
+   - If no results were found, suggest widening the search corridor
+   - If many results (>15), show top 15 and mention there are more
 
 **Important notes:**
-- buffer_tool can fail on very long LineStrings - always check route length first
-- For routes like Seattle to Portland (~280km), use the segmentation approach
-- Adjust buffer_meters based on context (wider for highways, narrower for city streets)
-- Walking routes typically need smaller buffers (500m), driving routes need larger (1000-2000m)
+- Routes < 50km: Use precise corridor filtering (buffer + point-in-polygon)
+- Routes ≥ 50km: Use pragmatic bbox filtering (to avoid token/complexity issues)
+- This threshold keeps the workflow practical and reliable
+- For very long routes (>200km), consider suggesting the user break into segments
 
 Make the output clear, actionable, and well-formatted.`
         }
