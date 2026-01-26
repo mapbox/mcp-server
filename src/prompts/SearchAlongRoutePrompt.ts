@@ -98,10 +98,12 @@ Please follow these steps:
 
    **For each sample point:**
    - Extract the coordinate [lon, lat] from the route
-   - Use category_search_tool with:
-     * query: "${search_for}"
-     * proximity: "lon,lat" (bias results near this point)
-     * limit: Keep results reasonable (10-20 per point for short routes, 5-10 for long routes)
+   - Choose the appropriate search tool:
+     * If "${search_for}" is a specific place/brand (e.g., "Starbucks", "McDonald's", "Whole Foods"):
+       Use search_and_geocode_tool with proximity="lon,lat" and q="${search_for}"
+     * If "${search_for}" is a category (e.g., "coffee shops", "gas stations", "restaurants"):
+       Use category_search_tool with types="${search_for}" and proximity="lon,lat"
+   - Limit results per point (10-20 for short routes, 5-10 for long routes)
 
    **Combine and deduplicate:**
    - Collect all results from sample points
