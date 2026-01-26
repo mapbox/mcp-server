@@ -116,10 +116,11 @@ Please follow these steps:
    - For long routes with bbox filtering: results are approximate corridor
 
 5. **Visualize and present**:
-   - Display a map showing:
-     * The route line
-     * Start and end markers
-     * All found locations as markers (limit to top 15 if many results)
+   - Use static_map_image_tool to create a map showing:
+     * The route as a path overlay (use the route geometry)
+     * Start and end locations as markers
+     * Found locations as markers (limit to top 10-15 if many results)
+     * Appropriate zoom level to show the entire route
    - Provide a list of results including:
      * Name and address of each place
      * Distance from start of route (e.g., "45 miles into your trip")
