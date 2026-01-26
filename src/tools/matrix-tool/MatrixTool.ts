@@ -282,11 +282,12 @@ export class MatrixTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url);
 
     if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
       return {
         content: [
           {
             type: 'text',
-            text: `Request failed with status ${response.status}: ${response.statusText}`
+            text: `Matrix API error: ${errorMessage}`
           }
         ],
         isError: true

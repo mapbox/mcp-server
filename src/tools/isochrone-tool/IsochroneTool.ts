@@ -136,11 +136,12 @@ export class IsochroneTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url);
 
     if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to calculate isochrones: ${response.status} ${response.statusText}`
+            text: `Isochrone API error: ${errorMessage}`
           }
         ],
         isError: true

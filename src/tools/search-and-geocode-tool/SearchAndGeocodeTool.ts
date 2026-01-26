@@ -175,16 +175,16 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
-      const errorBody = await response.text();
+      const errorMessage = await this.getErrorMessage(response);
       this.log(
         'error',
-        `SearchAndGeocodeTool: API Error - Status: ${response.status}, Body: ${errorBody}`
+        `SearchAndGeocodeTool: API Error - Status: ${response.status}, Message: ${errorMessage}`
       );
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to search: ${response.status} ${response.statusText}`
+            text: `Search API error: ${errorMessage}`
           }
         ],
         isError: true

@@ -149,11 +149,12 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to search category: ${response.status} ${response.statusText}`
+            text: `Category Search API error: ${errorMessage}`
           }
         ],
         isError: true
