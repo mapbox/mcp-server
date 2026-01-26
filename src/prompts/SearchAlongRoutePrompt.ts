@@ -105,6 +105,12 @@ Please follow these steps:
        Use category_search_tool with types="${search_for}" and proximity="lon,lat"
    - Limit results per point (10-20 for short routes, 5-10 for long routes)
 
+   **IMPORTANT - Execute searches in parallel:**
+   - All sample point searches are INDEPENDENT and can run concurrently
+   - Make ALL search tool calls in a single message (parallel execution)
+   - Example: If you have 5 sample points, make 5 search_and_geocode_tool calls in one turn
+   - This dramatically speeds up the workflow vs sequential searches
+
    **Combine and deduplicate:**
    - Collect all results from sample points
    - Remove duplicates (same place found from multiple sample points)
