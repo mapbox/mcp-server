@@ -124,12 +124,12 @@ Please follow these steps:
 5. **Visualize and present**:
 
    **Map generation:**
-   - For ALL routes, use static_map_image_tool to create a map:
-     * Use simplify_tool on route first (tolerance=0.01 for <50km, 0.05 for >50km)
-     * Show the simplified route as a path overlay
+   - For routes < 150km: Use static_map_image_tool to create a map
+     * Show the route as a path overlay (pass the route geometry directly)
      * Add start and end markers
      * Add found location markers (top 8-10 only to keep map clean)
-     * If route is very long (>150km), consider skipping map to save time
+   - For routes ≥ 150km: Skip map to avoid slow rendering
+     * Note to user: "Map skipped due to route length - see results list"
 
    **Results list (always provide):**
    - Name and address of each place
