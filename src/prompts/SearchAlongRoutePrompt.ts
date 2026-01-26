@@ -85,29 +85,36 @@ Please follow these steps:
 
 2. **Get the route**:
    - Use directions_tool with profile=${mode} to get the route geometry between the two points
-   - Extract the route LineString geometry from the response
-   - Note the total route distance
+   - Extract the route LineString coordinates from the response (it will be an array of [lon, lat] pairs)
+   - Note the total route distance in meters
 
 3. **Create search corridor and find places** (choose approach based on route length):
 
    **For SHORT routes (< 50km):** [RECOMMENDED - Most accurate]
-   - Use buffer_tool on the full route geometry with distance=${buffer_meters} meters
-   - Use category_search_tool or search_and_geocode_tool within the buffer's bounding box
-   - Use point_in_polygon_tool to filter results to the corridor
+   - Use buffer_tool on the route LineString coordinates with distance=${buffer_meters} meters
+     * Pass the coordinates as: {"geometry": [[lon1,lat1], [lon2,lat2], ...], "distance": ${buffer_meters}, "units": "meters"}
+   - The buffer result will be a Polygon
+   - Use bounding_box_tool on the buffer polygon to get search bbox
+     * Pass the polygon coordinates from the buffer result
+   - Use category_search_tool with the bbox parameter (format: "minLon,minLat,maxLon,maxLat")
+   - Use point_in_polygon_tool to filter results to the buffer corridor
    - This gives precise corridor filtering
 
    **For MEDIUM routes (50-150km):** [PRAGMATIC - Balanced]
-   - Calculate the route's bounding box (min/max lat/lon)
-   - Use category_search_tool or search_and_geocode_tool with bbox parameter
-   - Filter results by calculating distance to route (use distance_tool)
+   - Use bounding_box_tool on the route LineString coordinates to get the route's bbox
+     * Pass the route coordinates as: {"geometry": [[lon1,lat1], [lon2,lat2], ...]}
+   - Use category_search_tool with the bbox parameter (format: "minLon,minLat,maxLon,maxLat")
+   - Filter results by calculating distance to the closest route point (use distance_tool)
    - Keep only results within ${buffer_meters}m of the route
    - Note to user: "For this medium-length route, results are filtered to the general corridor"
 
    **For VERY LONG routes (> 150km):** [SAMPLING - Most practical]
-   - Sample 5-7 strategic points along the route (start, end, and evenly spaced middle points)
-   - For each sample point, use category_search_tool with a small radius (5-10km)
-   - Combine results from all sample points
-   - Order by distance from start
+   - Sample 5-7 strategic points evenly spaced along the route
+     * Extract coordinates at indices: 0, len/6, 2*len/6, 3*len/6, 4*len/6, 5*len/6, len-1
+   - For each sample point coordinate [lon, lat]:
+     * Use category_search_tool with proximity parameter: "lon,lat" and limit results
+   - Combine results from all sample points (remove duplicates if any)
+   - Order by distance from start point
    - Note to user: "Due to the route length (X km), showing results near major points along the route rather than the full corridor"
 
    **Why this three-tier approach:**
