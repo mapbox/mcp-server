@@ -54,14 +54,109 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0]).toMatchObject({
+      expect(result.content).toHaveLength(2); // text + image
+      // First content should be text description
+      expect(result.content[0].type).toBe('text');
+      // Second content should be image
+      expect(result.content[1]).toMatchObject({
         type: 'image',
         data: mockImageBuffer.toString('base64'),
         mimeType: 'image/jpeg' // satellite is a raster style
       });
     } finally {
       // Restore environment variable
+      if (originalEnv !== undefined) {
+        process.env.ENABLE_MCP_UI = originalEnv;
+      } else {
+        delete process.env.ENABLE_MCP_UI;
+      }
+    }
+  });
+
+  it('returns text content with map details as first item', async () => {
+    // Disable MCP-UI for this test to focus on text + image
+    const originalEnv = process.env.ENABLE_MCP_UI;
+    process.env.ENABLE_MCP_UI = 'false';
+
+    try {
+      const mockImageBuffer = Buffer.from('fake-image-data');
+      const mockArrayBuffer = mockImageBuffer.buffer.slice(
+        mockImageBuffer.byteOffset,
+        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
+      );
+
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
+      });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12'
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].type).toBe('text');
+
+      const textContent = result.content[0] as { type: 'text'; text: string };
+      expect(textContent.text).toContain('Static map image generated');
+      expect(textContent.text).toContain('40.7128'); // latitude
+      expect(textContent.text).toContain('-74.006'); // longitude
+      expect(textContent.text).toContain('12'); // zoom
+      expect(textContent.text).toContain('600x400'); // size
+      expect(textContent.text).toContain('mapbox/streets-v12'); // style
+    } finally {
+      if (originalEnv !== undefined) {
+        process.env.ENABLE_MCP_UI = originalEnv;
+      } else {
+        delete process.env.ENABLE_MCP_UI;
+      }
+    }
+  });
+
+  it('text content includes overlay count when overlays present', async () => {
+    const originalEnv = process.env.ENABLE_MCP_UI;
+    process.env.ENABLE_MCP_UI = 'false';
+
+    try {
+      const mockImageBuffer = Buffer.from('fake-image-data');
+      const mockArrayBuffer = mockImageBuffer.buffer.slice(
+        mockImageBuffer.byteOffset,
+        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
+      );
+
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
+      });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12',
+        overlays: [
+          {
+            type: 'marker',
+            longitude: -74.006,
+            latitude: 40.7128,
+            size: 'large',
+            color: 'ff0000'
+          },
+          {
+            type: 'marker',
+            longitude: -74.01,
+            latitude: 40.71,
+            size: 'small',
+            color: '00ff00'
+          }
+        ]
+      });
+
+      expect(result.isError).toBe(false);
+      const textContent = result.content[0] as { type: 'text'; text: string };
+      expect(textContent.text).toContain('Overlays: 2');
+    } finally {
       if (originalEnv !== undefined) {
         process.env.ENABLE_MCP_UI = originalEnv;
       } else {
@@ -573,11 +668,12 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(2); // image + UIResource
-      expect(result.content[0].type).toBe('image');
-      expect(result.content[1].type).toBe('resource');
-      if (result.content[1].type === 'resource') {
-        expect(result.content[1].resource.uri).toMatch(
+      expect(result.content).toHaveLength(3); // text + image + UIResource
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[1].type).toBe('image');
+      expect(result.content[2].type).toBe('resource');
+      if (result.content[2].type === 'resource') {
+        expect(result.content[2].resource.uri).toMatch(
           /^ui:\/\/mapbox\/static-map\//
         );
       }
@@ -608,8 +704,9 @@ describe('StaticMapImageTool', () => {
         });
 
         expect(result.isError).toBe(false);
-        expect(result.content).toHaveLength(1); // image only, no UIResource
-        expect(result.content[0].type).toBe('image');
+        expect(result.content).toHaveLength(2); // text + image, no UIResource
+        expect(result.content[0].type).toBe('text');
+        expect(result.content[1].type).toBe('image');
       } finally {
         // Restore environment variable
         if (originalEnv !== undefined) {
@@ -640,13 +737,14 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      if (result.content[1]?.type === 'resource') {
-        expect(result.content[1].resource.uri).toContain(
+      // UIResource is now at index 2 (after text and image)
+      if (result.content[2]?.type === 'resource') {
+        expect(result.content[2].resource.uri).toContain(
           '-122.4194,37.7749,13'
         );
         // Check that UIMetadata has preferred dimensions
-        if ('uiMetadata' in result.content[1].resource) {
-          const metadata = result.content[1].resource.uiMetadata as Record<
+        if ('uiMetadata' in result.content[2].resource) {
+          const metadata = result.content[2].resource.uiMetadata as Record<
             string,
             unknown
           >;
