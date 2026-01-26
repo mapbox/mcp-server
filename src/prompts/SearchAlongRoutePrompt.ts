@@ -123,21 +123,26 @@ Please follow these steps:
    - Limit to top 15 results if many were found
    - Note: Results are biased to the route corridor through proximity searches at sample points
 
-5. **Visualize and present**:
+5. **Present results**:
 
-   **Map generation:**
-   - For routes < 150km: Use static_map_image_tool to create a map
-     * Show the route as a path overlay (pass the route geometry directly)
-     * Add start and end markers
-     * Add found location markers (top 8-10 only to keep map clean)
-   - For routes ≥ 150km: Skip map to avoid slow rendering
-     * Note to user: "Map skipped due to route length - see results list"
+   **Skip map generation by default** (static_map_image_tool encoding is slow):
+   - Note to user: "Map visualization can be generated separately if needed"
+   - The client (Claude Desktop, etc.) may have its own map display capabilities
+   - Focus on providing excellent text results instead
 
    **Results list (always provide):**
-   - Name and address of each place
-   - Approximate distance from start of route (e.g., "45 miles into your trip")
+   - Summary: "Found X results along the route from ${from} to ${to}"
+   - Route details: Total distance and estimated travel time
+   - For each result:
+     * Name and address
+     * Approximate distance from start (e.g., "45 miles into your trip")
+     * Coordinates (so user could map them separately if desired)
    - Total results found
    - Note which sampling strategy was used
+
+   **If user explicitly asks for a map:**
+   - Only then use static_map_image_tool with route and top 8-10 results
+   - Warn that encoding may take time for longer routes
 
 6. **Additional context**:
    - Mention the total route distance and estimated travel time
