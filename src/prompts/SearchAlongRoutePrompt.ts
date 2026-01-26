@@ -96,18 +96,24 @@ Please follow these steps:
    - Use point_in_polygon_tool to filter results to the corridor
    - This gives precise corridor filtering
 
-   **For LONG routes (≥ 50km):** [PRAGMATIC - Simpler]
+   **For MEDIUM routes (50-150km):** [PRAGMATIC - Balanced]
    - Calculate the route's bounding box (min/max lat/lon)
    - Use category_search_tool or search_and_geocode_tool with bbox parameter
-   - Filter results by calculating distance to the route line
-   - Keep only results within ${buffer_meters}m of the route (use distance_tool)
-   - Accept that some results may be included that are off-route but within bbox
-   - Note to user: "For this long route, results are filtered to the general corridor"
+   - Filter results by calculating distance to route (use distance_tool)
+   - Keep only results within ${buffer_meters}m of the route
+   - Note to user: "For this medium-length route, results are filtered to the general corridor"
 
-   **Why this approach:**
-   - Short routes: Full corridor filtering is manageable and precise
-   - Long routes: Avoid token/complexity issues by using simpler bbox + distance filtering
-   - This keeps the workflow practical for all route lengths
+   **For VERY LONG routes (> 150km):** [SAMPLING - Most practical]
+   - Sample 5-7 strategic points along the route (start, end, and evenly spaced middle points)
+   - For each sample point, use category_search_tool with a small radius (5-10km)
+   - Combine results from all sample points
+   - Order by distance from start
+   - Note to user: "Due to the route length (X km), showing results near major points along the route rather than the full corridor"
+
+   **Why this three-tier approach:**
+   - Short routes: Full precision
+   - Medium routes: Balanced filtering
+   - Very long routes: Strategic sampling prevents token/timeout issues
 
 4. **Order and present results**:
    - Use distance_tool to calculate each POI's distance from the start point
@@ -129,15 +135,19 @@ Please follow these steps:
 
 6. **Additional context**:
    - Mention the total route distance and estimated travel time
-   - Note which approach was used (short route corridor vs long route bbox)
-   - If no results were found, suggest widening the search corridor
+   - Note which approach was used:
+     * Short route: "Using precise corridor filtering"
+     * Medium route: "Filtered to general route corridor"
+     * Very long route: "Showing results near major points along the route"
+   - If no results were found, suggest widening the search corridor or checking different locations
    - If many results (>15), show top 15 and mention there are more
 
 **Important notes:**
 - Routes < 50km: Use precise corridor filtering (buffer + point-in-polygon)
-- Routes ≥ 50km: Use pragmatic bbox filtering (to avoid token/complexity issues)
-- This threshold keeps the workflow practical and reliable
-- For very long routes (>200km), consider suggesting the user break into segments
+- Routes 50-150km: Use bbox filtering with distance checks
+- Routes > 150km: Use strategic point sampling (5-7 points) to avoid token/timeout issues
+- These thresholds keep the workflow practical and reliable for all route lengths
+- Always inform the user which approach was used and set appropriate expectations
 
 Make the output clear, actionable, and well-formatted.`
         }
