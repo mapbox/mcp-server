@@ -1,3 +1,12 @@
+## 0.8.2
+
+### Bug Fixes
+
+- **StaticMapImageTool**: Added text content to response for better MCP client compatibility (#103)
+  - Tool now returns structured content array with text description, image, and optional MCP-UI resource
+  - Text content includes map metadata (center, zoom, size, style, overlay count)
+  - Follows MCP specification for tool results with multiple content items
+
 ## 0.8.0
 
 ### Bug Fixes
@@ -9,7 +18,6 @@
 ### Features Added
 
 - **MCP Resources Support**: Added native MCP resource API support
-
   - Introduced `CategoryListResource` exposing category lists as `mapbox://categories` resource
   - Supports localized category lists via URI pattern `mapbox://categories/{language}` (e.g., `mapbox://categories/ja` for Japanese)
   - Created base resource infrastructure (`BaseResource`, `MapboxApiBasedResource`) for future resource implementations
