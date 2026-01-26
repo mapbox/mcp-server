@@ -114,7 +114,10 @@ Please follow these steps:
    **Combine and deduplicate:**
    - Collect all results from sample points
    - Remove duplicates (same place found from multiple sample points)
-   - Use distance_tool to calculate each result's distance from the start point
+   - Calculate distances from start point using distance_tool:
+     * These calculations are INDEPENDENT and can run in parallel
+     * Make ALL distance_tool calls in a single message for all results
+     * Example: If you have 10 unique results, make 10 distance_tool calls in one turn
    - Order results by distance from start (approximate route progress)
 
    **Why this approach works:**
