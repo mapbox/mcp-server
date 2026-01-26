@@ -59,6 +59,7 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 ### Location Discovery
 
 - "Find coffee shops within walking distance of the Empire State Building"
+- "I want to go from Seattle to Portland, is there a Starbucks along the way?"
 - "Show me gas stations along the route from Boston to New York"
 - "What restaurants are near Times Square?"
 
@@ -105,6 +106,8 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 - Specify your preferred travel method (driving, walking, cycling)
 - Include time constraints when relevant ("during rush hour", "at 3 PM")
 - Ask for specific output formats when needed ("as a map image", "in JSON format")
+
+> **Detailed examples:** See [examples/search-along-route.md](./examples/search-along-route.md) for comprehensive examples of the search-along-route prompt with different use cases and MCP Inspector testing instructions.
 
 ## Resources
 
