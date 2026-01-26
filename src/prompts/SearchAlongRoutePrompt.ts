@@ -67,8 +67,9 @@ export class SearchAlongRoutePrompt extends BasePrompt {
       from,
       to,
       search_for,
-      mode = 'driving',
-      buffer_meters = '1000'
+      mode = 'driving'
+      // buffer_meters parameter is kept for API compatibility but not used
+      // in the simplified proximity-sampling approach
     } = args;
 
     return [
@@ -86,87 +87,71 @@ Please follow these steps:
 2. **Get the route**:
    - Use directions_tool with profile=${mode} to get the route geometry between the two points
    - Extract the route LineString coordinates from the response (it will be an array of [lon, lat] pairs)
-   - Note the total route distance in meters
+   - Note the total route distance
 
-3. **Create search corridor and find places** (choose approach based on route length):
+3. **Search along the route using point sampling** (works for all route lengths):
 
-   **For SHORT routes (< 50km):** [RECOMMENDED - Most accurate]
-   - Use buffer_tool on the route LineString coordinates with distance=${buffer_meters} meters
-     * Pass the coordinates as: {"geometry": [[lon1,lat1], [lon2,lat2], ...], "distance": ${buffer_meters}, "units": "meters"}
-   - The buffer result will be a Polygon
-   - Use bounding_box_tool on the buffer polygon to get search bbox
-     * Pass the polygon coordinates from the buffer result
-   - Use category_search_tool with the bbox parameter (format: "minLon,minLat,maxLon,maxLat")
-   - Use point_in_polygon_tool to filter results to the buffer corridor
-   - This gives precise corridor filtering
+   **Determine sample strategy based on route length:**
+   - SHORT routes (< 50km): Sample every 5-10 points along the route (more samples for better coverage)
+   - MEDIUM routes (50-150km): Sample every 15-20 points along the route
+   - VERY LONG routes (> 150km): Sample 5-7 evenly spaced points (start, end, and middle points)
 
-   **For MEDIUM routes (50-150km):** [PRAGMATIC - Balanced]
-   - Use bounding_box_tool on the route LineString coordinates to get the route's bbox
-     * Pass the route coordinates as: {"geometry": [[lon1,lat1], [lon2,lat2], ...]}
-   - Use category_search_tool with the bbox parameter (format: "minLon,minLat,maxLon,maxLat")
-   - Filter results by calculating distance to the closest route point (use distance_tool)
-   - Keep only results within ${buffer_meters}m of the route
-   - Note to user: "For this medium-length route, results are filtered to the general corridor"
+   **For each sample point:**
+   - Extract the coordinate [lon, lat] from the route
+   - Use category_search_tool with:
+     * query: "${search_for}"
+     * proximity: "lon,lat" (bias results near this point)
+     * limit: Keep results reasonable (10-20 per point for short routes, 5-10 for long routes)
 
-   **For VERY LONG routes (> 150km):** [SAMPLING - Most practical]
-   - Sample 5-7 strategic points evenly spaced along the route
-     * Extract coordinates at indices: 0, len/6, 2*len/6, 3*len/6, 4*len/6, 5*len/6, len-1
-   - For each sample point coordinate [lon, lat]:
-     * Use category_search_tool with proximity parameter: "lon,lat" and limit results
-   - Combine results from all sample points (remove duplicates if any)
-   - Order by distance from start point
-   - Note to user: "Due to the route length (X km), showing results near major points along the route rather than the full corridor"
-
-   **Why this three-tier approach:**
-   - Short routes: Full precision
-   - Medium routes: Balanced filtering
-   - Very long routes: Strategic sampling prevents token/timeout issues
-
-4. **Order and present results**:
-   - Use distance_tool to calculate each POI's distance from the start point
+   **Combine and deduplicate:**
+   - Collect all results from sample points
+   - Remove duplicates (same place found from multiple sample points)
+   - Use distance_tool to calculate each result's distance from the start point
    - Order results by distance from start (approximate route progress)
-   - For short routes with precise corridor: results should all be on/near route
-   - For long routes with bbox filtering: results are approximate corridor
+
+   **Why this approach works:**
+   - Simple and reliable - just directions + proximity searches
+   - No buffer/bbox/polygon complexity
+   - Works consistently for all route lengths
+   - Fast execution, no token issues
+   - Covers the route corridor naturally through proximity searches
+
+4. **Present results**:
+   - Results are already ordered by distance from start
+   - Limit to top 15 results if many were found
+   - Note: Results are biased to the route corridor through proximity searches at sample points
 
 5. **Visualize and present**:
 
-   **Map generation (conditional based on route length):**
-   - For SHORT routes (<50km): Generate a detailed map with static_map_image_tool
-     * Use simplify_tool first to reduce route coordinates (tolerance=0.001)
+   **Map generation:**
+   - For ALL routes, use static_map_image_tool to create a map:
+     * Use simplify_tool on route first (tolerance=0.01 for <50km, 0.05 for >50km)
      * Show the simplified route as a path overlay
      * Add start and end markers
-     * Add found location markers (top 10)
-
-   - For MEDIUM routes (50-150km): Generate a simplified map
-     * Use simplify_tool with higher tolerance (0.01) to drastically reduce points
-     * Show simplified route, start/end markers, top 5-8 location markers
-
-   - For VERY LONG routes (>150km): Skip map generation
-     * Note: "Map visualization skipped for route length - see results list below"
-     * Focus on the text list of results instead
-     * This avoids slow encoding of complex routes
+     * Add found location markers (top 8-10 only to keep map clean)
+     * If route is very long (>150km), consider skipping map to save time
 
    **Results list (always provide):**
    - Name and address of each place
-   - Distance from start of route (e.g., "45 miles into your trip")
-   - Distance from route line (e.g., "0.3 miles off route")
+   - Approximate distance from start of route (e.g., "45 miles into your trip")
    - Total results found
+   - Note which sampling strategy was used
 
 6. **Additional context**:
    - Mention the total route distance and estimated travel time
-   - Note which approach was used:
-     * Short route: "Using precise corridor filtering"
-     * Medium route: "Filtered to general route corridor"
-     * Very long route: "Showing results near major points along the route"
-   - If no results were found, suggest widening the search corridor or checking different locations
+   - Note which sampling strategy was used:
+     * Short route: "Searched every 5-10 points along the route for comprehensive coverage"
+     * Medium route: "Sampled key points along the route"
+     * Very long route: "Sampled major points along the route"
+   - If no results were found, suggest trying a different search term or checking a specific segment
    - If many results (>15), show top 15 and mention there are more
 
 **Important notes:**
-- Routes < 50km: Use precise corridor filtering (buffer + point-in-polygon)
-- Routes 50-150km: Use bbox filtering with distance checks
-- Routes > 150km: Use strategic point sampling (5-7 points) to avoid token/timeout issues
-- These thresholds keep the workflow practical and reliable for all route lengths
-- Always inform the user which approach was used and set appropriate expectations
+- This approach uses simple proximity searches at sampled route points
+- No buffer/bbox/polygon operations needed - much more reliable
+- Works consistently for all route lengths
+- Fast and avoids token/timeout issues
+- Results naturally cover the route corridor through proximity biasing
 
 Make the output clear, actionable, and well-formatted.`
         }
