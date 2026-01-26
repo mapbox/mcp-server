@@ -122,16 +122,28 @@ Please follow these steps:
    - For long routes with bbox filtering: results are approximate corridor
 
 5. **Visualize and present**:
-   - Use static_map_image_tool to create a map showing:
-     * The route as a path overlay (use the route geometry)
-     * Start and end locations as markers
-     * Found locations as markers (limit to top 10-15 if many results)
-     * Appropriate zoom level to show the entire route
-   - Provide a list of results including:
-     * Name and address of each place
-     * Distance from start of route (e.g., "45 miles into your trip")
-     * Distance from route line (e.g., "0.3 miles off route")
-     * Total results found
+
+   **Map generation (conditional based on route length):**
+   - For SHORT routes (<50km): Generate a detailed map with static_map_image_tool
+     * Use simplify_tool first to reduce route coordinates (tolerance=0.001)
+     * Show the simplified route as a path overlay
+     * Add start and end markers
+     * Add found location markers (top 10)
+
+   - For MEDIUM routes (50-150km): Generate a simplified map
+     * Use simplify_tool with higher tolerance (0.01) to drastically reduce points
+     * Show simplified route, start/end markers, top 5-8 location markers
+
+   - For VERY LONG routes (>150km): Skip map generation
+     * Note: "Map visualization skipped for route length - see results list below"
+     * Focus on the text list of results instead
+     * This avoids slow encoding of complex routes
+
+   **Results list (always provide):**
+   - Name and address of each place
+   - Distance from start of route (e.g., "45 miles into your trip")
+   - Distance from route line (e.g., "0.3 miles off route")
+   - Total results found
 
 6. **Additional context**:
    - Mention the total route distance and estimated travel time
