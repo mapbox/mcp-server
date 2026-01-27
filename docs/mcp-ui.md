@@ -70,8 +70,10 @@ When MCP-UI is enabled, this tool returns:
 │  │ static_map_image_tool  │ │
 │  └────────┬───────────────┘ │
 │           │                  │
+│           ├─► Text description│
+│           │   (always)       │
 │           ├─► Base64 image   │
-│           │                  │
+│           │   (always)       │
 │           └─► UIResource     │
 │               (if enabled)   │
 └─────────────────────────────┘
@@ -79,17 +81,24 @@ When MCP-UI is enabled, this tool returns:
 
 ### Response Format
 
-When MCP-UI is enabled, the `static_map_image_tool` returns a response with multiple content items:
+The `static_map_image_tool` returns a response with multiple content items, following the progressive enhancement pattern:
 
 ```typescript
 {
   content: [
     {
+      // Text description with map metadata
+      type: 'text',
+      text: 'Static map image generated successfully.\nCenter: 37.7749, -122.4194\nZoom: 13\nSize: 800x600\nStyle: mapbox/streets-v12'
+    },
+    {
+      // Base64-encoded image
       type: 'image',
       data: '<base64-encoded-image>',
       mimeType: 'image/png'
     },
     {
+      // MCP-UI resource for interactive iframes (only when enabled)
       type: 'resource',
       resource: {
         uri: 'ui://mapbox/static-map/...',
@@ -104,9 +113,9 @@ When MCP-UI is enabled, the `static_map_image_tool` returns a response with mult
 }
 ```
 
-**Non-MCP-UI clients** simply ignore the second content item and display the base64 image.
+**Standard clients** (Claude Desktop, LibreChat, VS Code, Cursor) render the base64 image. The text content provides additional metadata about the generated map.
 
-**MCP-UI clients** can choose to render the iframe resource instead of (or in addition to) the static image.
+**MCP-UI clients** (like Goose) can render the interactive iframe resource for the richest experience.
 
 ## Configuration
 
@@ -203,8 +212,21 @@ The Mapbox MCP Server uses the `@mcp-ui/server` package (v5.13.1+) to create UIR
 import { createUIResource } from '@mcp-ui/server';
 import { isMcpUiEnabled } from '../../config/toolConfig.js';
 
-// Build content array with image data
+// Build descriptive text with map metadata
+const textDescription = [
+  'Static map image generated successfully.',
+  `Center: ${lat}, ${lng}`,
+  `Zoom: ${input.zoom}`,
+  `Size: ${width}x${height}`,
+  `Style: ${input.style}`
+].join('\n');
+
+// Build content array with text first, then image
 const content: CallToolResult['content'] = [
+  {
+    type: 'text',
+    text: textDescription
+  },
   {
     type: 'image',
     data: base64Data,
