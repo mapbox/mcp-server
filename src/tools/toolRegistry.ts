@@ -28,10 +28,6 @@ import { httpRequest } from '../utils/httpPipeline.js';
 /**
  * Core tools that work in all MCP clients without requiring special capabilities
  * These tools are registered immediately during server startup
- *
- * Note: ResourceReaderTool is included here since we cannot reliably detect
- * whether a client needs it. It's a useful fallback for clients that can list
- * resources but don't automatically fetch them (like Claude Desktop).
  */
 export const CORE_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
@@ -45,8 +41,6 @@ export const CORE_TOOLS = [
   new PointInPolygonTool(),
   new DistanceTool(),
   new VersionTool(),
-  new ResourceReaderTool(),
-  new CategoryListTool({ httpRequest }),
   new CategorySearchTool({ httpRequest }),
   new DirectionsTool({ httpRequest }),
   new IsochroneTool({ httpRequest }),
@@ -59,15 +53,45 @@ export const CORE_TOOLS = [
 ] as const;
 
 /**
+ * Tools that require elicitation capability for optimal functionality
+ * These tools use elicitInput() for secure token management
+ * Registered only if client supports elicitation
+ *
+ * Currently empty - elicitation support will be added in a future PR.
+ * This category is ready for tools that require the elicitation capability.
+ */
+export const ELICITATION_TOOLS = [] as const;
+
+/**
+ * Tools that serve as bridges/workarounds for missing resource support
+ * These tools are only registered if client does NOT support resources properly
+ *
+ * Context: These tools exist as workarounds for clients (like Claude Desktop) that
+ * can list resources but don't automatically fetch them. Clients that properly
+ * support resources don't need these bridge tools.
+ *
+ * - ResourceReaderTool: Generic fallback for reading any resource by URI
+ * - CategoryListTool: Provides access to category list (resource://mapbox://categories)
+ */
+export const RESOURCE_FALLBACK_TOOLS = [
+  new ResourceReaderTool(),
+  new CategoryListTool({ httpRequest })
+] as const;
+
+/**
  * All tools combined (for backward compatibility and testing)
  */
-export const ALL_TOOLS = [...CORE_TOOLS] as const;
+export const ALL_TOOLS = [
+  ...CORE_TOOLS,
+  ...ELICITATION_TOOLS,
+  ...RESOURCE_FALLBACK_TOOLS
+] as const;
 
 export type ToolInstance = (typeof ALL_TOOLS)[number];
 
 /**
  * Get all tools (for backward compatibility)
- * @deprecated Use getCoreTools() instead for capability-aware registration
+ * @deprecated Use getCoreTools(), getElicitationTools(), etc. instead for capability-aware registration
  */
 export function getAllTools(): readonly ToolInstance[] {
   return ALL_TOOLS;
@@ -78,6 +102,20 @@ export function getAllTools(): readonly ToolInstance[] {
  */
 export function getCoreTools(): readonly ToolInstance[] {
   return CORE_TOOLS;
+}
+
+/**
+ * Get tools that require elicitation capability
+ */
+export function getElicitationTools(): readonly ToolInstance[] {
+  return ELICITATION_TOOLS;
+}
+
+/**
+ * Get tools that serve as fallbacks when client doesn't support resources
+ */
+export function getResourceFallbackTools(): readonly ToolInstance[] {
+  return RESOURCE_FALLBACK_TOOLS;
 }
 
 export function getToolByName(name: string): ToolInstance | undefined {

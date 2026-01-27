@@ -16,7 +16,11 @@ import {
   GetPromptRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
-import { getCoreTools } from './tools/toolRegistry.js';
+import {
+  getCoreTools,
+  getElicitationTools,
+  getResourceFallbackTools
+} from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
@@ -56,8 +60,14 @@ const versionInfo = getVersionInfo();
 const config = parseToolConfigFromArgs();
 
 // Get and filter tools based on configuration
+// Split into categories for capability-aware registration
 const coreTools = getCoreTools();
+const elicitationTools = getElicitationTools();
+const resourceFallbackTools = getResourceFallbackTools();
+
 const enabledCoreTools = filterTools(coreTools, config);
+const enabledElicitationTools = filterTools(elicitationTools, config);
+const enabledResourceFallbackTools = filterTools(resourceFallbackTools, config);
 
 // Get all resources
 const allResources = getAllResources();
@@ -241,15 +251,78 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  // Note: Dynamic tool registration based on client capabilities is ready for use.
-  // Currently all tools are in CORE_TOOLS since this server doesn't have
-  // capability-dependent tools yet. When adding tools that require specific
-  // capabilities (like elicitation), follow the pattern used in mcp-devkit-server:
-  // 1. Categorize tools by capability requirements
-  // 2. Register core tools before connection
-  // 3. After connection, check client capabilities
-  // 4. Dynamically register capability-dependent tools
-  // 5. Send sendToolListChanged() notification
+  // After connection, dynamically register capability-dependent tools
+  const clientCapabilities = server.server.getClientCapabilities();
+  const clientVersion = server.server.getClientVersion();
+
+  // Debug: Log what capabilities we detected
+  server.server.sendLoggingMessage({
+    level: 'info',
+    data: `Client capabilities detected: ${JSON.stringify(clientCapabilities, null, 2)}`
+  });
+
+  let toolsAdded = false;
+
+  // Register elicitation tools if client supports elicitation
+  if (clientCapabilities?.elicitation && enabledElicitationTools.length > 0) {
+    server.server.sendLoggingMessage({
+      level: 'info',
+      data: `Client supports elicitation. Registering ${enabledElicitationTools.length} elicitation-dependent tools`
+    });
+
+    enabledElicitationTools.forEach((tool) => {
+      tool.installTo(server);
+    });
+    toolsAdded = true;
+  } else if (enabledElicitationTools.length > 0) {
+    server.server.sendLoggingMessage({
+      level: 'debug',
+      data: `Client does not support elicitation. Skipping ${enabledElicitationTools.length} elicitation-dependent tools`
+    });
+  }
+
+  // Register resource fallback tools for clients with known resource support issues
+  // Note: Resources are a core MCP feature, but some clients (like Claude Desktop) can list
+  // resources but don't automatically fetch them. We detect these clients by name.
+  // Most modern MCP clients (Inspector, VS Code, etc.) support resources properly.
+  const clientName = clientVersion?.name?.toLowerCase() || '';
+
+  // Known clients with resource support issues
+  const needsResourceFallback = clientName.includes('claude');
+
+  if (needsResourceFallback && enabledResourceFallbackTools.length > 0) {
+    server.server.sendLoggingMessage({
+      level: 'info',
+      data: `Client "${clientVersion?.name}" has known resource issues. Registering ${enabledResourceFallbackTools.length} resource fallback tools`
+    });
+
+    enabledResourceFallbackTools.forEach((tool) => {
+      tool.installTo(server);
+    });
+    toolsAdded = true;
+  } else if (enabledResourceFallbackTools.length > 0) {
+    server.server.sendLoggingMessage({
+      level: 'debug',
+      data: `Client "${clientVersion?.name}" supports resources properly. Skipping ${enabledResourceFallbackTools.length} resource fallback tools`
+    });
+  }
+
+  // Notify client about tool list changes if any tools were added
+  if (toolsAdded) {
+    try {
+      server.sendToolListChanged();
+
+      server.server.sendLoggingMessage({
+        level: 'debug',
+        data: 'Sent notifications/tools/list_changed to client'
+      });
+    } catch (error) {
+      server.server.sendLoggingMessage({
+        level: 'warning',
+        data: `Failed to send tool list change notification: ${error instanceof Error ? error.message : String(error)}`
+      });
+    }
+  }
 }
 
 // Ensure cleanup interval is cleared when the process exits

@@ -2,7 +2,12 @@
 // Licensed under the MIT License.
 
 import { describe, it, expect } from 'vitest';
-import { getCoreTools, getAllTools } from '../../src/tools/toolRegistry.js';
+import {
+  getCoreTools,
+  getElicitationTools,
+  getResourceFallbackTools,
+  getAllTools
+} from '../../src/tools/toolRegistry.js';
 
 describe('Tool Registry', () => {
   describe('getCoreTools', () => {
@@ -23,17 +28,52 @@ describe('Tool Registry', () => {
       expect(toolNames).toContain('category_search_tool');
     });
 
-    it('should include resource_reader_tool in core tools', () => {
+    it('should not include resource fallback tools', () => {
       const coreTools = getCoreTools();
       const toolNames = coreTools.map((tool) => tool.name);
 
-      // ResourceReaderTool is in core since we can't reliably detect resource support
+      // Resource fallback tools should not be in core
+      expect(toolNames).not.toContain('resource_reader_tool');
+      expect(toolNames).not.toContain('category_list_tool');
+    });
+  });
+
+  describe('getElicitationTools', () => {
+    it('should return an array of elicitation tools', () => {
+      const elicitationTools = getElicitationTools();
+      expect(Array.isArray(elicitationTools)).toBe(true);
+    });
+
+    it('should currently be empty (elicitation support pending)', () => {
+      const elicitationTools = getElicitationTools();
+      expect(elicitationTools.length).toBe(0);
+    });
+
+    it('should be ready for future elicitation-dependent tools', () => {
+      // This test documents that the infrastructure is in place
+      // When elicitation support is added, tools can be moved here
+      const elicitationTools = getElicitationTools();
+      expect(Array.isArray(elicitationTools)).toBe(true);
+    });
+  });
+
+  describe('getResourceFallbackTools', () => {
+    it('should return an array of resource fallback tools', () => {
+      const resourceFallbackTools = getResourceFallbackTools();
+      expect(Array.isArray(resourceFallbackTools)).toBe(true);
+      expect(resourceFallbackTools.length).toBe(2);
+    });
+
+    it('should include resource_reader_tool', () => {
+      const resourceFallbackTools = getResourceFallbackTools();
+      const toolNames = resourceFallbackTools.map((tool) => tool.name);
       expect(toolNames).toContain('resource_reader_tool');
     });
 
-    it('should have all expected tools (21 total)', () => {
-      const coreTools = getCoreTools();
-      expect(coreTools.length).toBe(21);
+    it('should include category_list_tool', () => {
+      const resourceFallbackTools = getResourceFallbackTools();
+      const toolNames = resourceFallbackTools.map((tool) => tool.name);
+      expect(toolNames).toContain('category_list_tool');
     });
   });
 
@@ -41,9 +81,14 @@ describe('Tool Registry', () => {
     it('should return all tools combined', () => {
       const allTools = getAllTools();
       const coreTools = getCoreTools();
+      const elicitationTools = getElicitationTools();
+      const resourceFallbackTools = getResourceFallbackTools();
 
-      // Currently all tools are in core
-      expect(allTools.length).toBe(coreTools.length);
+      expect(allTools.length).toBe(
+        coreTools.length +
+          elicitationTools.length +
+          resourceFallbackTools.length
+      );
     });
 
     it('should have no duplicate tools', () => {
@@ -60,18 +105,51 @@ describe('Tool Registry', () => {
 
       // Core tools
       expect(toolNames).toContain('distance_tool');
-      expect(toolNames).toContain('resource_reader_tool');
       expect(toolNames).toContain('directions_tool');
+      // Resource fallback tools
+      expect(toolNames).toContain('resource_reader_tool');
+      expect(toolNames).toContain('category_list_tool');
+      // Note: No elicitation tools yet (empty array)
     });
   });
 
   describe('Tool categorization consistency', () => {
-    it('should have all tools in a single category', () => {
-      const coreTools = getCoreTools();
-      const allTools = getAllTools();
+    it('should have no overlap between core and elicitation tools', () => {
+      const coreToolNames = getCoreTools().map((tool) => tool.name);
+      const elicitationToolNames = getElicitationTools().map(
+        (tool) => tool.name
+      );
 
-      // Currently all tools are in CORE_TOOLS
-      expect(coreTools.length).toBe(allTools.length);
+      const overlap = coreToolNames.filter((name) =>
+        elicitationToolNames.includes(name)
+      );
+      expect(overlap).toEqual([]);
+    });
+
+    it('should have no overlap between core and resource fallback tools', () => {
+      const coreToolNames = getCoreTools().map((tool) => tool.name);
+      const resourceFallbackToolNames = getResourceFallbackTools().map(
+        (tool) => tool.name
+      );
+
+      const overlap = coreToolNames.filter((name) =>
+        resourceFallbackToolNames.includes(name)
+      );
+      expect(overlap).toEqual([]);
+    });
+
+    it('should have no overlap between elicitation and resource fallback tools', () => {
+      const elicitationToolNames = getElicitationTools().map(
+        (tool) => tool.name
+      );
+      const resourceFallbackToolNames = getResourceFallbackTools().map(
+        (tool) => tool.name
+      );
+
+      const overlap = elicitationToolNames.filter((name) =>
+        resourceFallbackToolNames.includes(name)
+      );
+      expect(overlap).toEqual([]);
     });
   });
 });
