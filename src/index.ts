@@ -16,7 +16,7 @@ import {
   GetPromptRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
-import { getAllTools } from './tools/toolRegistry.js';
+import { getCoreTools } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { getVersionInfo } from './utils/versionUtils.js';
@@ -56,8 +56,8 @@ const versionInfo = getVersionInfo();
 const config = parseToolConfigFromArgs();
 
 // Get and filter tools based on configuration
-const allTools = getAllTools();
-const enabledTools = filterTools(allTools, config);
+const coreTools = getCoreTools();
+const enabledCoreTools = filterTools(coreTools, config);
 
 // Get all resources
 const allResources = getAllResources();
@@ -84,15 +84,18 @@ const server = new McpServer(
   },
   {
     capabilities: {
-      tools: {},
+      tools: {
+        listChanged: true // Advertise support for dynamic tool registration (ready for future capability-dependent tools)
+      },
       resources: {},
       prompts: {}
     }
   }
 );
 
-// Register enabled tools to the server
-enabledTools.forEach((tool) => {
+// Register only core tools before connection
+// Capability-dependent tools will be registered dynamically after connection
+enabledCoreTools.forEach((tool) => {
   tool.installTo(server);
 });
 
@@ -237,6 +240,16 @@ async function main() {
   // Start receiving messages on stdin and sending messages on stdout
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  // Note: Dynamic tool registration based on client capabilities is ready for use.
+  // Currently all tools are in CORE_TOOLS since this server doesn't have
+  // capability-dependent tools yet. When adding tools that require specific
+  // capabilities (like elicitation), follow the pattern used in mcp-devkit-server:
+  // 1. Categorize tools by capability requirements
+  // 2. Register core tools before connection
+  // 3. After connection, check client capabilities
+  // 4. Dynamically register capability-dependent tools
+  // 5. Send sendToolListChanged() notification
 }
 
 // Ensure cleanup interval is cleared when the process exits

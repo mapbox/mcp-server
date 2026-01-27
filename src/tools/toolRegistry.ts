@@ -25,8 +25,15 @@ import { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocode
 import { VersionTool } from './version-tool/VersionTool.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
-// Central registry of all tools
-export const ALL_TOOLS = [
+/**
+ * Core tools that work in all MCP clients without requiring special capabilities
+ * These tools are registered immediately during server startup
+ *
+ * Note: ResourceReaderTool is included here since we cannot reliably detect
+ * whether a client needs it. It's a useful fallback for clients that can list
+ * resources but don't automatically fetch them (like Claude Desktop).
+ */
+export const CORE_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
   new SimplifyTool(),
   new BoundingBoxTool(),
@@ -51,10 +58,26 @@ export const ALL_TOOLS = [
   new SearchAndGeocodeTool({ httpRequest })
 ] as const;
 
+/**
+ * All tools combined (for backward compatibility and testing)
+ */
+export const ALL_TOOLS = [...CORE_TOOLS] as const;
+
 export type ToolInstance = (typeof ALL_TOOLS)[number];
 
+/**
+ * Get all tools (for backward compatibility)
+ * @deprecated Use getCoreTools() instead for capability-aware registration
+ */
 export function getAllTools(): readonly ToolInstance[] {
   return ALL_TOOLS;
+}
+
+/**
+ * Get tools that work in all MCP clients
+ */
+export function getCoreTools(): readonly ToolInstance[] {
+  return CORE_TOOLS;
 }
 
 export function getToolByName(name: string): ToolInstance | undefined {
