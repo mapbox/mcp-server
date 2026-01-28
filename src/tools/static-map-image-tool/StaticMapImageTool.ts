@@ -166,9 +166,22 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       content.push(uiResource);
     }
 
-    return {
+    // Add MCP Apps metadata (new pattern for broader client compatibility)
+    const result: CallToolResult = {
       content,
       isError: false
     };
+
+    // Add ui:// resource URI for MCP Apps pattern
+    // This works alongside MCP-UI for backward compatibility
+    if (isMcpUiEnabled()) {
+      result._meta = {
+        ui: {
+          resourceUri: `ui://mapbox/static-map/${input.style}/${lng},${lat},${input.zoom}`
+        }
+      };
+    }
+
+    return result;
   }
 }
