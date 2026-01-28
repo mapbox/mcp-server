@@ -253,7 +253,6 @@ async function main() {
 
   // After connection, dynamically register capability-dependent tools
   const clientCapabilities = server.server.getClientCapabilities();
-  const clientVersion = server.server.getClientVersion();
 
   // Debug: Log what capabilities we detected
   server.server.sendLoggingMessage({
@@ -281,19 +280,21 @@ async function main() {
     });
   }
 
-  // Register resource fallback tools for clients with known resource support issues
-  // Note: Resources are a core MCP feature, but some clients (like Claude Desktop) can list
-  // resources but don't automatically fetch them. We detect these clients by name.
-  // Most modern MCP clients (Inspector, VS Code, etc.) support resources properly.
-  const clientName = clientVersion?.name?.toLowerCase() || '';
+  // Register resource fallback tools for clients that don't support resources
+  // Note: Resources are a core MCP feature supported by most clients.
+  // However, some clients (like smolagents) don't support resources at all.
+  // These fallback tools provide the same content as resources but via tool calls instead.
+  //
+  // Configuration via CLIENT_NEEDS_RESOURCE_FALLBACK environment variable:
+  // - unset (default) = Skip fallback tools (assume client supports resources)
+  // - "true" = Provide fallback tools (client does NOT support resources)
+  const clientNeedsResourceFallback =
+    process.env.CLIENT_NEEDS_RESOURCE_FALLBACK?.toLowerCase() === 'true';
 
-  // Known clients with resource support issues
-  const needsResourceFallback = clientName.includes('claude');
-
-  if (needsResourceFallback && enabledResourceFallbackTools.length > 0) {
+  if (clientNeedsResourceFallback && enabledResourceFallbackTools.length > 0) {
     server.server.sendLoggingMessage({
       level: 'info',
-      data: `Client "${clientVersion?.name}" has known resource issues. Registering ${enabledResourceFallbackTools.length} resource fallback tools`
+      data: `CLIENT_NEEDS_RESOURCE_FALLBACK=true. Registering ${enabledResourceFallbackTools.length} resource fallback tools`
     });
 
     enabledResourceFallbackTools.forEach((tool) => {
@@ -303,7 +304,7 @@ async function main() {
   } else if (enabledResourceFallbackTools.length > 0) {
     server.server.sendLoggingMessage({
       level: 'debug',
-      data: `Client "${clientVersion?.name}" supports resources properly. Skipping ${enabledResourceFallbackTools.length} resource fallback tools`
+      data: `CLIENT_NEEDS_RESOURCE_FALLBACK not set or false. Skipping ${enabledResourceFallbackTools.length} resource fallback tools (client supports resources)`
     });
   }
 

@@ -63,15 +63,20 @@ export const CORE_TOOLS = [
 export const ELICITATION_TOOLS = [] as const;
 
 /**
- * Tools that serve as bridges/workarounds for missing resource support
- * These tools are only registered if client does NOT support resources properly
+ * Tools that serve as bridges for clients without resource support
+ * These tools are only registered if CLIENT_NEEDS_RESOURCE_FALLBACK env var is set to "true"
  *
- * Context: These tools exist as workarounds for clients (like Claude Desktop) that
- * can list resources but don't automatically fetch them. Clients that properly
- * support resources don't need these bridge tools.
+ * Context: Most MCP clients support resources (Claude Desktop, VS Code, Inspector, etc.).
+ * However, some clients (like smolagents) don't support resources at all.
+ * These tools provide the same content as resources but via tool calls instead.
  *
+ * Configuration:
+ * - Leave unset (default) = Skip these tools (assumes client supports resources)
+ * - Set CLIENT_NEEDS_RESOURCE_FALLBACK=true = Include these tools (for smolagents, etc.)
+ *
+ * Tools:
  * - ResourceReaderTool: Generic fallback for reading any resource by URI
- * - CategoryListTool: Provides access to category list (resource://mapbox://categories)
+ * - CategoryListTool: Provides access to category list (mapbox://categories)
  */
 export const RESOURCE_FALLBACK_TOOLS = [
   new ResourceReaderTool(),
