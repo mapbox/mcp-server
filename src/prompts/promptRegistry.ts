@@ -3,6 +3,7 @@
 
 import { FindPlacesNearbyPrompt } from './FindPlacesNearbyPrompt.js';
 import { GetDirectionsPrompt } from './GetDirectionsPrompt.js';
+import { SearchAlongRoutePrompt } from './SearchAlongRoutePrompt.js';
 import { ShowReachableAreasPrompt } from './ShowReachableAreasPrompt.js';
 
 /**
@@ -16,6 +17,7 @@ import { ShowReachableAreasPrompt } from './ShowReachableAreasPrompt.js';
 const ALL_PROMPTS = [
   new FindPlacesNearbyPrompt(),
   new GetDirectionsPrompt(),
+  new SearchAlongRoutePrompt(),
   new ShowReachableAreasPrompt()
 ] as const;
 

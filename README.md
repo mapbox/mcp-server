@@ -59,6 +59,7 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 ### Location Discovery
 
 - "Find coffee shops within walking distance of the Empire State Building"
+- "I want to go from Seattle to Portland, is there a Starbucks along the way?"
 - "Show me gas stations along the route from Boston to New York"
 - "What restaurants are near Times Square?"
 
@@ -105,6 +106,8 @@ Try these prompts with Claude Desktop or other MCP clients after setup:
 - Specify your preferred travel method (driving, walking, cycling)
 - Include time constraints when relevant ("during rush hour", "at 3 PM")
 - Ask for specific output formats when needed ("as a map image", "in JSON format")
+
+> **Detailed examples:** See [examples/search-along-route.md](./examples/search-along-route.md) for comprehensive examples of the search-along-route prompt with different use cases and MCP Inspector testing instructions.
 
 ## Resources
 
@@ -180,6 +183,29 @@ node dist/esm/index.js --disable-mcp-ui
 ```
 
 **For more detailed information**, including compatible clients, technical implementation details, and troubleshooting, see the [MCP-UI documentation](./docs/mcp-ui.md).
+
+#### CLIENT_NEEDS_RESOURCE_FALLBACK
+
+**Resource Fallback Tools (Opt-In for Non-Compliant Clients)**
+
+Resources are a core MCP feature supported by most clients (Claude Desktop, VS Code, MCP Inspector, etc.). However, some clients (like smolagents) don't support resources at all. For these clients, the server can provide "resource fallback tools" that deliver the same content as resources but via tool calls.
+
+**Fallback Tools:**
+
+- `resource_reader_tool` - Generic fallback for reading any resource by URI
+- `category_list_tool` - Provides access to category list (mapbox://categories)
+
+**By default, these tools are NOT included** (assumes your client supports resources). If your client doesn't support resources, enable the fallback tools:
+
+```bash
+export CLIENT_NEEDS_RESOURCE_FALLBACK=true
+```
+
+**When to set this:**
+
+- ✅ Set to `true` if using smolagents or other clients without resource support
+- ❌ Leave unset (default) if using Claude Desktop, VS Code, MCP Inspector, or any resource-capable client
+- ❌ Leave unset if unsure (most clients support resources)
 
 ## Tools
 

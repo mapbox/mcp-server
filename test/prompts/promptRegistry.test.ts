@@ -12,13 +12,14 @@ describe('Prompt Registry', () => {
     test('returns all registered prompts', () => {
       const prompts = getAllPrompts();
 
-      // Should have at least the 3 initial prompts
-      expect(prompts.length).toBeGreaterThanOrEqual(3);
+      // Should have at least the 4 initial prompts
+      expect(prompts.length).toBeGreaterThanOrEqual(4);
 
       // Verify expected prompts are present
       const promptNames = prompts.map((p) => p.name);
       expect(promptNames).toContain('find-places-nearby');
       expect(promptNames).toContain('get-directions');
+      expect(promptNames).toContain('search-along-route');
       expect(promptNames).toContain('show-reachable-areas');
     });
 
@@ -85,6 +86,7 @@ describe('Prompt Registry', () => {
       const promptNames = [
         'find-places-nearby',
         'get-directions',
+        'search-along-route',
         'show-reachable-areas'
       ];
 
@@ -184,6 +186,45 @@ describe('Prompt Registry', () => {
 
       const modeArg = metadata.arguments?.find((a) => a.name === 'mode');
       expect(modeArg?.required).toBe(false);
+    });
+
+    test('search-along-route has correct metadata', () => {
+      const prompt = getPromptByName('search-along-route');
+      expect(prompt).toBeDefined();
+
+      const metadata = prompt!.getMetadata();
+
+      expect(metadata.name).toBe('search-along-route');
+      expect(metadata.description).toContain('places along a route');
+
+      // Should have from, to, search_for, mode, buffer_meters arguments
+      const argNames = metadata.arguments?.map((a) => a.name) || [];
+      expect(argNames).toContain('from');
+      expect(argNames).toContain('to');
+      expect(argNames).toContain('search_for');
+      expect(argNames).toContain('mode');
+      expect(argNames).toContain('buffer_meters');
+
+      // from, to, and search_for should be required
+      const fromArg = metadata.arguments?.find((a) => a.name === 'from');
+      expect(fromArg?.required).toBe(true);
+
+      const toArg = metadata.arguments?.find((a) => a.name === 'to');
+      expect(toArg?.required).toBe(true);
+
+      const searchForArg = metadata.arguments?.find(
+        (a) => a.name === 'search_for'
+      );
+      expect(searchForArg?.required).toBe(true);
+
+      // mode and buffer_meters should be optional
+      const modeArg = metadata.arguments?.find((a) => a.name === 'mode');
+      expect(modeArg?.required).toBe(false);
+
+      const bufferArg = metadata.arguments?.find(
+        (a) => a.name === 'buffer_meters'
+      );
+      expect(bufferArg?.required).toBe(false);
     });
   });
 });
