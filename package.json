@@ -1,6 +1,6 @@
 {
   "name": "@mapbox/mcp-server",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Mapbox MCP server.",
   "mcpName": "io.github.mapbox/mcp-server",
   "main": "./dist/commonjs/index.js",
@@ -76,7 +76,7 @@
   ],
   "dependencies": {
     "@mcp-ui/server": "^5.13.1",
-    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.56.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
