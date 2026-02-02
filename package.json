@@ -1,6 +1,6 @@
 {
   "name": "@mapbox/mcp-server",
-  "version": "0.8.3",
+  "version": "0.8.2",
   "description": "Mapbox MCP server.",
   "mcpName": "io.github.mapbox/mcp-server",
   "main": "./dist/commonjs/index.js",
@@ -11,17 +11,16 @@
   },
   "scripts": {
     "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
-    "changelog:prepare-release": "node scripts/prepare-changelog-release.cjs",
-    "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
-    "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
+    "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\"",
+    "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\"",
     "generate-version": "node scripts/build-helpers.cjs generate-version",
     "inspect:build": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js",
     "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" npx -y tsx src/index.ts",
-    "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\" --fix",
+    "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" --fix",
     "postinstall": "patch-package || (cd ../../.. && node ./node_modules/patch-package/index.js --patch-dir ./node_modules/@mapbox/mcp-server/patches) || true",
     "prepare": "node -e \"try { require('fs').accessSync('.husky/setup-hooks.js'); require('child_process').execSync('husky && node .husky/setup-hooks.js', {stdio:'inherit'}) } catch { }\"",
-    "spellcheck": "cspell \"*.md\" \"src/**/*.ts\" \"test/**/*.ts\" \"examples/**/*.ts\"",
+    "spellcheck": "cspell \"*.md\" \"src/**/*.ts\" \"test/**/*.ts\"",
     "sync-manifest": "node scripts/sync-manifest-version.cjs",
     "test": "vitest",
     "tracing:jaeger:start": "docker run --rm -d --name jaeger -p 16686:16686 -p 14250:14250 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest",
@@ -77,7 +76,8 @@
   ],
   "dependencies": {
     "@mcp-ui/server": "^5.13.1",
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.56.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
@@ -93,11 +93,7 @@
   "tshy": {
     "project": "./tsconfig.src.json",
     "exports": {
-      ".": "./src/index.ts",
-      "./tools": "./src/tools/index.ts",
-      "./resources": "./src/resources/index.ts",
-      "./prompts": "./src/prompts/index.ts",
-      "./utils": "./src/utils/index.ts"
+      ".": "./src/index.ts"
     },
     "dialects": [
       "esm",
@@ -114,46 +110,6 @@
       "require": {
         "types": "./dist/commonjs/index.d.ts",
         "default": "./dist/commonjs/index.js"
-      }
-    },
-    "./tools": {
-      "import": {
-        "types": "./dist/esm/tools/index.d.ts",
-        "default": "./dist/esm/tools/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/tools/index.d.ts",
-        "default": "./dist/commonjs/tools/index.js"
-      }
-    },
-    "./resources": {
-      "import": {
-        "types": "./dist/esm/resources/index.d.ts",
-        "default": "./dist/esm/resources/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/resources/index.d.ts",
-        "default": "./dist/commonjs/resources/index.js"
-      }
-    },
-    "./prompts": {
-      "import": {
-        "types": "./dist/esm/prompts/index.d.ts",
-        "default": "./dist/esm/prompts/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/prompts/index.d.ts",
-        "default": "./dist/commonjs/prompts/index.js"
-      }
-    },
-    "./utils": {
-      "import": {
-        "types": "./dist/esm/utils/index.d.ts",
-        "default": "./dist/esm/utils/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/utils/index.d.ts",
-        "default": "./dist/commonjs/utils/index.js"
       }
     }
   },
