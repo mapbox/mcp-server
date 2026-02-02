@@ -43,12 +43,52 @@ export class StaticMapUIResource extends BaseResource {
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #zoom-hint {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    #zoom-hint.show {
+      opacity: 1;
+    }
+    #image-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
     }
     #preview-image {
       max-width: 100%;
-      max-height: 100vh;
-      display: block;
-      margin: 0 auto;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: none;
+      cursor: zoom-in;
+      transition: transform 0.2s;
+    }
+    #preview-image:hover {
+      transform: scale(1.02);
+    }
+    #preview-image.zoomed {
+      cursor: zoom-out;
+      max-width: none;
+      max-height: none;
     }
     #loading {
       position: absolute;
@@ -56,18 +96,26 @@ export class StaticMapUIResource extends BaseResource {
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      color: #666;
+      color: #fff;
+      font-size: 16px;
     }
     #error {
       padding: 20px;
-      color: #cc0000;
+      color: #ff6b6b;
       text-align: center;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      max-width: 600px;
+      margin: 20px auto;
     }
   </style>
 </head>
 <body>
   <div id="loading">Loading static map preview...</div>
-  <img id="preview-image" style="display:none" alt="Static Map Preview">
+  <div id="image-container">
+    <img id="preview-image" alt="Static Map Preview">
+  </div>
+  <div id="zoom-hint">Click to view full size</div>
   <div id="error" style="display:none"></div>
 
   <script type="module">
@@ -75,6 +123,30 @@ export class StaticMapUIResource extends BaseResource {
     const image = document.getElementById('preview-image');
     const loading = document.getElementById('loading');
     const errorDiv = document.getElementById('error');
+    const zoomHint = document.getElementById('zoom-hint');
+
+    let isZoomed = false;
+
+    // Click to zoom image
+    image.addEventListener('click', () => {
+      isZoomed = !isZoomed;
+      if (isZoomed) {
+        image.classList.add('zoomed');
+        zoomHint.textContent = 'Click to fit to window';
+      } else {
+        image.classList.remove('zoomed');
+        zoomHint.textContent = 'Click to view full size';
+      }
+    });
+
+    // Show hint on hover
+    image.addEventListener('mouseenter', () => {
+      zoomHint.classList.add('show');
+    });
+
+    image.addEventListener('mouseleave', () => {
+      zoomHint.classList.remove('show');
+    });
 
     let messageId = 0;
     const pendingRequests = new Map();
@@ -213,6 +285,10 @@ export class StaticMapUIResource extends BaseResource {
               csp: {
                 connectDomains: ['https://api.mapbox.com'],
                 resourceDomains: ['https://api.mapbox.com']
+              },
+              preferredSize: {
+                width: 1200,
+                height: 900
               }
             }
           }
