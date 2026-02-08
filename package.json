@@ -110,7 +110,8 @@
         "types": "./dist/commonjs/index.d.ts",
         "default": "./dist/commonjs/index.js"
       }
-    }
+    },
+    "./*": "./*"
   },
   "types": "./dist/commonjs/index.d.ts"
 }
