@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
+    "changelog:prepare-release": "node scripts/prepare-changelog-release.cjs",
     "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
     "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
     "generate-version": "node scripts/build-helpers.cjs generate-version",
