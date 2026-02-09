@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true
+  },
+  "include": ["examples"],
+  "references": [
+    {
+      "path": "./tsconfig.src.json"
+    }
+  ]
+}
