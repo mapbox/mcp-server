@@ -1,3 +1,14 @@
+## 0.8.3
+
+### Security
+
+- **CVE-2026-0621**: Updated `@modelcontextprotocol/sdk` to 1.25.3 to fix ReDoS vulnerability in UriTemplate regex patterns
+- Regenerated SDK patch for version 1.25.3
+
+### Dependencies
+
+- Updated `@modelcontextprotocol/sdk` from 1.17.5 to 1.25.3
+
 ## 0.8.2
 
 ### Bug Fixes
