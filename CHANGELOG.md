@@ -1,3 +1,12 @@
+## Unreleased
+
+### Documentation
+
+- **PR Guidelines**: Added CHANGELOG requirement to CLAUDE.md (#112)
+  - All pull requests must now update CHANGELOG.md
+  - Document what changed, why, and any breaking changes
+  - Add entry under "Unreleased" section with PR number
+
 ## 0.8.3
 
 ### Security
