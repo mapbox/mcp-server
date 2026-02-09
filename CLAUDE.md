@@ -82,6 +82,15 @@ npx plop create-tool "Search" "search_tool"
 - Husky hooks auto-run linting and formatting
 - All checks must pass before commit
 
+### Pull Requests
+
+When creating pull requests:
+
+- **Always update CHANGELOG.md** - Document what changed, why, and any breaking changes
+- Follow the existing changelog format (check recent entries for examples)
+- Add your entry under the "Unreleased" section at the top
+- Include the PR number and a brief description of the change
+
 ## Important Constraints
 
 - **Dependency Injection**: Tools must accept `httpRequest` parameter for testability
