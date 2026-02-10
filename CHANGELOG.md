@@ -1,5 +1,13 @@
 ## Unreleased
 
+### Features
+
+- **Library Exports**: Added package exports for `toolRegistry`, `httpPipeline`, and `versionUtils` modules (ESM + CJS + types) to support consumption as an npm library
+
+### CI/CD
+
+- **Release Notifications**: Added workflow to send `repository_dispatch` to `hosted-mcp-server` on new releases
+
 ### Documentation
 
 - **PR Guidelines**: Added CHANGELOG requirement to CLAUDE.md (#112)
