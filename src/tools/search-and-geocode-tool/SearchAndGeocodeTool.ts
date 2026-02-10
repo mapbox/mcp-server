@@ -211,6 +211,89 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       `SearchAndGeocodeTool: Successfully completed search, found ${data.features?.length || 0} results`
     );
 
+    // Check if we have multiple results that might be ambiguous
+    if (
+      this.server &&
+      data.features &&
+      data.features.length >= 2 &&
+      data.features.length <= 10
+    ) {
+      // Use elicitation to let user choose which result they want
+      try {
+        const options = data.features.map((feature, index) => {
+          const props = feature.properties || {};
+          let label = props.name || 'Unknown';
+          if (props.place_formatted) {
+            label += ` - ${props.place_formatted}`;
+          } else if (props.full_address) {
+            label += ` - ${props.full_address}`;
+          }
+          return { value: String(index), label };
+        });
+
+        // Create a JSON Schema with enum for the selection
+        const result = await this.server.server.elicitInput({
+          mode: 'form',
+          message: `Found ${data.features.length} results for "${input.q}". Please select the correct location:`,
+          requestedSchema: {
+            type: 'object',
+            properties: {
+              selectedIndex: {
+                type: 'string',
+                title: 'Select Location',
+                description: 'Choose the correct location from the results',
+                enum: options.map((o) => o.value),
+                // Include labels for better UX (some clients may support this)
+                enumNames: options.map((o) => o.label)
+              }
+            },
+            required: ['selectedIndex']
+          }
+        });
+
+        if (result.action === 'accept' && result.content?.selectedIndex) {
+          const selectedIndexStr =
+            typeof result.content.selectedIndex === 'string'
+              ? result.content.selectedIndex
+              : String(result.content.selectedIndex);
+          const selectedIndex = parseInt(selectedIndexStr, 10);
+          const selectedFeature = data.features[selectedIndex];
+
+          // Return only the selected result
+          const singleResult: SearchBoxResponse = {
+            ...data,
+            features: [selectedFeature]
+          };
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: this.formatGeoJsonToText(
+                  singleResult as MapboxFeatureCollection
+                )
+              }
+            ],
+            structuredContent: singleResult,
+            isError: false
+          };
+        } else if (result.action === 'decline') {
+          // User declined to select - return all results as before
+          this.log(
+            'info',
+            'SearchAndGeocodeTool: User declined to select a specific result'
+          );
+        }
+      } catch (elicitError) {
+        // If elicitation fails, fall back to returning all results
+        this.log(
+          'warning',
+          `SearchAndGeocodeTool: Elicitation failed: ${elicitError instanceof Error ? elicitError.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    // Default behavior: return all results
     return {
       content: [
         {
