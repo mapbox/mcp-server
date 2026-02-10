@@ -93,10 +93,7 @@
   "tshy": {
     "project": "./tsconfig.src.json",
     "exports": {
-      ".": "./src/index.ts",
-      "./tools/toolRegistry": "./src/tools/toolRegistry.ts",
-      "./utils/httpPipeline": "./src/utils/httpPipeline.ts",
-      "./utils/versionUtils": "./src/utils/versionUtils.ts"
+      ".": "./src/index.ts"
     },
     "dialects": [
       "esm",
@@ -113,36 +110,6 @@
       "require": {
         "types": "./dist/commonjs/index.d.ts",
         "default": "./dist/commonjs/index.js"
-      }
-    },
-    "./tools/toolRegistry": {
-      "import": {
-        "types": "./dist/esm/tools/toolRegistry.d.ts",
-        "default": "./dist/esm/tools/toolRegistry.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/tools/toolRegistry.d.ts",
-        "default": "./dist/commonjs/tools/toolRegistry.js"
-      }
-    },
-    "./utils/httpPipeline": {
-      "import": {
-        "types": "./dist/esm/utils/httpPipeline.d.ts",
-        "default": "./dist/esm/utils/httpPipeline.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/utils/httpPipeline.d.ts",
-        "default": "./dist/commonjs/utils/httpPipeline.js"
-      }
-    },
-    "./utils/versionUtils": {
-      "import": {
-        "types": "./dist/esm/utils/versionUtils.d.ts",
-        "default": "./dist/esm/utils/versionUtils.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/utils/versionUtils.d.ts",
-        "default": "./dist/commonjs/utils/versionUtils.js"
       }
     }
   },
