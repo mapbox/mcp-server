@@ -12,6 +12,10 @@ import { SpanStatusCode } from '@opentelemetry/api';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
+  registerAppResource,
+  RESOURCE_MIME_TYPE
+} from '@modelcontextprotocol/ext-apps/server';
+import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
@@ -109,8 +113,29 @@ enabledCoreTools.forEach((tool) => {
   tool.installTo(server);
 });
 
-// Register all resources to the server
-allResources.forEach((resource) => {
+// Separate MCP Apps UI resources from regular resources
+const uiResources = allResources.filter((r) => r.uri.startsWith('ui://'));
+const regularResources = allResources.filter((r) => !r.uri.startsWith('ui://'));
+
+// Register MCP Apps UI resources using registerAppResource
+// IMPORTANT: Use RESOURCE_MIME_TYPE which is "text/html;profile=mcp-app"
+// This tells clients (like Claude Desktop) that this is an MCP App
+uiResources.forEach((resource) => {
+  registerAppResource(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    server as any,
+    resource.name,
+    resource.uri,
+    { mimeType: RESOURCE_MIME_TYPE, description: resource.description },
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return await resource.read(resource.uri, {} as any);
+    }
+  );
+});
+
+// Register regular resources using standard registration
+regularResources.forEach((resource) => {
   resource.installTo(server);
 });
 

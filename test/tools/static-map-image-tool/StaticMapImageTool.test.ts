@@ -5,10 +5,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import {
-  setupHttpRequest,
-  assertHeadersSent
-} from '../../utils/httpPipelineUtils.js';
+import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
 
 describe('StaticMapImageTool', () => {
@@ -16,35 +13,29 @@ describe('StaticMapImageTool', () => {
     vi.restoreAllMocks();
   });
 
-  it('sends custom header', async () => {
+  it('generates valid URL without fetching', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
-    await new StaticMapImageTool({ httpRequest }).run({
+    const result = await new StaticMapImageTool({ httpRequest }).run({
       center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
       size: { width: 600, height: 400 },
       style: 'mapbox/streets-v12'
     });
 
-    assertHeadersSent(mockHttpRequest);
+    // Should not call httpRequest since we're just generating URL
+    expect(mockHttpRequest).toHaveBeenCalledTimes(0);
+    expect(result.isError).toBe(false);
+    expect(result.content[0].type).toBe('text');
   });
 
-  it('returns image content with base64 data', async () => {
-    // Disable MCP-UI for this test to focus on image data only
+  it('returns URL as text content', async () => {
+    // Disable MCP-UI for this test to focus on URL only
     const originalEnv = process.env.ENABLE_MCP_UI;
     process.env.ENABLE_MCP_UI = 'false';
 
     try {
-      // Mock image buffer
-      const mockImageBuffer = Buffer.from('fake-image-data');
-      const mockArrayBuffer = mockImageBuffer.buffer.slice(
-        mockImageBuffer.byteOffset,
-        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
-      );
-
-      const { httpRequest } = setupHttpRequest({
-        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
-      });
+      const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
@@ -54,15 +45,15 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(2); // text + image
-      // First content should be text description
+      expect(result.content).toHaveLength(1); // URL only
       expect(result.content[0].type).toBe('text');
-      // Second content should be image
-      expect(result.content[1]).toMatchObject({
-        type: 'image',
-        data: mockImageBuffer.toString('base64'),
-        mimeType: 'image/jpeg' // satellite is a raster style
-      });
+      const textContent = result.content[0] as { type: 'text'; text: string };
+      expect(textContent.text).toContain(
+        'api.mapbox.com/styles/v1/mapbox/satellite-v9/static/'
+      );
+      expect(textContent.text).toContain('-74.006,40.7128,10');
+      expect(textContent.text).toContain('800x600');
+      expect(textContent.text).toContain('access_token=');
     } finally {
       // Restore environment variable
       if (originalEnv !== undefined) {
@@ -73,21 +64,13 @@ describe('StaticMapImageTool', () => {
     }
   });
 
-  it('returns text content with map details as first item', async () => {
-    // Disable MCP-UI for this test to focus on text + image
+  it('returns URL containing map details', async () => {
+    // Disable MCP-UI for this test to focus on URL only
     const originalEnv = process.env.ENABLE_MCP_UI;
     process.env.ENABLE_MCP_UI = 'false';
 
     try {
-      const mockImageBuffer = Buffer.from('fake-image-data');
-      const mockArrayBuffer = mockImageBuffer.buffer.slice(
-        mockImageBuffer.byteOffset,
-        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
-      );
-
-      const { httpRequest } = setupHttpRequest({
-        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
-      });
+      const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
@@ -100,12 +83,9 @@ describe('StaticMapImageTool', () => {
       expect(result.content[0].type).toBe('text');
 
       const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain('Static map image generated');
-      expect(textContent.text).toContain('40.7128'); // latitude
-      expect(textContent.text).toContain('-74.006'); // longitude
-      expect(textContent.text).toContain('12'); // zoom
-      expect(textContent.text).toContain('600x400'); // size
-      expect(textContent.text).toContain('mapbox/streets-v12'); // style
+      expect(textContent.text).toContain('mapbox/streets-v12/static/');
+      expect(textContent.text).toContain('-74.006,40.7128,12');
+      expect(textContent.text).toContain('600x400');
     } finally {
       if (originalEnv !== undefined) {
         process.env.ENABLE_MCP_UI = originalEnv;
@@ -115,20 +95,12 @@ describe('StaticMapImageTool', () => {
     }
   });
 
-  it('text content includes overlay count when overlays present', async () => {
+  it('URL includes overlay markers when overlays present', async () => {
     const originalEnv = process.env.ENABLE_MCP_UI;
     process.env.ENABLE_MCP_UI = 'false';
 
     try {
-      const mockImageBuffer = Buffer.from('fake-image-data');
-      const mockArrayBuffer = mockImageBuffer.buffer.slice(
-        mockImageBuffer.byteOffset,
-        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
-      );
-
-      const { httpRequest } = setupHttpRequest({
-        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
-      });
+      const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
@@ -155,7 +127,8 @@ describe('StaticMapImageTool', () => {
 
       expect(result.isError).toBe(false);
       const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain('Overlays: 2');
+      expect(textContent.text).toContain('pin-l+ff0000(-74.006,40.7128)');
+      expect(textContent.text).toContain('pin-s+00ff00(-74.01,40.71)');
     } finally {
       if (originalEnv !== undefined) {
         process.env.ENABLE_MCP_UI = originalEnv;
@@ -166,53 +139,33 @@ describe('StaticMapImageTool', () => {
   });
 
   it('constructs correct Mapbox Static API URL', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    const { httpRequest } = setupHttpRequest();
 
-    await new StaticMapImageTool({ httpRequest }).run({
+    const result = await new StaticMapImageTool({ httpRequest }).run({
       center: { longitude: -122.4194, latitude: 37.7749 },
       zoom: 15,
       size: { width: 1024, height: 768 },
       style: 'mapbox/dark-v10'
     });
 
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('styles/v1/mapbox/dark-v10/static/');
-    expect(calledUrl).toContain('-122.4194,37.7749,15');
-    expect(calledUrl).toContain('1024x768');
-    expect(calledUrl).toContain('access_token=');
+    const url = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(url).toContain('styles/v1/mapbox/dark-v10/static/');
+    expect(url).toContain('-122.4194,37.7749,15');
+    expect(url).toContain('1024x768');
+    expect(url).toContain('access_token=');
   });
 
   it('uses default style when not specified', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    const { httpRequest } = setupHttpRequest();
 
-    await new StaticMapImageTool({ httpRequest }).run({
+    const result = await new StaticMapImageTool({ httpRequest }).run({
       center: { longitude: 0, latitude: 0 },
       zoom: 1,
       size: { width: 300, height: 200 }
     });
 
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('styles/v1/mapbox/streets-v12/static/');
-  });
-
-  it('handles fetch errors gracefully', async () => {
-    const { httpRequest } = setupHttpRequest({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found'
-    });
-
-    const result = await new StaticMapImageTool({ httpRequest }).run({
-      center: { longitude: -74.006, latitude: 40.7128 },
-      zoom: 12,
-      size: { width: 600, height: 400 }
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0]).toMatchObject({
-      type: 'text',
-      text: 'Static Map API error: 404: Not Found'
-    });
+    const url = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(url).toContain('styles/v1/mapbox/streets-v12/static/');
   });
 
   it('validates coordinate constraints', async () => {
@@ -270,24 +223,24 @@ describe('StaticMapImageTool', () => {
   });
 
   it('supports high density parameter', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    const { httpRequest } = setupHttpRequest();
 
-    await new StaticMapImageTool({ httpRequest }).run({
+    const result = await new StaticMapImageTool({ httpRequest }).run({
       center: { longitude: -74.006, latitude: 40.7128 },
       zoom: 12,
       size: { width: 600, height: 400 },
       highDensity: true
     });
 
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('600x400@2x');
+    const url = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(url).toContain('600x400@2x');
   });
 
   describe('overlay support', () => {
     it('adds marker overlay to URL', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -303,14 +256,14 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
-      expect(calledUrl).toContain('pin-l-a+ff0000(-74.006,40.7128)/');
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain('pin-l-a+ff0000(-74.006,40.7128)/');
     });
 
     it('adds custom marker overlay to URL', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -324,16 +277,16 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
-      expect(calledUrl).toContain(
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain(
         `url-${encodeURIComponent('https://example.com/marker.png')}(-74.006,40.7128)/`
       );
     });
 
     it('adds path overlay to URL', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -350,21 +303,21 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
-      expect(calledUrl).toContain(
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain(
         `path-3+0000ff-0.8+ff0000-0.5(${encodeURIComponent('u{~vFvyys@fS]')})/`
       );
     });
 
     it('adds GeoJSON overlay to URL', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
       const geoJsonData = {
         type: 'Point',
         coordinates: [-74.006, 40.7128]
       };
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -376,16 +329,16 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
-      expect(calledUrl).toContain(
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain(
         `geojson(${encodeURIComponent(JSON.stringify(geoJsonData))})/`
       );
     });
 
     it('supports multiple overlays in order', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -408,30 +361,31 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
-      expect(calledUrl).toContain(
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain(
         'pin-s+00ff00(-74.01,40.71),pin-l-b+ff0000(-74.002,40.715)/'
       );
     });
 
     it('works without overlays', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 }
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      const calledUrl = (result.content[0] as { type: 'text'; text: string })
+        .text;
       // Should not have overlay string before coordinates
       expect(calledUrl).toMatch(/static\/-74\.006,40\.7128,12/);
     });
 
     it('transforms uppercase labels to lowercase', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -447,15 +401,16 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      const calledUrl = (result.content[0] as { type: 'text'; text: string })
+        .text;
       // Should contain lowercase 'z' even though 'Z' was provided
       expect(calledUrl).toContain('pin-s-z+0000ff(-74.006,40.7128)/');
     });
 
     it('supports Maki icon names as labels', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -471,14 +426,14 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
-      expect(calledUrl).toContain('pin-l-embassy+ff0000(-74.006,40.7128)/');
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain('pin-l-embassy+ff0000(-74.006,40.7128)/');
     });
 
     it('transforms uppercase Maki icon names to lowercase', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -494,15 +449,16 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      const calledUrl = (result.content[0] as { type: 'text'; text: string })
+        .text;
       // Should contain lowercase 'airport' even though 'AIRPORT' was provided
       expect(calledUrl).toContain('pin-s-airport+00ff00(-74.01,40.71)/');
     });
 
     it('supports numeric labels', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -518,14 +474,14 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
-      expect(calledUrl).toContain('pin-l-42+0000ff(-74.006,40.7128)/');
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain('pin-l-42+0000ff(-74.006,40.7128)/');
     });
 
     it('handles complex overlay combination with paths and markers', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -80.278, latitude: 25.796 },
         zoom: 15,
         size: { width: 800, height: 600 },
@@ -557,7 +513,8 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      const calledUrl = (result.content[0] as { type: 'text'; text: string })
+        .text;
       // Check that markers have lowercase labels
       expect(calledUrl).toContain('pin-l-a+ff0000(-80.2793529,25.7950805)');
       expect(calledUrl).toContain(
@@ -572,9 +529,9 @@ describe('StaticMapImageTool', () => {
     });
 
     it('truncates non-Maki multi-character labels to first character', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -598,16 +555,17 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      const calledUrl = (result.content[0] as { type: 'text'; text: string })
+        .text;
       // Should contain only the first character in lowercase
       expect(calledUrl).toContain('pin-s-h+0000ff(-74.006,40.7128)');
       expect(calledUrl).toContain('pin-l-x+ff0000(-74.01,40.71)');
     });
 
     it('preserves full Maki icon names that are in the supported list', async () => {
-      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      const { httpRequest } = setupHttpRequest();
 
-      await new StaticMapImageTool({ httpRequest }).run({
+      const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
         zoom: 12,
         size: { width: 600, height: 400 },
@@ -639,7 +597,8 @@ describe('StaticMapImageTool', () => {
         ]
       });
 
-      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      const calledUrl = (result.content[0] as { type: 'text'; text: string })
+        .text;
       // Should preserve the full Maki icon names
       expect(calledUrl).toContain('pin-s-restaurant+0000ff(-74.006,40.7128)');
       expect(calledUrl).toContain('pin-l-hospital+ff0000(-74.01,40.71)');
@@ -649,16 +608,7 @@ describe('StaticMapImageTool', () => {
 
   describe('MCP-UI support', () => {
     it('includes UIResource when MCP-UI is enabled (default)', async () => {
-      // Mock image buffer
-      const mockImageBuffer = Buffer.from('fake-image-data');
-      const mockArrayBuffer = mockImageBuffer.buffer.slice(
-        mockImageBuffer.byteOffset,
-        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
-      );
-
-      const { httpRequest } = setupHttpRequest({
-        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
-      });
+      const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -74.006, latitude: 40.7128 },
@@ -668,12 +618,11 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(3); // text + image + UIResource
+      expect(result.content).toHaveLength(2); // URL + UIResource
       expect(result.content[0].type).toBe('text');
-      expect(result.content[1].type).toBe('image');
-      expect(result.content[2].type).toBe('resource');
-      if (result.content[2].type === 'resource') {
-        expect(result.content[2].resource.uri).toMatch(
+      expect(result.content[1].type).toBe('resource');
+      if (result.content[1].type === 'resource') {
+        expect(result.content[1].resource.uri).toMatch(
           /^ui:\/\/mapbox\/static-map\//
         );
       }
@@ -685,16 +634,7 @@ describe('StaticMapImageTool', () => {
       process.env.ENABLE_MCP_UI = 'false';
 
       try {
-        // Mock image buffer
-        const mockImageBuffer = Buffer.from('fake-image-data');
-        const mockArrayBuffer = mockImageBuffer.buffer.slice(
-          mockImageBuffer.byteOffset,
-          mockImageBuffer.byteOffset + mockImageBuffer.byteLength
-        );
-
-        const { httpRequest } = setupHttpRequest({
-          arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
-        });
+        const { httpRequest } = setupHttpRequest();
 
         const result = await new StaticMapImageTool({ httpRequest }).run({
           center: { longitude: -74.006, latitude: 40.7128 },
@@ -704,9 +644,8 @@ describe('StaticMapImageTool', () => {
         });
 
         expect(result.isError).toBe(false);
-        expect(result.content).toHaveLength(2); // text + image, no UIResource
+        expect(result.content).toHaveLength(1); // URL only, no UIResource
         expect(result.content[0].type).toBe('text');
-        expect(result.content[1].type).toBe('image');
       } finally {
         // Restore environment variable
         if (originalEnv !== undefined) {
@@ -718,16 +657,7 @@ describe('StaticMapImageTool', () => {
     });
 
     it('UIResource includes correct iframe URL and dimensions', async () => {
-      // Mock image buffer
-      const mockImageBuffer = Buffer.from('fake-image-data');
-      const mockArrayBuffer = mockImageBuffer.buffer.slice(
-        mockImageBuffer.byteOffset,
-        mockImageBuffer.byteOffset + mockImageBuffer.byteLength
-      );
-
-      const { httpRequest } = setupHttpRequest({
-        arrayBuffer: vi.fn().mockResolvedValue(mockArrayBuffer)
-      });
+      const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
         center: { longitude: -122.4194, latitude: 37.7749 },
@@ -737,14 +667,14 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      // UIResource is now at index 2 (after text and image)
-      if (result.content[2]?.type === 'resource') {
-        expect(result.content[2].resource.uri).toContain(
+      // UIResource is now at index 1 (after URL text)
+      if (result.content[1]?.type === 'resource') {
+        expect(result.content[1].resource.uri).toContain(
           '-122.4194,37.7749,13'
         );
         // Check that UIMetadata has preferred dimensions
-        if ('uiMetadata' in result.content[2].resource) {
-          const metadata = result.content[2].resource.uiMetadata as Record<
+        if ('uiMetadata' in result.content[1].resource) {
+          const metadata = result.content[1].resource.uiMetadata as Record<
             string,
             unknown
           >;
