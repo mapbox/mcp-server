@@ -124,3 +124,15 @@ The `changelog:prepare-release` script automatically:
 - **Detailed Standards**: See docs/engineering_standards.md for complete guidelines
 - **Tracing Setup**: See docs/tracing.md for OpenTelemetry configuration
 - **Integration Guides**: See docs/ for Claude Desktop, VS Code, Cursor, and Goose setup
+- **Direct Imports**: See docs/importing-tools.md for using tools/resources/prompts in your own applications
+
+## Package Exports
+
+The package provides subpath exports for direct integration without running the MCP server:
+
+- `@mapbox/mcp-server/tools` - Tool classes and pre-configured instances
+- `@mapbox/mcp-server/resources` - Resource classes and instances
+- `@mapbox/mcp-server/prompts` - Prompt classes and instances
+- `@mapbox/mcp-server/utils` - HTTP pipeline utilities (httpRequest, HttpPipeline, policies)
+
+All exports support both ESM and CommonJS via tshy dual builds.
