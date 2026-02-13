@@ -2,6 +2,7 @@
 
 ### Testing
 
+- **Functional Tests**: Refactored functional tests to import from built npm artifact (`@mapbox/mcp-server/*`) instead of TypeScript source, ensuring tests validate exactly what users consume via the package `exports` map. The `test:functional` script now runs `npm run build` before executing tests.
 - **Functional Tests**: Added MCP protocol-level integration tests for all 9 API-based tools
   - Tests exercise the full MCP protocol via InMemoryTransport (Client <-> Server)
   - Covers tool discovery, tool calls with real Mapbox APIs, resource listing/reading, prompt listing/retrieval

@@ -24,12 +24,9 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
-import { getCoreTools } from '../../src/tools/toolRegistry.js';
-import { getAllResources } from '../../src/resources/resourceRegistry.js';
-import {
-  getAllPrompts,
-  getPromptByName
-} from '../../src/prompts/promptRegistry.js';
+import { getCoreTools } from '@mapbox/mcp-server/tools';
+import { getAllResources } from '@mapbox/mcp-server/resources';
+import { getAllPrompts, getPromptByName } from '@mapbox/mcp-server/prompts';
 
 // NYC landmark coordinates
 const TIMES_SQUARE = { longitude: -73.9857, latitude: 40.758 };
