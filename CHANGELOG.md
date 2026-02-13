@@ -1,5 +1,14 @@
 ## Unreleased
 
+### Testing
+
+- **Functional Tests**: Added MCP protocol-level integration tests for all 9 API-based tools
+  - Tests exercise the full MCP protocol via InMemoryTransport (Client <-> Server)
+  - Covers tool discovery, tool calls with real Mapbox APIs, resource listing/reading, prompt listing/retrieval
+  - Dedicated vitest config with 30s timeout, `npm run test:functional`
+  - CI runs functional tests after unit tests, blocks merge on failure
+  - Automatically skipped when `MAPBOX_ACCESS_TOKEN` is not set
+
 ### Documentation
 
 - **PR Guidelines**: Added CHANGELOG requirement to CLAUDE.md (#112)

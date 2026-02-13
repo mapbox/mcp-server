@@ -10,6 +10,7 @@ export default defineConfig({
     },
     watch: false,
     include: ['test/**/*.test.ts'],
+    exclude: ['test/functional/**'],
     coverage: {
       include: ['src/**/*.ts'],
       exclude: ['src/**/*-cjs.cts', 'vitest*.config.ts'],

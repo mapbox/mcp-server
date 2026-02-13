@@ -150,7 +150,7 @@ dist
 .tshy-build/
 
 # Test results
-test-results.xml
+test-results*.xml
 
 # Build artifacts
 *.tsbuildinfo
