@@ -51,6 +51,7 @@ For detailed setup instructions for different integrations, refer to the followi
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
+- **[Importing Tools Directly](./docs/importing-tools.md)** - Use Mapbox tools in your own applications without running the MCP server
 
 ## Example Prompts
 

@@ -1,3 +1,20 @@
+## Unreleased
+
+### Documentation
+
+- **PR Guidelines**: Added CHANGELOG requirement to CLAUDE.md (#112)
+  - All pull requests must now update CHANGELOG.md
+  - Document what changed, why, and any breaking changes
+  - Add entry under "Unreleased" section with PR number
+
+### Developer Experience
+
+- **Release Process**: Added automated CHANGELOG preparation script (#112)
+  - New `npm run changelog:prepare-release <version>` command
+  - Automatically replaces "Unreleased" with version and date
+  - Adds new empty "Unreleased" section for next changes
+  - Includes validation for version format and CHANGELOG structure
+
 ## 0.8.3
 
 ### Security

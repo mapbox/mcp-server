@@ -82,6 +82,36 @@ npx plop create-tool "Search" "search_tool"
 - Husky hooks auto-run linting and formatting
 - All checks must pass before commit
 
+### Pull Requests
+
+When creating pull requests:
+
+- **Always update CHANGELOG.md** - Document what changed, why, and any breaking changes
+- Follow the existing changelog format (check recent entries for examples)
+- Add your entry under the "Unreleased" section at the top
+- Include the PR number and a brief description of the change
+
+### Release Process
+
+When preparing a new release:
+
+```bash
+# Prepare CHANGELOG for release (replaces "Unreleased" with version and date)
+npm run changelog:prepare-release 1.0.0
+
+# Review changes, then commit and tag
+git add CHANGELOG.md
+git commit -m "Release v1.0.0"
+git tag v1.0.0
+git push && git push --tags
+```
+
+The `changelog:prepare-release` script automatically:
+
+- Replaces "## Unreleased" with "## {version} - {date}"
+- Adds a new empty "## Unreleased" section at the top
+- Validates version format and CHANGELOG structure
+
 ## Important Constraints
 
 - **Dependency Injection**: Tools must accept `httpRequest` parameter for testability
@@ -94,3 +124,15 @@ npx plop create-tool "Search" "search_tool"
 - **Detailed Standards**: See docs/engineering_standards.md for complete guidelines
 - **Tracing Setup**: See docs/tracing.md for OpenTelemetry configuration
 - **Integration Guides**: See docs/ for Claude Desktop, VS Code, Cursor, and Goose setup
+- **Direct Imports**: See docs/importing-tools.md for using tools/resources/prompts in your own applications
+
+## Package Exports
+
+The package provides subpath exports for direct integration without running the MCP server:
+
+- `@mapbox/mcp-server/tools` - Tool classes and pre-configured instances
+- `@mapbox/mcp-server/resources` - Resource classes and instances
+- `@mapbox/mcp-server/prompts` - Prompt classes and instances
+- `@mapbox/mcp-server/utils` - HTTP pipeline utilities (httpRequest, HttpPipeline, policies)
+
+All exports support both ESM and CommonJS via tshy dual builds.
