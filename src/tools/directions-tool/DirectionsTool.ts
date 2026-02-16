@@ -24,7 +24,10 @@ export class DirectionsTool extends MapboxApiBasedTool<
 > {
   name = 'directions_tool';
   description =
-    'Fetches directions from Mapbox API based on provided coordinates and direction method.';
+    'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
+    'For route planning and distance calculations, use geometries="none" to get compact responses. ' +
+    'Only request full geometry (geometries="geojson") when you need to visualize the route on a map ' +
+    'or provide detailed turn-by-turn navigation instructions.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,

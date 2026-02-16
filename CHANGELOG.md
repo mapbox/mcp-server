@@ -25,6 +25,7 @@
   - Full route geometry available via MCP resource API
   - Temporary resources expire after 30 minutes
   - Resource URI format: `mapbox://temp/directions-{id}`
+  - Updated tool description to guide LLMs: use geometries="none" for planning, geometries="geojson" only for visualization
 
 ## 0.8.3
 
