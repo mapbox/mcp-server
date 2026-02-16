@@ -304,8 +304,27 @@ export class DirectionsTool extends MapboxApiBasedTool<
 Waypoints: ${waypointCount}
 ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull geometry and details stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full details if needed.\nOr ask to read the resource by its URI.` : ''}`;
 
+      // Create minimal structured content for validation (without large geometry)
+      const summaryStructuredContent = {
+        ...validatedData,
+        routes: validatedData.routes?.map((route) => ({
+          distance: route.distance,
+          duration: route.duration,
+          legs: route.legs?.map((leg) => ({
+            distance: leg.distance,
+            duration: leg.duration,
+            summary: leg.summary,
+            // Omit steps and geometry to keep response small
+            steps: []
+          }))
+        })),
+        _resourceUri: resourceUri, // Custom field indicating full data location
+        _truncated: true // Indicates this is a summary response
+      };
+
       return {
         content: [{ type: 'text', text: summaryText }],
+        structuredContent: summaryStructuredContent,
         isError: false
       };
     }

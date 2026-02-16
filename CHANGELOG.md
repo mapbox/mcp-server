@@ -26,6 +26,7 @@
   - Temporary resources expire after 30 minutes
   - Resource URI format: `mapbox://temp/directions-{id}`
   - Updated tool description to guide LLMs: use geometries="none" for planning, geometries="geojson" only for visualization
+  - Returns lightweight structured content for large responses (summary data without geometry) to satisfy output schema validation
 
 ## 0.8.3
 
