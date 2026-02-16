@@ -35,6 +35,9 @@ jobs:
   functional-test:
     runs-on: ubuntu-latest
     needs: test
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,7 +53,19 @@ jobs:
       - name: Compile typescript
         run: npm run build
 
+      - name: Configure AWS Credentials
+        uses: mapbox/configure-aws-credentials-internal@v5
+        with:
+          target-account-id: ${{ vars.AWS_ACCOUNT_ID_DEFAULT }}
+
+      - name: Fetch secrets from AWS
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            FUNCTIONAL_TEST_SECRETS,general/locationai/mcp-server/functional-tests
+          parse-json-secrets: true
+
       - name: Run functional tests
         env:
-          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          MAPBOX_ACCESS_TOKEN: ${{ env.FUNCTIONAL_TEST_SECRETS_MAPBOX_ACCESS_TOKEN }}
         run: npm run test:functional
