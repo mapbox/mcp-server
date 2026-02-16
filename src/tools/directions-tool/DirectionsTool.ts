@@ -310,13 +310,18 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
         routes: validatedData.routes?.map((route) => ({
           distance: route.distance,
           duration: route.duration,
-          legs: route.legs?.map((leg) => ({
-            distance: leg.distance,
-            duration: leg.duration,
-            summary: leg.summary,
-            // Omit steps and geometry to keep response small
-            steps: []
-          }))
+          duration_typical: route.duration_typical,
+          weight_typical: route.weight_typical,
+          leg_summaries: route.leg_summaries,
+          intersecting_admins: route.intersecting_admins,
+          notifications_summary: route.notifications_summary,
+          incidents_summary: route.incidents_summary,
+          num_legs: route.num_legs,
+          congestion_information: route.congestion_information,
+          average_speed_kph: route.average_speed_kph,
+          // Omit geometry and legs to keep response small
+          geometry: undefined,
+          legs: undefined
         })),
         _resourceUri: resourceUri, // Custom field indicating full data location
         _truncated: true // Indicates this is a summary response
