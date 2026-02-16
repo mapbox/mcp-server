@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { URLSearchParams } from 'node:url';
+import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -13,6 +14,7 @@ import {
   type DirectionsResponse
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
+import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -269,8 +271,45 @@ export class DirectionsTool extends MapboxApiBasedTool<
       validatedData = cleanedData as DirectionsResponse;
     }
 
+    // Check response size and conditionally create temporary resource
+    const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
+    const responseText = JSON.stringify(validatedData, null, 2);
+    const responseSize = responseText.length;
+
+    if (responseSize > RESPONSE_SIZE_THRESHOLD) {
+      // Create temporary resource for large response
+      const resourceId = randomBytes(16).toString('hex');
+      const resourceUri = `mapbox://temp/directions-${resourceId}`;
+
+      temporaryResourceManager.create(resourceId, resourceUri, validatedData, {
+        toolName: this.name,
+        size: responseSize
+      });
+
+      // Extract summary information
+      const route = validatedData.routes?.[0];
+      const distance = route?.distance
+        ? `${(route.distance / 1609.34).toFixed(1)} miles`
+        : 'unknown';
+      const duration = route?.duration
+        ? `${Math.floor(route.duration / 60)} minutes`
+        : 'unknown';
+      const waypointCount = validatedData.waypoints?.length ?? 0;
+
+      const summaryText = `Route found: ${distance}, ${duration}
+
+Waypoints: ${waypointCount}
+${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull geometry and details stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full details if needed.\nOr ask to read the resource by its URI.` : ''}`;
+
+      return {
+        content: [{ type: 'text', text: summaryText }],
+        isError: false
+      };
+    }
+
+    // Small response - return normally
     return {
-      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      content: [{ type: 'text', text: responseText }],
       structuredContent: validatedData,
       isError: false
     };
