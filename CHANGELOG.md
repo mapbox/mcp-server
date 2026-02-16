@@ -27,6 +27,7 @@
   - Resource URI format: `mapbox://temp/directions-{id}`
   - Updated tool description to guide LLMs: use geometries="none" for planning, geometries="geojson" only for visualization
   - Returns lightweight structured content for large responses (summary data without geometry) to satisfy output schema validation
+  - Updated `search-along-route` prompt to use `geometries="none"` and linear interpolation for route sampling instead of extracting coordinates from geometry
 
 ## 0.8.3
 
