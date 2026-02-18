@@ -128,10 +128,13 @@ export class StaticMapUIResource extends BaseResource {
 
     function requestSizeToFit() {
       if (currentDisplayMode !== 'inline') return;
-      const toolbarHeight = canFullscreen ? toolbar.offsetHeight : 0;
-      sendNotification('ui/notifications/size-changed', {
-        width: image.naturalWidth,
-        height: image.naturalHeight + toolbarHeight
+      // Use requestAnimationFrame to measure after layout so we get the
+      // actual rendered height (constrained by max-width:100%), not natural px
+      requestAnimationFrame(() => {
+        const toolbarHeight = canFullscreen ? toolbar.offsetHeight : 0;
+        sendNotification('ui/notifications/size-changed', {
+          height: Math.round(image.getBoundingClientRect().height) + toolbarHeight
+        });
       });
     }
 
