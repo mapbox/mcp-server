@@ -38,10 +38,117 @@ export class DirectionsTool extends MapboxApiBasedTool<
       httpRequest: params.httpRequest
     });
   }
+  private formatDuration(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.round((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}min`;
+    }
+    return `${minutes}min`;
+  }
+
+  private formatDistance(meters: number): string {
+    const km = (meters / 1000).toFixed(1);
+    const miles = (meters / 1609.34).toFixed(1);
+    return `${km}km (${miles}mi)`;
+  }
+
   protected async execute(
     input: z.infer<typeof DirectionsInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
+    // Stage 1: Elicit routing preferences if server available and no preferences set
+    const excludeOptions: string[] = [];
+    if (
+      this.server &&
+      !input.exclude &&
+      input.coordinates.length === 2 // Only for simple A-to-B routes
+    ) {
+      try {
+        const isDrivingProfile =
+          input.routing_profile === 'mapbox/driving-traffic' ||
+          input.routing_profile === 'mapbox/driving';
+
+        const preferenceOptions = [
+          {
+            value: 'fastest',
+            label: 'Fastest route (tolls OK)'
+          },
+          {
+            value: 'avoid_tolls',
+            label: 'Avoid tolls (may be slower)'
+          }
+        ];
+
+        if (isDrivingProfile) {
+          preferenceOptions.push({
+            value: 'avoid_highways',
+            label: 'Avoid highways/motorways'
+          });
+        }
+
+        preferenceOptions.push({
+          value: 'avoid_ferries',
+          label: 'Avoid ferries'
+        });
+
+        const preferencesResult = await this.server.server.elicitInput({
+          mode: 'form',
+          message: 'Choose your routing preferences:',
+          requestedSchema: {
+            type: 'object',
+            properties: {
+              routePreference: {
+                type: 'string',
+                title: 'Route Preference',
+                description: 'Select your routing priorities',
+                enum: preferenceOptions.map((o) => o.value),
+                enumNames: preferenceOptions.map((o) => o.label)
+              }
+            },
+            required: ['routePreference']
+          }
+        });
+
+        if (
+          preferencesResult.action === 'accept' &&
+          preferencesResult.content?.routePreference
+        ) {
+          const preference =
+            typeof preferencesResult.content.routePreference === 'string'
+              ? preferencesResult.content.routePreference
+              : String(preferencesResult.content.routePreference);
+
+          // Map preferences to exclude options
+          if (preference === 'avoid_tolls') {
+            excludeOptions.push('toll', 'cash_only_tolls');
+          } else if (preference === 'avoid_highways' && isDrivingProfile) {
+            excludeOptions.push('motorway');
+          } else if (preference === 'avoid_ferries') {
+            excludeOptions.push('ferry');
+          }
+
+          // Force alternatives=true to get multiple routes for Stage 2
+          input.alternatives = true;
+
+          this.log(
+            'info',
+            `DirectionsTool: User selected preference: ${preference}, exclude: ${excludeOptions.join(',')}`
+          );
+        }
+      } catch (elicitError) {
+        this.log(
+          'warning',
+          `DirectionsTool: Stage 1 elicitation failed: ${elicitError instanceof Error ? elicitError.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    // Apply collected exclusions
+    if (excludeOptions.length > 0 && !input.exclude) {
+      input.exclude = excludeOptions.join(',');
+    }
+
     // Validate exclude parameter against the actual routing_profile
     // This is needed because some exclusions are only driving specific
     if (input.exclude) {
@@ -267,6 +374,116 @@ export class DirectionsTool extends MapboxApiBasedTool<
         `DirectionsTool: Response validation failed: ${error}`
       );
       validatedData = cleanedData as DirectionsResponse;
+    }
+
+    // Stage 2: Elicit route selection if multiple routes returned
+    if (
+      this.server &&
+      validatedData.routes &&
+      validatedData.routes.length >= 2
+    ) {
+      try {
+        const routeOptions = validatedData.routes.map((route, index) => {
+          const duration = this.formatDuration(route.duration);
+          const distance = this.formatDistance(route.distance);
+          const roads =
+            route.leg_summaries && route.leg_summaries.length > 0
+              ? route.leg_summaries[0]
+              : 'Route';
+
+          // Build traffic/congestion summary
+          let trafficInfo = '';
+          if (route.congestion_information) {
+            const congestion = route.congestion_information;
+            const totalLength =
+              congestion.length_low +
+              congestion.length_moderate +
+              congestion.length_heavy +
+              congestion.length_severe;
+            const heavyPercent = Math.round(
+              ((congestion.length_heavy + congestion.length_severe) /
+                totalLength) *
+                100
+            );
+            if (heavyPercent > 20) {
+              trafficInfo = ` ⚠️ Heavy traffic (${heavyPercent}%)`;
+            } else if (congestion.length_moderate > 0) {
+              trafficInfo = ' 🟡 Moderate traffic';
+            } else {
+              trafficInfo = ' ✅ Light traffic';
+            }
+          }
+
+          // Count incidents
+          const incidentCount = route.incidents_summary?.length || 0;
+          const incidentInfo =
+            incidentCount > 0 ? ` • ${incidentCount} incident(s)` : '';
+
+          return {
+            value: String(index),
+            label: `${duration} via ${roads} • ${distance}${trafficInfo}${incidentInfo}`
+          };
+        });
+
+        const routeSelectionResult = await this.server.server.elicitInput({
+          mode: 'form',
+          message: `Found ${validatedData.routes.length} routes. Choose your preferred route:`,
+          requestedSchema: {
+            type: 'object',
+            properties: {
+              selectedRoute: {
+                type: 'string',
+                title: 'Select Route',
+                description: 'Choose the route that best fits your needs',
+                enum: routeOptions.map((o) => o.value),
+                enumNames: routeOptions.map((o) => o.label)
+              }
+            },
+            required: ['selectedRoute']
+          }
+        });
+
+        if (
+          routeSelectionResult.action === 'accept' &&
+          routeSelectionResult.content?.selectedRoute
+        ) {
+          const selectedIndexStr =
+            typeof routeSelectionResult.content.selectedRoute === 'string'
+              ? routeSelectionResult.content.selectedRoute
+              : String(routeSelectionResult.content.selectedRoute);
+          const selectedIndex = parseInt(selectedIndexStr, 10);
+          const selectedRoute = validatedData.routes[selectedIndex];
+
+          // Return only the selected route
+          const singleRouteResult: DirectionsResponse = {
+            ...validatedData,
+            routes: [selectedRoute]
+          };
+
+          this.log(
+            'info',
+            `DirectionsTool: User selected route ${selectedIndex}: ${this.formatDuration(selectedRoute.duration)} via ${selectedRoute.leg_summaries?.[0] || 'route'}`
+          );
+
+          return {
+            content: [
+              { type: 'text', text: JSON.stringify(singleRouteResult, null, 2) }
+            ],
+            structuredContent: singleRouteResult,
+            isError: false
+          };
+        } else if (routeSelectionResult.action === 'decline') {
+          this.log(
+            'info',
+            'DirectionsTool: User declined to select a specific route'
+          );
+        }
+      } catch (elicitError) {
+        this.log(
+          'warning',
+          `DirectionsTool: Stage 2 elicitation failed: ${elicitError instanceof Error ? elicitError.message : 'Unknown error'}`
+        );
+      }
     }
 
     return {
