@@ -1,6 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
@@ -136,7 +137,10 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
 
     return {
       content,
-      isError: false
+      isError: false,
+      _meta: {
+        viewUUID: randomUUID()
+      }
     };
   }
 }
