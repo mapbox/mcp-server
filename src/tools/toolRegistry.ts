@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 // INSERT NEW TOOL IMPORT HERE
+import { InteractiveMapTool } from './interactive-map-tool/InteractiveMapTool.js';
 import { SimplifyTool } from './simplify-tool/SimplifyTool.js';
 import { BoundingBoxTool } from './bounding-box-tool/BoundingBoxTool.js';
 import { CentroidTool } from './centroid-tool/CentroidTool.js';
@@ -31,6 +32,7 @@ import { httpRequest } from '../utils/httpPipeline.js';
  */
 export const CORE_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
+  new InteractiveMapTool({ httpRequest }),
   new SimplifyTool(),
   new BoundingBoxTool(),
   new CentroidTool(),

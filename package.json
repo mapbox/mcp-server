@@ -10,7 +10,8 @@
     "mcp-server": "dist/esm/index.js"
   },
   "scripts": {
-    "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
+    "build": "npm run prepare && tshy && npm run build:ui && npm run generate-version && node scripts/add-shebang.cjs",
+    "build:ui": "vite build --config ui/vite.config.ts",
     "changelog:prepare-release": "node scripts/prepare-changelog-release.cjs",
     "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
     "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
@@ -54,6 +55,10 @@
     "tshy": "^3.0.2",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.42.0",
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "mapbox-gl": "^3.18.1",
+    "vite": "^7.3.1",
+    "vite-plugin-singlefile": "^2.3.0",
     "vitest": "^3.2.4"
   },
   "prettier": {
