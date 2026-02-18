@@ -126,7 +126,18 @@ uiResources.forEach((resource) => {
     server as any,
     resource.name,
     resource.uri,
-    { mimeType: RESOURCE_MIME_TYPE, description: resource.description },
+    {
+      mimeType: RESOURCE_MIME_TYPE,
+      description: resource.description,
+      _meta: {
+        ui: {
+          csp: {
+            connectDomains: ['https://api.mapbox.com'],
+            resourceDomains: ['https://api.mapbox.com']
+          }
+        }
+      }
+    },
     async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await resource.read(resource.uri, {} as any);
