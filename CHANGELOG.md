@@ -1,5 +1,10 @@
 ## Unreleased
 
+### Dependencies
+
+- Upgrade `@modelcontextprotocol/sdk` from 1.25.3 to 1.26.0
+- Regenerated SDK patch for version 1.26.0
+
 ### Documentation
 
 - **PR Guidelines**: Added CHANGELOG requirement to CLAUDE.md (#112)
