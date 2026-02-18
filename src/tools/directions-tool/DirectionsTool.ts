@@ -322,9 +322,7 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
           // Omit geometry and legs to keep response small
           geometry: undefined,
           legs: undefined
-        })),
-        _resourceUri: resourceUri, // Custom field indicating full data location
-        _truncated: true // Indicates this is a summary response
+        }))
       };
 
       return {
