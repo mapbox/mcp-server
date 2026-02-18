@@ -66,27 +66,22 @@ export class StaticMapUIResource extends BaseResource {
     #image-container {
       flex: 1;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       overflow: auto;
       position: relative;
     }
     #preview-image {
       max-width: 100%;
-      max-height: 100%;
       display: none;
       cursor: zoom-in;
     }
     #preview-image.zoomed {
       cursor: zoom-out;
       max-width: none;
-      max-height: none;
     }
     #loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      padding: 20px;
       color: #fff;
       font-size: 16px;
     }
@@ -99,7 +94,7 @@ export class StaticMapUIResource extends BaseResource {
 </head>
 <body>
   <div id="toolbar">
-    <button id="fullscreen-btn">&#x26F6; Fullscreen</button>
+    <button id="fullscreen-btn">⛶ Fullscreen</button>
   </div>
   <div id="image-container">
     <div id="loading">Loading static map preview...</div>
@@ -140,17 +135,16 @@ export class StaticMapUIResource extends BaseResource {
 
     function requestSizeToFit() {
       if (currentDisplayMode !== 'inline') return;
+      const toolbarHeight = canFullscreen ? toolbar.offsetHeight : 0;
       sendNotification('ui/notifications/size-changed', {
         width: image.naturalWidth,
-        height: image.naturalHeight
+        height: image.naturalHeight + toolbarHeight
       });
     }
 
     function updateFullscreenButton() {
       fullscreenBtn.textContent =
-        currentDisplayMode === 'fullscreen'
-          ? '&#x229F; Exit Fullscreen'
-          : '&#x26F6; Fullscreen';
+        currentDisplayMode === 'fullscreen' ? '⊟ Exit Fullscreen' : '⛶ Fullscreen';
     }
 
     async function toggleFullscreen() {
