@@ -39,10 +39,6 @@ export class StaticMapUIResource extends BaseResource {
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #000;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
     }
     #toolbar {
       display: none;
@@ -64,21 +60,18 @@ export class StaticMapUIResource extends BaseResource {
     }
     #fullscreen-btn:hover { background: rgba(255, 255, 255, 0.25); }
     #image-container {
-      flex: 1;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      overflow: auto;
       position: relative;
     }
     #preview-image {
-      max-width: 100%;
       display: none;
+      max-width: 100%;
+      width: 100%;
       cursor: zoom-in;
     }
     #preview-image.zoomed {
       cursor: zoom-out;
       max-width: none;
+      width: auto;
     }
     #loading {
       padding: 20px;
