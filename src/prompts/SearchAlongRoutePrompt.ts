@@ -85,19 +85,19 @@ Please follow these steps:
    - Use search_and_geocode_tool to convert ${from} and ${to} to coordinates if they're not already in coordinate format
 
 2. **Get the route**:
-   - Use directions_tool with profile=${mode} to get the route geometry between the two points
-   - Extract the route LineString coordinates from the response (it will be an array of [lon, lat] pairs)
-   - Note the total route distance
+   - Use directions_tool with profile=${mode} and geometries="none" to get route metadata (distance, duration)
+   - This returns a compact response with route summary WITHOUT large geometry data
+   - Note the total route distance to determine sampling strategy
 
 3. **Search along the route using point sampling** (works for all route lengths):
 
    **Determine sample strategy based on route length:**
-   - SHORT routes (< 50km): Sample every 5-10 points along the route (more samples for better coverage)
-   - MEDIUM routes (50-150km): Sample every 15-20 points along the route
+   - SHORT routes (< 50km): Sample 5-7 evenly spaced points between start and end
+   - MEDIUM routes (50-150km): Sample 5-7 evenly spaced points between start and end
    - VERY LONG routes (> 150km): Sample 5-7 evenly spaced points (start, end, and middle points)
 
    **For each sample point:**
-   - Extract the coordinate [lon, lat] from the route
+   - Calculate coordinates by interpolating linearly between start and end coordinates
    - Choose the appropriate search tool:
      * If "${search_for}" is a specific place/brand (e.g., "Starbucks", "McDonald's", "Whole Foods"):
        Use search_and_geocode_tool with proximity="lon,lat" and q="${search_for}"

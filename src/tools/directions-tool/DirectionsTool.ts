@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { URLSearchParams } from 'node:url';
+import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -13,6 +14,7 @@ import {
   type DirectionsResponse
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
+import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -22,7 +24,10 @@ export class DirectionsTool extends MapboxApiBasedTool<
 > {
   name = 'directions_tool';
   description =
-    'Fetches directions from Mapbox API based on provided coordinates and direction method.';
+    'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
+    'For route planning and distance calculations, use geometries="none" to get compact responses. ' +
+    'Only request full geometry (geometries="geojson") when you need to visualize the route on a map ' +
+    'or provide detailed turn-by-turn navigation instructions.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
@@ -269,8 +274,67 @@ export class DirectionsTool extends MapboxApiBasedTool<
       validatedData = cleanedData as DirectionsResponse;
     }
 
+    // Check response size and conditionally create temporary resource
+    const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
+    const responseText = JSON.stringify(validatedData, null, 2);
+    const responseSize = responseText.length;
+
+    if (responseSize > RESPONSE_SIZE_THRESHOLD) {
+      // Create temporary resource for large response
+      const resourceId = randomBytes(16).toString('hex');
+      const resourceUri = `mapbox://temp/directions-${resourceId}`;
+
+      temporaryResourceManager.create(resourceId, resourceUri, validatedData, {
+        toolName: this.name,
+        size: responseSize
+      });
+
+      // Extract summary information
+      const route = validatedData.routes?.[0];
+      const distance = route?.distance
+        ? `${(route.distance / 1609.34).toFixed(1)} miles`
+        : 'unknown';
+      const duration = route?.duration
+        ? `${Math.floor(route.duration / 60)} minutes`
+        : 'unknown';
+      const waypointCount = validatedData.waypoints?.length ?? 0;
+
+      const summaryText = `Route found: ${distance}, ${duration}
+
+Waypoints: ${waypointCount}
+${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull geometry and details stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full details if needed.\nOr ask to read the resource by its URI.` : ''}`;
+
+      // Create minimal structured content for validation (without large geometry)
+      const summaryStructuredContent = {
+        ...validatedData,
+        routes: validatedData.routes?.map((route) => ({
+          distance: route.distance,
+          duration: route.duration,
+          duration_typical: route.duration_typical,
+          weight_typical: route.weight_typical,
+          leg_summaries: route.leg_summaries,
+          intersecting_admins: route.intersecting_admins,
+          notifications_summary: route.notifications_summary,
+          incidents_summary: route.incidents_summary,
+          num_legs: route.num_legs,
+          congestion_information: route.congestion_information,
+          average_speed_kph: route.average_speed_kph,
+          // Omit geometry and legs to keep response small
+          geometry: undefined,
+          legs: undefined
+        }))
+      };
+
+      return {
+        content: [{ type: 'text', text: summaryText }],
+        structuredContent: summaryStructuredContent,
+        isError: false
+      };
+    }
+
+    // Small response - return normally
     return {
-      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      content: [{ type: 'text', text: responseText }],
       structuredContent: validatedData,
       isError: false
     };

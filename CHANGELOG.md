@@ -20,6 +20,20 @@
   - Adds new empty "Unreleased" section for next changes
   - Includes validation for version format and CHANGELOG structure
 
+## Unreleased
+
+### Features Added
+
+- **Large Response Handling**: DirectionsTool now creates temporary resources for responses >50KB
+  - Prevents context window overflow on long-distance routes
+  - Returns summary with distance, duration, and resource URI
+  - Full route geometry available via MCP resource API
+  - Temporary resources expire after 30 minutes
+  - Resource URI format: `mapbox://temp/directions-{id}`
+  - Updated tool description to guide LLMs: use geometries="none" for planning, geometries="geojson" only for visualization
+  - Returns lightweight structured content for large responses (summary data without geometry) to satisfy output schema validation
+  - Updated `search-along-route` prompt to use `geometries="none"` and linear interpolation for route sampling instead of extracting coordinates from geometry
+
 ## 0.8.3
 
 ### Security
