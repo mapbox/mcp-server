@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Map</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+      }
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 14px;
+        color: #666;
+        z-index: 10;
+        pointer-events: none;
+      }
+
+      /* ── Fullscreen button ── */
+      #fullscreen-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 20;
+        width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      #fullscreen-btn:hover {
+        background: rgba(240, 240, 240, 0.95);
+      }
+      #fullscreen-btn svg {
+        width: 18px;
+        height: 18px;
+        stroke: #333;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <button id="fullscreen-btn" title="Toggle fullscreen (Ctrl+Enter)">
+      <svg id="expand-icon" viewBox="0 0 24 24">
+        <polyline points="15 3 21 3 21 9" />
+        <polyline points="9 21 3 21 3 15" />
+        <line x1="21" y1="3" x2="14" y2="10" />
+        <line x1="3" y1="21" x2="10" y2="14" />
+      </svg>
+      <svg id="compress-icon" viewBox="0 0 24 24" style="display: none">
+        <polyline points="4 14 10 14 10 20" />
+        <polyline points="20 10 14 10 14 4" />
+        <line x1="14" y1="10" x2="21" y2="3" />
+        <line x1="3" y1="21" x2="10" y2="14" />
+      </svg>
+    </button>
+
+    <div id="loading">Loading map...</div>
+    <script type="module" src="./mcp-app.ts"></script>
+  </body>
+</html>
