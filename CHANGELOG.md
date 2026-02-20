@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Registry
+
+- Added hosted MCP endpoint (`https://mcp.mapbox.com/mcp`) to `server.json` `remotes` for registry discoverability
+
 ### Dependencies
 
 - Upgrade `@modelcontextprotocol/sdk` from 1.25.3 to 1.26.0

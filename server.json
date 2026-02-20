@@ -27,5 +27,11 @@
         }
       ]
     }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.mapbox.com/mcp"
+    }
   ]
 }
