@@ -37,6 +37,64 @@ export class PlaceDetailsTool extends MapboxApiBasedTool<
     });
   }
 
+  private formatOpenHours(openHours: Record<string, unknown>): string {
+    const DAY_NAMES = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday'
+    ];
+
+    // Use weekday_text if the API provides it — already formatted per day
+    if (Array.isArray(openHours['weekday_text'])) {
+      const lines = (openHours['weekday_text'] as string[])
+        .map((line) => `  ${line}`)
+        .join('\n');
+      return `Hours:\n${lines}`;
+    }
+
+    // Fall back to parsing periods array
+    if (!Array.isArray(openHours['periods'])) return '';
+
+    type Period = {
+      open: { day: number; time: string };
+      close?: { day: number; time: string };
+    };
+
+    const formatTime = (hhmm: string): string => {
+      const h = parseInt(hhmm.slice(0, 2), 10);
+      const m = hhmm.slice(2);
+      const period = h < 12 ? 'AM' : 'PM';
+      const hour = h % 12 || 12;
+      return m === '00' ? `${hour} ${period}` : `${hour}:${m} ${period}`;
+    };
+
+    // Group periods by open day
+    const byDay = new Map<number, string[]>();
+    for (const period of openHours['periods'] as Period[]) {
+      const day = period.open.day;
+      const open = formatTime(period.open.time);
+      const close = period.close ? formatTime(period.close.time) : 'midnight';
+      const range = `${open} – ${close}`;
+      const existing = byDay.get(day);
+      if (existing) {
+        existing.push(range);
+      } else {
+        byDay.set(day, [range]);
+      }
+    }
+
+    const dayLines = DAY_NAMES.map((name, i) => {
+      const ranges = byDay.get(i);
+      return `  ${name}: ${ranges ? ranges.join(', ') : 'Closed'}`;
+    });
+
+    return `Hours:\n${dayLines.join('\n')}`;
+  }
+
   private formatDetailsToText(data: PlaceDetailsOutput): string {
     const props = data.properties;
     const lines: string[] = [];
@@ -111,10 +169,10 @@ export class PlaceDetailsTool extends MapboxApiBasedTool<
         metadata['open_hours'] &&
         typeof metadata['open_hours'] === 'object'
       ) {
-        const hours = metadata['open_hours'] as Record<string, unknown>;
-        if (Array.isArray(hours['periods'])) {
-          lines.push(`Hours: ${JSON.stringify(hours['periods'])}`);
-        }
+        const formatted = this.formatOpenHours(
+          metadata['open_hours'] as Record<string, unknown>
+        );
+        if (formatted) lines.push(formatted);
       }
 
       // Photos

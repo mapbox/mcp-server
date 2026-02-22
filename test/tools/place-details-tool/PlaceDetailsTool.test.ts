@@ -52,6 +52,46 @@ const sampleResponseWithVenue = {
   }
 };
 
+const sampleResponseWithWeekdayText = {
+  ...sampleResponse,
+  properties: {
+    ...sampleResponse.properties,
+    metadata: {
+      open_hours: {
+        weekday_text: [
+          'Monday: 9:00 AM – 9:00 PM',
+          'Tuesday: 9:00 AM – 9:00 PM',
+          'Wednesday: 9:00 AM – 9:00 PM',
+          'Thursday: 9:00 AM – 9:00 PM',
+          'Friday: 9:00 AM – 10:00 PM',
+          'Saturday: 10:00 AM – 10:00 PM',
+          'Sunday: Closed'
+        ]
+      }
+    }
+  }
+};
+
+const sampleResponseWithPeriods = {
+  ...sampleResponse,
+  properties: {
+    ...sampleResponse.properties,
+    metadata: {
+      open_hours: {
+        periods: [
+          { open: { day: 1, time: '0900' }, close: { day: 1, time: '2100' } },
+          { open: { day: 2, time: '0900' }, close: { day: 2, time: '2100' } },
+          { open: { day: 3, time: '0900' }, close: { day: 3, time: '2100' } },
+          { open: { day: 4, time: '0900' }, close: { day: 4, time: '2100' } },
+          { open: { day: 5, time: '0900' }, close: { day: 5, time: '2200' } },
+          { open: { day: 6, time: '1000' }, close: { day: 6, time: '2200' } }
+          // Sunday (0) absent — should appear as Closed
+        ]
+      }
+    }
+  }
+};
+
 describe('PlaceDetailsTool', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -219,6 +259,44 @@ describe('PlaceDetailsTool', () => {
     const result = await new PlaceDetailsTool({ httpRequest }).run({});
 
     expect(result.isError).toBe(true);
+  });
+
+  it('formats hours using weekday_text when available', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => sampleResponseWithWeekdayText
+    });
+
+    const result = await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
+      attribute_sets: ['visit']
+    });
+
+    expect(result.isError).toBe(false);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Hours:');
+    expect(text).toContain('Monday: 9:00 AM – 9:00 PM');
+    expect(text).toContain('Sunday: Closed');
+  });
+
+  it('formats hours from periods when weekday_text is absent', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => sampleResponseWithPeriods
+    });
+
+    const result = await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
+      attribute_sets: ['visit']
+    });
+
+    expect(result.isError).toBe(false);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Hours:');
+    expect(text).toContain('Monday: 9 AM – 9 PM');
+    expect(text).toContain('Friday: 9 AM – 10 PM');
+    expect(text).toContain('Saturday: 10 AM – 10 PM');
+    expect(text).toContain('Sunday: Closed');
+    // Raw JSON should not appear
+    expect(text).not.toContain('"day"');
   });
 
   it('has output schema defined', () => {
