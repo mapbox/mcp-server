@@ -1,5 +1,13 @@
 ## Unreleased
 
+### New Features
+
+- **place_details_tool**: New tool to retrieve detailed information about a specific place by Mapbox ID
+  - Accepts a `mapbox_id` from search results (`search_and_geocode_tool`, `category_search_tool`, `reverse_geocode_tool`)
+  - Optional `attribute_sets` parameter: `basic`, `photos`, `visit` (hours, rating, price), `venue` (phone, website, social media)
+  - Optional `language` and `worldview` parameters
+  - Returns formatted text summary plus structured GeoJSON Feature content
+
 ### Bug Fixes
 
 - **category_search_tool**: Fix schema validation failures on Japanese and other international place data
