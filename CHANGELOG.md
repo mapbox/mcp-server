@@ -1,5 +1,12 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **category_search_tool**: Fix schema validation failures on Japanese and other international place data
+  - Added `.passthrough()` to all context sub-schemas to allow extra fields returned by the API
+  - Made `country_code`, `country_code_alpha_3`, `region_code`, and `region_code_full` optional to match real API responses
+  - Fixed `BaseTool` to pass the full Zod schema (not just `.shape`) to the MCP SDK so `.passthrough()` settings are preserved during structured-content validation
+
 ### Registry
 
 - Added hosted MCP endpoint (`https://mcp.mapbox.com/mcp`) to `server.json` `remotes` for registry discoverability
