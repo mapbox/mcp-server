@@ -1,6 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
@@ -22,6 +23,15 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/static-map/index.html',
+      csp: {
+        connectDomains: ['https://api.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -100,48 +110,18 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const density = input.highDensity ? '@2x' : '';
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
 
+    // Fetch and encode image as base64 for clients without MCP Apps support
     const response = await this.httpRequest(url);
-
-    if (!response.ok) {
-      const errorMessage = await this.getErrorMessage(response);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Static Map API error: ${errorMessage}`
-          }
-        ],
-        isError: true
-      };
-    }
-
     const buffer = await response.arrayBuffer();
-
     const base64Data = Buffer.from(buffer).toString('base64');
-
-    // Determine MIME type based on style (raster-only styles return JPEG)
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
-    // Build descriptive text with map metadata (Issue #103)
-    // Text content provides additional context alongside the image
-    const textDescription = [
-      'Static map image generated successfully.',
-      `Center: ${lat}, ${lng}`,
-      `Zoom: ${input.zoom}`,
-      `Size: ${width}x${height}${input.highDensity ? ' @2x' : ''}`,
-      `Style: ${input.style}`,
-      input.overlays?.length ? `Overlays: ${input.overlays.length}` : null
-    ]
-      .filter(Boolean)
-      .join('\n');
-
-    // Build content array with text first, then image
-    // Per MCP spec, content array can have multiple items of different types
+    // content[0] MUST be the URL text — MCP Apps UI finds it via content.find(c => c.type === 'text')
     const content: CallToolResult['content'] = [
       {
         type: 'text',
-        text: textDescription
+        text: url
       },
       {
         type: 'image',
@@ -150,7 +130,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       }
     ];
 
-    // Conditionally add MCP-UI resource if enabled
+    // Conditionally add MCP-UI resource if enabled (backward compatibility)
     if (isMcpUiEnabled()) {
       const uiResource = createUIResource({
         uri: `ui://mapbox/static-map/${input.style}/${lng},${lat},${input.zoom}`,
@@ -168,7 +148,10 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
 
     return {
       content,
-      isError: false
+      isError: false,
+      _meta: {
+        viewUUID: randomUUID()
+      }
     };
   }
 }

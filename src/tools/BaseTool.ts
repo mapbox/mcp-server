@@ -23,6 +23,16 @@ export abstract class BaseTool<
 
   readonly inputSchema: InputSchema;
   readonly outputSchema?: OutputSchema;
+  readonly meta?: {
+    ui?: {
+      resourceUri?: string;
+      csp?: {
+        connectDomains?: string[];
+        resourceDomains?: string[];
+        frameDomains?: string[];
+      };
+    };
+  };
   protected server: McpServer | null = null;
 
   constructor(params: {
@@ -47,6 +57,16 @@ export abstract class BaseTool<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       outputSchema?: any;
       annotations?: ToolAnnotations;
+      _meta?: {
+        ui?: {
+          resourceUri?: string;
+          csp?: {
+            connectDomains?: string[];
+            resourceDomains?: string[];
+            frameDomains?: string[];
+          };
+        };
+      };
     } = {
       title: this.annotations.title,
       description: this.description,
@@ -55,11 +75,16 @@ export abstract class BaseTool<
       annotations: this.annotations
     };
 
-    // Add outputSchema if provided
+    // Add outputSchema if provided — pass the full Zod schema (not just .shape)
+    // so that .passthrough() and other schema-level settings are preserved when
+    // the MCP SDK converts it for structured-content validation.
     if (this.outputSchema) {
-      config.outputSchema =
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.outputSchema as unknown as z.ZodObject<any>).shape;
+      config.outputSchema = this.outputSchema;
+    }
+
+    // Add _meta for MCP Apps support if provided (includes CSP configuration)
+    if (this.meta) {
+      config._meta = this.meta;
     }
 
     return server.registerTool(
