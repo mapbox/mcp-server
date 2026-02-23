@@ -1,7 +1,17 @@
 ## Unreleased
 
+### New Features
+
+- **place_details_tool**: New tool to retrieve detailed information about a specific place by Mapbox ID
+  - Accepts a `mapbox_id` from search results (`search_and_geocode_tool`, `category_search_tool`, `reverse_geocode_tool`)
+  - Optional `attribute_sets` parameter: `basic`, `photos`, `visit` (hours, rating, price), `venue` (phone, website, social media)
+  - Optional `language` and `worldview` parameters
+  - Returns formatted text summary plus structured GeoJSON Feature content
+  - Opening hours formatted as readable per-day text (e.g. "Monday: 9 AM – 9 PM") rather than raw JSON
+
 ### Bug Fixes
 
+- **search_and_geocode_tool**, **category_search_tool**: Include `mapbox_id` in formatted text output so models can chain directly to `place_details_tool` without re-fetching results as JSON
 - **category_search_tool**: Fix schema validation failures on Japanese and other international place data
   - Added `.passthrough()` to all context sub-schemas to allow extra fields returned by the API
   - Made `country_code`, `country_code_alpha_3`, `region_code`, and `region_code_full` optional to match real API responses

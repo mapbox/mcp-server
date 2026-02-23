@@ -89,6 +89,11 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
           result += `\n   Category: ${props.category}`;
         }
 
+        // Mapbox ID — required for place_details_tool lookups
+        if (props.mapbox_id) {
+          result += `\n   Mapbox ID: ${props.mapbox_id}`;
+        }
+
         return result;
       }
     );
