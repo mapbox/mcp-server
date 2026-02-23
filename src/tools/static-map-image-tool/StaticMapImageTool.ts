@@ -16,7 +16,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
 > {
   name = 'static_map_image_tool';
   description =
-    'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns the Static Maps API URL for visualization.';
+    'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns PNG for vector styles, JPEG for raster-only styles.';
   annotations = {
     title: 'Static Map Image Tool',
     readOnlyHint: true,
@@ -110,12 +110,23 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const density = input.highDensity ? '@2x' : '';
     const url = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
 
-    // Return the URL directly instead of fetching and encoding
-    // This enables MCP Apps to display the image with proper CSP
+    // Fetch and encode image as base64 for clients without MCP Apps support
+    const response = await this.httpRequest(url);
+    const buffer = await response.arrayBuffer();
+    const base64Data = Buffer.from(buffer).toString('base64');
+    const isRasterStyle = input.style.includes('satellite');
+    const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
+
+    // content[0] MUST be the URL text — MCP Apps UI finds it via content.find(c => c.type === 'text')
     const content: CallToolResult['content'] = [
       {
         type: 'text',
         text: url
+      },
+      {
+        type: 'image',
+        data: base64Data,
+        mimeType
       }
     ];
 
