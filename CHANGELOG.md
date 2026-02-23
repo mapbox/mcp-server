@@ -45,6 +45,7 @@
 - **`static_map_image_tool`**: Tool now returns the map URL as `text` content instead of a base64-encoded image
   - Before: `content: [{ type: "image", data: "...base64...", mimeType: "image/png" }]`
   - After: `content: [{ type: "text", text: "https://api.mapbox.com/styles/v1/..." }]`
+  - Base64-encoding large map images (up to 1280×1280px) could consume 100,000+ tokens, far exceeding the 25K token limit in Claude apps — returning a URL eliminates this risk
   - In MCP Apps-capable hosts the image is rendered interactively via `StaticMapUIResource`; in other hosts the model receives the URL and can present or use it directly
 
 ### Features Added
