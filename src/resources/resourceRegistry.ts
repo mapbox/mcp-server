@@ -4,13 +4,15 @@
 // INSERT NEW RESOURCE IMPORT HERE
 import { CategoryListResource } from './category-list/CategoryListResource.js';
 import { TemporaryDataResource } from './temporary/TemporaryDataResource.js';
+import { StaticMapUIResource } from './ui-apps/StaticMapUIResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
 // Central registry of all resources
 export const ALL_RESOURCES = [
   // INSERT NEW RESOURCE INSTANCE HERE
   new CategoryListResource({ httpRequest }),
-  new TemporaryDataResource()
+  new TemporaryDataResource(),
+  new StaticMapUIResource()
 ] as const;
 
 export type ResourceInstance = (typeof ALL_RESOURCES)[number];

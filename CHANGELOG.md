@@ -57,6 +57,25 @@
 
 ## 0.8.3
 
+### Breaking Changes
+
+- **`static_map_image_tool`**: Tool now returns the map URL as `text` content instead of a base64-encoded image
+  - Before: `content: [{ type: "image", data: "...base64...", mimeType: "image/png" }]`
+  - After: `content: [{ type: "text", text: "https://api.mapbox.com/styles/v1/..." }]`
+  - In MCP Apps-capable hosts the image is rendered interactively via `StaticMapUIResource`; in other hosts the model receives the URL and can present or use it directly
+
+### Features Added
+
+- **MCP Apps Support for StaticMapImageTool** (#109)
+  - Added interactive map preview in compatible MCP clients (VS Code, Claude Code, Goose)
+  - Implemented `StaticMapUIResource` serving interactive HTML with inline MCP Apps SDK
+  - Added `@modelcontextprotocol/ext-apps@^1.0.1` dependency
+  - Enhanced `BaseTool` with `meta` property for MCP Apps metadata
+  - Configured CSP for `api.mapbox.com` domains
+  - Sends `ui/notifications/size-changed` to fit panel to rendered image height
+  - Fullscreen toggle using `ui/request-display-mode`
+  - Uses proper `RESOURCE_MIME_TYPE` ("text/html;profile=mcp-app") per MCP Apps specification
+
 ### Security
 
 - **CVE-2026-0621**: Updated `@modelcontextprotocol/sdk` to 1.25.3 to fix ReDoS vulnerability in UriTemplate regex patterns
@@ -64,6 +83,7 @@
 
 ### Dependencies
 
+- Added `@modelcontextprotocol/ext-apps@^1.0.1`
 - Updated `@modelcontextprotocol/sdk` from 1.17.5 to 1.25.3
 
 ## 0.8.2
