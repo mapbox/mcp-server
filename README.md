@@ -482,6 +482,30 @@ npx plop create-tool
 # provide tool name without suffix (e.g. Search)
 ```
 
+## Releasing a New Version
+
+```sh
+# 1. Bump version in package.json
+npm version <new-version> --no-git-tag-version
+
+# 2. Sync version to manifest.json and server.json
+npm run sync-manifest
+
+# 3. Prepare CHANGELOG (replaces "Unreleased" with version and date)
+npm run changelog:prepare-release <new-version>
+
+# 4. Update package-lock.json
+npm install
+
+# 5. Review changes, then commit and tag
+git add package.json package-lock.json manifest.json server.json CHANGELOG.md
+git commit -m "Release v<new-version>"
+git tag v<new-version>
+git push && git push --tags
+```
+
+**Important**: The publisher workflow validates that `package.json` and `server.json` versions match the release version. Skipping the version bump or manifest sync will cause publish failures.
+
 ## OpenTelemetry Tracing
 
 This MCP server includes comprehensive OpenTelemetry tracing for production observability:
