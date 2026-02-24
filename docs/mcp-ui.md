@@ -17,11 +17,13 @@ This document provides comprehensive information about MCP-UI support in the Map
 
 **MCP-UI** is an open specification that extends the Model Context Protocol (MCP) to support rich, interactive UI elements within MCP client applications. It enables MCP servers to return not just text and data, but also embeddable UI components like iframes, which compatible clients can render inline.
 
+This server also supports the newer **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`), which serves self-contained HTML apps directly inside the chat panel. MCP Apps is supported by Claude Desktop, VS Code with GitHub Copilot, and Claude Code.
+
 ### Key Benefits
 
-- **Enhanced User Experience**: Display interactive maps, charts, and visualizations directly in the chat interface
-- **Full Backwards Compatibility**: Clients without MCP-UI support continue to work normally, receiving standard text and image responses
-- **Progressive Enhancement**: Tools provide baseline functionality for all clients, with enhanced visual experiences for MCP-UI-compatible clients
+- **Enhanced User Experience**: Display interactive maps directly in the chat interface
+- **Full Backwards Compatibility**: Clients without interactive preview support still receive the base64 map image
+- **Progressive Enhancement**: Tools provide baseline functionality for all clients, with enhanced visual experiences for MCP Apps / MCP-UI-compatible clients
 
 ## Supported Tools
 
@@ -40,17 +42,22 @@ When MCP-UI is enabled, this tool returns:
 
 ## Compatible Clients
 
+### MCP Apps Compatible ✅
+
+- **Claude Desktop** - Interactive map panel with Fullscreen toggle
+- **VS Code with GitHub Copilot** - Interactive map panel with Fullscreen toggle
+- **Claude Code** - Interactive map panel with Fullscreen toggle
+
 ### MCP-UI Compatible ✅
 
-- **[Goose](https://github.com/block/goose)** - AI agent framework with full MCP-UI support for inline map visualization
+- **[Goose](https://github.com/block/goose)** - AI agent framework with inline map visualization via embedded iframe
 
-### Not Yet Compatible ❌
+### Standard (base64 image only)
 
-- **Claude Desktop** - Does not support MCP-UI (displays base64 images only)
-- **VS Code with Copilot** - Does not support MCP-UI (displays base64 images only)
-- **Cursor IDE** - Does not support MCP-UI (displays base64 images only)
+- **Cursor IDE** - Renders the base64 map image
+- **Other MCP clients** - Render the base64 map image
 
-> **Note**: Client compatibility may change as MCP-UI adoption grows. Check with your specific client's documentation for the latest support status.
+> **Note**: Client compatibility may change as adoption of both protocols grows. Check your client's documentation for the latest support status.
 
 ## How It Works
 
@@ -87,18 +94,18 @@ The `static_map_image_tool` returns a response with multiple content items, foll
 {
   content: [
     {
-      // Text description with map metadata
+      // The Mapbox Static Images API URL — MCP Apps reads this to render the map
       type: 'text',
-      text: 'Static map image generated successfully.\nCenter: 37.7749, -122.4194\nZoom: 13\nSize: 800x600\nStyle: mapbox/streets-v12'
+      text: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/...'
     },
     {
-      // Base64-encoded image
+      // Base64-encoded image — for all clients without interactive preview support
       type: 'image',
       data: '<base64-encoded-image>',
       mimeType: 'image/png'
     },
     {
-      // MCP-UI resource for interactive iframes (only when enabled)
+      // MCP-UI resource for interactive iframes — only present when MCP-UI is enabled
       type: 'resource',
       resource: {
         uri: 'ui://mapbox/static-map/...',
@@ -113,9 +120,11 @@ The `static_map_image_tool` returns a response with multiple content items, foll
 }
 ```
 
-**Standard clients** (Claude Desktop, LibreChat, VS Code, Cursor) render the base64 image. The text content provides additional metadata about the generated map.
+**MCP Apps clients** (Claude Desktop, VS Code, Claude Code) render the interactive HTML panel served via `StaticMapUIResource`. The URL in `content[0]` is used by the panel to fetch and display the map image.
 
-**MCP-UI clients** (like Goose) can render the interactive iframe resource for the richest experience.
+**MCP-UI clients** (Goose) render the iframe resource for an inline preview.
+
+**Standard clients** (Cursor, etc.) render the base64 image from `content[1]`.
 
 ## Configuration
 
@@ -199,12 +208,17 @@ If both the environment variable and command-line flag are specified, the **envi
 
 ### Implementation
 
-The Mapbox MCP Server uses the `@mcp-ui/server` package (v5.13.1+) to create UIResource objects.
+The Mapbox MCP Server supports two interactive preview protocols:
+
+- **MCP Apps** (`@modelcontextprotocol/ext-apps`) — serves a self-contained HTML app via `StaticMapUIResource` with `RESOURCE_MIME_TYPE` (`text/html;profile=mcp-app`). Supported by Claude Desktop, VS Code, and Claude Code.
+- **MCP-UI** (`@mcp-ui/server`) — creates `UIResource` objects with embedded iframe URLs. Supported by Goose.
 
 **Key Files:**
 
 - `src/config/toolConfig.ts` - Configuration logic for MCP-UI (`isMcpUiEnabled()` helper)
-- `src/tools/static-map-image-tool/StaticMapImageTool.ts` - Conditional UIResource creation
+- `src/tools/static-map-image-tool/StaticMapImageTool.ts` - Fetch + base64 encoding, URL as first content item, conditional UIResource
+- `src/resources/ui-apps/StaticMapUIResource.ts` - MCP Apps HTML panel implementation
+- `src/tools/BaseTool.ts` - `meta.ui` property for MCP Apps CSP configuration
 
 **Code Example:**
 
@@ -212,20 +226,11 @@ The Mapbox MCP Server uses the `@mcp-ui/server` package (v5.13.1+) to create UIR
 import { createUIResource } from '@mcp-ui/server';
 import { isMcpUiEnabled } from '../../config/toolConfig.js';
 
-// Build descriptive text with map metadata
-const textDescription = [
-  'Static map image generated successfully.',
-  `Center: ${lat}, ${lng}`,
-  `Zoom: ${input.zoom}`,
-  `Size: ${width}x${height}`,
-  `Style: ${input.style}`
-].join('\n');
-
-// Build content array with text first, then image
+// content[0] MUST be the URL — MCP Apps UI finds it via content.find(c => c.type === 'text')
 const content: CallToolResult['content'] = [
   {
     type: 'text',
-    text: textDescription
+    text: url // Mapbox Static Images API URL
   },
   {
     type: 'image',
@@ -234,7 +239,7 @@ const content: CallToolResult['content'] = [
   }
 ];
 
-// Conditionally add MCP-UI resource if enabled
+// Conditionally add MCP-UI resource if enabled (for Goose and other MCP-UI clients)
 if (isMcpUiEnabled()) {
   const uiResource = createUIResource({
     uri: `ui://mapbox/static-map/${input.style}/${lng},${lat},${input.zoom}`,
@@ -286,15 +291,19 @@ Create a map showing the route from Golden Gate Bridge to Fisherman's Wharf
 with markers at both locations
 ```
 
-**With MCP-UI Client (Goose):**
+**MCP Apps clients (Claude Desktop, VS Code, Claude Code):**
 
-- Displays interactive embedded map in the chat
+- Displays interactive HTML map panel with Fullscreen toggle
 
-**Without MCP-UI Client (Claude Desktop):**
+**MCP-UI clients (Goose):**
+
+- Displays interactive embedded map via iframe
+
+**Standard clients (Cursor, etc.):**
 
 - Displays base64-encoded static PNG image
 
-Both provide the same information, but the experience differs based on client capabilities.
+All clients provide the same map information; the experience differs based on client capabilities.
 
 ## Troubleshooting
 
@@ -308,7 +317,7 @@ Both provide the same information, but the experience differs based on client ca
 
 ### "How do I verify MCP-UI is enabled?"
 
-**Solution**: Check the server logs or test with a known MCP-UI compatible client like Goose. When MCP-UI is enabled, the `static_map_image_tool` will return 2 content items instead of 1.
+**Solution**: Check the server logs or test with a known MCP-UI compatible client like Goose. When MCP-UI is enabled, the `static_map_image_tool` will return 3 content items (URL text + image + UIResource) instead of 2 (URL text + image).
 
 ### "Can I use MCP-UI with custom tools?"
 
