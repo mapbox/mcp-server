@@ -35,6 +35,7 @@
 
 ### Dependencies
 
+- Upgrade `@modelcontextprotocol/ext-apps` from `^1.1.0` to `^1.1.1`
 - Upgrade `@modelcontextprotocol/sdk` from 1.25.3 to 1.26.0
 - Regenerated SDK patch for version 1.26.0
 
