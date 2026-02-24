@@ -1,10 +1,10 @@
-# MCP-UI Support
+# Interactive Map Previews (MCP Apps & MCP-UI)
 
-This document provides comprehensive information about MCP-UI support in the Mapbox MCP Server.
+This document covers how the Mapbox MCP Server delivers interactive map previews in compatible clients.
 
 ## Table of Contents
 
-- [What is MCP-UI?](#what-is-mcp-ui)
+- [Overview](#overview)
 - [Supported Tools](#supported-tools)
 - [Compatible Clients](#compatible-clients)
 - [How It Works](#how-it-works)
@@ -13,32 +13,35 @@ This document provides comprehensive information about MCP-UI support in the Map
 - [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
 
-## What is MCP-UI?
+## Overview
 
-**MCP-UI** is an open specification that extends the Model Context Protocol (MCP) to support rich, interactive UI elements within MCP client applications. It enables MCP servers to return not just text and data, but also embeddable UI components like iframes, which compatible clients can render inline.
+The Mapbox MCP Server actively invests in **MCP Apps** as its primary interactive preview protocol. MCP Apps serves self-contained HTML app panels directly inside the chat, and is supported by Claude Desktop, VS Code with GitHub Copilot, and Claude Code.
 
-This server also supports the newer **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`), which serves self-contained HTML apps directly inside the chat panel. MCP Apps is supported by Claude Desktop, VS Code with GitHub Copilot, and Claude Code.
+The server also maintains support for **MCP-UI** for backwards compatibility with clients like Goose. MCP-UI is not being removed, but new interactive preview development is focused on MCP Apps.
+
+All clients — regardless of protocol support — receive the base64-encoded map image as standard output.
 
 ### Key Benefits
 
-- **Enhanced User Experience**: Display interactive maps directly in the chat interface
-- **Full Backwards Compatibility**: Clients without interactive preview support still receive the base64 map image
-- **Progressive Enhancement**: Tools provide baseline functionality for all clients, with enhanced visual experiences for MCP Apps / MCP-UI-compatible clients
+- **Rich interactive previews**: MCP Apps clients get a full HTML map panel with a Fullscreen toggle
+- **Full backwards compatibility**: Clients without MCP Apps or MCP-UI support still receive the base64 image
+- **Progressive enhancement**: Every client gets a usable result; supporting clients get a richer experience
 
 ## Supported Tools
 
-The following tools in the Mapbox MCP Server support MCP-UI:
-
 ### Static Map Image Tool (`static_map_image_tool`)
 
-When MCP-UI is enabled, this tool returns:
+This tool always returns:
 
-1. **Base64-encoded map image** (for all clients)
-2. **Embeddable iframe URL** (for MCP-UI compatible clients)
+1. **The Mapbox Static Images API URL** (text, required first for MCP Apps to render)
+2. **Base64-encoded map image** (for all clients without interactive preview support)
+3. **MCP-UI UIResource** (only when MCP-UI is enabled, for Goose and other MCP-UI clients)
 
-**Without MCP-UI**: Clients receive only the base64 image data, which they can display as a static image.
+**MCP Apps clients** (Claude Desktop, VS Code, Claude Code): Render the interactive HTML panel served by `StaticMapUIResource`, with click-to-zoom and a Fullscreen toggle.
 
-**With MCP-UI**: Compatible clients can render an interactive iframe showing the map directly from Mapbox's Static Images API, potentially with additional interactivity depending on the client's implementation.
+**MCP-UI clients** (Goose): Render the embedded iframe resource.
+
+**Standard clients**: Display the base64 image inline.
 
 ## Compatible Clients
 
