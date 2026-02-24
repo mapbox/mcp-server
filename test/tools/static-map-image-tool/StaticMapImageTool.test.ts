@@ -13,7 +13,7 @@ describe('StaticMapImageTool', () => {
     vi.restoreAllMocks();
   });
 
-  it('generates valid URL without fetching', async () => {
+  it('generates valid URL and fetches image', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest();
 
     const result = await new StaticMapImageTool({ httpRequest }).run({
@@ -23,8 +23,8 @@ describe('StaticMapImageTool', () => {
       style: 'mapbox/streets-v12'
     });
 
-    // Should not call httpRequest since we're just generating URL
-    expect(mockHttpRequest).toHaveBeenCalledTimes(0);
+    // Should call httpRequest once to fetch the image
+    expect(mockHttpRequest).toHaveBeenCalledTimes(1);
     expect(result.isError).toBe(false);
     expect(result.content[0].type).toBe('text');
   });
@@ -45,7 +45,7 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(1); // URL only
+      expect(result.content).toHaveLength(2); // URL text + image
       expect(result.content[0].type).toBe('text');
       const textContent = result.content[0] as { type: 'text'; text: string };
       expect(textContent.text).toContain(
@@ -618,11 +618,12 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(2); // URL + UIResource
+      expect(result.content).toHaveLength(3); // URL + image + UIResource
       expect(result.content[0].type).toBe('text');
-      expect(result.content[1].type).toBe('resource');
-      if (result.content[1].type === 'resource') {
-        expect(result.content[1].resource.uri).toMatch(
+      expect(result.content[1].type).toBe('image');
+      expect(result.content[2].type).toBe('resource');
+      if (result.content[2].type === 'resource') {
+        expect(result.content[2].resource.uri).toMatch(
           /^ui:\/\/mapbox\/static-map\//
         );
       }
@@ -644,7 +645,7 @@ describe('StaticMapImageTool', () => {
         });
 
         expect(result.isError).toBe(false);
-        expect(result.content).toHaveLength(1); // URL only, no UIResource
+        expect(result.content).toHaveLength(2); // URL + image, no UIResource
         expect(result.content[0].type).toBe('text');
       } finally {
         // Restore environment variable
@@ -667,14 +668,14 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      // UIResource is now at index 1 (after URL text)
-      if (result.content[1]?.type === 'resource') {
-        expect(result.content[1].resource.uri).toContain(
+      // UIResource is at index 2 (after URL text and base64 image)
+      if (result.content[2]?.type === 'resource') {
+        expect(result.content[2].resource.uri).toContain(
           '-122.4194,37.7749,13'
         );
         // Check that UIMetadata has preferred dimensions
-        if ('uiMetadata' in result.content[1].resource) {
-          const metadata = result.content[1].resource.uiMetadata as Record<
+        if ('uiMetadata' in result.content[2].resource) {
+          const metadata = result.content[2].resource.uiMetadata as Record<
             string,
             unknown
           >;
