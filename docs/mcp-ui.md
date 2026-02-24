@@ -45,22 +45,18 @@ This tool always returns:
 
 ## Compatible Clients
 
-### MCP Apps Compatible ✅
-
-- **Claude Desktop** - Interactive map panel with Fullscreen toggle
-- **VS Code with GitHub Copilot** - Interactive map panel with Fullscreen toggle
-- **Claude Code** - Interactive map panel with Fullscreen toggle
-
-### MCP-UI Compatible ✅
-
-- **[Goose](https://github.com/block/goose)** - AI agent framework with inline map visualization via embedded iframe
-
-### Standard (base64 image only)
-
-- **Cursor IDE** - Renders the base64 map image
-- **Other MCP clients** - Render the base64 map image
+| Client                                  | MCP Apps | MCP-UI |
+| --------------------------------------- | -------- | ------ |
+| Claude Desktop                          | ✅       |        |
+| VS Code with GitHub Copilot             | ✅       |        |
+| Claude Code                             | ✅       |        |
+| [Goose](https://github.com/block/goose) | ✅       | ✅     |
+| Cursor IDE                              |          |        |
+| Other clients                           |          |        |
 
 > **Note**: Client compatibility may change as adoption of both protocols grows. Check your client's documentation for the latest support status.
+
+All clients in the table receive the base64 image regardless of protocol support.
 
 ## How It Works
 
