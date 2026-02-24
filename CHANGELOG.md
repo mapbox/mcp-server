@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Dependencies
+
+- Upgrade `@modelcontextprotocol/ext-apps` from `^1.1.0` to `^1.1.1`
+
 ### New Features
 
 - **place_details_tool**: New tool to retrieve detailed information about a specific place by Mapbox ID
