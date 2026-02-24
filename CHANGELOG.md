@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.9.0 - 2026-02-24
+
 ### New Features
 
 - **place_details_tool**: New tool to retrieve detailed information about a specific place by Mapbox ID
