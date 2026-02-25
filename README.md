@@ -544,12 +544,15 @@ See [docs/tracing.md](./docs/tracing.md) for complete setup instructions includi
 
 ## Contributing
 
-We welcome contributions to the Mapbox MCP Server! Please review our standards and guidelines before contributing:
+We welcome contributions to the Mapbox MCP Server! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before submitting a pull request.
 
-- **[Engineering Standards (docs/engineering_standards.md)](./docs/engineering_standards.md)** - Complete code quality, testing, documentation, and collaboration standards for all contributors
+Full standards and guidelines:
+
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Getting started, PR process, quick reference
+- **[Engineering Standards (docs/engineering_standards.md)](./docs/engineering_standards.md)** - Complete code quality, testing, documentation, and collaboration standards
 - **[Claude Code Guide (CLAUDE.md)](./CLAUDE.md)** - Standards and patterns for contributors using Claude Code
-- **[AI Agent Instructions (AGENTS.md)](./AGENTS.md)** - Guide for general AI coding assistants (Cursor, Continue, Aider, etc.)
-- **[GitHub Copilot Guidelines](./.github/copilot-instructions.md)** - Best practices for using GitHub Copilot responsibly in this project
+- **[AI Agent Instructions (AGENTS.md)](./AGENTS.md)** - Guide for other AI coding assistants (Cursor, Continue, Aider, etc.)
+- **[GitHub Copilot Guidelines](./.github/copilot-instructions.md)** - Best practices for using GitHub Copilot responsibly
 
 ### Quick Start for Contributors
 

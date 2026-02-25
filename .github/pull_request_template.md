@@ -14,9 +14,10 @@
 
 ## Checklist
 
-- [ ] Code has been tested locally
-- [ ] Unit tests have been added or updated
-- [ ] Documentation has been updated if needed
+- [ ] Tests added or updated (`npm test` passes)
+- [ ] Lint passes (`npm run lint`)
+- [ ] `CHANGELOG.md` updated under `Unreleased`
+- [ ] Documentation updated if needed (README, JSDoc)
 
 ---
 
