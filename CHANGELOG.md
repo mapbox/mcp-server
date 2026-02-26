@@ -33,12 +33,6 @@
   - Made `country_code`, `country_code_alpha_3`, `region_code`, and `region_code_full` optional to match real API responses
   - Fixed `BaseTool` to pass the full Zod schema (not just `.shape`) to the MCP SDK so `.passthrough()` settings are preserved during structured-content validation
 
-# <<<<<<< HEAD
-
-> > > > > > > 05f71d8 (fix: return proper error when static map API returns non-2xx response)
-
-> > > > > > > 756d71c (fix: return proper error when static map API returns non-2xx response)
-
 ### Registry
 
 - Added hosted MCP endpoint (`https://mcp.mapbox.com/mcp`) to `server.json` `remotes` for registry discoverability
