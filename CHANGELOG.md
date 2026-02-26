@@ -1,5 +1,40 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **static_map_image_tool**: Return a proper error when the Mapbox Static Images API returns a non-2xx response instead of silently encoding the error JSON as a fake base64 image
+
+## 0.9.0 - 2026-02-24
+
+### New Features
+
+- **place_details_tool**: New tool to retrieve detailed information about a specific place by Mapbox ID
+  - Accepts a `mapbox_id` from search results (`search_and_geocode_tool`, `category_search_tool`, `reverse_geocode_tool`)
+  - Optional `attribute_sets` parameter: `basic`, `photos`, `visit` (hours, rating, price), `venue` (phone, website, social media)
+  - Optional `language` and `worldview` parameters
+  - Returns formatted text summary plus structured GeoJSON Feature content
+  - Opening hours formatted as readable per-day text (e.g. "Monday: 9 AM – 9 PM") rather than raw JSON
+
+- **Large Response Handling**: DirectionsTool now creates temporary resources for responses >50KB
+  - Prevents context window overflow on long-distance routes
+  - Returns summary with distance, duration, and resource URI
+  - Full route geometry available via MCP resource API
+  - Temporary resources expire after 30 minutes
+  - Resource URI format: `mapbox://temp/directions-{id}`
+  - Updated tool description to guide LLMs: use geometries="none" for planning, geometries="geojson" only for visualization
+  - Returns lightweight structured content for large responses (summary data without geometry) to satisfy output schema validation
+  - Updated `search-along-route` prompt to use `geometries="none"` and linear interpolation for route sampling instead of extracting coordinates from geometry
+
+### Bug Fixes
+
+- **search_and_geocode_tool**, **category_search_tool**: Include `mapbox_id` in formatted text output so models can chain directly to `place_details_tool` without re-fetching results as JSON
+- **category_search_tool**: Fix schema validation failures on Japanese and other international place data
+  - Added `.passthrough()` to all context sub-schemas to allow extra fields returned by the API
+  - Made `country_code`, `country_code_alpha_3`, `region_code`, and `region_code_full` optional to match real API responses
+  - Fixed `BaseTool` to pass the full Zod schema (not just `.shape`) to the MCP SDK so `.passthrough()` settings are preserved during structured-content validation
+
+> > > > > > > 05f71d8 (fix: return proper error when static map API returns non-2xx response)
+
 ### Registry
 
 - Added hosted MCP endpoint (`https://mcp.mapbox.com/mcp`) to `server.json` `remotes` for registry discoverability
