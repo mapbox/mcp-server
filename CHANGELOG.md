@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **static_map_image_tool**: Return a proper error when the Mapbox Static Images API returns a non-2xx response instead of silently encoding the error JSON as a fake base64 image
+
 ## 0.9.0 - 2026-02-24
 
 ### New Features
@@ -28,6 +32,12 @@
   - Added `.passthrough()` to all context sub-schemas to allow extra fields returned by the API
   - Made `country_code`, `country_code_alpha_3`, `region_code`, and `region_code_full` optional to match real API responses
   - Fixed `BaseTool` to pass the full Zod schema (not just `.shape`) to the MCP SDK so `.passthrough()` settings are preserved during structured-content validation
+
+# <<<<<<< HEAD
+
+> > > > > > > 05f71d8 (fix: return proper error when static map API returns non-2xx response)
+
+> > > > > > > 756d71c (fix: return proper error when static map API returns non-2xx response)
 
 ### Registry
 
