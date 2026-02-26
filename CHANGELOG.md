@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **static_map_image_tool**: Return a proper error when the Mapbox Static Images API returns a non-2xx response instead of silently encoding the error JSON as a fake base64 image
+
 ## 0.9.0 - 2026-02-24
 
 ### New Features
