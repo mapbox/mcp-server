@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.9.0 - 2026-02-24
+
 ### New Features
 
 - **place_details_tool**: New tool to retrieve detailed information about a specific place by Mapbox ID
@@ -8,6 +10,16 @@
   - Optional `language` and `worldview` parameters
   - Returns formatted text summary plus structured GeoJSON Feature content
   - Opening hours formatted as readable per-day text (e.g. "Monday: 9 AM – 9 PM") rather than raw JSON
+
+- **Large Response Handling**: DirectionsTool now creates temporary resources for responses >50KB
+  - Prevents context window overflow on long-distance routes
+  - Returns summary with distance, duration, and resource URI
+  - Full route geometry available via MCP resource API
+  - Temporary resources expire after 30 minutes
+  - Resource URI format: `mapbox://temp/directions-{id}`
+  - Updated tool description to guide LLMs: use geometries="none" for planning, geometries="geojson" only for visualization
+  - Returns lightweight structured content for large responses (summary data without geometry) to satisfy output schema validation
+  - Updated `search-along-route` prompt to use `geometries="none"` and linear interpolation for route sampling instead of extracting coordinates from geometry
 
 ### Bug Fixes
 
@@ -23,6 +35,7 @@
 
 ### Dependencies
 
+- Upgrade `@modelcontextprotocol/ext-apps` from `^1.1.0` to `^1.1.1`
 - Upgrade `@modelcontextprotocol/sdk` from 1.25.3 to 1.26.0
 - Regenerated SDK patch for version 1.26.0
 
@@ -40,20 +53,6 @@
   - Automatically replaces "Unreleased" with version and date
   - Adds new empty "Unreleased" section for next changes
   - Includes validation for version format and CHANGELOG structure
-
-## Unreleased
-
-### Features Added
-
-- **Large Response Handling**: DirectionsTool now creates temporary resources for responses >50KB
-  - Prevents context window overflow on long-distance routes
-  - Returns summary with distance, duration, and resource URI
-  - Full route geometry available via MCP resource API
-  - Temporary resources expire after 30 minutes
-  - Resource URI format: `mapbox://temp/directions-{id}`
-  - Updated tool description to guide LLMs: use geometries="none" for planning, geometries="geojson" only for visualization
-  - Returns lightweight structured content for large responses (summary data without geometry) to satisfy output schema validation
-  - Updated `search-along-route` prompt to use `geometries="none"` and linear interpolation for route sampling instead of extracting coordinates from geometry
 
 ## 0.8.3
 

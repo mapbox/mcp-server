@@ -96,15 +96,26 @@ When creating pull requests:
 When preparing a new release:
 
 ```bash
-# Prepare CHANGELOG for release (replaces "Unreleased" with version and date)
-npm run changelog:prepare-release 1.0.0
+# 1. Bump version in package.json
+npm version <new-version> --no-git-tag-version
 
-# Review changes, then commit and tag
-git add CHANGELOG.md
-git commit -m "Release v1.0.0"
-git tag v1.0.0
+# 2. Sync version to manifest.json and server.json
+npm run sync-manifest
+
+# 3. Prepare CHANGELOG (replaces "Unreleased" with version and date)
+npm run changelog:prepare-release <new-version>
+
+# 4. Update package-lock.json
+npm install
+
+# 5. Review changes, then commit and tag
+git add package.json package-lock.json manifest.json server.json CHANGELOG.md
+git commit -m "Release v<new-version>"
+git tag v<new-version>
 git push && git push --tags
 ```
+
+**Important**: The publisher workflow (`mcp-server-publisher`) validates that `package.json` and `server.json` versions match the release version. Skipping the version bump or manifest sync will cause publish failures.
 
 The `changelog:prepare-release` script automatically:
 

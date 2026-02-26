@@ -133,25 +133,27 @@ Access the complete list of available category IDs for use with the category sea
 - **Clients with native MCP resource support**: Use the `resources/read` MCP protocol method
 - **Clients without resource support**: Use the `resource_reader_tool` with the resource URI
 
-## MCP-UI Support
+## Rich Map Previews (MCP Apps & MCP-UI)
 
-This MCP server supports **MCP-UI**, an open specification that allows compatible clients to render interactive UI elements like embedded iframes. This provides a richer visual experience while maintaining full backwards compatibility with clients that don't support MCP-UI.
+The `static_map_image_tool` provides an interactive map preview panel in compatible clients, in addition to the base64 image that all clients receive.
 
-### What is MCP-UI?
+### MCP Apps
 
-MCP-UI enables tools to return interactive UI resources alongside their standard output. Compatible clients can render these as embedded iframes, while clients without MCP-UI support simply ignore them and use the standard output.
+This server implements the **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`), which renders a self-contained HTML app panel directly inside the chat. Supported clients show an interactive map with a Fullscreen toggle:
 
-### Supported Tools
+- **Claude Desktop** ✅
+- **VS Code with GitHub Copilot** ✅
+- **Claude Code** ✅
 
-- **Static Map Image Tool**: Returns both image data and an embeddable iframe URL for inline map visualization
+### MCP-UI
 
-### Benefits
+This server also supports **MCP-UI** (`@mcp-ui/server`), an earlier open specification for embedded iframe previews:
 
-- **Enhanced Experience**: Compatible clients (e.g., Goose) can display maps inline without leaving the chat
-- **Backwards Compatible**: Non-supporting clients (e.g., Claude Desktop) continue working unchanged
-- **No Configuration Required**: MCP-UI is enabled by default
+- **[Goose](https://github.com/block/goose)** ✅
 
-### Configuration
+### Backwards Compatibility
+
+All clients receive the base64-encoded map image regardless of protocol support — interactive previews are a progressive enhancement on top of the standard image response.
 
 MCP-UI is **enabled by default**. To disable it:
 
@@ -183,7 +185,7 @@ node dist/esm/index.js --disable-mcp-ui
 }
 ```
 
-**For more detailed information**, including compatible clients, technical implementation details, and troubleshooting, see the [MCP-UI documentation](./docs/mcp-ui.md).
+**For more detailed information**, including technical implementation details and troubleshooting, see the [MCP-UI documentation](./docs/mcp-ui.md).
 
 #### CLIENT_NEEDS_RESOURCE_FALLBACK
 
@@ -479,6 +481,30 @@ npx @modelcontextprotocol/inspector docker run -i --rm --env MAPBOX_ACCESS_TOKEN
 npx plop create-tool
 # provide tool name without suffix (e.g. Search)
 ```
+
+## Releasing a New Version
+
+```sh
+# 1. Bump version in package.json
+npm version <new-version> --no-git-tag-version
+
+# 2. Sync version to manifest.json and server.json
+npm run sync-manifest
+
+# 3. Prepare CHANGELOG (replaces "Unreleased" with version and date)
+npm run changelog:prepare-release <new-version>
+
+# 4. Update package-lock.json
+npm install
+
+# 5. Review changes, then commit and tag
+git add package.json package-lock.json manifest.json server.json CHANGELOG.md
+git commit -m "Release v<new-version>"
+git tag v<new-version>
+git push && git push --tags
+```
+
+**Important**: The publisher workflow validates that `package.json` and `server.json` versions match the release version. Skipping the version bump or manifest sync will cause publish failures.
 
 ## OpenTelemetry Tracing
 
