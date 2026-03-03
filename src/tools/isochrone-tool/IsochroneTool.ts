@@ -1,6 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -10,6 +11,7 @@ import {
   IsochroneResponseSchema,
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
+import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -150,6 +152,30 @@ export class IsochroneTool extends MapboxApiBasedTool<
 
     const data = await response.json();
 
+    // Check response size and conditionally create temporary resource
+    const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
+    const responseText = JSON.stringify(data, null, 2);
+    const responseSize = responseText.length;
+
+    if (responseSize > RESPONSE_SIZE_THRESHOLD) {
+      const resourceId = randomBytes(16).toString('hex');
+      const resourceUri = `mapbox://temp/isochrone-${resourceId}`;
+
+      temporaryResourceManager.create(resourceId, resourceUri, data, {
+        toolName: this.name,
+        size: responseSize
+      });
+
+      const contourCount =
+        (data as { features?: unknown[] }).features?.length ?? 0;
+      const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full GeoJSON if needed.`;
+
+      return {
+        content: [{ type: 'text', text: summaryText }],
+        isError: false
+      };
+    }
+
     // Validate the response against our schema
     const parsedData = IsochroneResponseSchema.safeParse(data);
 
@@ -171,7 +197,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
         `IsochroneTool: Response validation failed: ${parsedData.error.message}`
       );
       return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        content: [{ type: 'text', text: responseText }],
         structuredContent: data as Record<string, unknown>,
         isError: false
       };
