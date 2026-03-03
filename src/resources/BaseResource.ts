@@ -1,7 +1,10 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  type McpServer,
+  ResourceTemplate
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
   ServerRequest,
@@ -26,20 +29,37 @@ export abstract class BaseResource {
   installTo(server: McpServer): void {
     this.server = server;
 
-    server.registerResource(
-      this.name,
-      this.uri,
-      {
-        title: this.name,
-        description: this.description,
-        mimeType: this.mimeType
-      },
+    const metadata = {
+      title: this.name,
+      description: this.description,
+      mimeType: this.mimeType
+    };
 
-      (
-        uri: URL,
-        extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-      ) => this.read(uri.toString(), extra)
-    );
+    if (this.uri.includes('{')) {
+      // URI contains template variables — register as a ResourceTemplate so the
+      // SDK performs proper URI template matching (e.g. mapbox://temp/{id}).
+      const template = new ResourceTemplate(this.uri, { list: undefined });
+      server.registerResource(
+        this.name,
+        template,
+        metadata,
+        (
+          uri: URL,
+          _variables: Record<string, string | string[]>,
+          extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+        ) => this.read(uri.toString(), extra)
+      );
+    } else {
+      server.registerResource(
+        this.name,
+        this.uri,
+        metadata,
+        (
+          uri: URL,
+          extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+        ) => this.read(uri.toString(), extra)
+      );
+    }
   }
 
   /**
