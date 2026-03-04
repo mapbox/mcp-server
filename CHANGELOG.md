@@ -1,5 +1,10 @@
 ## Unreleased
 
+### Exports
+
+- Added `getAllTools` to `@mapbox/mcp-server/tools` subpath export for batch access to all registered tools
+- Added `getVersionInfo` and `VersionInfo` type to `@mapbox/mcp-server/utils` subpath export
+
 ### Removed
 
 - **version_tool**: Removed from the tool list — version info is now available as a resource at `mapbox://version` with zero token overhead
