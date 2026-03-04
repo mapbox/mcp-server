@@ -30,13 +30,17 @@ import { httpRequest } from '../utils/httpPipeline.js';
 
 // Export all resource classes
 export { CategoryListResource } from './category-list/CategoryListResource.js';
+export { VersionResource } from './version/VersionResource.js';
 
 // Import resource classes for instantiation
 import { CategoryListResource } from './category-list/CategoryListResource.js';
+import { VersionResource } from './version/VersionResource.js';
 
 // Export pre-configured resource instances with short, clean names
 /** Category list for place search (mapbox://categories) */
 export const categoryList = new CategoryListResource({ httpRequest });
+/** Server version info (mapbox://version) */
+export const version = new VersionResource();
 
 // Export registry functions for batch access
 export {
