@@ -47,7 +47,7 @@ For more information about Mapbox access tokens, see the [Mapbox documentation o
 For detailed setup instructions for different integrations, refer to the following guides:
 
 - [Claude Desktop Setup](./docs/claude-desktop-setup.md) - Instructions for configuring Claude Desktop to work with this MCP server
-- [Goose Setup](./docs/goose-setup.md) - Setting up Goose AI agent framework with MCP-UI support
+- [Goose Setup](./docs/goose-setup.md) - Setting up Goose AI agent framework
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
@@ -133,59 +133,24 @@ Access the complete list of available category IDs for use with the category sea
 - **Clients with native MCP resource support**: Use the `resources/read` MCP protocol method
 - **Clients without resource support**: Use the `resource_reader_tool` with the resource URI
 
-## Rich Map Previews (MCP Apps & MCP-UI)
+## Rich Map Previews (MCP Apps)
 
 The `static_map_image_tool` provides an interactive map preview panel in compatible clients, in addition to the base64 image that all clients receive.
-
-### MCP Apps
 
 This server implements the **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`), which renders a self-contained HTML app panel directly inside the chat. Supported clients show an interactive map with a Fullscreen toggle:
 
 - **Claude Desktop** ✅
 - **VS Code with GitHub Copilot** ✅
 - **Claude Code** ✅
-
-### MCP-UI
-
-This server also supports **MCP-UI** (`@mcp-ui/server`), an earlier open specification for embedded iframe previews:
-
 - **[Goose](https://github.com/block/goose)** ✅
-
-### Backwards Compatibility
 
 All clients receive the base64-encoded map image regardless of protocol support — interactive previews are a progressive enhancement on top of the standard image response.
 
-MCP-UI is **enabled by default**. To disable it:
+### Legacy: MCP-UI
 
-**Via Environment Variable:**
+This server also retains support for **MCP-UI** (`@mcp-ui/server`), an earlier open specification for embedded iframe previews. MCP Apps is the recommended protocol; MCP-UI support is kept for backwards compatibility.
 
-```bash
-ENABLE_MCP_UI=false npm run build
-```
-
-**Via Command-Line Flag:**
-
-```bash
-node dist/esm/index.js --disable-mcp-ui
-```
-
-**In Claude Desktop config:**
-
-```json
-{
-  "mcpServers": {
-    "mapbox": {
-      "command": "npx",
-      "args": ["-y", "@mapbox/mcp-server", "--disable-mcp-ui"],
-      "env": {
-        "MAPBOX_ACCESS_TOKEN": "your_token_here"
-      }
-    }
-  }
-}
-```
-
-**For more detailed information**, including technical implementation details and troubleshooting, see the [MCP-UI documentation](./docs/mcp-ui.md).
+MCP-UI is enabled by default. To disable it, pass `--disable-mcp-ui` as a command-line flag or set `ENABLE_MCP_UI=false`. See the [MCP-UI documentation](./docs/mcp-ui.md) for details.
 
 #### CLIENT_NEEDS_RESOURCE_FALLBACK
 
