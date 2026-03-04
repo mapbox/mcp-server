@@ -135,6 +135,7 @@ export const staticMapImage = new StaticMapImageTool({ httpRequest });
 
 // Export registry functions for batch access
 export {
+  getAllTools,
   getCoreTools,
   getElicitationTools,
   getResourceFallbackTools,
