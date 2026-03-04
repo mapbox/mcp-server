@@ -6,7 +6,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, vi } from 'vitest';
 import { CategoryListTool } from '../../../src/tools/category-list-tool/CategoryListTool.js';
-import { setupHttpRequest } from 'test/utils/httpPipelineUtils.js';
+import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 describe('CategoryListTool output schema registration', () => {
   it('should have an output schema defined', () => {

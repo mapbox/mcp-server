@@ -195,6 +195,31 @@ describe('StaticMapImageTool', () => {
     });
   });
 
+  it('returns error when Mapbox API returns non-2xx response', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      text: async () =>
+        JSON.stringify({
+          message: 'This API requires a token with styles:tiles scope.'
+        })
+    } as Partial<Response>);
+
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 600, height: 400 },
+      style: 'mapbox/streets-v12'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].type).toBe('text');
+    const textContent = result.content[0] as { type: 'text'; text: string };
+    expect(textContent.text).toContain('401');
+    expect(textContent.text).toContain('styles:tiles');
+  });
+
   it('validates size constraints', async () => {
     const { httpRequest } = setupHttpRequest();
     const tool = new StaticMapImageTool({ httpRequest });

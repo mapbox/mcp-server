@@ -112,6 +112,13 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
 
     // Fetch and encode image as base64 for clients without MCP Apps support
     const response = await this.httpRequest(url);
+    if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
+      return {
+        content: [{ type: 'text', text: errorMessage }],
+        isError: true
+      };
+    }
     const buffer = await response.arrayBuffer();
     const base64Data = Buffer.from(buffer).toString('base64');
     const isRasterStyle = input.style.includes('satellite');
