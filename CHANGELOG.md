@@ -19,6 +19,7 @@
 ### Dependencies
 
 - Upgrade `@mcp-ui/server` from `^5.13.1` to `^6.1.0` (security advisory on older versions)
+- Upgrade `@modelcontextprotocol/sdk` from `^1.26.0` to `^1.27.1` (security advisory on older versions); regenerated output-validation patch for new version
 
 ### Documentation
 
