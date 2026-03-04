@@ -16,6 +16,10 @@
   - `server.registerResource()` with a plain string registers an exact-match static resource; template URIs like `mapbox://temp/{id}` require a `ResourceTemplate` object
   - `BaseResource.installTo()` now detects `{` in the URI and wraps it with `ResourceTemplate` automatically
 
+### Dependencies
+
+- Upgrade `@mcp-ui/server` from `^5.13.1` to `^6.1.0` (security advisory on older versions)
+
 ### Documentation
 
 - Updated README: Goose added to MCP Apps supported clients; MCP-UI noted as legacy protocol
