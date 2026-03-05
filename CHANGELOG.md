@@ -1,5 +1,13 @@
 ## Unreleased
 
+### Removed
+
+- **version_tool**: Removed from the tool list — version info is now available as a resource at `mapbox://version` with zero token overhead
+
+### New Features
+
+- **mapbox://version resource**: Server version, git SHA, tag, and branch accessible via `readResource('mapbox://version')`
+
 ## 0.10.0 - 2026-03-04
 
 ### New Features

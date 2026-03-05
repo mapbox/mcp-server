@@ -23,7 +23,6 @@ import { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
 import { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
-import { VersionTool } from './version-tool/VersionTool.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
 /**
@@ -42,7 +41,6 @@ export const CORE_TOOLS = [
   new BufferTool(),
   new PointInPolygonTool(),
   new DistanceTool(),
-  new VersionTool(),
   new CategorySearchTool({ httpRequest }),
   new DirectionsTool({ httpRequest }),
   new IsochroneTool({ httpRequest }),
