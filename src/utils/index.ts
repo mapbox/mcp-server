@@ -45,3 +45,7 @@ export {
 
 // Export types
 export type { HttpRequest, TracedRequestInit } from './types.js';
+
+// Export version utilities
+export { getVersionInfo } from './versionUtils.js';
+export type { VersionInfo } from './versionUtils.js';

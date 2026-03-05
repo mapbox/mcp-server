@@ -27,9 +27,15 @@ describe('Package exports', () => {
     });
 
     it('should export registry functions', async () => {
-      const { getCoreTools, getElicitationTools, getResourceFallbackTools } =
-        await import('../src/tools/index.js');
+      const {
+        getAllTools,
+        getCoreTools,
+        getElicitationTools,
+        getResourceFallbackTools
+      } = await import('../src/tools/index.js');
 
+      expect(getAllTools).toBeDefined();
+      expect(typeof getAllTools).toBe('function');
       expect(getCoreTools).toBeDefined();
       expect(getElicitationTools).toBeDefined();
       expect(getResourceFallbackTools).toBeDefined();
@@ -139,6 +145,13 @@ describe('Package exports', () => {
       expect(policies).toHaveLength(2);
       expect(policies[0]).toBeInstanceOf(UserAgentPolicy);
       expect(policies[1]).toBeInstanceOf(RetryPolicy);
+    });
+
+    it('should export getVersionInfo', async () => {
+      const { getVersionInfo } = await import('../src/utils/index.js');
+
+      expect(getVersionInfo).toBeDefined();
+      expect(typeof getVersionInfo).toBe('function');
     });
 
     it('should allow using custom pipeline with tools', async () => {
