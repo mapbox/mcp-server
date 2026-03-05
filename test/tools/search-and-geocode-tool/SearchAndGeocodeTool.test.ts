@@ -391,4 +391,230 @@ describe('SearchAndGeocodeTool', () => {
       isError: true
     });
   });
+
+  describe('Elicitation behavior', () => {
+    const createMockServer = (elicitResponse?: {
+      action: 'accept' | 'decline';
+      content?: Record<string, unknown>;
+    }) => {
+      return {
+        server: {
+          elicitInput: vi.fn().mockResolvedValue(
+            elicitResponse || {
+              action: 'accept',
+              content: { selectedIndex: '0' }
+            }
+          ),
+          sendLoggingMessage: vi.fn()
+        },
+        registerTool: vi.fn()
+      } as any;
+    };
+
+    const createMultipleResultsResponse = (count: number) => ({
+      type: 'FeatureCollection',
+      features: Array.from({ length: count }, (_, i) => ({
+        type: 'Feature',
+        properties: {
+          name: `Springfield #${i + 1}`,
+          place_formatted: `Springfield, State ${i + 1}, United States`
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [-73.0 - i, 42.0 + i]
+        }
+      }))
+    });
+
+    it('triggers elicitation when 2-10 results returned', async () => {
+      const mockResponse = createMultipleResultsResponse(5);
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer();
+      tool.installTo(mockServer);
+
+      await tool.run({ q: 'Springfield' });
+
+      expect(mockServer.server.elicitInput).toHaveBeenCalledOnce();
+      expect(mockServer.server.elicitInput).toHaveBeenCalledWith({
+        mode: 'form',
+        message:
+          'Found 5 results for "Springfield". Please select the correct location:',
+        requestedSchema: expect.objectContaining({
+          type: 'object',
+          properties: expect.objectContaining({
+            selectedIndex: expect.objectContaining({
+              type: 'string',
+              title: 'Select Location',
+              enum: ['0', '1', '2', '3', '4'],
+              enumNames: expect.arrayContaining([
+                expect.stringContaining('Springfield #1'),
+                expect.stringContaining('Springfield #2')
+              ])
+            })
+          }),
+          required: ['selectedIndex']
+        })
+      });
+    });
+
+    it('does not trigger elicitation with only 1 result', async () => {
+      const mockResponse = createMultipleResultsResponse(1);
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer();
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ q: 'Paris' });
+
+      expect(mockServer.server.elicitInput).not.toHaveBeenCalled();
+      expect(result.isError).toBe(false);
+      expect((result.structuredContent as any).features).toHaveLength(1);
+    });
+
+    it('does not trigger elicitation with more than 10 results', async () => {
+      const mockResponse = createMultipleResultsResponse(15);
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer();
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ q: 'Main Street' });
+
+      expect(mockServer.server.elicitInput).not.toHaveBeenCalled();
+      expect(result.isError).toBe(false);
+      expect((result.structuredContent as any).features).toHaveLength(15);
+    });
+
+    it('returns only selected result when user accepts elicitation', async () => {
+      const mockResponse = createMultipleResultsResponse(3);
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer({
+        action: 'accept',
+        content: { selectedIndex: '1' } // Select second item
+      });
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ q: 'Springfield' });
+
+      expect(result.isError).toBe(false);
+      const features = (result.structuredContent as any).features;
+      expect(features).toHaveLength(1);
+      expect(features[0].properties.name).toBe('Springfield #2');
+    });
+
+    it('returns all results when user declines elicitation', async () => {
+      const mockResponse = createMultipleResultsResponse(4);
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer({
+        action: 'decline'
+      });
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ q: 'Springfield' });
+
+      expect(result.isError).toBe(false);
+      const features = (result.structuredContent as any).features;
+      expect(features).toHaveLength(4);
+    });
+
+    it('falls back to all results when elicitation fails', async () => {
+      const mockResponse = createMultipleResultsResponse(3);
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = {
+        server: {
+          elicitInput: vi
+            .fn()
+            .mockRejectedValue(new Error('Elicitation not supported')),
+          sendLoggingMessage: vi.fn()
+        },
+        registerTool: vi.fn()
+      } as any;
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ q: 'Springfield' });
+
+      expect(result.isError).toBe(false);
+      const features = (result.structuredContent as any).features;
+      expect(features).toHaveLength(3);
+    });
+
+    it('handles elicitation gracefully when server is not installed', async () => {
+      const mockResponse = createMultipleResultsResponse(5);
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      // Don't install to server - tool.server will be null
+
+      const result = await tool.run({ q: 'Springfield' });
+
+      expect(result.isError).toBe(false);
+      const features = (result.structuredContent as any).features;
+      expect(features).toHaveLength(5);
+    });
+
+    it('builds correct enumNames with location labels', async () => {
+      const mockResponse = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {
+              name: 'Springfield',
+              place_formatted: 'Springfield, Illinois, United States'
+            },
+            geometry: { type: 'Point', coordinates: [-89.6501, 39.7817] }
+          },
+          {
+            type: 'Feature',
+            properties: {
+              name: 'Springfield',
+              full_address: '123 Main St, Springfield, MA 01103'
+            },
+            geometry: { type: 'Point', coordinates: [-72.5301, 42.1015] }
+          }
+        ]
+      };
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer();
+      tool.installTo(mockServer);
+
+      await tool.run({ q: 'Springfield' });
+
+      const elicitCall = mockServer.server.elicitInput.mock.calls[0][0];
+      expect(
+        elicitCall.requestedSchema.properties.selectedIndex.enumNames
+      ).toEqual([
+        'Springfield - Springfield, Illinois, United States',
+        'Springfield - 123 Main St, Springfield, MA 01103'
+      ]);
+    });
+  });
 });
