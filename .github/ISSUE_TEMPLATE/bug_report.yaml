@@ -1,0 +1,63 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug] <brief summary>"
+labels: [bug, needs-triage]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: "The tool returned an error when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Configure the MCP server with ...
+        2. Ask the AI assistant to ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: "The tool should have returned..."
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `npx @mapbox/mcp-server --version` or package version
+      placeholder: "0.4.7"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP Client
+      description: Which AI assistant or MCP client are you using?
+      options:
+        - Claude Desktop
+        - Claude Code
+        - Cursor
+        - VS Code (GitHub Copilot)
+        - Other
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Context
+      description: Logs, screenshots, or anything else that might help.
+    validations:
+      required: false

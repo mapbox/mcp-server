@@ -1,0 +1,42 @@
+name: Feature Request
+description: Suggest a new tool, resource, prompt, or improvement
+title: "[Feature] <brief summary>"
+labels: [enhancement, needs-triage]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - New tool
+        - New resource
+        - New prompt
+        - Improvement to existing tool/resource
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation
+      description: What use case or gap does this address?
+      placeholder: "When I ask Claude to..., there's no good way to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: What should the new tool/resource/prompt do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Context
+    validations:
+      required: false
