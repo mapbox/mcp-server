@@ -7,6 +7,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
+import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 
 describe('StaticMapImageTool', () => {
   afterEach(() => {
@@ -193,6 +194,38 @@ describe('StaticMapImageTool', () => {
     ).resolves.toMatchObject({
       isError: true
     });
+  });
+
+  it('stores large images as temporary resources instead of inlining base64', async () => {
+    // Simulate a response larger than the 700KB inline threshold
+    const largeBuffer = new ArrayBuffer(750 * 1024);
+    const { httpRequest } = setupHttpRequest({
+      arrayBuffer: async () => largeBuffer
+    } as Partial<Response>);
+
+    temporaryResourceManager.clear();
+
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 1280, height: 900 },
+      style: 'mapbox/streets-v12'
+    });
+
+    expect(result.isError).toBe(false);
+    // Should not contain an inline image
+    expect(result.content.some((c) => c.type === 'image')).toBe(false);
+    // Should contain a text item with the resource URI
+    const resourceText = result.content.find(
+      (c) =>
+        c.type === 'text' &&
+        (c as { type: 'text'; text: string }).text.includes(
+          'mapbox://temp/static-map-'
+        )
+    );
+    expect(resourceText).toBeDefined();
+    // Temp resource should be registered
+    expect(temporaryResourceManager.count()).toBe(1);
   });
 
   it('returns error when Mapbox API returns non-2xx response', async () => {
