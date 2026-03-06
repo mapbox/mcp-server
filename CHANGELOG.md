@@ -13,6 +13,13 @@
 
 - **mapbox://version resource**: Server version, git SHA, tag, and branch accessible via `readResource('mapbox://version')`
 
+### Bug Fixes
+
+- **static_map_image_tool**: Large images (>700KB raw) are now stored as temporary resources instead of being inlined as base64, preventing the 1MB tool result limit from being exceeded in Claude Desktop
+  - Image stored at `mapbox://temp/static-map-{id}`, retrievable via `resources/read` with a 30-minute TTL
+  - `TemporaryResourceManager` now enforces a 50MB byte cap with oldest-first eviction to prevent unbounded memory growth
+  - `TemporaryDataResource` now serves image mime types as blob content
+
 ## 0.10.0 - 2026-03-04
 
 ### New Features
