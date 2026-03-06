@@ -49,8 +49,6 @@ export { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js
 export { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
 export { SimplifyTool } from './simplify-tool/SimplifyTool.js';
 export { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
-export { VersionTool } from './version-tool/VersionTool.js';
-
 // Import tool classes for instantiation
 import { AreaTool } from './area-tool/AreaTool.js';
 import { BearingTool } from './bearing-tool/BearingTool.js';
@@ -72,8 +70,6 @@ import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js
 import { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
 import { SimplifyTool } from './simplify-tool/SimplifyTool.js';
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
-import { VersionTool } from './version-tool/VersionTool.js';
-
 // Export pre-configured tool instances with short, clean names
 // Note: Import path already indicates these are tools, so we omit the "Tool" suffix
 
@@ -137,11 +133,9 @@ export const simplify = new SimplifyTool();
 /** Generate static map images */
 export const staticMapImage = new StaticMapImageTool({ httpRequest });
 
-/** Get version information */
-export const version = new VersionTool();
-
 // Export registry functions for batch access
 export {
+  getAllTools,
   getCoreTools,
   getElicitationTools,
   getResourceFallbackTools,

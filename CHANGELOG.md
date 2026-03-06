@@ -1,8 +1,42 @@
 ## Unreleased
 
+### Exports
+
+- Added `getAllTools` to `@mapbox/mcp-server/tools` subpath export for batch access to all registered tools
+- Added `getVersionInfo` and `VersionInfo` type to `@mapbox/mcp-server/utils` subpath export
+
+### Removed
+
+- **version_tool**: Removed from the tool list — version info is now available as a resource at `mapbox://version` with zero token overhead
+
+### New Features
+
+- **mapbox://version resource**: Server version, git SHA, tag, and branch accessible via `readResource('mapbox://version')`
+
+## 0.10.0 - 2026-03-04
+
+### New Features
+
+- **IsochroneTool large-response handling**: Isochrone responses exceeding 50KB are now stored as temporary resources, consistent with DirectionsTool (#131)
+  - Returns a compact summary with contour count and resource URI instead of the full GeoJSON
+  - Full GeoJSON retrievable via `readResource('mapbox://temp/isochrone-{id}')` with 30-minute TTL
+  - Normal-sized responses are unaffected
+
 ### Bug Fixes
 
-- **static_map_image_tool**: Return a proper error when the Mapbox Static Images API returns a non-2xx response instead of silently encoding the error JSON as a fake base64 image
+- **static_map_image_tool**: Return a proper error when the Mapbox Static Images API returns a non-2xx response instead of silently encoding the error JSON as a fake base64 image (#130)
+- **BaseResource URI template registration**: Fixed `TemporaryDataResource` (and any resource with `{` in its URI) never matching `readResource` calls (#133)
+  - `server.registerResource()` with a plain string registers an exact-match static resource; template URIs like `mapbox://temp/{id}` require a `ResourceTemplate` object
+  - `BaseResource.installTo()` now detects `{` in the URI and wraps it with `ResourceTemplate` automatically
+
+### Dependencies
+
+- Upgrade `@mcp-ui/server` from `^5.13.1` to `^6.1.0` (security advisory on older versions)
+- Upgrade `@modelcontextprotocol/sdk` from `^1.26.0` to `^1.27.1` (security advisory on older versions); regenerated output-validation patch for new version
+
+### Documentation
+
+- Updated README: Goose added to MCP Apps supported clients; MCP-UI noted as legacy protocol
 
 ## 0.9.0 - 2026-02-24
 
