@@ -67,13 +67,22 @@ describe('Tool Annotations', () => {
       'version_tool',
       'distance_tool',
       'point_in_polygon_tool',
+      'points_within_polygon_tool',
       'bearing_tool',
       'midpoint_tool',
       'centroid_tool',
       'area_tool',
       'bbox_tool',
       'buffer_tool',
-      'simplify_tool'
+      'simplify_tool',
+      'union_tool',
+      'nearest_point_tool',
+      'intersect_tool',
+      'difference_tool',
+      'destination_tool',
+      'length_tool',
+      'nearest_point_on_line_tool',
+      'convex_tool'
     ];
     const apiTools = tools.filter((tool) => !offlineTools.includes(tool.name));
 
@@ -89,13 +98,22 @@ describe('Tool Annotations', () => {
         'version_tool',
         'distance_tool',
         'point_in_polygon_tool',
+        'points_within_polygon_tool',
         'bearing_tool',
         'midpoint_tool',
         'centroid_tool',
         'area_tool',
         'bbox_tool',
         'buffer_tool',
-        'simplify_tool'
+        'simplify_tool',
+        'union_tool',
+        'nearest_point_tool',
+        'intersect_tool',
+        'difference_tool',
+        'destination_tool',
+        'length_tool',
+        'nearest_point_on_line_tool',
+        'convex_tool'
       ].includes(tool.name)
     );
 

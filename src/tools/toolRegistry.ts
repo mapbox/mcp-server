@@ -2,6 +2,15 @@
 // Licensed under the MIT License.
 
 // INSERT NEW TOOL IMPORT HERE
+import { PointsWithinPolygonTool } from './points-within-polygon-tool/PointsWithinPolygonTool.js';
+import { UnionTool } from './union-tool/UnionTool.js';
+import { NearestPointTool } from './nearest-point-tool/NearestPointTool.js';
+import { IntersectTool } from './intersect-tool/IntersectTool.js';
+import { DifferenceTool } from './difference-tool/DifferenceTool.js';
+import { DestinationTool } from './destination-tool/DestinationTool.js';
+import { LengthTool } from './length-tool/LengthTool.js';
+import { NearestPointOnLineTool } from './nearest-point-on-line-tool/NearestPointOnLineTool.js';
+import { ConvexTool } from './convex-tool/ConvexTool.js';
 import { PlaceDetailsTool } from './place-details-tool/PlaceDetailsTool.js';
 import { SimplifyTool } from './simplify-tool/SimplifyTool.js';
 import { BoundingBoxTool } from './bounding-box-tool/BoundingBoxTool.js';
@@ -31,6 +40,15 @@ import { httpRequest } from '../utils/httpPipeline.js';
  */
 export const CORE_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
+  new PointsWithinPolygonTool(),
+  new UnionTool(),
+  new NearestPointTool(),
+  new IntersectTool(),
+  new DifferenceTool(),
+  new DestinationTool(),
+  new LengthTool(),
+  new NearestPointOnLineTool(),
+  new ConvexTool(),
   new PlaceDetailsTool({ httpRequest }),
   new SimplifyTool(),
   new BoundingBoxTool(),

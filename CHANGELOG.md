@@ -1,5 +1,18 @@
 ## Unreleased
 
+### New Features
+
+- **9 new offline Turf.js geometry tools** (no API key required, instant results):
+  - **`points_within_polygon_tool`**: Batch-test multiple points against a polygon in one call — replaces N `point_in_polygon_tool` calls for delivery zone validation, fleet geofencing, etc.
+  - **`union_tool`**: Merge two or more polygons into a single unified geometry; useful for combining service areas, isochrones, or delivery zones
+  - **`nearest_point_tool`**: Find the nearest point in a collection to a target — replaces calling `distance_tool` for each candidate
+  - **`intersect_tool`**: Find the intersection geometry of two polygons (area they share in common)
+  - **`difference_tool`**: Subtract one polygon from another ("what is in zone A but not zone B?")
+  - **`destination_tool`**: Calculate a destination point given origin, bearing, and distance
+  - **`length_tool`**: Measure the total length of a line/route without a routing API call
+  - **`nearest_point_on_line_tool`**: Snap a point to the nearest position on a line or route
+  - **`convex_tool`**: Compute the convex hull of a set of points
+
 ### Exports
 
 - Added `getAllTools` to `@mapbox/mcp-server/tools` subpath export for batch access to all registered tools
