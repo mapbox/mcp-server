@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 99.0.0-dev - 2026-03-10
+
 ### Exports
 
 - Added `getAllTools` to `@mapbox/mcp-server/tools` subpath export for batch access to all registered tools
