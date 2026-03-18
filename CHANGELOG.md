@@ -1,5 +1,12 @@
 ## Unreleased
 
+### New Features
+
+- **DirectionsTool two-stage elicitations**: When multiple routes are returned, users are now prompted to select their preferred route before receiving the full result (#99)
+  - Stage 1 (existing): Elicits routing preferences (travel mode, avoid tolls/ferries, route count) before making the API call
+  - Stage 2 (new): Presents available routes with duration, distance, road names, traffic conditions, and incident info; returns only the selected route
+  - Falls back gracefully if elicitations are not supported or the user declines
+
 ### Exports
 
 - Added `getAllTools` to `@mapbox/mcp-server/tools` subpath export for batch access to all registered tools
