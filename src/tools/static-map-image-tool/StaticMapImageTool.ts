@@ -112,10 +112,8 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       .split('/')
       .map(encodeURIComponent)
       .join('/');
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
-
-    // Public URL without credentials for returning to the model
     const publicUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
+    const url = `${publicUrl}?access_token=${accessToken}`;
 
     // Fetch and encode image as base64 for clients without MCP Apps support
     const response = await this.httpRequest(url);
