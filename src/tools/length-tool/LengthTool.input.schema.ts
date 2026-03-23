@@ -16,7 +16,7 @@ export const LengthInputSchema = z.object({
 
   units: z
     .enum(['kilometers', 'miles', 'meters', 'feet'])
-    .default('kilometers')
+    .default('meters')
     .describe('Units for the length measurement')
 });
 

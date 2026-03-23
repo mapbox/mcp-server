@@ -23,7 +23,7 @@ export const DestinationInputSchema = z.object({
 
   units: z
     .enum(['kilometers', 'miles', 'meters', 'feet'])
-    .default('kilometers')
+    .default('meters')
     .describe('Units for the distance')
 });
 

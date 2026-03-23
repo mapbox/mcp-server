@@ -23,7 +23,7 @@ export const NearestPointInputSchema = z.object({
 
   units: z
     .enum(['kilometers', 'miles', 'meters', 'feet'])
-    .default('kilometers')
+    .default('meters')
     .describe('Distance units for the result')
 });
 
