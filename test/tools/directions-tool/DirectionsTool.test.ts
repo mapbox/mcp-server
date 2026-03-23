@@ -1064,4 +1064,155 @@ describe('DirectionsTool', () => {
       isError: true
     });
   });
+
+  describe('elicitation behavior', () => {
+    it('does not elicit when exclude parameter is already provided', async () => {
+      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+
+      await new DirectionsTool({ httpRequest }).run({
+        coordinates: [
+          { longitude: -74.006, latitude: 40.7128 },
+          { longitude: -71.0589, latitude: 42.3601 }
+        ],
+        exclude: 'toll'
+      });
+
+      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      // Should use the provided exclude parameter
+      expect(calledUrl).toContain('exclude=toll');
+      // Should not modify alternatives (defaults to false)
+      expect(calledUrl).toContain('alternatives=false');
+    });
+
+    it('does not elicit when more than 2 coordinates provided', async () => {
+      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+
+      await new DirectionsTool({ httpRequest }).run({
+        coordinates: [
+          { longitude: -74.006, latitude: 40.7128 },
+          { longitude: -73.9, latitude: 41.0 },
+          { longitude: -71.0589, latitude: 42.3601 }
+        ]
+      });
+
+      const calledUrl = mockHttpRequest.mock.calls[0][0];
+      // Should not set alternatives=true (elicitation skipped for multi-waypoint)
+      expect(calledUrl).toContain('alternatives=false');
+    });
+
+    it('returns multiple routes when alternatives=true and no elicitation', async () => {
+      const mockResponse = {
+        code: 'Ok',
+        routes: [
+          {
+            duration: 17280,
+            distance: 366800,
+            legs: [
+              {
+                summary: 'I-84 East, I-90 East',
+                duration: 17280,
+                distance: 366800,
+                steps: []
+              }
+            ],
+            leg_summaries: ['I-84 East, I-90 East'],
+            congestion_information: {
+              length_low: 300000,
+              length_moderate: 50000,
+              length_heavy: 16800,
+              length_severe: 0
+            },
+            incidents_summary: [{ type: 'construction' }]
+          },
+          {
+            duration: 17880,
+            distance: 348000,
+            legs: [
+              {
+                summary: 'CT-15 North, I-90 East',
+                duration: 17880,
+                distance: 348000,
+                steps: []
+              }
+            ],
+            leg_summaries: ['CT-15 North, I-90 East'],
+            congestion_information: {
+              length_low: 280000,
+              length_moderate: 60000,
+              length_heavy: 8000,
+              length_severe: 0
+            },
+            incidents_summary: [
+              { type: 'construction' },
+              { type: 'accident' },
+              { type: 'construction' },
+              { type: 'construction' },
+              { type: 'construction' }
+            ]
+          }
+        ],
+        waypoints: []
+      };
+
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const result = await new DirectionsTool({ httpRequest }).run({
+        coordinates: [
+          { longitude: -74.006, latitude: 40.7128 },
+          { longitude: -71.0589, latitude: 42.3601 }
+        ],
+        alternatives: true
+      });
+
+      expect(result.isError).toBe(false);
+      // Without elicitation, should return all routes
+      const response = JSON.parse(
+        (result.content[0] as { type: 'text'; text: string }).text
+      );
+      expect(response.routes).toHaveLength(2);
+    });
+
+    it('returns single route when only one route available (no Stage 2 elicitation)', async () => {
+      const mockResponse = {
+        code: 'Ok',
+        routes: [
+          {
+            duration: 17280,
+            distance: 366800,
+            legs: [
+              {
+                summary: 'I-84 East, I-90 East',
+                duration: 17280,
+                distance: 366800,
+                steps: []
+              }
+            ],
+            leg_summaries: ['I-84 East, I-90 East']
+          }
+        ],
+        waypoints: []
+      };
+
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const result = await new DirectionsTool({ httpRequest }).run({
+        coordinates: [
+          { longitude: -74.006, latitude: 40.7128 },
+          { longitude: -71.0589, latitude: 42.3601 }
+        ],
+        alternatives: true
+      });
+
+      expect(result.isError).toBe(false);
+      // Should return the single route
+      const response = JSON.parse(
+        (result.content[0] as { type: 'text'; text: string }).text
+      );
+      expect(response.routes).toHaveLength(1);
+    });
+  });
 });
