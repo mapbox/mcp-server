@@ -53,7 +53,7 @@ describe('StaticMapImageTool', () => {
       );
       expect(textContent.text).toContain('-74.006,40.7128,10');
       expect(textContent.text).toContain('800x600');
-      expect(textContent.text).toContain('access_token=');
+      expect(textContent.text).not.toContain('access_token=');
     } finally {
       // Restore environment variable
       if (originalEnv !== undefined) {
@@ -152,7 +152,7 @@ describe('StaticMapImageTool', () => {
     expect(url).toContain('styles/v1/mapbox/dark-v10/static/');
     expect(url).toContain('-122.4194,37.7749,15');
     expect(url).toContain('1024x768');
-    expect(url).toContain('access_token=');
+    expect(url).not.toContain('access_token=');
   });
 
   it('uses default style when not specified', async () => {
@@ -166,6 +166,30 @@ describe('StaticMapImageTool', () => {
 
     const url = (result.content[0] as { type: 'text'; text: string }).text;
     expect(url).toContain('styles/v1/mapbox/streets-v12/static/');
+  });
+
+  it('rejects style values with path traversal patterns', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const tool = new StaticMapImageTool({ httpRequest });
+
+    const traversalPayloads = [
+      '../../tokens/v2',
+      '../styles',
+      'mapbox/../../../tokens',
+      '/etc/passwd',
+      'mapbox/streets-v12/../../tokens'
+    ];
+
+    for (const style of traversalPayloads) {
+      await expect(
+        tool.run({
+          center: { longitude: -74, latitude: 40 },
+          zoom: 10,
+          size: { width: 600, height: 400 },
+          style
+        })
+      ).resolves.toMatchObject({ isError: true });
+    }
   });
 
   it('validates coordinate constraints', async () => {

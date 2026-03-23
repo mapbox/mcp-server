@@ -108,7 +108,12 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     }
 
     const density = input.highDensity ? '@2x' : '';
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${input.style}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}?access_token=${accessToken}`;
+    const encodedStyle = input.style
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/');
+    const publicUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
+    const url = `${publicUrl}?access_token=${accessToken}`;
 
     // Fetch and encode image as base64 for clients without MCP Apps support
     const response = await this.httpRequest(url);
@@ -125,10 +130,11 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
     // content[0] MUST be the URL text — MCP Apps UI finds it via content.find(c => c.type === 'text')
+    // Use public URL (without credentials) to avoid leaking the access token
     const content: CallToolResult['content'] = [
       {
         type: 'text',
-        text: url
+        text: publicUrl
       },
       {
         type: 'image',
