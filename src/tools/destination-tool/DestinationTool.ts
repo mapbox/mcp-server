@@ -18,9 +18,10 @@ export class DestinationTool extends BaseTool<
 > {
   readonly name = 'destination_tool';
   readonly description =
-    'Calculate a destination point given a starting point, bearing, and distance. ' +
+    'Calculate a destination point given a starting point, bearing, and distance using geodesic (great-circle) straight-line offset. ' +
     'Useful for "find a point 5km north of X", constructing search offsets, or computing waypoints. ' +
     'Bearing: 0=north, 90=east, 180/-180=south, -90=west. ' +
+    'Note: this calculates a straight-line geographic offset, not road-network distance. ' +
     'Works offline without API calls.';
 
   readonly annotations = {
