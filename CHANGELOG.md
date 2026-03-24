@@ -1,5 +1,10 @@
 ## Unreleased
 
+### Security
+
+- **static_map_image_tool**: Validate `style` parameter against `username/style-id` format to prevent path traversal attacks where a crafted style value (e.g., `../../tokens/v2`) could escape the `/styles/v1/` URL path and access arbitrary Mapbox API endpoints using the server operator's token
+- **static_map_image_tool**: Remove access token from URL returned in text content — the token is only used internally for the HTTP fetch and the MCP Apps iframe URL, not exposed to the model context
+
 ### New Features
 
 - **9 new offline Turf.js geometry tools** (no API key required, instant results):

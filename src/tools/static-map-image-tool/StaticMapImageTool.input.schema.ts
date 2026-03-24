@@ -339,10 +339,14 @@ export const StaticMapImageInputSchema = z.object({
     ),
   style: z
     .string()
+    .regex(
+      /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/,
+      'Style must be in the format username/style-id using only alphanumeric characters, hyphens, and underscores (e.g., mapbox/streets-v12)'
+    )
     .optional()
     .default('mapbox/streets-v12')
     .describe(
-      'Mapbox style ID (e.g., mapbox/streets-v12, mapbox/satellite-v9, mapbox/dark-v11)'
+      'Mapbox style ID in the format username/style-id (e.g., mapbox/streets-v12, mapbox/satellite-v9, mapbox/dark-v11)'
     ),
   highDensity: z
     .boolean()
