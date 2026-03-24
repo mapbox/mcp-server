@@ -89,6 +89,45 @@ describe('IntersectTool', () => {
     expect(result.structuredContent?.geometry).not.toBeNull();
   });
 
+  it('respects holes when computing intersection', async () => {
+    // polygon1: [0,0]→[4,4] with a hole at [1,1]→[3,3]
+    const polygonWithHole = [
+      [
+        [0, 0],
+        [4, 0],
+        [4, 4],
+        [0, 4],
+        [0, 0]
+      ],
+      [
+        [1, 1],
+        [3, 1],
+        [3, 3],
+        [1, 3],
+        [1, 1]
+      ]
+    ];
+    // polygon2: covers the hole area [1,1]→[3,3]
+    const smallSquare = [
+      [
+        [1, 1],
+        [3, 1],
+        [3, 3],
+        [1, 3],
+        [1, 1]
+      ]
+    ];
+
+    const result = await tool.run({
+      polygon1: polygonWithHole,
+      polygon2: smallSquare
+    });
+
+    expect(result.isError).toBe(false);
+    // The hole excludes that area from polygon1, so no shared area
+    expect(result.structuredContent?.intersects).toBe(false);
+  });
+
   it('text content describes intersection result', async () => {
     const overlapping = await tool.run({
       polygon1: [

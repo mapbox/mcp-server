@@ -100,6 +100,44 @@ describe('PointsWithinPolygonTool', () => {
     expect(result.structuredContent?.count).toBe(1);
   });
 
+  it('excludes points that fall inside a hole', async () => {
+    // Outer ring: [0,0] → [4,4]; inner ring (hole): [1,1] → [3,3]
+    const polygonWithHole = [
+      [
+        [0, 0],
+        [4, 0],
+        [4, 4],
+        [0, 4],
+        [0, 0]
+      ],
+      [
+        [1, 1],
+        [3, 1],
+        [3, 3],
+        [1, 3],
+        [1, 1]
+      ]
+    ];
+
+    const result = await tool.run({
+      points: [
+        { longitude: 0.5, latitude: 0.5 }, // inside outer ring, outside hole → inside
+        { longitude: 2, latitude: 2 }, // inside hole → NOT inside
+        { longitude: 3.5, latitude: 3.5 } // inside outer ring, outside hole → inside
+      ],
+      polygon: polygonWithHole
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent?.count).toBe(2);
+    expect(result.structuredContent?.total).toBe(3);
+    // The hole point (2,2) should not be returned
+    const lngs = result.structuredContent?.points_within.map(
+      (p) => p.longitude
+    );
+    expect(lngs).not.toContain(2);
+  });
+
   it('rejects invalid input', async () => {
     const result = await tool.run({
       points: [{ longitude: 200, latitude: 0 }], // longitude out of range

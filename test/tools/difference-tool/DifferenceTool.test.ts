@@ -88,6 +88,46 @@ describe('DifferenceTool', () => {
     expect(result.structuredContent?.geometry).not.toBeNull();
   });
 
+  it('respects holes in polygon1', async () => {
+    // polygon1: [0,0]→[4,4] with a hole at [1,1]→[3,3]
+    const polygonWithHole = [
+      [
+        [0, 0],
+        [4, 0],
+        [4, 4],
+        [0, 4],
+        [0, 0]
+      ],
+      [
+        [1, 1],
+        [3, 1],
+        [3, 3],
+        [1, 3],
+        [1, 1]
+      ]
+    ];
+    // polygon2: covers only the top-right corner [3,3]→[4,4]
+    const corner = [
+      [
+        [3, 3],
+        [4, 3],
+        [4, 4],
+        [3, 4],
+        [3, 3]
+      ]
+    ];
+
+    const result = await tool.run({
+      polygon1: polygonWithHole,
+      polygon2: corner
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent?.has_difference).toBe(true);
+    // Result should still have a hole in it
+    expect(result.structuredContent?.geometry).not.toBeNull();
+  });
+
   it('text content describes the result', async () => {
     const withDiff = await tool.run({
       polygon1: [
