@@ -102,7 +102,8 @@ const server = new McpServer(
         listChanged: true // Advertise support for dynamic tool registration (ready for future capability-dependent tools)
       },
       resources: {},
-      prompts: {}
+      prompts: {},
+      logging: {}
     }
   }
 );
@@ -181,6 +182,7 @@ server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
 async function main() {
   // Initialize OpenTelemetry tracing if not in test mode
   let tracingInitialized = false;
+  let tracingError: Error | null = null;
   if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
     try {
       await initializeTracing();
@@ -219,16 +221,24 @@ async function main() {
         span.end();
       }
     } catch (error) {
-      // Tracing initialization failed, log it but continue without tracing
-      server.server.sendLoggingMessage({
-        level: 'warning',
-        data: `Failed to initialize tracing: ${error instanceof Error ? error.message : String(error)}`
-      });
+      // Store the error to log after connection is established
+      tracingError = error instanceof Error ? error : new Error(String(error));
     }
   }
 
+  // Start receiving messages on stdin and sending messages on stdout
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+
+  // Now that we're connected, send all the logging messages
+
   // Log tracing status and configuration
-  if (tracingInitialized) {
+  if (tracingError) {
+    server.server.sendLoggingMessage({
+      level: 'warning',
+      data: `Failed to initialize tracing: ${tracingError.message}`
+    });
+  } else if (tracingInitialized) {
     const tracingConfig = {
       status: 'enabled',
       endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'not set',
@@ -272,10 +282,6 @@ async function main() {
     level: 'debug',
     data: JSON.stringify(relevantEnvVars, null, 2)
   });
-
-  // Start receiving messages on stdin and sending messages on stdout
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
 
   // After connection, dynamically register capability-dependent tools
   const clientCapabilities = server.server.getClientCapabilities();
