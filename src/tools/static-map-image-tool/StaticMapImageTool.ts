@@ -1,7 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
@@ -10,6 +10,12 @@ import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js'
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+
+// Images larger than this threshold are stored as temporary resources instead
+// of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
+// result limit. base64 adds ~33% overhead, so 700KB raw ≈ 933KB encoded.
+const IMAGE_INLINE_THRESHOLD = 700 * 1024; // 700KB
 
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
@@ -115,7 +121,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const publicUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
     const url = `${publicUrl}?access_token=${accessToken}`;
 
-    // Fetch and encode image as base64 for clients without MCP Apps support
+    // Fetch image
     const response = await this.httpRequest(url);
     if (!response.ok) {
       const errorMessage = await this.getErrorMessage(response);
@@ -125,23 +131,37 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       };
     }
     const buffer = await response.arrayBuffer();
-    const base64Data = Buffer.from(buffer).toString('base64');
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
     // content[0] MUST be the URL text — MCP Apps UI finds it via content.find(c => c.type === 'text')
     // Use public URL (without credentials) to avoid leaking the access token
     const content: CallToolResult['content'] = [
-      {
-        type: 'text',
-        text: publicUrl
-      },
-      {
-        type: 'image',
-        data: base64Data,
-        mimeType
-      }
+      { type: 'text', text: publicUrl }
     ];
+
+    if (buffer.byteLength > IMAGE_INLINE_THRESHOLD) {
+      // Image is too large to inline safely — store as temporary resource
+      const resourceId = randomBytes(16).toString('hex');
+      const resourceUri = `mapbox://temp/static-map-${resourceId}`;
+      const base64Data = Buffer.from(buffer).toString('base64');
+      temporaryResourceManager.create(
+        resourceId,
+        resourceUri,
+        base64Data,
+        { toolName: this.name, size: buffer.byteLength },
+        undefined,
+        mimeType
+      );
+      content.push({
+        type: 'text',
+        text: `⚠️ Image (${Math.round(buffer.byteLength / 1024)}KB) stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes`
+      });
+    } else {
+      // Image is small enough to inline as base64
+      const base64Data = Buffer.from(buffer).toString('base64');
+      content.push({ type: 'image', data: base64Data, mimeType });
+    }
 
     // Conditionally add MCP-UI resource if enabled (backward compatibility)
     if (isMcpUiEnabled()) {
