@@ -99,6 +99,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     url.searchParams.append('latitude', latitude.toString());
     url.searchParams.append('access_token', accessToken);
     url.searchParams.append('limit', '1');
+    url.searchParams.append('types', 'neighborhood,locality,place');
     if (language) url.searchParams.append('language', language);
 
     const response = await this.httpRequest(url.toString());
