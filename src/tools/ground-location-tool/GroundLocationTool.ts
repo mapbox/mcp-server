@@ -69,7 +69,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
 > {
   name = 'ground_location_tool';
   description =
-    'Ground AI responses in live Mapbox location data for a given coordinate. Composes reverse geocoding, nearby POI search, and travel-time isochrone into a single cited response. Use this instead of training data when answering questions about what is near a location, neighborhood context, or local discovery. Returns place name, nearby POIs matching an optional query, and travel-time reachability — all sourced from live Mapbox APIs with citations.';
+    'Answer questions about what is near a location, what neighborhood a coordinate is in, or what places are within walking/driving distance. Use this as the FIRST tool when given coordinates and asked about nearby places, neighborhood context, local discovery, or area summaries. Returns place name, nearby POIs matching an optional category query, and travel-time reachability — all sourced from live Mapbox data with citations. Prefer this over calling reverse_geocode_tool + category_search_tool + isochrone_tool separately.';
   annotations = {
     title: 'Ground Location Tool',
     readOnlyHint: true,
