@@ -20,7 +20,7 @@ export class ReverseGeocodeTool extends MapboxApiBasedTool<
 > {
   name = 'reverse_geocode_tool';
   description =
-    'Find addresses, cities, towns, neighborhoods, postcodes, districts, regions, and countries around a specified geographic coordinate pair. Converts geographic coordinates (longitude, latitude) into human-readable addresses or place names. Use limit=1 for best results. This tool cannot reverse geocode businesses, landmarks, historic sites, and other points of interest that are not of the types mentioned. Supports both JSON and text output formats.';
+    'Convert geographic coordinates (longitude, latitude) into a human-readable address or place name. Use only when you need an address/place name alone. If you also need nearby places, neighborhood context, or travel-time reachability, use ground_location_tool instead — it already includes reverse geocoding plus POI search and isochrone in one call. This tool cannot reverse geocode businesses, landmarks, or POIs. Supports JSON and text output formats.';
   annotations = {
     title: 'Reverse Geocode Tool',
     readOnlyHint: true,
