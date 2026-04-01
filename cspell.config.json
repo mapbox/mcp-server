@@ -7,7 +7,9 @@
     "isochrone",
     "mapbox",
     "mmss",
-    "tilequery"
+    "tilequery",
+    "GHSA",
+    "mxjg"
   ],
   "ignorePaths": [
     "node_modules",
