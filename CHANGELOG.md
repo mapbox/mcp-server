@@ -4,6 +4,7 @@
 
 ### Security
 
+- **CVE-2026-4926**: Upgraded `@modelcontextprotocol/sdk` to `^1.29.0`, resolving `path-to-regexp` to `8.4.1` and fixing the ReDoS vulnerability [GHSA-j3q9-mxjg-w52f](https://github.com/advisories/GHSA-j3q9-mxjg-w52f); regenerated output-validation patch for the new version
 - **static_map_image_tool**: Validate `style` parameter against `username/style-id` format to prevent path traversal attacks where a crafted style value (e.g., `../../tokens/v2`) could escape the `/styles/v1/` URL path and access arbitrary Mapbox API endpoints using the server operator's token
 - **static_map_image_tool**: Remove access token from URL returned in text content — the token is only used internally for the HTTP fetch and the MCP Apps iframe URL, not exposed to the model context
 
