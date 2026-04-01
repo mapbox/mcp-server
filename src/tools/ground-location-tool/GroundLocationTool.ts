@@ -11,6 +11,8 @@ import {
   type GroundLocationOutput
 } from './GroundLocationTool.output.schema.js';
 
+type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
+
 // Minimal types for API responses we care about
 interface GeocodingFeature {
   properties?: {
@@ -86,10 +88,68 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     });
   }
 
+  /**
+   * Use sampling to classify what kind of grounding the query needs.
+   * Falls back to 'neighborhood' if sampling is unavailable or classification fails.
+   */
+  private async classifyGroundingStrategy(
+    query: string | undefined,
+    longitude: number,
+    latitude: number
+  ): Promise<GroundingStrategy> {
+    const samplingCapability =
+      this.server?.server.getClientCapabilities()?.sampling;
+    if (!samplingCapability || !this.server) {
+      return 'neighborhood';
+    }
+
+    const contextHint = query ? ` The user also asked about: "${query}".` : '';
+    const prompt =
+      `A user is asking about a location at coordinates ${latitude}, ${longitude}.${contextHint}\n\n` +
+      `Classify what kind of location grounding is needed. Reply with exactly one word:\n` +
+      `- "routing" — user needs precise routable coordinates for navigation or directions\n` +
+      `- "neighborhood" — user wants to know what area/district/neighborhood this is\n` +
+      `- "poi" — user wants nearby points of interest or places of a specific category\n` +
+      `- "region" — user wants area/boundary context like travel-time zones or coverage areas`;
+
+    try {
+      const result = await this.server.server.createMessage({
+        messages: [{ role: 'user', content: { type: 'text', text: prompt } }],
+        maxTokens: 10
+      });
+
+      const text =
+        result.content.type === 'text'
+          ? result.content.text.trim().toLowerCase()
+          : '';
+
+      if (
+        text === 'routing' ||
+        text === 'neighborhood' ||
+        text === 'poi' ||
+        text === 'region'
+      ) {
+        this.log(
+          'debug',
+          `ground_location_tool: sampling classified as "${text}"`
+        );
+        return text as GroundingStrategy;
+      }
+    } catch (err) {
+      this.log(
+        'debug',
+        `ground_location_tool: sampling classification failed, falling back to neighborhood: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+
+    return 'neighborhood';
+  }
+
   private async reverseGeocode(
     longitude: number,
     latitude: number,
     accessToken: string,
+    types: string,
     language?: string
   ): Promise<{ place: string; full_address?: string }> {
     const url = new URL(
@@ -99,7 +159,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     url.searchParams.append('latitude', latitude.toString());
     url.searchParams.append('access_token', accessToken);
     url.searchParams.append('limit', '1');
-    url.searchParams.append('types', 'neighborhood,locality,place');
+    url.searchParams.append('types', types);
     if (language) url.searchParams.append('language', language);
 
     const response = await this.httpRequest(url.toString());
@@ -178,14 +238,33 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     };
   }
 
-  private formatOutput(result: GroundLocationOutput): string {
+  private formatOutput(
+    result: GroundLocationOutput,
+    strategy: GroundingStrategy
+  ): string {
     const lines: string[] = [];
 
-    lines.push(`**${result.place}** (live Mapbox data)`);
+    const strategyLabel: Record<GroundingStrategy, string> = {
+      neighborhood: 'neighborhood context',
+      routing: 'routing coordinates',
+      poi: 'nearby places',
+      region: 'region context'
+    };
+
+    lines.push(
+      `**${result.place}** (${strategyLabel[strategy]} · live Mapbox data)`
+    );
     if (result.full_address && result.full_address !== result.place) {
       lines.push(result.full_address);
     }
     lines.push('');
+
+    if (strategy === 'routing') {
+      lines.push(
+        `Routable coordinates: ${result.latitude}, ${result.longitude}`
+      );
+      lines.push('');
+    }
 
     if (result.nearby_pois?.length) {
       lines.push(`Nearby places:`);
@@ -227,17 +306,40 @@ export class GroundLocationTool extends MapboxApiBasedTool<
       language
     } = input;
 
+    // Classify the grounding strategy via sampling (falls back gracefully if unsupported)
+    const strategy = await this.classifyGroundingStrategy(
+      query,
+      longitude,
+      latitude
+    );
+
     const citations: string[] = ['Mapbox Geocoding API'];
 
-    // Fan out all requests in parallel
+    // Choose reverse geocode result types based on strategy
+    const geocodeTypes =
+      strategy === 'routing'
+        ? 'address,poi'
+        : strategy === 'region'
+          ? 'region,district,place'
+          : 'neighborhood,locality,place';
+
+    // Fan out requests in parallel, shaped by strategy
     const [geocodeResult, poisResult, isochroneResult] = await Promise.all([
-      this.reverseGeocode(longitude, latitude, accessToken, language),
-      query
+      this.reverseGeocode(
+        longitude,
+        latitude,
+        accessToken,
+        geocodeTypes,
+        language
+      ),
+
+      // POIs: always fetch if query given; boost limit for poi-focused strategy
+      query || strategy === 'poi'
         ? this.categorySearch(
-            query,
+            query ?? 'place',
             longitude,
             latitude,
-            limit,
+            strategy === 'poi' ? Math.max(limit, 15) : limit,
             accessToken,
             language
           ).then((pois) => {
@@ -245,16 +347,20 @@ export class GroundLocationTool extends MapboxApiBasedTool<
             return pois;
           })
         : Promise.resolve(undefined),
-      this.isochrone(
-        longitude,
-        latitude,
-        profile,
-        contours_minutes,
-        accessToken
-      ).then((iso) => {
-        if (iso) citations.push('Mapbox Isochrone API');
-        return iso;
-      })
+
+      // Isochrone: always for region/neighborhood strategies
+      strategy === 'region' || strategy === 'neighborhood'
+        ? this.isochrone(
+            longitude,
+            latitude,
+            profile,
+            contours_minutes,
+            accessToken
+          ).then((iso) => {
+            if (iso) citations.push('Mapbox Isochrone API');
+            return iso;
+          })
+        : Promise.resolve(undefined)
     ]);
 
     const result: GroundLocationOutput = {
@@ -271,7 +377,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     const output = validated.success ? validated.data : result;
 
     return {
-      content: [{ type: 'text', text: this.formatOutput(output) }],
+      content: [{ type: 'text', text: this.formatOutput(output, strategy) }],
       structuredContent: output as unknown as Record<string, unknown>,
       isError: false
     };
