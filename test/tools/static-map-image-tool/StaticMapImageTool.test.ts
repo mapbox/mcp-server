@@ -7,6 +7,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
+import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 
 describe('StaticMapImageTool', () => {
   afterEach(() => {
@@ -53,7 +54,7 @@ describe('StaticMapImageTool', () => {
       );
       expect(textContent.text).toContain('-74.006,40.7128,10');
       expect(textContent.text).toContain('800x600');
-      expect(textContent.text).toContain('access_token=');
+      expect(textContent.text).not.toContain('access_token=');
     } finally {
       // Restore environment variable
       if (originalEnv !== undefined) {
@@ -152,7 +153,7 @@ describe('StaticMapImageTool', () => {
     expect(url).toContain('styles/v1/mapbox/dark-v10/static/');
     expect(url).toContain('-122.4194,37.7749,15');
     expect(url).toContain('1024x768');
-    expect(url).toContain('access_token=');
+    expect(url).not.toContain('access_token=');
   });
 
   it('uses default style when not specified', async () => {
@@ -166,6 +167,30 @@ describe('StaticMapImageTool', () => {
 
     const url = (result.content[0] as { type: 'text'; text: string }).text;
     expect(url).toContain('styles/v1/mapbox/streets-v12/static/');
+  });
+
+  it('rejects style values with path traversal patterns', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const tool = new StaticMapImageTool({ httpRequest });
+
+    const traversalPayloads = [
+      '../../tokens/v2',
+      '../styles',
+      'mapbox/../../../tokens',
+      '/etc/passwd',
+      'mapbox/streets-v12/../../tokens'
+    ];
+
+    for (const style of traversalPayloads) {
+      await expect(
+        tool.run({
+          center: { longitude: -74, latitude: 40 },
+          zoom: 10,
+          size: { width: 600, height: 400 },
+          style
+        })
+      ).resolves.toMatchObject({ isError: true });
+    }
   });
 
   it('validates coordinate constraints', async () => {
@@ -193,6 +218,38 @@ describe('StaticMapImageTool', () => {
     ).resolves.toMatchObject({
       isError: true
     });
+  });
+
+  it('stores large images as temporary resources instead of inlining base64', async () => {
+    // Simulate a response larger than the 700KB inline threshold
+    const largeBuffer = new ArrayBuffer(750 * 1024);
+    const { httpRequest } = setupHttpRequest({
+      arrayBuffer: async () => largeBuffer
+    } as Partial<Response>);
+
+    temporaryResourceManager.clear();
+
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 1280, height: 900 },
+      style: 'mapbox/streets-v12'
+    });
+
+    expect(result.isError).toBe(false);
+    // Should not contain an inline image
+    expect(result.content.some((c) => c.type === 'image')).toBe(false);
+    // Should contain a text item with the resource URI
+    const resourceText = result.content.find(
+      (c) =>
+        c.type === 'text' &&
+        (c as { type: 'text'; text: string }).text.includes(
+          'mapbox://temp/static-map-'
+        )
+    );
+    expect(resourceText).toBeDefined();
+    // Temp resource should be registered
+    expect(temporaryResourceManager.count()).toBe(1);
   });
 
   it('returns error when Mapbox API returns non-2xx response', async () => {

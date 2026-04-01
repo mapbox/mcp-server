@@ -6,7 +6,8 @@ import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 
 /**
- * Resource for temporary data storage (large tool responses)
+ * Resource for temporary data storage (large tool responses).
+ * Serves JSON text for structured data and binary blobs for image data.
  */
 export class TemporaryDataResource extends BaseResource {
   readonly name = 'Temporary Data';
@@ -25,6 +26,19 @@ export class TemporaryDataResource extends BaseResource {
             uri: uri,
             mimeType: 'text/plain',
             text: 'Resource not found or expired. Temporary resources have a 30-minute TTL.'
+          }
+        ]
+      };
+    }
+
+    // For image data, return as blob
+    if (resource.mimeType?.startsWith('image/')) {
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: resource.mimeType,
+            blob: resource.data as string
           }
         ]
       };

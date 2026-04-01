@@ -1,5 +1,23 @@
 ## Unreleased
 
+### Security
+
+- **static_map_image_tool**: Validate `style` parameter against `username/style-id` format to prevent path traversal attacks where a crafted style value (e.g., `../../tokens/v2`) could escape the `/styles/v1/` URL path and access arbitrary Mapbox API endpoints using the server operator's token
+- **static_map_image_tool**: Remove access token from URL returned in text content — the token is only used internally for the HTTP fetch and the MCP Apps iframe URL, not exposed to the model context
+
+### New Features
+
+- **9 new offline Turf.js geometry tools** (no API key required, instant results):
+  - **`points_within_polygon_tool`**: Batch-test multiple points against a polygon in one call — replaces N `point_in_polygon_tool` calls for delivery zone validation, fleet geofencing, etc.
+  - **`union_tool`**: Merge two or more polygons into a single unified geometry; useful for combining service areas, isochrones, or delivery zones
+  - **`nearest_point_tool`**: Find the nearest point in a collection to a target — replaces calling `distance_tool` for each candidate
+  - **`intersect_tool`**: Find the intersection geometry of two polygons (area they share in common)
+  - **`difference_tool`**: Subtract one polygon from another ("what is in zone A but not zone B?")
+  - **`destination_tool`**: Calculate a destination point given origin, bearing, and distance
+  - **`length_tool`**: Measure the total length of a line/route without a routing API call
+  - **`nearest_point_on_line_tool`**: Snap a point to the nearest position on a line or route
+  - **`convex_tool`**: Compute the convex hull of a set of points
+
 ### Exports
 
 - Added `getAllTools` to `@mapbox/mcp-server/tools` subpath export for batch access to all registered tools
@@ -12,6 +30,13 @@
 ### New Features
 
 - **mapbox://version resource**: Server version, git SHA, tag, and branch accessible via `readResource('mapbox://version')`
+
+### Bug Fixes
+
+- **static_map_image_tool**: Large images (>700KB raw) are now stored as temporary resources instead of being inlined as base64, preventing the 1MB tool result limit from being exceeded in Claude Desktop
+  - Image stored at `mapbox://temp/static-map-{id}`, retrievable via `resources/read` with a 30-minute TTL
+  - `TemporaryResourceManager` now enforces a 50MB byte cap with oldest-first eviction to prevent unbounded memory growth
+  - `TemporaryDataResource` now serves image mime types as blob content
 
 ## 0.10.0 - 2026-03-04
 
