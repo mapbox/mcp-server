@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.11.0 - 2026-04-01
+
 ### Security
 
 - **static_map_image_tool**: Validate `style` parameter against `username/style-id` format to prevent path traversal attacks where a crafted style value (e.g., `../../tokens/v2`) could escape the `/styles/v1/` URL path and access arbitrary Mapbox API endpoints using the server operator's token
