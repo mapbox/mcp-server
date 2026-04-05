@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "mcp-server": {
+      "command": "node",
+      "args": [
+        "dist/esm/index.js"
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "mcp-server",
+  "version": "0.1.0",
+  "description": "Mapbox Model Context Protocol (MCP) server",
+  "author": {
+    "name": "mapbox",
+    "url": "https://github.com/mapbox"
+  },
+  "homepage": "https://github.com/mapbox/mcp-server",
+  "repository": "https://github.com/mapbox/mcp-server",
+  "keywords": [
+    "mcp",
+    "codex"
+  ],
+  "mcpServers": "./.mcp.json"
+}
