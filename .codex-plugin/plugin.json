@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "name": "mapbox-mcp-server",
+  "version": "1.0.0",
+  "registry": { "visibility": "public" },
+  "manifest": {
+    "homepage": "https://github.com/mapbox/mcp-server",
+    "repository": "https://github.com/mapbox/mcp-server",
+    "license": "BSD-2-Clause"
+  },
+  "tools": [
+    { "id": "mapbox_geocode", "name": "geocode", "description": "Geocode addresses to coordinates" },
+    { "id": "mapbox_directions", "name": "directions", "description": "Get driving/walking directions" }
+  ]
+}
