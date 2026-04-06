@@ -202,8 +202,9 @@ export class GroundLocationTool extends MapboxApiBasedTool<
 
     if (result.isochrone) {
       const { profile, contours_minutes } = result.isochrone;
+      const profileLabel = profile.replace('mapbox/', '').replace('-', ' ');
       lines.push(
-        `Reachable by ${profile}: ${contours_minutes.map((m) => `${m} min`).join(', ')}`
+        `Reachable by ${profileLabel}: ${contours_minutes.map((m) => `${m} min`).join(', ')}`
       );
       lines.push('');
     }

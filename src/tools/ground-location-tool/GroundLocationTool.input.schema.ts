@@ -22,11 +22,16 @@ export const GroundLocationInputSchema = z.object({
       'Optional category or type of places to search for nearby (e.g., "restaurant", "coffee", "park"). If omitted, returns general place context only.'
     ),
   profile: z
-    .enum(['walking', 'driving', 'cycling'])
+    .enum([
+      'mapbox/walking',
+      'mapbox/driving',
+      'mapbox/driving-traffic',
+      'mapbox/cycling'
+    ])
     .optional()
-    .default('walking')
+    .default('mapbox/walking')
     .describe(
-      'Travel profile for isochrone calculation. Defaults to "walking".'
+      'Travel profile for isochrone calculation. Use "mapbox/driving-traffic" for traffic-aware driving. Defaults to "mapbox/walking".'
     ),
   contours_minutes: z
     .array(z.number().min(1).max(60))
