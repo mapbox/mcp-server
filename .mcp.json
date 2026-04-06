@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mapbox-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "@mapbox/mcp-server"]
+    }
+  }
+}
