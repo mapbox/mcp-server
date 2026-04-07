@@ -37,24 +37,94 @@ const PROMPT_ARG_COMPLETIONS: Record<string, readonly string[]> = {
 };
 
 /**
- * Filter values by case-insensitive prefix and cap at MAX_COMPLETION_VALUES.
+ * Levenshtein distance between two strings.
+ */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
+
+  for (let i = 1; i <= m; i++) {
+    let prev = i - 1;
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const temp = dp[j];
+      dp[j] =
+        a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = temp;
+    }
+  }
+
+  return dp[n];
+}
+
+/**
+ * Filter values by prefix match first, then fuzzy match to fill remaining slots.
+ * Results are sorted: prefix matches first, then fuzzy matches by edit distance.
  */
 function filterValues(
   values: readonly string[],
-  prefix: string
+  query: string
 ): CompletionResult {
-  const lowerPrefix = prefix.toLowerCase();
-  const matched = lowerPrefix
-    ? values.filter((v) => v.toLowerCase().startsWith(lowerPrefix))
-    : [...values];
+  if (!query) {
+    const all = [...values];
+    if (all.length <= MAX_COMPLETION_VALUES) {
+      return { values: all };
+    }
+    return {
+      values: all.slice(0, MAX_COMPLETION_VALUES),
+      total: all.length,
+      hasMore: true
+    };
+  }
 
-  if (matched.length <= MAX_COMPLETION_VALUES) {
-    return { values: matched };
+  const lowerQuery = query.toLowerCase();
+
+  // Phase 1: prefix matches
+  const prefixMatches: string[] = [];
+  // Phase 2: fuzzy candidates (non-prefix matches within edit distance threshold)
+  const fuzzyMatches: Array<{ value: string; distance: number }> = [];
+
+  // Allow ~1 typo per 4 chars, minimum 1, maximum 3
+  const maxDistance = Math.min(
+    3,
+    Math.max(1, Math.floor(lowerQuery.length / 4))
+  );
+
+  for (const v of values) {
+    const lowerV = v.toLowerCase();
+    if (lowerV.startsWith(lowerQuery)) {
+      prefixMatches.push(v);
+    } else {
+      // Only compute Levenshtein if prefix didn't match and query is long enough
+      if (lowerQuery.length >= 3) {
+        // Compare against the same-length prefix of the candidate for substring-like matching
+        const compareLen = Math.min(lowerQuery.length, lowerV.length);
+        const distance = levenshtein(
+          lowerQuery.slice(0, compareLen),
+          lowerV.slice(0, compareLen)
+        );
+        if (distance <= maxDistance) {
+          fuzzyMatches.push({ value: v, distance });
+        }
+      }
+    }
+  }
+
+  // Sort fuzzy matches by distance, then alphabetically
+  fuzzyMatches.sort(
+    (a, b) => a.distance - b.distance || a.value.localeCompare(b.value)
+  );
+
+  const combined = [...prefixMatches, ...fuzzyMatches.map((m) => m.value)];
+
+  if (combined.length <= MAX_COMPLETION_VALUES) {
+    return { values: combined };
   }
 
   return {
-    values: matched.slice(0, MAX_COMPLETION_VALUES),
-    total: matched.length,
+    values: combined.slice(0, MAX_COMPLETION_VALUES),
+    total: combined.length,
     hasMore: true
   };
 }

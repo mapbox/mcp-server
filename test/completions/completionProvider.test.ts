@@ -18,7 +18,8 @@ describe('completePromptArgument', () => {
       );
       expect(result.values).toContain('restaurant');
       expect(result.values).toContain('rest_area');
-      expect(result.values.every((v) => v.startsWith('rest'))).toBe(true);
+      // Prefix matches come first
+      expect(result.values[0].startsWith('rest')).toBe(true);
     });
 
     it('returns capped results for empty value', () => {
@@ -61,6 +62,37 @@ describe('completePromptArgument', () => {
     it('is case-insensitive', () => {
       const result = completePromptArgument('get-directions', 'mode', 'Walk');
       expect(result.values).toEqual(['walking']);
+    });
+  });
+
+  describe('fuzzy matching', () => {
+    it('matches typos like "resturant" to "restaurant"', () => {
+      const result = completePromptArgument(
+        'find-places-nearby',
+        'category',
+        'resturant'
+      );
+      expect(result.values).toContain('restaurant');
+    });
+
+    it('puts prefix matches before fuzzy matches', () => {
+      const result = completePromptArgument(
+        'find-places-nearby',
+        'category',
+        'cafe'
+      );
+      // "cafe" is an exact prefix match and should come first
+      expect(result.values[0]).toBe('cafe');
+    });
+
+    it('does not fuzzy match for very short queries', () => {
+      // Fuzzy only kicks in for queries >= 3 chars
+      const result = completePromptArgument(
+        'find-places-nearby',
+        'category',
+        'zz'
+      );
+      expect(result.values).toEqual([]);
     });
   });
 
