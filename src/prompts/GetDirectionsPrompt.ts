@@ -40,7 +40,7 @@ export class GetDirectionsPrompt extends BasePrompt {
     {
       name: 'mode',
       description:
-        'Travel mode: driving, walking, or cycling (default: driving)',
+        'Travel mode: driving, driving-traffic, walking, or cycling (default: driving)',
       required: false
     }
   ];
