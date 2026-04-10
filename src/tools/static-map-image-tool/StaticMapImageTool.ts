@@ -169,7 +169,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
         uri: `ui://mapbox/static-map/${input.style}/${lng},${lat},${input.zoom}`,
         content: {
           type: 'externalUrl',
-          iframeUrl: url
+          iframeUrl: publicUrl
         },
         encoding: 'text',
         uiMetadata: {
