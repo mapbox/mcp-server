@@ -31,13 +31,13 @@ const ContextNeighborhoodSchema = z.object({
       name: z.string()
     })
     .optional(),
-  translations: z.record(TranslationSchema).optional()
+  translations: z.record(z.string(), TranslationSchema).optional()
 });
 
 const ContextPostcodeSchema = z.object({
   mapbox_id: z.string(),
   name: z.string(),
-  translations: z.record(TranslationSchema).optional()
+  translations: z.record(z.string(), TranslationSchema).optional()
 });
 
 const ContextLocalitySchema = z.object({
@@ -50,7 +50,7 @@ const ContextLocalitySchema = z.object({
       name: z.string()
     })
     .optional(),
-  translations: z.record(TranslationSchema).optional()
+  translations: z.record(z.string(), TranslationSchema).optional()
 });
 
 const ContextPlaceSchema = z.object({
@@ -63,14 +63,14 @@ const ContextPlaceSchema = z.object({
       name: z.string()
     })
     .optional(),
-  translations: z.record(TranslationSchema).optional()
+  translations: z.record(z.string(), TranslationSchema).optional()
 });
 
 const ContextDistrictSchema = z.object({
   mapbox_id: z.string(),
   name: z.string(),
   wikidata_id: z.string().optional(),
-  translations: z.record(TranslationSchema).optional()
+  translations: z.record(z.string(), TranslationSchema).optional()
 });
 
 const ContextRegionSchema = z.object({
@@ -79,7 +79,7 @@ const ContextRegionSchema = z.object({
   wikidata_id: z.string().optional(),
   region_code: z.string(),
   region_code_full: z.string(),
-  translations: z.record(TranslationSchema).optional()
+  translations: z.record(z.string(), TranslationSchema).optional()
 });
 
 const ContextCountrySchema = z.object({
@@ -88,7 +88,7 @@ const ContextCountrySchema = z.object({
   wikidata_id: z.string().optional(),
   country_code: z.string(),
   country_code_alpha_3: z.string(),
-  translations: z.record(TranslationSchema).optional()
+  translations: z.record(z.string(), TranslationSchema).optional()
 });
 
 const ContextBlockSchema = z.object({

@@ -33,7 +33,7 @@ function detectTupleUsage(schema: z.ZodType): string[] {
         traverse(node._def.type, `${path}[item]`);
       }
     } else if (node instanceof z.ZodObject) {
-      const shape = node._def.shape();
+      const shape = node._def.shape;
       for (const [key, value] of Object.entries(shape)) {
         traverse(value as z.ZodType, path ? `${path}.${key}` : key);
       }
