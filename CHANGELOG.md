@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Dependencies
+
+- **Upgrade `zod` from `^3.25.42` to `^4.3.6`** — migrated `z.record()` calls to require explicit key schema (`z.string()`), updated `.shape` access (no longer a function in v4), and fixed `denoise` default handling in `IsochroneTool` input schema
+
 ### New Features
 
 - **MCP Completions capability**: Add auto-completion support for prompt arguments per MCP spec (2025-11-25). Clients can now suggest values when users fill in prompt parameters (#176)
