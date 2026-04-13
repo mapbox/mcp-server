@@ -71,7 +71,7 @@ const vehicleSchema = z.object({
       'Ending location as a STRING name (e.g., "location-0" for coordinates[0], NOT the integer 0)'
     ),
   capacities: z
-    .record(z.number())
+    .record(z.string(), z.number())
     .optional()
     .describe('Custom capacity dimensions (e.g., weight, volume)'),
   capabilities: z
@@ -129,7 +129,7 @@ const shipmentSchema = z.object({
       'Delivery location as a STRING name (e.g., "location-0" for coordinates[0], NOT the integer 0)'
     ),
   size: z
-    .record(z.number())
+    .record(z.string(), z.number())
     .optional()
     .describe('Capacity consumption (weight, volume, etc.)'),
   requirements: z

@@ -6,7 +6,7 @@ import { z } from 'zod';
 export const IntersectOutputSchema = z.object({
   intersects: z.boolean().describe('Whether the two polygons overlap'),
   geometry: z
-    .record(z.unknown())
+    .record(z.string(), z.unknown())
     .nullable()
     .describe('GeoJSON geometry of the intersection, or null if no overlap')
 });

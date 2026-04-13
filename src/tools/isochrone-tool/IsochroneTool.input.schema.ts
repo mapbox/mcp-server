@@ -56,7 +56,6 @@ export const IsochroneInputSchema = z.object({
     .number()
     .min(0)
     .max(1)
-    .default(1)
     .optional()
     .describe(
       'A floating point value that can be used to remove smaller contours. A value of 1.0 will only return the largest contour for a given value.'
