@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 export const UnionOutputSchema = z.object({
   geometry: z
-    .record(z.unknown())
+    .record(z.string(), z.unknown())
     .describe(
       'GeoJSON geometry of the merged polygon (Polygon or MultiPolygon)'
     ),
