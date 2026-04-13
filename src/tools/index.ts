@@ -44,12 +44,14 @@ export { MatrixTool } from './matrix-tool/MatrixTool.js';
 export { MidpointTool } from './midpoint-tool/MidpointTool.js';
 export { OptimizationTool } from './optimization-tool/OptimizationTool.js';
 export { PointInPolygonTool } from './point-in-polygon-tool/PointInPolygonTool.js';
+export { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
 export { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js';
 export { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 export { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
 export { SimplifyTool } from './simplify-tool/SimplifyTool.js';
 export { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
 // Import tool classes for instantiation
+import { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
 import { AreaTool } from './area-tool/AreaTool.js';
 import { BearingTool } from './bearing-tool/BearingTool.js';
 import { BoundingBoxTool } from './bounding-box-tool/BoundingBoxTool.js';
@@ -99,6 +101,9 @@ export const directions = new DirectionsTool({ httpRequest });
 
 /** Calculate distance between points */
 export const distance = new DistanceTool();
+
+/** Ground AI responses in live Mapbox location data */
+export const groundLocation = new GroundLocationTool({ httpRequest });
 
 /** Calculate travel time isochrones */
 export const isochrone = new IsochroneTool({ httpRequest });

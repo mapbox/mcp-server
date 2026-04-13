@@ -1,5 +1,15 @@
 ## Unreleased
 
+### New Features
+
+- **MCP Completions capability**: Add auto-completion support for prompt arguments per MCP spec (2025-11-25). Clients can now suggest values when users fill in prompt parameters (#176)
+  - `category` argument on `find-places-nearby` — 482 Mapbox Search API categories
+  - `mode` argument on `get-directions`, `search-along-route`, `show-reachable-areas` — driving, driving-traffic, walking, cycling
+
+### Fixes
+
+- **Prompt descriptions**: Add missing `driving-traffic` transport mode to `get-directions`, `search-along-route`, and `show-reachable-areas` prompt descriptions
+
 ## 0.11.0 - 2026-04-01
 
 ### Security
