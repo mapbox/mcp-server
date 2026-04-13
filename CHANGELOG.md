@@ -2,6 +2,7 @@
 
 ### Dependencies
 
+- **Upgrade `tshy` to `^4.1.1`, `vitest`/`@vitest/coverage-istanbul` to `^4.1.4`, `typescript` to `^6.0.2`** — removed deprecated `baseUrl` from `tsconfig.base.json` (TS6), updated `paths` entry to use relative `./` prefix
 - **Upgrade `zod` from `^3.25.42` to `^4.3.6`** — migrated `z.record()` calls to require explicit key schema (`z.string()`), updated `.shape` access (no longer a function in v4), and fixed `denoise` default handling in `IsochroneTool` input schema
 
 ### New Features
