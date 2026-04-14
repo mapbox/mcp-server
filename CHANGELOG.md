@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Breaking Changes
+
+- **Remove `point_in_polygon_tool`** — `points_within_polygon_tool` fully covers the single-point case; pass a one-element `points` array instead. Updated `points_within_polygon_tool` description to make clear it handles single points as well as batches.
+
 ### Dependencies
 
 - **Upgrade OpenTelemetry to 2.x** — upgraded `@opentelemetry/resources` and `@opentelemetry/sdk-trace-base` from `^1.30.1` to `^2.6.1`; upgraded experimental packages (`sdk-node`, `instrumentation`, `exporter-trace-otlp-http`) from `^0.56.0` to `^0.214.0`; upgraded `auto-instrumentations-node` to `^0.72.0` and `semantic-conventions` to `^1.40.0`; migrated `new Resource()` to `resourceFromAttributes()` following the 2.x API change

@@ -20,7 +20,6 @@ import { MidpointTool } from './midpoint-tool/MidpointTool.js';
 import { BearingTool } from './bearing-tool/BearingTool.js';
 import { AreaTool } from './area-tool/AreaTool.js';
 import { BufferTool } from './buffer-tool/BufferTool.js';
-import { PointInPolygonTool } from './point-in-polygon-tool/PointInPolygonTool.js';
 import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
@@ -59,7 +58,6 @@ export const CORE_TOOLS = [
   new BearingTool(),
   new AreaTool(),
   new BufferTool(),
-  new PointInPolygonTool(),
   new DistanceTool(),
   new CategorySearchTool({ httpRequest }),
   new DirectionsTool({ httpRequest }),

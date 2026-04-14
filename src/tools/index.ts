@@ -43,7 +43,6 @@ export { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
 export { MatrixTool } from './matrix-tool/MatrixTool.js';
 export { MidpointTool } from './midpoint-tool/MidpointTool.js';
 export { OptimizationTool } from './optimization-tool/OptimizationTool.js';
-export { PointInPolygonTool } from './point-in-polygon-tool/PointInPolygonTool.js';
 export { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
 export { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js';
 export { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
@@ -66,7 +65,6 @@ import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
 import { MatrixTool } from './matrix-tool/MatrixTool.js';
 import { MidpointTool } from './midpoint-tool/MidpointTool.js';
 import { OptimizationTool } from './optimization-tool/OptimizationTool.js';
-import { PointInPolygonTool } from './point-in-polygon-tool/PointInPolygonTool.js';
 import { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js';
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 import { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocodeTool.js';
@@ -119,9 +117,6 @@ export const midpoint = new MidpointTool();
 
 /** Solve vehicle routing optimization problems */
 export const optimization = new OptimizationTool({ httpRequest });
-
-/** Check if point is inside polygon */
-export const pointInPolygon = new PointInPolygonTool();
 
 /** Read MCP resources by URI (fallback for clients without resource support) */
 export const resourceReader = new ResourceReaderTool();

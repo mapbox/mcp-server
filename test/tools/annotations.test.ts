@@ -66,7 +66,6 @@ describe('Tool Annotations', () => {
     const offlineTools = [
       'version_tool',
       'distance_tool',
-      'point_in_polygon_tool',
       'points_within_polygon_tool',
       'bearing_tool',
       'midpoint_tool',
@@ -97,7 +96,6 @@ describe('Tool Annotations', () => {
       [
         'version_tool',
         'distance_tool',
-        'point_in_polygon_tool',
         'points_within_polygon_tool',
         'bearing_tool',
         'midpoint_tool',
