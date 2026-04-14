@@ -3,7 +3,7 @@
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION
@@ -167,7 +167,7 @@ export async function initializeTracing(): Promise<void> {
 
   try {
     // Create resource with service information
-    const resource = new Resource({
+    const resource = resourceFromAttributes({
       [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || versionInfo.name,
       [ATTR_SERVICE_VERSION]: versionInfo.version,
       [ATTR_SERVICE_INSTANCE_ID]: process.env.HOSTNAME || 'unknown',

@@ -2,6 +2,8 @@
 
 ### Dependencies
 
+- **Upgrade OpenTelemetry to 2.x** — upgraded `@opentelemetry/resources` and `@opentelemetry/sdk-trace-base` from `^1.30.1` to `^2.6.1`; upgraded experimental packages (`sdk-node`, `instrumentation`, `exporter-trace-otlp-http`) from `^0.56.0` to `^0.214.0`; upgraded `auto-instrumentations-node` to `^0.72.0` and `semantic-conventions` to `^1.40.0`; migrated `new Resource()` to `resourceFromAttributes()` following the 2.x API change
+
 - **Upgrade `zod` from `^3.25.42` to `^4.3.6`** — migrated `z.record()` calls to require explicit key schema (`z.string()`), updated `.shape` access (no longer a function in v4), and fixed `denoise` default handling in `IsochroneTool` input schema
 
 ### New Features
