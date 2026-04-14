@@ -64,9 +64,7 @@ describe('Tool Annotations', () => {
     // Most Mapbox API tools interact with external services (open world)
     // Exclude offline/local tools that don't make external API calls
     const offlineTools = [
-      'version_tool',
       'distance_tool',
-      'point_in_polygon_tool',
       'points_within_polygon_tool',
       'bearing_tool',
       'midpoint_tool',
@@ -95,9 +93,7 @@ describe('Tool Annotations', () => {
     const tools = getAllTools();
     const offlineTools = tools.filter((tool) =>
       [
-        'version_tool',
         'distance_tool',
-        'point_in_polygon_tool',
         'points_within_polygon_tool',
         'bearing_tool',
         'midpoint_tool',

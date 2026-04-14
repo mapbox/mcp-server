@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Breaking Changes
+
+- **Remove `point_in_polygon_tool`** — `points_within_polygon_tool` fully covers the single-point case; pass a one-element `points` array instead. Updated `points_within_polygon_tool` description to make clear it handles single points as well as batches.
+
 ### Dependencies
 
 - **Upgrade `tshy` to `^4.1.1`, `vitest`/`@vitest/coverage-istanbul` to `^4.1.4`, `typescript` to `^6.0.2`** — removed deprecated `baseUrl` from `tsconfig.base.json` (TS6), updated `paths` entry to use relative `./` prefix
