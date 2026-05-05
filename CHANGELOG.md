@@ -2,7 +2,7 @@
 
 ### Security
 
-- chore: upgrade @opentelemetry/\* packages to latest (fixes protobufjs GHSA-xq3m-2v4x-88gg critical CVE) (#TBD)
+- chore: upgrade @opentelemetry/\* packages to latest (fixes protobufjs GHSA-xq3m-2v4x-88gg critical CVE) (#183)
 
 ### Breaking Changes
 
