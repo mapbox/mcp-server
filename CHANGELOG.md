@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.7.1-dev - 2026-05-05
+
 ### Breaking Changes
 
 - **Remove `point_in_polygon_tool`** — `points_within_polygon_tool` fully covers the single-point case; pass a one-element `points` array instead. Updated `points_within_polygon_tool` description to make clear it handles single points as well as batches.
