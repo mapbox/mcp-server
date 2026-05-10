@@ -52,6 +52,27 @@ For detailed setup instructions for different integrations, refer to the followi
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
 - **[Importing Tools Directly](./docs/importing-tools.md)** - Use Mapbox tools in your own applications without running the MCP server
+- [Kiro Setup](#kiro-setup) - Setting up the Mapbox MCP server in Kiro
+
+### Kiro Setup
+
+[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=mapbox&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40mapbox%2Fmcp-server%22%5D%2C%22env%22%3A%7B%22MAPBOX_ACCESS_TOKEN%22%3A%22YOUR_MAPBOX_TOKEN%22%7D%7D)
+
+Or add the following to your Kiro MCP config file (`~/.kiro/settings/mcp.json` for global, or `.kiro/settings/mcp.json` for project-scoped). See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/) for more details.
+
+```json
+{
+  "mcpServers": {
+    "mapbox": {
+      "command": "npx",
+      "args": ["-y", "@mapbox/mcp-server"],
+      "env": {
+        "MAPBOX_ACCESS_TOKEN": "YOUR_MAPBOX_TOKEN"
+      }
+    }
+  }
+}
+```
 
 ## Example Prompts
 
