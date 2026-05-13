@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { z } from 'zod';
+import { isSafeExternalUrl } from '../../utils/urlSafety.js';
 
 // List of valid Maki icon names
 const MAKI_ICONS = [
@@ -265,7 +266,13 @@ export const CustomMarkerOverlaySchema = z.object({
   url: z
     .string()
     .url()
-    .describe('URL of custom marker image (PNG or JPEG, max 1024px)')
+    .refine(isSafeExternalUrl, {
+      message:
+        'URL must be an https:// URL pointing to a public host (loopback, private, link-local, and unique-local addresses are not allowed)'
+    })
+    .describe(
+      'HTTPS URL of custom marker image (PNG or JPEG, max 1024px). Must point to a publicly reachable host; URLs targeting localhost, private, link-local, or unique-local addresses are rejected to prevent SSRF.'
+    )
 });
 
 export const PathOverlaySchema = z.object({
