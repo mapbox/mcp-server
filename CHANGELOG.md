@@ -6,6 +6,10 @@
   - `category` argument on `find-places-nearby` — 482 Mapbox Search API categories
   - `mode` argument on `get-directions`, `search-along-route`, `show-reachable-areas` — driving, driving-traffic, walking, cycling
 
+### Security
+
+- **static_map_image_tool**: Validate custom-marker URLs to reject loopback, private, link-local, and cloud-metadata IP addresses, preventing SSRF via the Mapbox Static Images API (CWE-918)
+
 ### Fixes
 
 - **Prompt descriptions**: Add missing `driving-traffic` transport mode to `get-directions`, `search-along-route`, and `show-reachable-areas` prompt descriptions
