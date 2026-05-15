@@ -57,6 +57,7 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     }
     const [a, b] = octets;
     // 0.0.0.0/8, 10/8, 127/8
+    // 0.0.0.0/8 — "this network" (unspecified + reserved); block conservatively
     if (a === 0 || a === 10 || a === 127) return false;
     // 169.254/16 (link-local, includes cloud metadata 169.254.169.254)
     if (a === 169 && b === 254) return false;

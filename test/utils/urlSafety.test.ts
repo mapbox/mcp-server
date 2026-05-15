@@ -67,4 +67,13 @@ describe('isSafeExternalUrl', () => {
   it('rejects IPv4-mapped IPv6 literals', () => {
     expect(isSafeExternalUrl('https://[::ffff:127.0.0.1]/x.png')).toBe(false);
   });
+
+  it('rejects IPv4-mapped IPv6 for private IPv4 ranges', () => {
+    expect(isSafeExternalUrl('https://[::ffff:10.0.0.1]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[::ffff:192.168.1.1]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[::ffff:172.16.0.1]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[::ffff:169.254.169.254]/x.png')).toBe(
+      false
+    );
+  });
 });
