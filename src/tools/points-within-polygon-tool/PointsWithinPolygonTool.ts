@@ -23,8 +23,8 @@ export class PointsWithinPolygonTool extends BaseTool<
 > {
   readonly name = 'points_within_polygon_tool';
   readonly description =
-    'Test multiple points against a polygon in a single call, returning only those inside. ' +
-    'More efficient than calling point_in_polygon_tool repeatedly for batch checks. ' +
+    'Test one or more geographic points against a polygon, returning only those inside. ' +
+    'Handles a single point or a batch of points in one call. ' +
     'Useful for delivery zone validation, fleet geofencing, and customer segmentation. ' +
     'Works offline without API calls.';
 
