@@ -193,6 +193,40 @@ describe('StaticMapImageTool', () => {
     }
   });
 
+  it('rejects custom-marker URLs targeting unsafe / private hosts (SSRF)', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const tool = new StaticMapImageTool({ httpRequest });
+
+    const unsafeUrls = [
+      'http://example.com/marker.png', // non-https
+      'https://localhost/marker.png',
+      'https://127.0.0.1/marker.png',
+      'https://10.0.0.5/marker.png',
+      'https://192.168.1.1/marker.png',
+      'https://169.254.169.254/latest/meta-data/', // cloud metadata
+      'https://[::1]/marker.png',
+      'https://[fc00::1]/marker.png'
+    ];
+
+    for (const url of unsafeUrls) {
+      await expect(
+        tool.run({
+          center: { longitude: -74, latitude: 40 },
+          zoom: 10,
+          size: { width: 600, height: 400 },
+          overlays: [
+            {
+              type: 'custom-marker',
+              longitude: -74,
+              latitude: 40,
+              url
+            }
+          ]
+        })
+      ).resolves.toMatchObject({ isError: true });
+    }
+  });
+
   it('validates coordinate constraints', async () => {
     const { httpRequest } = setupHttpRequest();
     const tool = new StaticMapImageTool({ httpRequest });
