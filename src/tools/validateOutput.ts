@@ -34,7 +34,8 @@ export function validateAndSanitizeOutput<OutputSchema extends ZodTypeAny>(
     // If successful, return the result with validated structured content
     return {
       ...result,
-      structuredContent: parsed
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      structuredContent: parsed as any
     };
   } catch (validationError) {
     // Validation failed - return a safe response without structuredContent

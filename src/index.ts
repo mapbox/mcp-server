@@ -17,7 +17,8 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 import {
   ListPromptsRequestSchema,
-  GetPromptRequestSchema
+  GetPromptRequestSchema,
+  CompleteRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import {
@@ -27,6 +28,7 @@ import {
 } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
+import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import {
   initializeTracing,
@@ -101,6 +103,7 @@ const server = new McpServer(
       tools: {
         listChanged: true // Advertise support for dynamic tool registration (ready for future capability-dependent tools)
       },
+      completions: {},
       resources: {},
       prompts: {},
       logging: {}
@@ -176,6 +179,23 @@ server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
       description: prompt.description,
       messages
     };
+  }
+);
+
+// Register completion handler
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(server.server as any).setRequestHandler(
+  CompleteRequestSchema,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async (request: any) => {
+    const { ref, argument } = request.params;
+
+    const completion =
+      ref.type === 'ref/prompt'
+        ? completePromptArgument(ref.name, argument.name, argument.value)
+        : { values: [] as string[] };
+
+    return { completion };
   }
 );
 
