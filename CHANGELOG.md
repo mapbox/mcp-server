@@ -19,10 +19,14 @@
 - **MCP Completions capability**: Add auto-completion support for prompt arguments per MCP spec (2025-11-25). Clients can now suggest values when users fill in prompt parameters (#176)
   - `category` argument on `find-places-nearby` — 482 Mapbox Search API categories
   - `mode` argument on `get-directions`, `search-along-route`, `show-reachable-areas` — driving, driving-traffic, walking, cycling
+- **ground_location_tool MCP sampling**: Use MCP sampling to classify the grounding strategy (`routing` / `neighborhood` / `poi` / `region`) and shape downstream Geocoding, Search, and Isochrone calls accordingly. Falls back to `neighborhood` when the client doesn't support sampling.
 
 ### Fixes
 
 - **Prompt descriptions**: Add missing `driving-traffic` transport mode to `get-directions`, `search-along-route`, and `show-reachable-areas` prompt descriptions
+- **ground_location_tool**: Use `mapbox/` prefix for isochrone profiles and add `driving-traffic` support
+- **ground_location_tool**: Reverse geocode now returns neighborhood/locality/place name instead of street address by default
+- **ground_location_tool**: Strengthened tool description to prefer it over `reverse_geocode_tool` for location context queries
 
 ## 0.11.0 - 2026-04-01
 
