@@ -3,6 +3,7 @@
 ### Security
 
 - chore: upgrade @opentelemetry/\* packages to latest (fixes protobufjs GHSA-xq3m-2v4x-88gg critical CVE) (#183)
+- **CVE-2026-33750**: Added `overrides` for `brace-expansion` to `^2.0.3` — eliminates vulnerable `1.1.14` installs nested under `@eslint/config-array`, `@eslint/eslintrc`, and `eslint` via `minimatch@3.1.5`
 
 ### Breaking Changes
 

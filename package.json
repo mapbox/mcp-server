@@ -91,6 +91,9 @@
     "patch-package": "^8.0.1",
     "zod": "^4.3.6"
   },
+  "overrides": {
+    "brace-expansion": "^2.0.3"
+  },
   "tshy": {
     "project": "./tsconfig.src.json",
     "exports": {
