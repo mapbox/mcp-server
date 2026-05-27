@@ -362,15 +362,20 @@ function renderIsochroneAppHtml(params: {
         .addTo(map);
     }
 
-    if (isFinite(minLng)) {
-      map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-        padding: { top: 70, bottom: 30, left: 30, right: 30 },
-        duration: 600
-      });
-    }
-
     loadingEl.style.display = 'none';
-    requestSizeToFit();
+
+    if (isFinite(minLng)) {
+      requestSizeToFit();
+      setTimeout(function() {
+        map.resize();
+        map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+          padding: { top: 70, bottom: 30, left: 30, right: 30 },
+          duration: 600
+        });
+      }, 60);
+    } else {
+      requestSizeToFit();
+    }
   }
 })();
 </script>
