@@ -339,13 +339,19 @@ function renderDirectionsAppHtml(params: {
       [Math.min.apply(null, lngs), Math.min.apply(null, lats)],
       [Math.max.apply(null, lngs), Math.max.apply(null, lats)]
     ];
-    map.fitBounds(bounds, {
-      padding: { top: 70, bottom: 30, left: 30, right: 30 },
-      duration: 600
-    });
-
     loadingEl.style.display = 'none';
+
+    // Request the final iframe size FIRST so fitBounds computes against the
+    // post-resize viewport. Wait a tick for the host to apply the change,
+    // then force a map.resize() so Mapbox re-measures before fitting.
     requestSizeToFit();
+    setTimeout(function() {
+      map.resize();
+      map.fitBounds(bounds, {
+        padding: { top: 70, bottom: 30, left: 30, right: 30 },
+        duration: 600
+      });
+    }, 60);
   }
 })();
 </script>
