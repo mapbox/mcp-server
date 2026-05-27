@@ -10,6 +10,7 @@ import { IsochroneAppUIResource } from './ui-apps/IsochroneAppUIResource.js';
 import { OptimizationAppUIResource } from './ui-apps/OptimizationAppUIResource.js';
 import { SearchAppUIResource } from './ui-apps/SearchAppUIResource.js';
 import { MapMatchingAppUIResource } from './ui-apps/MapMatchingAppUIResource.js';
+import { GroundLocationAppUIResource } from './ui-apps/GroundLocationAppUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
@@ -24,6 +25,7 @@ export const ALL_RESOURCES = [
   new OptimizationAppUIResource({ httpRequest }),
   new SearchAppUIResource({ httpRequest }),
   new MapMatchingAppUIResource({ httpRequest }),
+  new GroundLocationAppUIResource({ httpRequest }),
   new VersionResource()
 ] as const;
 
