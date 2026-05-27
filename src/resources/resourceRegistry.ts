@@ -8,6 +8,7 @@ import { StaticMapUIResource } from './ui-apps/StaticMapUIResource.js';
 import { DirectionsAppUIResource } from './ui-apps/DirectionsAppUIResource.js';
 import { IsochroneAppUIResource } from './ui-apps/IsochroneAppUIResource.js';
 import { OptimizationAppUIResource } from './ui-apps/OptimizationAppUIResource.js';
+import { SearchAppUIResource } from './ui-apps/SearchAppUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
@@ -20,6 +21,7 @@ export const ALL_RESOURCES = [
   new DirectionsAppUIResource({ httpRequest }),
   new IsochroneAppUIResource({ httpRequest }),
   new OptimizationAppUIResource({ httpRequest }),
+  new SearchAppUIResource({ httpRequest }),
   new VersionResource()
 ] as const;
 

@@ -31,6 +31,10 @@ import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
 import { MatrixTool } from './matrix-tool/MatrixTool.js';
 import { OptimizationTool } from './optimization-tool/OptimizationTool.js';
 import { OptimizationAppTool } from './optimization-app-tool/OptimizationAppTool.js';
+import {
+  SearchAndGeocodeAppTool,
+  CategorySearchAppTool
+} from './search-app-tool/SearchAppTool.js';
 import { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js';
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
@@ -71,6 +75,8 @@ export const CORE_TOOLS = [
   new MatrixTool({ httpRequest }),
   new OptimizationTool({ httpRequest }),
   new OptimizationAppTool({ httpRequest }),
+  new SearchAndGeocodeAppTool({ httpRequest }),
+  new CategorySearchAppTool({ httpRequest }),
   new ReverseGeocodeTool({ httpRequest }),
   new StaticMapImageTool({ httpRequest }),
   new SearchAndGeocodeTool({ httpRequest })
