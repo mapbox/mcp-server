@@ -44,6 +44,7 @@ export {
   SearchAndGeocodeAppTool,
   CategorySearchAppTool
 } from './search-app-tool/SearchAppTool.js';
+export { MapMatchingAppTool } from './map-matching-app-tool/MapMatchingAppTool.js';
 export { DistanceTool } from './distance-tool/DistanceTool.js';
 export { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 export { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -73,6 +74,7 @@ import {
   SearchAndGeocodeAppTool,
   CategorySearchAppTool
 } from './search-app-tool/SearchAppTool.js';
+import { MapMatchingAppTool } from './map-matching-app-tool/MapMatchingAppTool.js';
 import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -125,6 +127,9 @@ export const searchAndGeocodeApp = new SearchAndGeocodeAppTool({ httpRequest });
 
 /** Category-filtered POI search results on an interactive Mapbox GL JS map (MCP App) */
 export const categorySearchApp = new CategorySearchAppTool({ httpRequest });
+
+/** Snap a GPS trace to the road network and render raw + matched on a map (MCP App) */
+export const mapMatchingApp = new MapMatchingAppTool({ httpRequest });
 
 /** Calculate distance between points */
 export const distance = new DistanceTool();

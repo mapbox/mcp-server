@@ -35,6 +35,7 @@ import {
   SearchAndGeocodeAppTool,
   CategorySearchAppTool
 } from './search-app-tool/SearchAppTool.js';
+import { MapMatchingAppTool } from './map-matching-app-tool/MapMatchingAppTool.js';
 import { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js';
 import { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
 import { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
@@ -77,6 +78,7 @@ export const CORE_TOOLS = [
   new OptimizationAppTool({ httpRequest }),
   new SearchAndGeocodeAppTool({ httpRequest }),
   new CategorySearchAppTool({ httpRequest }),
+  new MapMatchingAppTool({ httpRequest }),
   new ReverseGeocodeTool({ httpRequest }),
   new StaticMapImageTool({ httpRequest }),
   new SearchAndGeocodeTool({ httpRequest })
