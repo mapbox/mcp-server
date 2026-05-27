@@ -354,13 +354,15 @@ function renderOptimizationAppHtml(params: {
       [Math.min.apply(null, lngs), Math.min.apply(null, lats)],
       [Math.max.apply(null, lngs), Math.max.apply(null, lats)]
     ];
-    map.fitBounds(bounds, {
-      padding: { top: 70, bottom: 30, left: 30, right: 30 },
-      duration: 600
-    });
-
     loadingEl.style.display = 'none';
     requestSizeToFit();
+    setTimeout(function() {
+      map.resize();
+      map.fitBounds(bounds, {
+        padding: { top: 70, bottom: 30, left: 30, right: 30 },
+        duration: 600
+      });
+    }, 60);
   }
 })();
 </script>

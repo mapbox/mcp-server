@@ -343,13 +343,15 @@ function renderMapMatchingAppHtml(params: {
     ext(payload.raw_trace.coordinates);
     ext(payload.matched_geometry.coordinates);
 
-    map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-      padding: { top: 70, bottom: 50, left: 30, right: 30 },
-      duration: 600
-    });
-
     loadingEl.style.display = 'none';
     requestSizeToFit();
+    setTimeout(function() {
+      map.resize();
+      map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+        padding: { top: 70, bottom: 50, left: 30, right: 30 },
+        duration: 600
+      });
+    }, 60);
   }
 })();
 </script>
