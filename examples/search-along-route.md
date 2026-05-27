@@ -144,7 +144,7 @@ This document provides examples for testing the `search-along-route` prompt in t
    - Get the route using `directions_tool`
    - Create buffer using `buffer_tool`
    - Search using `category_search_tool` or `search_and_geocode_tool`
-   - Filter using `point_in_polygon_tool`
+   - Filter using `points_within_polygon_tool`
    - Order using `distance_tool`
    - Visualize on map
 
