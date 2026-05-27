@@ -323,20 +323,23 @@ function renderHtml(params: {
         .addTo(map);
     });
 
-    if (isFinite(minLng)) {
-      if (minLng === maxLng && minLat === maxLat) {
-        map.flyTo({ center: [minLng, minLat], zoom: 14 });
-      } else {
-        map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-          padding: { top: 70, bottom: 30, left: 30, right: 30 },
-          duration: 600,
-          maxZoom: 15
-        });
-      }
-    }
-
     loadingEl.style.display = 'none';
     requestSizeToFit();
+
+    if (isFinite(minLng)) {
+      setTimeout(function() {
+        map.resize();
+        if (minLng === maxLng && minLat === maxLat) {
+          map.flyTo({ center: [minLng, minLat], zoom: 14 });
+        } else {
+          map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+            padding: { top: 70, bottom: 30, left: 30, right: 30 },
+            duration: 600,
+            maxZoom: 15
+          });
+        }
+      }, 60);
+    }
   }
 })();
 </script>
