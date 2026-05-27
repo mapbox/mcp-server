@@ -37,6 +37,7 @@ export { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 export { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 export { CentroidTool } from './centroid-tool/CentroidTool.js';
 export { DirectionsTool } from './directions-tool/DirectionsTool.js';
+export { DirectionsAppTool } from './directions-app-tool/DirectionsAppTool.js';
 export { DistanceTool } from './distance-tool/DistanceTool.js';
 export { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 export { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -59,6 +60,7 @@ import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { CentroidTool } from './centroid-tool/CentroidTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
+import { DirectionsAppTool } from './directions-app-tool/DirectionsAppTool.js';
 import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -96,6 +98,9 @@ export const centroid = new CentroidTool();
 
 /** Get directions between waypoints */
 export const directions = new DirectionsTool({ httpRequest });
+
+/** Render a directions route on an interactive Mapbox GL JS map (MCP App) */
+export const directionsApp = new DirectionsAppTool({ httpRequest });
 
 /** Calculate distance between points */
 export const distance = new DistanceTool();

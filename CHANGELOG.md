@@ -17,6 +17,7 @@
 
 ### New Features
 
+- **`directions_app_tool`**: New tool that renders a route on an interactive Mapbox GL JS map as a self-contained MCP App (rawHtml UI resource). Useful when the user wants a visual, interactive map rather than turn-by-turn data. Requires a `MAPBOX_PUBLIC_TOKEN` (public `pk.*` token) env var separate from the existing secret `MAPBOX_ACCESS_TOKEN`.
 - **MCP Completions capability**: Add auto-completion support for prompt arguments per MCP spec (2025-11-25). Clients can now suggest values when users fill in prompt parameters (#176)
   - `category` argument on `find-places-nearby` — 482 Mapbox Search API categories
   - `mode` argument on `get-directions`, `search-along-route`, `show-reachable-areas` — driving, driving-traffic, walking, cycling
