@@ -365,15 +365,18 @@ function renderHtml(params: {
 
     legendEl.style.display = 'block';
 
-    if (isFinite(minLng)) {
-      map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-        padding: { top: 70, bottom: 50, left: 30, right: 30 },
-        duration: 600
-      });
-    }
-
     loadingEl.style.display = 'none';
     requestSizeToFit();
+
+    if (isFinite(minLng)) {
+      setTimeout(function() {
+        map.resize();
+        map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+          padding: { top: 70, bottom: 50, left: 30, right: 30 },
+          duration: 600
+        });
+      }, 60);
+    }
   }
 })();
 </script>
