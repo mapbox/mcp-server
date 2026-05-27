@@ -46,6 +46,11 @@ export {
 } from './search-app-tool/SearchAppTool.js';
 export { MapMatchingAppTool } from './map-matching-app-tool/MapMatchingAppTool.js';
 export { GroundLocationAppTool } from './ground-location-app-tool/GroundLocationAppTool.js';
+export {
+  UnionAppTool,
+  IntersectAppTool,
+  DifferenceAppTool
+} from './polygon-ops-app-tool/PolygonOpsAppTool.js';
 export { DistanceTool } from './distance-tool/DistanceTool.js';
 export { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 export { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -77,6 +82,11 @@ import {
 } from './search-app-tool/SearchAppTool.js';
 import { MapMatchingAppTool } from './map-matching-app-tool/MapMatchingAppTool.js';
 import { GroundLocationAppTool } from './ground-location-app-tool/GroundLocationAppTool.js';
+import {
+  UnionAppTool,
+  IntersectAppTool,
+  DifferenceAppTool
+} from './polygon-ops-app-tool/PolygonOpsAppTool.js';
 import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -135,6 +145,15 @@ export const mapMatchingApp = new MapMatchingAppTool({ httpRequest });
 
 /** Reverse-geocode + nearby POIs rendered on an interactive Mapbox GL JS map (MCP App) */
 export const groundLocationApp = new GroundLocationAppTool({ httpRequest });
+
+/** Union of two or more polygons rendered on an interactive map (MCP App) */
+export const unionApp = new UnionAppTool();
+
+/** Intersection of two polygons rendered on an interactive map (MCP App) */
+export const intersectApp = new IntersectAppTool();
+
+/** Difference (polygon1 minus polygon2) rendered on an interactive map (MCP App) */
+export const differenceApp = new DifferenceAppTool();
 
 /** Calculate distance between points */
 export const distance = new DistanceTool();

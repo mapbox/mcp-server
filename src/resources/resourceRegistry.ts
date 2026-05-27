@@ -11,6 +11,7 @@ import { OptimizationAppUIResource } from './ui-apps/OptimizationAppUIResource.j
 import { SearchAppUIResource } from './ui-apps/SearchAppUIResource.js';
 import { MapMatchingAppUIResource } from './ui-apps/MapMatchingAppUIResource.js';
 import { GroundLocationAppUIResource } from './ui-apps/GroundLocationAppUIResource.js';
+import { PolygonOpsAppUIResource } from './ui-apps/PolygonOpsAppUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
@@ -26,6 +27,7 @@ export const ALL_RESOURCES = [
   new SearchAppUIResource({ httpRequest }),
   new MapMatchingAppUIResource({ httpRequest }),
   new GroundLocationAppUIResource({ httpRequest }),
+  new PolygonOpsAppUIResource({ httpRequest }),
   new VersionResource()
 ] as const;
 

@@ -80,7 +80,10 @@ describe('Tool Annotations', () => {
       'destination_tool',
       'length_tool',
       'nearest_point_on_line_tool',
-      'convex_tool'
+      'convex_tool',
+      'union_app_tool',
+      'intersect_app_tool',
+      'difference_app_tool'
     ];
     const apiTools = tools.filter((tool) => !offlineTools.includes(tool.name));
 
