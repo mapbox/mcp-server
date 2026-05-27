@@ -7,6 +7,7 @@ import { TemporaryDataResource } from './temporary/TemporaryDataResource.js';
 import { StaticMapUIResource } from './ui-apps/StaticMapUIResource.js';
 import { DirectionsAppUIResource } from './ui-apps/DirectionsAppUIResource.js';
 import { IsochroneAppUIResource } from './ui-apps/IsochroneAppUIResource.js';
+import { OptimizationAppUIResource } from './ui-apps/OptimizationAppUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
@@ -18,6 +19,7 @@ export const ALL_RESOURCES = [
   new StaticMapUIResource(),
   new DirectionsAppUIResource({ httpRequest }),
   new IsochroneAppUIResource({ httpRequest }),
+  new OptimizationAppUIResource({ httpRequest }),
   new VersionResource()
 ] as const;
 
