@@ -7,6 +7,7 @@ import { createUIResource } from '@mcp-ui/server';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 import { DirectionsAppInputSchema } from './DirectionsAppTool.input.schema.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
@@ -21,16 +22,34 @@ interface DirectionsResponse {
   routes?: RouteFeature[];
 }
 
+interface TokenListEntry {
+  token?: string;
+  usage?: string;
+  default?: boolean;
+}
+
+// Cache the resolved pk.* token for an hour to avoid an extra Tokens API call
+// on every directions_app_tool invocation.
+interface CachedToken {
+  token: string;
+  expiresAt: number;
+}
+const PUBLIC_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
+
 export class DirectionsAppTool extends MapboxApiBasedTool<
   typeof DirectionsAppInputSchema
 > {
+  private cachedPublicToken: CachedToken | null = null;
+
   name = 'directions_app_tool';
   description =
     'Render a directions route on an interactive Mapbox GL JS map as an MCP App. ' +
     'Returns a self-contained HTML UI resource with the route drawn, start/end markers, ' +
-    'and camera fit to the route bounds. Requires the MAPBOX_PUBLIC_TOKEN env var ' +
-    '(a public Mapbox access token). Use this when the user asks for a visual, ' +
-    'interactive map of a route rather than just turn-by-turn data.';
+    'and camera fit to the route bounds. The required public (pk.*) token is fetched ' +
+    "from the user's Mapbox account via the Tokens API (requires the tokens:read scope) " +
+    'or read from the optional MAPBOX_PUBLIC_TOKEN env var as a fallback. ' +
+    'Use this when the user asks for a visual, interactive map of a route rather than ' +
+    'just turn-by-turn data.';
   annotations = {
     title: 'Directions App Tool',
     readOnlyHint: true,
@@ -50,13 +69,13 @@ export class DirectionsAppTool extends MapboxApiBasedTool<
     input: z.infer<typeof DirectionsAppInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    const publicToken = process.env.MAPBOX_PUBLIC_TOKEN;
+    const publicToken = await this.resolvePublicToken(accessToken);
     if (!publicToken) {
       return {
         content: [
           {
             type: 'text',
-            text: 'MAPBOX_PUBLIC_TOKEN environment variable is not set. Provide a public (pk.*) Mapbox access token to render the interactive map.'
+            text: 'Unable to resolve a public Mapbox token. The server token does not have tokens:read scope and MAPBOX_PUBLIC_TOKEN is not set. Either grant tokens:read to the OAuth client or set MAPBOX_PUBLIC_TOKEN (a pk.* token).'
           }
         ],
         isError: true
@@ -119,6 +138,20 @@ export class DirectionsAppTool extends MapboxApiBasedTool<
       encoding: 'text',
       uiMetadata: {
         'preferred-frame-size': ['100%', '480px']
+      },
+      resourceProps: {
+        _meta: {
+          ui: {
+            csp: {
+              connectDomains: [
+                'https://*.mapbox.com',
+                'https://events.mapbox.com'
+              ],
+              resourceDomains: ['https://api.mapbox.com'],
+              workerDomains: ['blob:']
+            }
+          }
+        }
       }
     });
 
@@ -129,6 +162,76 @@ export class DirectionsAppTool extends MapboxApiBasedTool<
         viewUUID: randomUUID()
       }
     };
+  }
+
+  /**
+   * Resolve a public (pk.*) token suitable for embedding in client-side HTML.
+   *
+   * Resolution order:
+   * 1. If the server token is already a pk.* token, use it directly.
+   * 2. If we have a cached pk.* token with >5 min TTL remaining, reuse it.
+   * 3. If the server token is an sk.* token, call GET /tokens/v2/{user}?default=true
+   *    to fetch the user's default public token (requires tokens:read scope).
+   * 4. Fall back to the MAPBOX_PUBLIC_TOKEN env var.
+   *
+   * Returns undefined if none of the above produces a pk.* token.
+   */
+  private async resolvePublicToken(
+    accessToken: string
+  ): Promise<string | undefined> {
+    if (accessToken.startsWith('pk.')) {
+      return accessToken;
+    }
+
+    const now = Date.now();
+    if (
+      this.cachedPublicToken &&
+      this.cachedPublicToken.expiresAt - now > 5 * 60 * 1000
+    ) {
+      return this.cachedPublicToken.token;
+    }
+
+    if (accessToken.startsWith('sk.')) {
+      const username = getUserNameFromToken(accessToken);
+      if (username) {
+        try {
+          const tokensUrl = new URL(
+            `${MapboxApiBasedTool.mapboxApiEndpoint}tokens/v2/${username}`
+          );
+          tokensUrl.searchParams.set('default', 'true');
+          tokensUrl.searchParams.set('access_token', accessToken);
+
+          const response = await this.httpRequest(tokensUrl.toString());
+          if (response.ok) {
+            const body = (await response.json()) as unknown;
+            const entries: TokenListEntry[] = Array.isArray(body)
+              ? (body as TokenListEntry[])
+              : ((body as { tokens?: TokenListEntry[] })?.tokens ?? []);
+            const defaultPk = entries.find(
+              (entry) =>
+                entry?.usage === 'pk' && typeof entry.token === 'string'
+            );
+            if (defaultPk?.token) {
+              this.cachedPublicToken = {
+                token: defaultPk.token,
+                expiresAt: now + PUBLIC_TOKEN_TTL_MS
+              };
+              return defaultPk.token;
+            }
+          }
+        } catch (err) {
+          this.log(
+            'debug',
+            `directions_app_tool: failed to fetch default public token, falling back to env var: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      }
+    }
+
+    const envFallback = process.env.MAPBOX_PUBLIC_TOKEN;
+    return envFallback && envFallback.startsWith('pk.')
+      ? envFallback
+      : undefined;
   }
 }
 
