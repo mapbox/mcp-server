@@ -364,7 +364,7 @@ function renderIsochroneAppHtml(params: {
 
     if (isFinite(minLng)) {
       map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-        padding: 60,
+        padding: { top: 70, bottom: 30, left: 30, right: 30 },
         duration: 600
       });
     }
