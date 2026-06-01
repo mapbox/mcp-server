@@ -24,7 +24,6 @@ import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
-import { DirectionsAppTool } from './directions-app-tool/DirectionsAppTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
 import { MatrixTool } from './matrix-tool/MatrixTool.js';
@@ -62,7 +61,6 @@ export const CORE_TOOLS = [
   new DistanceTool(),
   new CategorySearchTool({ httpRequest }),
   new DirectionsTool({ httpRequest }),
-  new DirectionsAppTool({ httpRequest }),
   new IsochroneTool({ httpRequest }),
   new MapMatchingTool({ httpRequest }),
   new MatrixTool({ httpRequest }),
