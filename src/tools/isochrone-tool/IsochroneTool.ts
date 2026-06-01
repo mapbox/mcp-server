@@ -1,8 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -12,6 +13,9 @@ import {
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import { renderIsochroneAppHtml } from '../../resources/ui-apps/isochroneAppHtml.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -29,6 +33,15 @@ export class IsochroneTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/isochrone-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -178,29 +191,95 @@ export class IsochroneTool extends MapboxApiBasedTool<
 
     // Validate the response against our schema
     const parsedData = IsochroneResponseSchema.safeParse(data);
+    const validatedData = parsedData.success
+      ? (parsedData.data as unknown as Record<string, unknown>)
+      : (data as Record<string, unknown>);
 
-    if (parsedData.success) {
-      // Valid response - use formatted output
-      const formattedText = this.formatIsochroneResponse(parsedData.data);
-      return {
-        content: [{ type: 'text', text: formattedText }],
-        structuredContent: parsedData.data as unknown as Record<
-          string,
-          unknown
-        >,
-        isError: false
-      };
-    } else {
-      // Invalid response - fall back to JSON string for backward compatibility
+    if (!parsedData.success) {
       this.log(
         'warning',
         `IsochroneTool: Response validation failed: ${parsedData.error.message}`
       );
-      return {
-        content: [{ type: 'text', text: responseText }],
-        structuredContent: data as Record<string, unknown>,
-        isError: false
-      };
     }
+
+    const text = parsedData.success
+      ? this.formatIsochroneResponse(parsedData.data)
+      : responseText;
+
+    const content: CallToolResult['content'] = [{ type: 'text', text }];
+
+    if (isMcpUiEnabled()) {
+      const inlineHtml = await tryRenderIsochroneInlineHtml(
+        data,
+        input,
+        accessToken,
+        this.httpRequest
+      );
+      if (inlineHtml) {
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/isochrone/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: {
+              'preferred-frame-size': ['100%', '500px']
+            }
+          })
+        );
+      }
+    }
+
+    return {
+      content,
+      structuredContent: validatedData,
+      isError: false
+    };
   }
+}
+
+/**
+ * Bake the isochrone FeatureCollection + origin coordinates into the shared
+ * iframe template so MCP-UI clients render inline without a postMessage hop.
+ */
+async function tryRenderIsochroneInlineHtml(
+  data: unknown,
+  input: z.infer<typeof IsochroneInputSchema>,
+  accessToken: string,
+  httpRequest: HttpRequest
+): Promise<string | undefined> {
+  const fc = data as { type?: string; features?: unknown[] } | null;
+  if (
+    !fc ||
+    fc.type !== 'FeatureCollection' ||
+    !Array.isArray(fc.features) ||
+    fc.features.length === 0
+  ) {
+    return undefined;
+  }
+
+  const publicToken = await resolveMapboxPublicToken({
+    accessToken,
+    apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+    httpRequest
+  });
+  if (!publicToken) return undefined;
+
+  const mode = input.profile.replace('mapbox/', '').replace('-', ' ');
+  let summary = `Isochrone: ${fc.features.length} contour${fc.features.length !== 1 ? 's' : ''}`;
+  if (input.contours_minutes && input.contours_minutes.length > 0) {
+    summary = `Reachable by ${mode}: ${input.contours_minutes.map((m) => `${m} min`).join(', ')}`;
+  } else if (input.contours_meters && input.contours_meters.length > 0) {
+    summary = `Reachable by ${mode}: ${input.contours_meters
+      .map((m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`))
+      .join(', ')}`;
+  }
+
+  return renderIsochroneAppHtml({
+    publicToken,
+    initialData: {
+      featureCollection: fc as { type: string; features: unknown[] },
+      origin: input.coordinates,
+      summary
+    }
+  });
 }
