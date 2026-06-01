@@ -37,14 +37,6 @@ export { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 export { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 export { CentroidTool } from './centroid-tool/CentroidTool.js';
 export { DirectionsTool } from './directions-tool/DirectionsTool.js';
-export { DirectionsAppTool } from './directions-app-tool/DirectionsAppTool.js';
-export { IsochroneAppTool } from './isochrone-app-tool/IsochroneAppTool.js';
-export { OptimizationAppTool } from './optimization-app-tool/OptimizationAppTool.js';
-export {
-  SearchAndGeocodeAppTool,
-  CategorySearchAppTool
-} from './search-app-tool/SearchAppTool.js';
-export { MapMatchingAppTool } from './map-matching-app-tool/MapMatchingAppTool.js';
 export { DistanceTool } from './distance-tool/DistanceTool.js';
 export { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 export { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -67,14 +59,6 @@ import { CategoryListTool } from './category-list-tool/CategoryListTool.js';
 import { CategorySearchTool } from './category-search-tool/CategorySearchTool.js';
 import { CentroidTool } from './centroid-tool/CentroidTool.js';
 import { DirectionsTool } from './directions-tool/DirectionsTool.js';
-import { DirectionsAppTool } from './directions-app-tool/DirectionsAppTool.js';
-import { IsochroneAppTool } from './isochrone-app-tool/IsochroneAppTool.js';
-import { OptimizationAppTool } from './optimization-app-tool/OptimizationAppTool.js';
-import {
-  SearchAndGeocodeAppTool,
-  CategorySearchAppTool
-} from './search-app-tool/SearchAppTool.js';
-import { MapMatchingAppTool } from './map-matching-app-tool/MapMatchingAppTool.js';
 import { DistanceTool } from './distance-tool/DistanceTool.js';
 import { IsochroneTool } from './isochrone-tool/IsochroneTool.js';
 import { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
@@ -112,24 +96,6 @@ export const centroid = new CentroidTool();
 
 /** Get directions between waypoints */
 export const directions = new DirectionsTool({ httpRequest });
-
-/** Render a directions route on an interactive Mapbox GL JS map (MCP App) */
-export const directionsApp = new DirectionsAppTool({ httpRequest });
-
-/** Render reachable-area isochrones on an interactive Mapbox GL JS map (MCP App) */
-export const isochroneApp = new IsochroneAppTool({ httpRequest });
-
-/** Render an optimized multi-stop trip on an interactive Mapbox GL JS map (MCP App) */
-export const optimizationApp = new OptimizationAppTool({ httpRequest });
-
-/** Free-text search/geocode results on an interactive Mapbox GL JS map (MCP App) */
-export const searchAndGeocodeApp = new SearchAndGeocodeAppTool({ httpRequest });
-
-/** Category-filtered POI search results on an interactive Mapbox GL JS map (MCP App) */
-export const categorySearchApp = new CategorySearchAppTool({ httpRequest });
-
-/** Snap a GPS trace to the road network and render raw + matched on a map (MCP App) */
-export const mapMatchingApp = new MapMatchingAppTool({ httpRequest });
 
 /** Calculate distance between points */
 export const distance = new DistanceTool();

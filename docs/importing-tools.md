@@ -116,7 +116,7 @@ import {
   centroid,
   distance,
   midpoint,
-  pointInPolygon,
+  pointsWithinPolygon,
   simplify,
 
   // API tools (HTTP pre-configured)
@@ -149,7 +149,7 @@ import {
   CentroidTool,
   DistanceTool,
   MidpointTool,
-  PointInPolygonTool,
+  PointsWithinPolygonTool,
   SimplifyTool,
 
   // API tools

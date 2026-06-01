@@ -1,7 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import { SpanStatusCode } from '@opentelemetry/api';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import {
   OptimizationInputSchema,
@@ -14,6 +16,9 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolExecutionContext } from '../../utils/tracing.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import { renderOptimizationAppHtml } from '../../resources/ui-apps/optimizationAppHtml.js';
 
 /**
  * OptimizationTool - Find optimal route through multiple coordinates (V1 API)
@@ -37,6 +42,15 @@ export class OptimizationTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/optimization-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -165,8 +179,33 @@ export class OptimizationTool extends MapboxApiBasedTool<
         validatedResult.waypoints.length
       );
 
+      const content: CallToolResult['content'] = [
+        { type: 'text' as const, text }
+      ];
+
+      if (isMcpUiEnabled()) {
+        const inlineHtml = await tryRenderOptimizationInlineHtml(
+          validatedResult,
+          input,
+          accessToken,
+          this.httpRequest
+        );
+        if (inlineHtml) {
+          content.push(
+            createUIResource({
+              uri: `ui://mapbox/optimization/${randomUUID()}`,
+              content: { type: 'rawHtml', htmlString: inlineHtml },
+              encoding: 'text',
+              uiMetadata: {
+                'preferred-frame-size': ['100%', '500px']
+              }
+            })
+          );
+        }
+      }
+
       return {
-        content: [{ type: 'text' as const, text }],
+        content,
         structuredContent: validatedResult,
         isError: false
       };
@@ -186,4 +225,53 @@ export class OptimizationTool extends MapboxApiBasedTool<
       };
     }
   }
+}
+
+/**
+ * Bake the optimized trip into the shared iframe template for MCP-UI clients.
+ */
+async function tryRenderOptimizationInlineHtml(
+  result: OptimizationOutput,
+  _input: OptimizationInput,
+  accessToken: string,
+  httpRequest: HttpRequest
+): Promise<string | undefined> {
+  const trip = result.trips?.[0];
+  if (!trip?.geometry) return undefined;
+
+  const publicToken = await resolveMapboxPublicToken({
+    accessToken,
+    apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+    httpRequest
+  });
+  if (!publicToken) return undefined;
+
+  // Sort waypoints by waypoint_index = position in optimized trip
+  const stops = (result.waypoints ?? [])
+    .map((wp, inputIndex) => ({ wp, inputIndex }))
+    .sort((a, b) => a.wp.waypoint_index - b.wp.waypoint_index)
+    .map(({ wp, inputIndex }, orderIndex) => ({
+      order: orderIndex + 1,
+      input_index: inputIndex,
+      location: wp.location as [number, number],
+      name: wp.name
+    }));
+
+  const parts: string[] = [];
+  if (typeof trip.distance === 'number') {
+    parts.push(`${(trip.distance / 1609.34).toFixed(1)} mi`);
+  }
+  if (typeof trip.duration === 'number') {
+    parts.push(`${Math.round(trip.duration / 60)} min`);
+  }
+  const summary = `Optimized trip: ${parts.length ? parts.join(', ') : `${stops.length} stops`}`;
+
+  return renderOptimizationAppHtml({
+    publicToken,
+    initialData: {
+      geometry: trip.geometry,
+      stops,
+      summary
+    }
+  });
 }
