@@ -213,12 +213,39 @@ ${initialDataScript}
 
   function handleToolResult(result) {
     var route = extractRoute(result);
-    if (!route) {
-      loadingEl.style.display = 'none';
-      errorEl.textContent = 'Could not find route data in tool result.';
-      errorEl.style.display = 'block';
+    if (route) {
+      renderRoute(route);
       return;
     }
+
+    // Fallback: large directions responses are stored as a temporary resource
+    // (mapbox://temp/directions-id) and the structuredContent is stripped of
+    // geometry to keep the agent context light. Read it back via the
+    // MCP Apps host resources/read bridge.
+    var tempUri = findTempResourceUri(result);
+    if (tempUri) {
+      loadingEl.textContent = 'Fetching full route…';
+      sendRequest('resources/read', { uri: tempUri }).then(
+        function(rr) {
+          var fetched = readResourceJson(rr);
+          var fetchedRoute = fetched ? extractRoute({ structuredContent: fetched }) : null;
+          if (fetchedRoute) {
+            renderRoute(fetchedRoute);
+          } else {
+            showError('Could not parse route from the temporary resource.');
+          }
+        },
+        function(err) {
+          showError('Could not read temporary resource: ' + (err && err.message ? err.message : err));
+        }
+      );
+      return;
+    }
+
+    showError('Could not find route data in tool result.');
+  }
+
+  function renderRoute(route) {
     if (route.summary) {
       summaryEl.textContent = route.summary;
       summaryEl.style.display = 'block';
@@ -226,6 +253,34 @@ ${initialDataScript}
     if (!map) { loadingEl.style.display = 'none'; return; }
     if (mapLoaded) drawRoute(route);
     else pendingRoute = route;
+  }
+
+  function showError(message) {
+    loadingEl.style.display = 'none';
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+  }
+
+  // Mapbox MCP server emits the URI in the summary text content of large
+  // responses: "Resource URI: mapbox://temp/directions-<hex>".
+  function findTempResourceUri(result) {
+    if (!result || !Array.isArray(result.content)) return null;
+    for (var i = 0; i < result.content.length; i++) {
+      var c = result.content[i];
+      if (c && c.type === 'text' && typeof c.text === 'string') {
+        var m = c.text.match(/mapbox:\\/\\/temp\\/directions-[0-9a-fA-F]+/);
+        if (m) return m[0];
+      }
+    }
+    return null;
+  }
+
+  // resources/read responses have shape: { contents: [{ text: "<json>", ... }] }
+  function readResourceJson(rr) {
+    if (!rr || !Array.isArray(rr.contents) || rr.contents.length === 0) return null;
+    var first = rr.contents[0];
+    if (!first || typeof first.text !== 'string') return null;
+    try { return JSON.parse(first.text); } catch (_) { return null; }
   }
 
   function extractRoute(result) {
