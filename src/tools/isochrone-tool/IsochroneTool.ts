@@ -100,20 +100,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
       `${MapboxApiBasedTool.mapboxApiEndpoint}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
     );
     url.searchParams.append('access_token', accessToken);
-    if (
-      (!input.contours_minutes || input.contours_minutes.length === 0) &&
-      (!input.contours_meters || input.contours_meters.length === 0)
-    ) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: "At least one of 'contours_minutes' or 'contours_meters' must be provided"
-          }
-        ],
-        isError: true
-      };
-    }
     if (input.contours_minutes && input.contours_minutes.length > 0) {
       url.searchParams.append(
         'contours_minutes',
