@@ -93,6 +93,9 @@ ${initialDataScript}
   var mapLoaded = false;
   var pendingRoute = null;
   var currentDisplayMode = 'inline';
+  // Track markers across re-renders so we can remove them before drawing the
+  // next route — otherwise a second tool-result delivery stacks pins.
+  var routeMarkers = [];
 
   // -------------------------------------------------------------------------
   // MCP App postMessage protocol (skipped silently in MCP-UI rawHtml mode)
@@ -408,6 +411,11 @@ ${initialDataScript}
 
     if (map.getLayer('route-line')) map.removeLayer('route-line');
     if (map.getSource('route')) map.removeSource('route');
+    // Remove any markers from a prior render so we don't stack pins.
+    for (var mi = 0; mi < routeMarkers.length; mi++) {
+      routeMarkers[mi].remove();
+    }
+    routeMarkers = [];
 
     map.addSource('route', {
       type: 'geojson',
@@ -422,14 +430,18 @@ ${initialDataScript}
     });
 
     var coords = route.geometry.coordinates;
-    new mapboxgl.Marker({ color: '#22c55e' })
-      .setLngLat(coords[0])
-      .setPopup(new mapboxgl.Popup().setText('Start'))
-      .addTo(map);
-    new mapboxgl.Marker({ color: '#ef4444' })
-      .setLngLat(coords[coords.length - 1])
-      .setPopup(new mapboxgl.Popup().setText('End'))
-      .addTo(map);
+    routeMarkers.push(
+      new mapboxgl.Marker({ color: '#22c55e' })
+        .setLngLat(coords[0])
+        .setPopup(new mapboxgl.Popup().setText('Start'))
+        .addTo(map)
+    );
+    routeMarkers.push(
+      new mapboxgl.Marker({ color: '#ef4444' })
+        .setLngLat(coords[coords.length - 1])
+        .setPopup(new mapboxgl.Popup().setText('End'))
+        .addTo(map)
+    );
 
     var lngs = coords.map(function(c) { return c[0]; });
     var lats = coords.map(function(c) { return c[1]; });
