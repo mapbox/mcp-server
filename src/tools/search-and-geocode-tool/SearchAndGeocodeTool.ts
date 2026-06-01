@@ -1,7 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.input.schema.js';
@@ -14,6 +16,8 @@ import type {
   MapboxFeature
 } from '../../schemas/geojson.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { tryRenderSearchInlineHtml } from '../../resources/ui-apps/searchAppHtml.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -30,6 +34,15 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/search-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -299,13 +312,40 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     }
 
     // Default behavior: return all results
+    const content: CallToolResult['content'] = [
+      {
+        type: 'text',
+        text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
+      }
+    ];
+
+    if (isMcpUiEnabled()) {
+      const inlineHtml = await tryRenderSearchInlineHtml({
+        featureCollection: data as { features?: unknown[] },
+        proximity: input.proximity,
+        summary: `Found ${(data as { features?: unknown[] }).features?.length ?? 0} result${
+          (data as { features?: unknown[] }).features?.length === 1 ? '' : 's'
+        } for "${input.q}"`,
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+        httpRequest: this.httpRequest
+      });
+      if (inlineHtml) {
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/search/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: {
+              'preferred-frame-size': ['100%', '500px']
+            }
+          })
+        );
+      }
+    }
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
-        }
-      ],
+      content,
       structuredContent: data,
       isError: false
     };
