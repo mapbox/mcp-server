@@ -1,7 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -10,6 +12,8 @@ import {
   GroundLocationOutputSchema,
   type GroundLocationOutput
 } from './GroundLocationTool.output.schema.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { tryRenderGroundLocationInlineHtml } from '../../resources/ui-apps/groundLocationAppHtml.js';
 
 // Minimal types for API responses we care about
 interface GeocodingFeature {
@@ -76,6 +80,15 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/ground-location-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -271,8 +284,37 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     const validated = GroundLocationOutputSchema.safeParse(result);
     const output = validated.success ? validated.data : result;
 
+    const content: CallToolResult['content'] = [
+      { type: 'text', text: this.formatOutput(output) }
+    ];
+
+    if (isMcpUiEnabled()) {
+      const inlineHtml = await tryRenderGroundLocationInlineHtml({
+        place: output.place,
+        full_address: output.full_address,
+        longitude: output.longitude,
+        latitude: output.latitude,
+        nearby_pois: output.nearby_pois,
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+        httpRequest: this.httpRequest
+      });
+      if (inlineHtml) {
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/ground-location/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: {
+              'preferred-frame-size': ['100%', '500px']
+            }
+          })
+        );
+      }
+    }
+
     return {
-      content: [{ type: 'text', text: this.formatOutput(output) }],
+      content,
       structuredContent: output as unknown as Record<string, unknown>,
       isError: false
     };
