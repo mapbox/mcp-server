@@ -395,14 +395,15 @@ async function tryRenderInlineUiHtml(
 ): Promise<string | undefined> {
   const route = data.routes?.[0];
   const geometry = route?.geometry;
-  // The GeoJSON branch is the only one we can render without decoding work.
-  if (
-    !geometry ||
-    typeof geometry !== 'object' ||
-    geometry === null ||
-    (geometry as { type?: string }).type !== 'LineString' ||
-    !Array.isArray((geometry as { coordinates?: unknown }).coordinates)
-  ) {
+  // Accept either a GeoJSON LineString object or a polyline string — the
+  // iframe normalizes both shapes before rendering.
+  const hasGeojson =
+    geometry &&
+    typeof geometry === 'object' &&
+    (geometry as { type?: string }).type === 'LineString' &&
+    Array.isArray((geometry as { coordinates?: unknown }).coordinates);
+  const hasPolyline = typeof geometry === 'string' && geometry.length > 0;
+  if (!hasGeojson && !hasPolyline) {
     return undefined;
   }
 
@@ -427,7 +428,7 @@ async function tryRenderInlineUiHtml(
   return renderDirectionsAppHtml({
     publicToken,
     initialData: {
-      geometry: geometry as {
+      geometry: geometry as unknown as {
         type: string;
         coordinates: [number, number][];
       },

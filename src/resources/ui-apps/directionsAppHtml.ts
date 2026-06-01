@@ -190,14 +190,23 @@ ${initialDataScript}
 
   // -------------------------------------------------------------------------
   // Initial data path (MCP-UI rawHtml): geometry was baked in server-side.
+  // Accepts the same geometry shapes as extractRoute (GeoJSON or polyline).
   // -------------------------------------------------------------------------
   function consumeInitialData() {
     var el = document.getElementById('initial-data');
     if (!el || !el.textContent) return;
     try {
       var data = JSON.parse(el.textContent);
-      if (data && data.geometry && data.geometry.coordinates) {
-        drawRoute(data);
+      if (!data || !data.geometry) return;
+      // Reuse pickRouteGeometry by wrapping the baked-in payload as a route.
+      var route = pickRouteGeometry({
+        geometry: data.geometry,
+        distance: data.distance,
+        duration: data.duration
+      });
+      if (route) {
+        if (data.summary) route.summary = data.summary;
+        drawRoute(route);
       }
     } catch (_) { /* ignore */ }
   }
@@ -222,10 +231,8 @@ ${initialDataScript}
   function extractRoute(result) {
     var sc = result && result.structuredContent;
     if (sc && Array.isArray(sc.routes) && sc.routes.length > 0) {
-      var r = sc.routes[0];
-      if (r && r.geometry && r.geometry.coordinates) {
-        return { geometry: r.geometry, summary: buildSummary(r) };
-      }
+      var picked = pickRouteGeometry(sc.routes[0]);
+      if (picked) return picked;
     }
     if (result && Array.isArray(result.content)) {
       for (var i = 0; i < result.content.length; i++) {
@@ -233,9 +240,9 @@ ${initialDataScript}
         if (c && c.type === 'text' && typeof c.text === 'string') {
           try {
             var parsed = JSON.parse(c.text);
-            if (parsed && Array.isArray(parsed.routes) && parsed.routes[0] && parsed.routes[0].geometry) {
-              var r2 = parsed.routes[0];
-              return { geometry: r2.geometry, summary: buildSummary(r2) };
+            if (parsed && Array.isArray(parsed.routes) && parsed.routes[0]) {
+              var picked2 = pickRouteGeometry(parsed.routes[0]);
+              if (picked2) return picked2;
             }
             if (parsed && parsed.geometry && parsed.geometry.coordinates) {
               return parsed;
@@ -245,6 +252,79 @@ ${initialDataScript}
       }
     }
     return null;
+  }
+
+  // Mapbox Directions can return geometry in 3 shapes:
+  //   - GeoJSON  : { type: 'LineString', coordinates: [[lng,lat], ...] }
+  //   - polyline : "encoded_string"  (precision 5, default)
+  //   - polyline6: "encoded_string"  (precision 6)
+  // We accept all three and normalize to GeoJSON for rendering.
+  function pickRouteGeometry(route) {
+    if (!route || !route.geometry) return null;
+    var g = route.geometry;
+    if (typeof g === 'object' && Array.isArray(g.coordinates) && g.coordinates.length) {
+      return { geometry: g, summary: buildSummary(route) };
+    }
+    if (typeof g === 'string' && g.length > 0) {
+      // Pick precision: polyline6 strings often contain '_' / '@'-like density
+      // but the response usually carries a hint at top level. Try 6 first if
+      // the response object says so, else 5.
+      var coords = decodePolyline(g, 5);
+      if (coords.length > 0 && coordsLookSane(coords)) {
+        return {
+          geometry: { type: 'LineString', coordinates: coords },
+          summary: buildSummary(route)
+        };
+      }
+      coords = decodePolyline(g, 6);
+      if (coords.length > 0 && coordsLookSane(coords)) {
+        return {
+          geometry: { type: 'LineString', coordinates: coords },
+          summary: buildSummary(route)
+        };
+      }
+    }
+    return null;
+  }
+
+  function coordsLookSane(coords) {
+    for (var i = 0; i < coords.length; i++) {
+      var c = coords[i];
+      if (!Array.isArray(c) || c.length !== 2) return false;
+      if (c[0] < -180 || c[0] > 180 || c[1] < -90 || c[1] > 90) return false;
+    }
+    return true;
+  }
+
+  // Standard Google/Mapbox polyline decoder. Precision = 5 (default) or 6.
+  function decodePolyline(str, precision) {
+    precision = precision || 5;
+    var factor = Math.pow(10, precision);
+    var coords = [];
+    var lat = 0;
+    var lng = 0;
+    var i = 0;
+    while (i < str.length) {
+      var shift = 0;
+      var result = 0;
+      var b;
+      do {
+        b = str.charCodeAt(i++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20 && i < str.length);
+      lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+      shift = 0;
+      result = 0;
+      do {
+        b = str.charCodeAt(i++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20 && i < str.length);
+      lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+      coords.push([lng / factor, lat / factor]);
+    }
+    return coords;
   }
 
   function buildSummary(route) {
