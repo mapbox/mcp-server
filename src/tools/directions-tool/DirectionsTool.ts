@@ -2,8 +2,9 @@
 // Licensed under the MIT License.
 
 import { URLSearchParams } from 'node:url';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { cleanResponseData } from './cleanResponseData.js';
@@ -15,6 +16,9 @@ import {
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import { renderDirectionsAppHtml } from '../../resources/ui-apps/directionsAppHtml.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -34,6 +38,15 @@ export class DirectionsTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/directions-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -333,10 +346,93 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
     }
 
     // Small response - return normally
+    const content: CallToolResult['content'] = [
+      { type: 'text', text: responseText }
+    ];
+
+    // Legacy MCP-UI: inline a rawHtml UIResource so non-MCP-Apps clients
+    // also get a live GL JS map. Only works when the response actually
+    // carries a renderable GeoJSON geometry — i.e. geometries=geojson.
+    if (isMcpUiEnabled()) {
+      const inlineHtml = await tryRenderInlineUiHtml(
+        validatedData,
+        accessToken,
+        this.httpRequest
+      );
+      if (inlineHtml) {
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/directions/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: {
+              'preferred-frame-size': ['100%', '500px']
+            }
+          })
+        );
+      }
+    }
+
     return {
-      content: [{ type: 'text', text: responseText }],
+      content,
       structuredContent: validatedData,
       isError: false
     };
   }
+}
+
+/**
+ * Try to render the same DirectionsAppHtml as the MCP Apps resource, but
+ * with the route geometry baked in so MCP-UI clients (which don't fetch
+ * external resources) can render inline. Returns undefined when the
+ * response has no GeoJSON geometry to render or no public token can be
+ * resolved — the caller falls back to text-only output.
+ */
+async function tryRenderInlineUiHtml(
+  data: DirectionsResponse,
+  accessToken: string,
+  httpRequest: HttpRequest
+): Promise<string | undefined> {
+  const route = data.routes?.[0];
+  const geometry = route?.geometry;
+  // Accept either a GeoJSON LineString object or a polyline string — the
+  // iframe normalizes both shapes before rendering.
+  const hasGeojson =
+    geometry &&
+    typeof geometry === 'object' &&
+    (geometry as { type?: string }).type === 'LineString' &&
+    Array.isArray((geometry as { coordinates?: unknown }).coordinates);
+  const hasPolyline = typeof geometry === 'string' && geometry.length > 0;
+  if (!hasGeojson && !hasPolyline) {
+    return undefined;
+  }
+
+  const publicToken = await resolveMapboxPublicToken({
+    accessToken,
+    apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+    httpRequest
+  });
+  if (!publicToken) return undefined;
+
+  const summaryParts: string[] = [];
+  if (typeof route?.distance === 'number') {
+    summaryParts.push(`${(route.distance / 1609.34).toFixed(1)} mi`);
+  }
+  if (typeof route?.duration === 'number') {
+    summaryParts.push(`${Math.round(route.duration / 60)} min`);
+  }
+  const summary = summaryParts.length
+    ? `Route: ${summaryParts.join(', ')}`
+    : 'Route';
+
+  return renderDirectionsAppHtml({
+    publicToken,
+    initialData: {
+      geometry: geometry as unknown as {
+        type: string;
+        coordinates: [number, number][];
+      },
+      summary
+    }
+  });
 }
