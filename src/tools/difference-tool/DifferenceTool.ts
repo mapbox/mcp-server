@@ -1,8 +1,10 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import { difference, polygon, featureCollection } from '@turf/turf';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
+import { createUIResource } from '@mcp-ui/server';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { DifferenceInputSchema } from './DifferenceTool.input.schema.js';
@@ -11,6 +13,8 @@ import {
   type DifferenceOutput
 } from './DifferenceTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { tryRenderPolygonOpsInlineHtml } from '../../resources/ui-apps/polygonOpsAppHtml.js';
 
 export class DifferenceTool extends BaseTool<
   typeof DifferenceInputSchema,
@@ -29,6 +33,16 @@ export class DifferenceTool extends BaseTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false
+  };
+
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/polygon-ops-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor() {
@@ -63,11 +77,44 @@ export class DifferenceTool extends BaseTool<
             ? `Difference computed (area in polygon1 not covered by polygon2).\nGeometry:\n${JSON.stringify(validated.geometry, null, 2)}`
             : 'No difference: polygon2 fully covers polygon1.';
 
+          const content: CallToolResult['content'] = [
+            { type: 'text' as const, text }
+          ];
+
+          if (isMcpUiEnabled()) {
+            const inlineHtml = tryRenderPolygonOpsInlineHtml({
+              operation: 'difference',
+              inputs: [poly1, poly2] as Array<{
+                type: 'Feature';
+                geometry: unknown;
+              }>,
+              result: (result ?? null) as {
+                type: 'Feature';
+                geometry: unknown;
+              } | null,
+              summary: validated.has_difference
+                ? 'Difference of two polygons (polygon1 minus polygon2)'
+                : 'polygon2 fully covers polygon1 (no difference)'
+            });
+            if (inlineHtml) {
+              content.push(
+                createUIResource({
+                  uri: `ui://mapbox/polygon-ops/${randomUUID()}`,
+                  content: { type: 'rawHtml', htmlString: inlineHtml },
+                  encoding: 'text',
+                  uiMetadata: {
+                    'preferred-frame-size': ['100%', '500px']
+                  }
+                })
+              );
+            }
+          }
+
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
           return {
-            content: [{ type: 'text' as const, text }],
+            content,
             structuredContent: validated,
             isError: false
           };
@@ -81,7 +128,10 @@ export class DifferenceTool extends BaseTool<
           toolContext.span.end();
           return {
             content: [
-              { type: 'text' as const, text: `DifferenceTool: ${errorMessage}` }
+              {
+                type: 'text' as const,
+                text: `DifferenceTool: ${errorMessage}`
+              }
             ],
             isError: true
           };
