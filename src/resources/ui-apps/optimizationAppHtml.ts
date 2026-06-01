@@ -330,19 +330,31 @@ ${initialDataScript}
     });
 
     stops.forEach(function(stop, idx) {
+      // The iframe accepts tool-result from any postMessage source, so guard
+      // against malformed payloads where stop.location is missing or not a
+      // [lng, lat] pair — otherwise setLngLat throws mid-loop and leaves the
+      // UI half-rendered. Skip the bad entry and keep going.
+      if (!Array.isArray(stop.location) || stop.location.length < 2 ||
+          typeof stop.location[0] !== 'number' ||
+          typeof stop.location[1] !== 'number') {
+        return;
+      }
       var el = document.createElement('div');
       el.className = 'stop-marker';
       if (idx === 0) el.classList.add('start');
       else if (idx === stops.length - 1 && !payload.roundtrip) el.classList.add('end');
       el.textContent = String(stop.order);
 
+      // The Mapbox Optimization API populates waypoint.name with the road
+      // name the input coordinate was snapped to (not a place name), so
+      // label it as "on <road>" to avoid implying we identified a place.
+      var label = 'Stop ' + stop.order + ' (input #' + stop.input_index + ')';
+      if (stop.name) label += ' — on ' + stop.name;
+
       stopMarkers.push(
         new mapboxgl.Marker({ element: el })
           .setLngLat(stop.location)
-          .setPopup(new mapboxgl.Popup().setText(
-            'Stop ' + stop.order + (stop.name ? ' — ' + stop.name : '') +
-            ' (input #' + stop.input_index + ')'
-          ))
+          .setPopup(new mapboxgl.Popup().setText(label))
           .addTo(map)
       );
     });
