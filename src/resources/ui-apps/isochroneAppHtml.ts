@@ -296,9 +296,16 @@ ${initialDataScript}
     contourSourceIds = [];
     if (originMarker) { originMarker.remove(); originMarker = null; }
 
+    var HEX6_RE = /^[0-9a-fA-F]{6}$/;
+    function sanitizeHex(raw) {
+      if (typeof raw !== 'string') return '3b82f6';
+      var bare = raw.replace(/^#/, '');
+      return HEX6_RE.test(bare) ? bare : '3b82f6';
+    }
+
     features.forEach(function(feature, i) {
       var props = feature.properties || {};
-      var color = '#' + (props.color || props.fillColor || '3b82f6').replace(/^#/, '');
+      var color = '#' + sanitizeHex(props.color || props.fillColor);
       var fillOpacity = typeof props.fillOpacity === 'number' ? props.fillOpacity : 0.25;
 
       var sid = 'iso-source-' + i;
@@ -319,7 +326,11 @@ ${initialDataScript}
       if (feature.geometry) walkCoords(feature.geometry.coordinates);
     });
 
-    if (payload.origin && typeof payload.origin.longitude === 'number') {
+    if (
+      payload.origin &&
+      typeof payload.origin.longitude === 'number' &&
+      typeof payload.origin.latitude === 'number'
+    ) {
       originMarker = new mapboxgl.Marker({ color: '#0f172a' })
         .setLngLat([payload.origin.longitude, payload.origin.latitude])
         .setPopup(new mapboxgl.Popup().setText('Origin'))
