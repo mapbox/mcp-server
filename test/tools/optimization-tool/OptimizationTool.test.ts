@@ -113,6 +113,23 @@ describe('OptimizationTool V1 API', () => {
     expect(callUrl).toContain('optimized-trips/v1/mapbox/cycling/');
   });
 
+  it('rejects roundtrip=false without source=first and destination=last', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const tool = new OptimizationTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      roundtrip: false
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain(
+      'roundtrip=false'
+    );
+  });
+
   it('should handle source and destination options', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest({
       ok: true,

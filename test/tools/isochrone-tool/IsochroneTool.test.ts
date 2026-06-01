@@ -131,4 +131,62 @@ describe('IsochroneTool', () => {
     expect(result.content[0].type).toEqual('text');
     expect(result.isError).toBe(true);
   });
+
+  it('rejects when both contours_minutes and contours_meters are provided', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const result = await new IsochroneTool({ httpRequest }).run({
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_minutes: [5],
+      contours_meters: [1000],
+      generalize: 1000
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain(
+      'only one of'
+    );
+  });
+
+  it('rejects non-ascending contours_minutes', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const result = await new IsochroneTool({ httpRequest }).run({
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_minutes: [30, 10],
+      generalize: 1000
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('ascending');
+  });
+
+  it('rejects non-ascending contours_meters', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const result = await new IsochroneTool({ httpRequest }).run({
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_meters: [5000, 1000],
+      generalize: 1000
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('ascending');
+  });
+
+  it('rejects mismatched contours_colors length', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const result = await new IsochroneTool({ httpRequest }).run({
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_minutes: [5, 10],
+      contours_colors: ['ff0000'],
+      generalize: 1000
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain(
+      'contours_colors'
+    );
+  });
 });
