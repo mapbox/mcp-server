@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 import { URLSearchParams } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { MapMatchingInputSchema } from './MapMatchingTool.input.schema.js';
@@ -11,6 +13,8 @@ import {
   type MapMatchingOutput
 } from './MapMatchingTool.output.schema.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { tryRenderMapMatchingInlineHtml } from '../../resources/ui-apps/mapMatchingAppHtml.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
@@ -31,6 +35,15 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/map-matching-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -120,28 +133,57 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     const data = (await response.json()) as MapMatchingOutput;
 
     // Validate the response against our output schema
+    let validatedData: MapMatchingOutput = data;
     try {
-      const validatedData = MapMatchingOutputSchema.parse(data);
-
-      return {
-        content: [
-          { type: 'text', text: JSON.stringify(validatedData, null, 2) }
-        ],
-        structuredContent: validatedData,
-        isError: false
-      };
+      validatedData = MapMatchingOutputSchema.parse(data);
     } catch (validationError) {
-      // If validation fails, return the raw result anyway with a warning
       this.log(
         'warning',
         `Schema validation warning: ${validationError instanceof Error ? validationError.message : String(validationError)}`
       );
-
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data,
-        isError: false
-      };
     }
+
+    const content: CallToolResult['content'] = [
+      { type: 'text', text: JSON.stringify(validatedData, null, 2) }
+    ];
+
+    if (isMcpUiEnabled()) {
+      const matching = (validatedData as { matchings?: unknown[] })
+        .matchings?.[0] as
+        | {
+            geometry?: unknown;
+            distance?: number;
+            duration?: number;
+            confidence?: number;
+          }
+        | undefined;
+      if (matching) {
+        const inlineHtml = await tryRenderMapMatchingInlineHtml({
+          matching,
+          rawTrace: input.coordinates,
+          accessToken,
+          apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+          httpRequest: this.httpRequest
+        });
+        if (inlineHtml) {
+          content.push(
+            createUIResource({
+              uri: `ui://mapbox/map-matching/${randomUUID()}`,
+              content: { type: 'rawHtml', htmlString: inlineHtml },
+              encoding: 'text',
+              uiMetadata: {
+                'preferred-frame-size': ['100%', '500px']
+              }
+            })
+          );
+        }
+      }
+    }
+
+    return {
+      content,
+      structuredContent: validatedData,
+      isError: false
+    };
   }
 }

@@ -1064,4 +1064,98 @@ describe('DirectionsTool', () => {
       isError: true
     });
   });
+
+  describe('MCP App + MCP-UI integration', () => {
+    it('declares meta.ui.resourceUri pointing to the directions-app resource', () => {
+      const { httpRequest } = setupHttpRequest();
+      const tool = new DirectionsTool({ httpRequest });
+      expect(tool.meta?.ui?.resourceUri).toBe(
+        'ui://mapbox/directions-app/index.html'
+      );
+    });
+
+    it('adds an inline MCP-UI rawHtml resource for small geojson responses', async () => {
+      const fakeResponse = {
+        routes: [
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-74.0, 40.7],
+                [-74.01, 40.71]
+              ]
+            },
+            distance: 1500,
+            duration: 180,
+            legs: []
+          }
+        ],
+        waypoints: [
+          { location: [-74.0, 40.7], name: '' },
+          { location: [-74.01, 40.71], name: '' }
+        ],
+        code: 'Ok'
+      };
+      const tokensListResponse = [
+        {
+          usage: 'pk',
+          default: true,
+          token: 'pk.fake-public-token'
+        }
+      ];
+
+      const httpRequestFn = vi.fn(async (url: string) => {
+        if (url.includes('tokens/v2/')) {
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => tokensListResponse,
+            text: async () => JSON.stringify(tokensListResponse)
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => fakeResponse,
+          text: async () => JSON.stringify(fakeResponse)
+        } as Response;
+      });
+
+      // Mapbox sk.* tokens are 3 dot-segments: sk.<base64-payload>.<signature>
+      const realToken = process.env.MAPBOX_ACCESS_TOKEN;
+      const payload = Buffer.from(JSON.stringify({ u: 'testuser' })).toString(
+        'base64'
+      );
+      process.env.MAPBOX_ACCESS_TOKEN = `sk.${payload}.signature`;
+
+      try {
+        const result = await new DirectionsTool({
+          httpRequest: httpRequestFn
+        }).run({
+          coordinates: [
+            { longitude: -74.0, latitude: 40.7 },
+            { longitude: -74.01, latitude: 40.71 }
+          ],
+          geometries: 'geojson'
+        });
+
+        expect(result.isError).toBe(false);
+        // Expect at least the response text + the MCP-UI resource block
+        expect(result.content.length).toBeGreaterThanOrEqual(2);
+        const uiBlock = result.content.find(
+          (c) => (c as { type?: string }).type === 'resource'
+        ) as { resource?: { text?: string; mimeType?: string } } | undefined;
+        expect(uiBlock).toBeDefined();
+        expect(uiBlock?.resource?.text).toContain('mapbox-gl.js');
+        expect(uiBlock?.resource?.text).toContain('pk.fake-public-token');
+        // Initial-data block should carry the baked-in geometry
+        expect(uiBlock?.resource?.text).toContain('initial-data');
+        expect(uiBlock?.resource?.text).toContain('LineString');
+      } finally {
+        process.env.MAPBOX_ACCESS_TOKEN = realToken;
+      }
+    });
+  });
 });

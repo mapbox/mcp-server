@@ -1,7 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -11,6 +13,8 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { tryRenderSearchInlineHtml } from '../../resources/ui-apps/searchAppHtml.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -27,6 +31,15 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/search-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -181,18 +194,42 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       data = rawData as MapboxFeatureCollection;
     }
 
-    if (input.format === 'json_string') {
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
-    } else {
-      return {
-        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
+    const text =
+      input.format === 'json_string'
+        ? JSON.stringify(data, null, 2)
+        : this.formatGeoJsonToText(data);
+
+    const content: CallToolResult['content'] = [{ type: 'text', text }];
+
+    if (isMcpUiEnabled()) {
+      const inlineHtml = await tryRenderSearchInlineHtml({
+        featureCollection: data as { features?: unknown[] },
+        proximity: input.proximity,
+        summary: `Found ${(data as { features?: unknown[] }).features?.length ?? 0} "${input.category}" place${
+          (data as { features?: unknown[] }).features?.length === 1 ? '' : 's'
+        }`,
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+        httpRequest: this.httpRequest
+      });
+      if (inlineHtml) {
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/search/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: {
+              'preferred-frame-size': ['100%', '500px']
+            }
+          })
+        );
+      }
     }
+
+    return {
+      content,
+      structuredContent: data as unknown as Record<string, unknown>,
+      isError: false
+    };
   }
 }
