@@ -73,8 +73,13 @@ export async function resolveMapboxPublicToken(params: {
             return defaultPk.token;
           }
         }
-      } catch {
-        // Fall through to env-var fallback
+      } catch (err) {
+        // Network failures and JSON parse errors land here. Surface a warning
+        // so the cause is diagnosable from logs rather than masked behind the
+        // generic env-var fallback path.
+        console.warn(
+          `resolveMapboxPublicToken: Tokens API call failed, falling back to MAPBOX_PUBLIC_TOKEN env var: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
     }
   }
