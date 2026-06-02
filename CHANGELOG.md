@@ -18,6 +18,13 @@
 
 ### New Features
 
+- **`directions_tool` now renders as a live Mapbox GL JS map** for both the MCP Apps spec and legacy MCP-UI clients:
+  - **MCP Apps**: the tool declares `_meta.ui.resourceUri` pointing to a new `DirectionsAppUIResource` (`ui://mapbox/directions-app/index.html`). MCP App–capable hosts (Claude Desktop, VS Code, Cursor) render the route via postMessage handoff.
+  - **MCP-UI**: when `geometries=geojson` is requested and the response carries a renderable LineString, an inline `rawHtml` UIResource is added to the tool's `content[]` (gated by the existing `ENABLE_MCP_UI`/`--disable-mcp-ui` flag, like `static_map_image_tool`).
+  - **One source of truth**: both pathways render the same HTML produced by `renderDirectionsAppHtml` — for MCP Apps the resource serves a generic version and the iframe receives the tool result via postMessage; for MCP-UI the tool bakes the route geometry into the HTML before returning. No more "GL JS map for one client, static image for the other."
+  - **Public token**: resolved server-side via `GET /tokens/v2/{user}?default=true` (requires `tokens:read` on the `sk.*` token) with `MAPBOX_PUBLIC_TOKEN` env var fallback. Non-MCP-App hosts that also have MCP-UI disabled ignore both UI hints and consume the existing text/structuredContent payload unchanged.
+  - **Graceful degradation**: responses without renderable geometry (>50KB temporary-resource path, `geometries=none`, `geometries=polyline*`) skip the inline rawHtml block and show a "no geometry to render" message in the MCP App iframe.
+  - **CSP**: `_meta.ui.csp.workerDomains: ['blob:']` so MCP App hosts grant Mapbox GL JS the iframe sandbox permissions it needs.
 - **MCP Completions capability**: Add auto-completion support for prompt arguments per MCP spec (2025-11-25). Clients can now suggest values when users fill in prompt parameters (#176)
   - `category` argument on `find-places-nearby` — 482 Mapbox Search API categories
   - `mode` argument on `get-directions`, `search-along-route`, `show-reachable-areas` — driving, driving-traffic, walking, cycling
