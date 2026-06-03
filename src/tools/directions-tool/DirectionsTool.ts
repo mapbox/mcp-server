@@ -296,6 +296,10 @@ export class DirectionsTool extends MapboxApiBasedTool<
     const responseText = JSON.stringify(validatedData, null, 2);
     const responseSize = responseText.length;
 
+    // Build the map-app payload from the full geometry before we conditionally
+    // strip it for the large-response path — the iframe needs the route line.
+    const mapPayloadFull = buildDirectionsMapPayload(validatedData);
+
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
       // Create temporary resource for large response
       const resourceId = randomBytes(16).toString('hex');
@@ -322,7 +326,7 @@ Waypoints: ${waypointCount}
 ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull geometry and details stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full details if needed.\nOr ask to read the resource by its URI.` : ''}`;
 
       // Create minimal structured content for validation (without large geometry)
-      const summaryStructuredContent = {
+      const summaryStructuredContent: Record<string, unknown> = {
         ...validatedData,
         routes: validatedData.routes?.map((route) => ({
           distance: route.distance,
@@ -341,12 +345,19 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
           legs: undefined
         }))
       };
+      // Attach the map-app payload so the iframe can still render the route
+      // even though geometry was stripped from the response body.
+      if (mapPayloadFull) summaryStructuredContent._mapApp = mapPayloadFull;
 
-      return {
+      const result: CallToolResult = {
         content: [{ type: 'text', text: summaryText }],
         structuredContent: summaryStructuredContent,
         isError: false
       };
+      if (mapPayloadFull) {
+        result._meta = { ui: { payload: mapPayloadFull } };
+      }
+      return result;
     }
 
     // Small response - return normally
@@ -354,7 +365,7 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       { type: 'text', text: responseText }
     ];
 
-    const mapPayload = buildDirectionsMapPayload(validatedData);
+    const mapPayload = mapPayloadFull;
 
     // Legacy MCP-UI: inline a rawHtml UIResource so non-MCP-Apps clients
     // also get a live GL JS map. Uses the same generic renderer as the
