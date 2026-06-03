@@ -189,11 +189,14 @@ const FeatureSchema = z
   .passthrough();
 
 // Main Search Box API Category Search response schema (FeatureCollection)
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
 export const CategorySearchResponseSchema = z
   .object({
     type: z.literal('FeatureCollection'),
     features: z.array(FeatureSchema),
-    attribution: z.string()
+    attribution: z.string(),
+    _mapApp: MapAppRefSchema.optional()
   })
   .passthrough();
 

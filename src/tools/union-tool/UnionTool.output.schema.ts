@@ -3,6 +3,8 @@
 
 import { z } from 'zod';
 
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
 export const UnionOutputSchema = z
   .object({
     geometry: z
@@ -10,8 +12,9 @@ export const UnionOutputSchema = z
       .describe(
         'GeoJSON geometry of the merged polygon (Polygon or MultiPolygon)'
       ),
-    type: z.string().describe('Geometry type: Polygon or MultiPolygon')
+    type: z.string().describe('Geometry type: Polygon or MultiPolygon'),
+    _mapApp: MapAppRefSchema.optional()
   })
-  .passthrough(); // allow `_mapApp` payload attachment
+  .passthrough();
 
 export type UnionOutput = z.infer<typeof UnionOutputSchema>;

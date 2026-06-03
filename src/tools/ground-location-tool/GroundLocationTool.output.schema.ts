@@ -18,6 +18,8 @@ export const IsochroneSummarySchema = z.object({
   contour_areas_sqkm: z.array(z.number()).optional()
 });
 
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
 export const GroundLocationOutputSchema = z
   .object({
     place: z
@@ -35,8 +37,9 @@ export const GroundLocationOutputSchema = z
     ),
     citations: z
       .array(z.string())
-      .describe('Mapbox APIs used to produce this grounded response')
+      .describe('Mapbox APIs used to produce this grounded response'),
+    _mapApp: MapAppRefSchema.optional()
   })
-  .passthrough(); // allow `_mapApp` map-app payload attachment
+  .passthrough();
 
 export type GroundLocationOutput = z.infer<typeof GroundLocationOutputSchema>;

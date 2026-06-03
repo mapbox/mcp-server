@@ -53,12 +53,15 @@ export const IsochroneFeatureSchema = z.object({
  * Complete Isochrone API response
  * Returns a GeoJSON FeatureCollection containing isochrone contours
  */
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
 export const IsochroneResponseSchema = z
   .object({
     type: z.literal('FeatureCollection'),
-    features: z.array(IsochroneFeatureSchema)
+    features: z.array(IsochroneFeatureSchema),
+    _mapApp: MapAppRefSchema.optional()
   })
-  .passthrough(); // allow `_mapApp` map-app payload attachment
+  .passthrough();
 
 export type IsochroneResponse = z.infer<typeof IsochroneResponseSchema>;
 export type IsochroneFeature = z.infer<typeof IsochroneFeatureSchema>;

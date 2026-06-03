@@ -2,8 +2,29 @@
 // Licensed under the MIT License.
 
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { temporaryResourceManager } from './temporaryResourceManager.js';
 import type { MapAppPayload } from './mapAppPayload.js';
+
+/**
+ * Schema for the `_mapApp` field that data tools attach to their
+ * structuredContent. Each tool declares this on its output schema so
+ * Claude Desktop (and any other host that strictly validates tool results
+ * against the published output schema) doesn't flag the response.
+ */
+export const MapAppRefSchema = z
+  .object({
+    ref: z
+      .string()
+      .describe(
+        'Server-side payload reference. Pass to `render_map_tool` via `payload_refs: ["<this ref>"]` to display the data on a live Mapbox GL JS map.'
+      )
+  })
+  .describe(
+    'Map-payload reference for `render_map_tool`. Surfaced so the LLM can chain the next call without re-emitting geometry.'
+  );
+
+export type MapAppRef = z.infer<typeof MapAppRefSchema>;
 
 const TEMP_URI_PREFIX = 'mapbox://temp/map-payload-';
 

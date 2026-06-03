@@ -3,6 +3,8 @@
 
 import { z } from 'zod';
 
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
 export const DifferenceOutputSchema = z
   .object({
     has_difference: z
@@ -15,7 +17,8 @@ export const DifferenceOutputSchema = z
       .nullable()
       .describe(
         'GeoJSON geometry of the remaining area (polygon1 minus polygon2), or null if polygon2 fully covers polygon1'
-      )
+      ),
+    _mapApp: MapAppRefSchema.optional()
   })
   .passthrough();
 

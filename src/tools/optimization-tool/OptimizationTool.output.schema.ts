@@ -73,6 +73,8 @@ const tripSchema = z
  *
  * Returns the optimized trip through all input coordinates.
  */
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
 export const OptimizationOutputSchema = z
   .object({
     code: z
@@ -89,7 +91,11 @@ export const OptimizationOutputSchema = z
         'Array containing the optimized trip (typically 1 trip for all waypoints)'
       ),
     // Error response fields
-    message: z.string().optional().describe('Error message if code is not "Ok"')
+    message: z
+      .string()
+      .optional()
+      .describe('Error message if code is not "Ok"'),
+    _mapApp: MapAppRefSchema.optional()
   })
   .passthrough();
 
