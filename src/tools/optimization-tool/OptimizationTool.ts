@@ -1,7 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import { SpanStatusCode } from '@opentelemetry/api';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import {
   OptimizationInputSchema,
@@ -14,6 +16,13 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolExecutionContext } from '../../utils/tracing.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
+import {
+  decodePolylineWithFallback,
+  type MapAppPayload
+} from '../../utils/mapAppPayload.js';
 
 /**
  * OptimizationTool - Find optimal route through multiple coordinates (V1 API)
@@ -37,6 +46,15 @@ export class OptimizationTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/map-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -165,11 +183,45 @@ export class OptimizationTool extends MapboxApiBasedTool<
         validatedResult.waypoints.length
       );
 
-      return {
-        content: [{ type: 'text' as const, text }],
-        structuredContent: validatedResult,
+      const mapPayload = buildOptimizationMapPayload(validatedResult);
+      const content: CallToolResult['content'] = [
+        { type: 'text' as const, text }
+      ];
+
+      if (isMcpUiEnabled() && mapPayload) {
+        const publicToken = await resolveMapboxPublicToken({
+          accessToken,
+          apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+          httpRequest: this.httpRequest
+        });
+        if (publicToken) {
+          const inlineHtml = renderMapAppHtml({
+            publicToken,
+            initialData: mapPayload
+          });
+          content.push(
+            createUIResource({
+              uri: `ui://mapbox/optimization/${randomUUID()}`,
+              content: { type: 'rawHtml', htmlString: inlineHtml },
+              encoding: 'text',
+              uiMetadata: { 'preferred-frame-size': ['100%', '500px'] }
+            })
+          );
+        }
+      }
+
+      const sc: Record<string, unknown> = {
+        ...(validatedResult as unknown as Record<string, unknown>)
+      };
+      if (mapPayload) sc._mapApp = mapPayload;
+
+      const result: CallToolResult = {
+        content,
+        structuredContent: sc,
         isError: false
       };
+      if (mapPayload) result._meta = { ui: { payload: mapPayload } };
+      return result;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -186,4 +238,79 @@ export class OptimizationTool extends MapboxApiBasedTool<
       };
     }
   }
+}
+
+/**
+ * Build a `MapAppPayload` from an Optimization API response: a single trip
+ * line plus numbered visit-order markers (start=green, end=red, middle=blue).
+ * Polyline-encoded geometries are decoded tool-side so the iframe only ever
+ * receives GeoJSON.
+ */
+function buildOptimizationMapPayload(
+  result: OptimizationOutput
+): MapAppPayload | null {
+  const trip = result.trips?.[0];
+  if (!trip) return null;
+
+  let coords: [number, number][] | null = null;
+  const g = trip.geometry as unknown;
+  if (
+    g &&
+    typeof g === 'object' &&
+    (g as { type?: string }).type === 'LineString' &&
+    Array.isArray((g as { coordinates?: unknown }).coordinates)
+  ) {
+    coords = (g as { coordinates: [number, number][] }).coordinates;
+  } else if (typeof g === 'string' && g.length > 0) {
+    coords = decodePolylineWithFallback(g);
+  }
+  if (!coords || coords.length === 0) return null;
+
+  // Stops in optimized visit order: sort waypoints by waypoint_index.
+  const ordered = (result.waypoints ?? [])
+    .map((wp, inputIndex) => ({ wp, inputIndex }))
+    .sort((a, b) => a.wp.waypoint_index - b.wp.waypoint_index);
+
+  const markers: MapAppPayload['markers'] = ordered.map((entry, i) => {
+    const isStart = i === 0;
+    const isEnd = i === ordered.length - 1;
+    const label = String(i + 1);
+    const color = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#2563eb';
+    const popupParts = [`Stop ${i + 1} (input #${entry.inputIndex})`];
+    // wp.name is the snapped road name, not a place name — label accordingly.
+    if (entry.wp.name) popupParts.push(`on ${entry.wp.name}`);
+    return {
+      coordinates: entry.wp.location as [number, number],
+      style: 'numbered',
+      label,
+      color,
+      popup: popupParts.join(' — ')
+    };
+  });
+
+  const miles = (trip.distance / 1609.34).toFixed(1);
+  const minutes = Math.round(trip.duration / 60);
+  const summary = `Optimized trip: ${miles} mi, ${minutes} min`;
+
+  return {
+    summary,
+    layers: [
+      {
+        id: 'trip',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: coords },
+          properties: {}
+        },
+        paint: {
+          'line-color': '#3b82f6',
+          'line-width': 5,
+          'line-opacity': 0.85
+        },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      }
+    ],
+    markers
+  };
 }

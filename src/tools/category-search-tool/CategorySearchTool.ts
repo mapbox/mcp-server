@@ -1,7 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -11,6 +13,10 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
+import { buildSearchMapPayload } from '../search-and-geocode-tool/buildSearchMapPayload.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -27,6 +33,15 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/map-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -181,18 +196,59 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       data = rawData as MapboxFeatureCollection;
     }
 
-    if (input.format === 'json_string') {
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
-    } else {
-      return {
-        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
+    const baseText =
+      input.format === 'json_string'
+        ? JSON.stringify(data, null, 2)
+        : this.formatGeoJsonToText(data);
+
+    const proximity =
+      input.proximity &&
+      typeof (input.proximity as { longitude?: number }).longitude === 'number'
+        ? (input.proximity as { longitude: number; latitude: number })
+        : undefined;
+    const payload = buildSearchMapPayload({
+      data,
+      query: input.category,
+      proximity
+    });
+
+    const content: CallToolResult['content'] = [
+      { type: 'text', text: baseText }
+    ];
+
+    if (isMcpUiEnabled() && payload) {
+      const publicToken = await resolveMapboxPublicToken({
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+        httpRequest: this.httpRequest
+      });
+      if (publicToken) {
+        const inlineHtml = renderMapAppHtml({
+          publicToken,
+          initialData: payload
+        });
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/category-search/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: { 'preferred-frame-size': ['100%', '500px'] }
+          })
+        );
+      }
     }
+
+    const sc: Record<string, unknown> = {
+      ...(data as unknown as Record<string, unknown>)
+    };
+    if (payload) sc._mapApp = payload;
+
+    const result: CallToolResult = {
+      content,
+      structuredContent: sc,
+      isError: false
+    };
+    if (payload) result._meta = { ui: { payload } };
+    return result;
   }
 }

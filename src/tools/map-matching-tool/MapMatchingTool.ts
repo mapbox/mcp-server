@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 import { URLSearchParams } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { MapMatchingInputSchema } from './MapMatchingTool.input.schema.js';
@@ -11,6 +13,13 @@ import {
   type MapMatchingOutput
 } from './MapMatchingTool.output.schema.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
+import {
+  decodePolylineWithFallback,
+  type MapAppPayload
+} from '../../utils/mapAppPayload.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
@@ -31,6 +40,15 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/map-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -119,29 +137,126 @@ export class MapMatchingTool extends MapboxApiBasedTool<
 
     const data = (await response.json()) as MapMatchingOutput;
 
-    // Validate the response against our output schema
+    let validatedData: MapMatchingOutput;
     try {
-      const validatedData = MapMatchingOutputSchema.parse(data);
-
-      return {
-        content: [
-          { type: 'text', text: JSON.stringify(validatedData, null, 2) }
-        ],
-        structuredContent: validatedData,
-        isError: false
-      };
+      validatedData = MapMatchingOutputSchema.parse(data);
     } catch (validationError) {
-      // If validation fails, return the raw result anyway with a warning
       this.log(
         'warning',
         `Schema validation warning: ${validationError instanceof Error ? validationError.message : String(validationError)}`
       );
-
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data,
-        isError: false
-      };
+      validatedData = data;
     }
+
+    const mapPayload = buildMapMatchingPayload(validatedData, input);
+    const content: CallToolResult['content'] = [
+      { type: 'text', text: JSON.stringify(validatedData, null, 2) }
+    ];
+
+    if (isMcpUiEnabled() && mapPayload) {
+      const publicToken = await resolveMapboxPublicToken({
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+        httpRequest: this.httpRequest
+      });
+      if (publicToken) {
+        const inlineHtml = renderMapAppHtml({
+          publicToken,
+          initialData: mapPayload
+        });
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/map-matching/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: { 'preferred-frame-size': ['100%', '500px'] }
+          })
+        );
+      }
+    }
+
+    const sc: Record<string, unknown> = {
+      ...(validatedData as unknown as Record<string, unknown>)
+    };
+    if (mapPayload) sc._mapApp = mapPayload;
+
+    const result: CallToolResult = {
+      content,
+      structuredContent: sc,
+      isError: false
+    };
+    if (mapPayload) result._meta = { ui: { payload: mapPayload } };
+    return result;
   }
+}
+
+/**
+ * Build a payload showing the raw GPS trace as a dashed orange line and
+ * the matched route as a solid blue line, with a legend explaining both.
+ */
+function buildMapMatchingPayload(
+  data: MapMatchingOutput,
+  input: z.infer<typeof MapMatchingInputSchema>
+): MapAppPayload | null {
+  const match = data.matchings?.[0];
+  if (!match) return null;
+
+  let matchedCoords: [number, number][] | null = null;
+  const g = match.geometry as unknown;
+  if (
+    g &&
+    typeof g === 'object' &&
+    (g as { type?: string }).type === 'LineString' &&
+    Array.isArray((g as { coordinates?: unknown }).coordinates)
+  ) {
+    matchedCoords = (g as { coordinates: [number, number][] }).coordinates;
+  } else if (typeof g === 'string' && g.length > 0) {
+    matchedCoords = decodePolylineWithFallback(g);
+  }
+  if (!matchedCoords || matchedCoords.length === 0) return null;
+
+  const rawCoords: [number, number][] = input.coordinates.map((c) => [
+    c.longitude,
+    c.latitude
+  ]);
+
+  const matched = data.tracepoints?.filter((t) => t != null).length ?? 0;
+  const total = data.tracepoints?.length ?? input.coordinates.length;
+
+  return {
+    summary: `Matched ${matched}/${total} GPS points (confidence ${(match.confidence * 100).toFixed(0)}%)`,
+    layers: [
+      {
+        id: 'raw-trace',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: rawCoords },
+          properties: {}
+        },
+        paint: {
+          'line-color': '#f97316',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.8
+        },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      },
+      {
+        id: 'matched-route',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: matchedCoords },
+          properties: {}
+        },
+        paint: { 'line-color': '#3b82f6', 'line-width': 4 },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      }
+    ],
+    legend: [
+      { label: 'Raw trace', color: '#f97316' },
+      { label: 'Matched route', color: '#3b82f6' }
+    ]
+  };
 }

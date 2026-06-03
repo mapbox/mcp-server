@@ -17,6 +17,17 @@
   instead of producing its own bespoke HTML. The
   `DirectionsAppUIResource` is kept registered for backward compatibility
   but the tool no longer references it.
+- **Six more tools migrated to the generic map app** — `isochrone_tool`,
+  `optimization_tool`, `search_and_geocode_tool`, `category_search_tool`,
+  `map_matching_tool`, `ground_location_tool`, plus the three offline
+  polygon-op tools (`union_tool`, `intersect_tool`, `difference_tool`)
+  now each emit a `MapAppPayload` instead of producing per-tool HTML.
+  Each tool's payload builder is ~20-80 lines: layered fills for
+  isochrone contours, numbered visit markers for optimization,
+  result/POI pins for search and ground-location, dashed+solid lines
+  for map-matching, and operation-keyed legends for polygon ops.
+  Polygon ops tools require `MAPBOX_PUBLIC_TOKEN` to be set for inline
+  MCP-UI emission (they're offline tools with no access token in scope).
 
 ### Security
 

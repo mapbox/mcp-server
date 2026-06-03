@@ -1,7 +1,9 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.input.schema.js';
@@ -14,6 +16,10 @@ import type {
   MapboxFeature
 } from '../../schemas/geojson.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { isMcpUiEnabled } from '../../config/toolConfig.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
+import { buildSearchMapPayload } from './buildSearchMapPayload.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -30,6 +36,15 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+  readonly meta = {
+    ui: {
+      resourceUri: 'ui://mapbox/map-app/index.html',
+      csp: {
+        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
+        resourceDomains: ['https://api.mapbox.com']
+      }
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -270,18 +285,23 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
             features: [selectedFeature]
           };
 
-          return {
-            content: [
-              {
-                type: 'text',
-                text: this.formatGeoJsonToText(
-                  singleResult as MapboxFeatureCollection
-                )
-              }
-            ],
-            structuredContent: singleResult,
-            isError: false
-          };
+          return await this.withMapPayload(
+            {
+              content: [
+                {
+                  type: 'text',
+                  text: this.formatGeoJsonToText(
+                    singleResult as MapboxFeatureCollection
+                  )
+                }
+              ],
+              structuredContent: singleResult,
+              isError: false
+            },
+            singleResult,
+            input,
+            accessToken
+          );
         } else if (result.action === 'decline') {
           // User declined to select - return all results as before
           this.log(
@@ -299,15 +319,72 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     }
 
     // Default behavior: return all results
+    return await this.withMapPayload(
+      {
+        content: [
+          {
+            type: 'text',
+            text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
+          }
+        ],
+        structuredContent: data,
+        isError: false
+      },
+      data,
+      input,
+      accessToken
+    );
+  }
+
+  private async withMapPayload(
+    base: CallToolResult,
+    data: unknown,
+    input: z.infer<typeof SearchAndGeocodeInputSchema>,
+    accessToken: string
+  ): Promise<CallToolResult> {
+    const proximity =
+      input.proximity &&
+      typeof (input.proximity as { longitude?: number }).longitude === 'number'
+        ? (input.proximity as { longitude: number; latitude: number })
+        : undefined;
+    const payload = buildSearchMapPayload({
+      data,
+      query: input.q,
+      proximity
+    });
+    if (!payload) return base;
+
+    const content = [...(base.content ?? [])];
+    if (isMcpUiEnabled()) {
+      const publicToken = await resolveMapboxPublicToken({
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+        httpRequest: this.httpRequest
+      });
+      if (publicToken) {
+        const inlineHtml = renderMapAppHtml({
+          publicToken,
+          initialData: payload
+        });
+        content.push(
+          createUIResource({
+            uri: `ui://mapbox/search/${randomUUID()}`,
+            content: { type: 'rawHtml', htmlString: inlineHtml },
+            encoding: 'text',
+            uiMetadata: { 'preferred-frame-size': ['100%', '500px'] }
+          })
+        );
+      }
+    }
+    const sc = {
+      ...((base.structuredContent ?? {}) as Record<string, unknown>),
+      _mapApp: payload
+    };
     return {
-      content: [
-        {
-          type: 'text',
-          text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
-        }
-      ],
-      structuredContent: data,
-      isError: false
+      ...base,
+      content,
+      structuredContent: sc,
+      _meta: { ui: { payload } }
     };
   }
 }

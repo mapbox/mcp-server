@@ -3,13 +3,15 @@
 
 import { z } from 'zod';
 
-export const UnionOutputSchema = z.object({
-  geometry: z
-    .record(z.string(), z.unknown())
-    .describe(
-      'GeoJSON geometry of the merged polygon (Polygon or MultiPolygon)'
-    ),
-  type: z.string().describe('Geometry type: Polygon or MultiPolygon')
-});
+export const UnionOutputSchema = z
+  .object({
+    geometry: z
+      .record(z.string(), z.unknown())
+      .describe(
+        'GeoJSON geometry of the merged polygon (Polygon or MultiPolygon)'
+      ),
+    type: z.string().describe('Geometry type: Polygon or MultiPolygon')
+  })
+  .passthrough(); // allow `_mapApp` payload attachment
 
 export type UnionOutput = z.infer<typeof UnionOutputSchema>;

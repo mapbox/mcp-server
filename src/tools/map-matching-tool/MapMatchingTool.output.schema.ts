@@ -46,11 +46,14 @@ const MatchingSchema = z.object({
     .optional()
 });
 
-// Main output schema
-export const MapMatchingOutputSchema = z.object({
-  code: z.string(),
-  matchings: z.array(MatchingSchema),
-  tracepoints: z.array(TracepointSchema.nullable())
-});
+// Main output schema. Uses .passthrough() so tools can attach a `_mapApp`
+// rendering payload without the MCP SDK's output validation stripping it.
+export const MapMatchingOutputSchema = z
+  .object({
+    code: z.string(),
+    matchings: z.array(MatchingSchema),
+    tracepoints: z.array(TracepointSchema.nullable())
+  })
+  .passthrough();
 
 export type MapMatchingOutput = z.infer<typeof MapMatchingOutputSchema>;
