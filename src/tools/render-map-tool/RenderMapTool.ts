@@ -1,9 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomUUID } from 'node:crypto';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
-import { createUIResource } from '@mcp-ui/server';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -12,9 +10,6 @@ import {
   type RenderMapInput
 } from './RenderMapTool.input.schema.js';
 import { RenderMapOutputSchema } from './RenderMapTool.output.schema.js';
-import { isMcpUiEnabled } from '../../config/toolConfig.js';
-import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 import {
   resolveMapPayloadRef,
@@ -120,10 +115,14 @@ export class RenderMapTool extends BaseTool<
             (payload.summary ? ` — ${payload.summary}` : '') +
             '.';
 
-          // Stash the merged payload server-side first so we can include
-          // the ref in the visible content. Claude Desktop strips
-          // structuredContent from MCP App iframe postMessages, so the
-          // iframe scans content[] for a sentinel-tagged ref URI.
+          // Stash the merged payload server-side. Claude Desktop strips
+          // structuredContent from MCP App iframe postMessages and
+          // replaces large content[] payloads with placeholder text, so
+          // the iframe must extract the ref from a tiny sentinel-tagged
+          // text item in content[]. Keep the total response tiny:
+          // no inline rawHtml (Claude Desktop already opens the iframe
+          // via meta.ui.resourceUri, so the rawHtml duplicate just bloats
+          // the response and trips the host's "too large" trim).
           const mergedRef = storeMapPayload(payload);
 
           const content: CallToolResult['content'] = [
@@ -133,32 +132,6 @@ export class RenderMapTool extends BaseTool<
               text: `[[MAPBOX_RENDER_REF]] ${mergedRef}`
             }
           ];
-
-          // Inline MCP-UI fallback for hosts that don't speak the MCP Apps
-          // spec. The iframe HTML is identical to what MapAppUIResource
-          // serves; only the delivery channel differs.
-          if (isMcpUiEnabled()) {
-            const accessToken = process.env.MAPBOX_ACCESS_TOKEN ?? '';
-            const publicToken = await resolveMapboxPublicToken({
-              accessToken,
-              apiEndpoint: this.apiEndpoint(),
-              httpRequest: this.httpRequest
-            });
-            if (publicToken) {
-              const inlineHtml = renderMapAppHtml({
-                publicToken,
-                initialData: payload
-              });
-              content.push(
-                createUIResource({
-                  uri: `ui://mapbox/map-app/${randomUUID()}`,
-                  content: { type: 'rawHtml', htmlString: inlineHtml },
-                  encoding: 'text',
-                  uiMetadata: { 'preferred-frame-size': ['100%', '500px'] }
-                })
-              );
-            }
-          }
 
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
