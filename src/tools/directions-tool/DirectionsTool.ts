@@ -385,10 +385,15 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
 
     const result: CallToolResult = {
       content,
-      structuredContent: validatedData,
+      structuredContent: mapPayload
+        ? { ...validatedData, _mapApp: mapPayload }
+        : validatedData,
       isError: false
     };
     if (mapPayload) {
+      // Also publish at _meta.ui.payload per the MCP Apps spec — hosts that
+      // forward _meta will pick it up there; the structuredContent._mapApp
+      // copy is the guaranteed-delivery fallback.
       result._meta = { ui: { payload: mapPayload } };
     }
     return result;

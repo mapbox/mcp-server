@@ -215,12 +215,24 @@ ${initialDataScript}
 
   function extractPayload(result) {
     if (!result) return null;
-    // Primary contract: _meta.ui.payload on the tool result.
-    if (result._meta && result._meta.ui && result._meta.ui.payload &&
-        Array.isArray(result._meta.ui.payload.layers || result._meta.ui.payload.markers)) {
+    // Primary contract: structuredContent._mapApp. Lives here because
+    // structuredContent is guaranteed to flow through to the iframe via
+    // ui/notifications/tool-result, whereas hosts vary in whether they
+    // forward CallToolResult._meta.
+    var sc = result.structuredContent;
+    if (sc && sc._mapApp && looksLikePayload(sc._mapApp)) {
+      return sc._mapApp;
+    }
+    // Belt-and-suspenders: _meta.ui.payload per the MCP Apps spec.
+    if (result._meta && result._meta.ui && looksLikePayload(result._meta.ui.payload)) {
       return result._meta.ui.payload;
     }
     return null;
+  }
+
+  function looksLikePayload(p) {
+    return p && typeof p === 'object' &&
+      (Array.isArray(p.layers) || Array.isArray(p.markers));
   }
 
   function stageRender(payload) {

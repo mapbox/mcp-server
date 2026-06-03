@@ -1152,26 +1152,27 @@ describe('DirectionsTool', () => {
         expect(uiBlock?.resource?.text).toContain('initial-data');
         expect(uiBlock?.resource?.text).toContain('LineString');
 
-        // The tool also publishes a MapAppPayload at _meta.ui.payload so the
-        // MCP Apps iframe can render via postMessage.
-        const meta = (result as { _meta?: unknown })._meta as
-          | {
-              ui?: {
-                payload?: {
-                  summary?: string;
-                  layers?: Array<{ id: string; type: string }>;
-                  markers?: Array<{ style?: string }>;
-                };
-              };
-            }
+        // The tool publishes the MapAppPayload via structuredContent._mapApp
+        // (guaranteed-delivery path) AND _meta.ui.payload (spec path). The
+        // iframe reads the former first because hosts vary in whether they
+        // forward _meta through ui/notifications/tool-result.
+        type Payload = {
+          summary?: string;
+          layers?: Array<{ id: string; type: string }>;
+          markers?: Array<{ style?: string }>;
+        };
+        const sc = result.structuredContent as
+          | { _mapApp?: Payload }
           | undefined;
+        const mapApp = sc?._mapApp;
+        expect(mapApp?.layers?.[0]?.id).toBe('route');
+        expect(mapApp?.layers?.[0]?.type).toBe('line');
+        expect(mapApp?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
+        expect(mapApp?.summary).toMatch(/mi/);
+
+        const meta = (result as { _meta?: { ui?: { payload?: Payload } } })
+          ._meta;
         expect(meta?.ui?.payload?.layers?.[0]?.id).toBe('route');
-        expect(meta?.ui?.payload?.layers?.[0]?.type).toBe('line');
-        expect(meta?.ui?.payload?.markers?.map((m) => m.style)).toEqual([
-          'start',
-          'end'
-        ]);
-        expect(meta?.ui?.payload?.summary).toMatch(/mi/);
       } finally {
         process.env.MAPBOX_ACCESS_TOKEN = realToken;
       }

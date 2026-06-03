@@ -367,13 +367,17 @@ const CleanedWaypointSchema = z.object({
   metadata: WaypointMetadataSchema.nullable().optional()
 });
 
-// Main Directions API response schema
-export const DirectionsResponseSchema = z.object({
-  routes: z.array(RouteSchema).optional(), // Can be missing if no route found
-  waypoints: z.array(CleanedWaypointSchema).optional(), // Modified waypoints with renamed fields
-  code: z.string().optional(), // Removed by cleanResponseData for token efficiency
-  uuid: z.string().optional() // Removed by cleanResponseData for token efficiency
-});
+// Main Directions API response schema. Uses .passthrough() so the tool can
+// attach a `_mapApp` rendering payload to structuredContent without the
+// MCP SDK's output-schema validation stripping it.
+export const DirectionsResponseSchema = z
+  .object({
+    routes: z.array(RouteSchema).optional(), // Can be missing if no route found
+    waypoints: z.array(CleanedWaypointSchema).optional(), // Modified waypoints with renamed fields
+    code: z.string().optional(), // Removed by cleanResponseData for token efficiency
+    uuid: z.string().optional() // Removed by cleanResponseData for token efficiency
+  })
+  .passthrough();
 
 export type DirectionsResponse = z.infer<typeof DirectionsResponseSchema>;
 export type Route = z.infer<typeof RouteSchema>;
