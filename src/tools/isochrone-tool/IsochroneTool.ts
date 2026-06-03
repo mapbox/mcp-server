@@ -13,6 +13,7 @@ import {
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
+import { storeMapPayload } from '../../utils/storeMapPayload.js';
 
 const HEX6_RE = /^[0-9a-fA-F]{6}$/;
 function sanitizeHex(raw: unknown, fallback: string): string {
@@ -178,7 +179,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
       const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full GeoJSON if needed.`;
 
       const summaryStructured: Record<string, unknown> = mapPayload
-        ? { _mapApp: mapPayload }
+        ? { _mapApp: { ref: storeMapPayload(mapPayload) } }
         : {};
       return {
         content: [{ type: 'text', text: summaryText }],
@@ -206,7 +207,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
     const sc: Record<string, unknown> = {
       ...(validated as unknown as Record<string, unknown>)
     };
-    if (mapPayload) sc._mapApp = mapPayload;
+    if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
 
     return {
       content: [{ type: 'text', text }],

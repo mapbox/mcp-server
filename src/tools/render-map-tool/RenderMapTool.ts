@@ -16,22 +16,27 @@ import { isMcpUiEnabled } from '../../config/toolConfig.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
 import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
+import {
+  resolveMapPayloadRef,
+  mergeMapPayloads
+} from '../../utils/storeMapPayload.js';
 import type { HttpRequest } from '../../utils/types.js';
 
 /**
  * `render_map_tool` — the single visualization primitive for Mapbox MCP.
  *
- * Every other Mapbox tool that has geospatial output (directions, isochrone,
- * optimization, search, map-matching, ground-location, polygon-ops) returns
- * a ready-to-render `_mapApp` payload as part of its structuredContent.
- * The LLM passes that payload (or composes its own) to this tool to display
- * a live Mapbox GL JS map.
+ * Every other Mapbox tool that returns geospatial output stashes a
+ * `MapAppPayload` server-side and surfaces a short ref in its
+ * `structuredContent._mapApp.ref`. The LLM hands those refs to this tool
+ * to display the data on a live Mapbox GL JS map.
  *
- * Why this lives in its own tool rather than being attached to each data
- * tool: MCP App hosts (Claude Desktop today) only fully render the iframe
- * for the LAST tool in a chained sequence. By funneling all rendering
- * through one terminal tool we sidestep that chain-position penalty —
- * `render_map_tool` is always last by design.
+ * Two reasons it's a separate tool:
+ *   1. MCP App hosts (Claude Desktop today) only fully render the iframe
+ *      for the LAST tool in a chained sequence. By funneling all rendering
+ *      through one terminal tool we sidestep the chain-position penalty.
+ *   2. Server-side refs mean the LLM never has to emit thousands of
+ *      coordinate pairs as tool input — keeping latency in the
+ *      hundreds-of-millseconds range instead of 20-30s.
  */
 export class RenderMapTool extends BaseTool<
   typeof RenderMapInputSchema,
@@ -40,11 +45,13 @@ export class RenderMapTool extends BaseTool<
   readonly name = 'render_map_tool';
   readonly description =
     'Display a live, interactive Mapbox GL JS map. ' +
-    'Call this AFTER gathering geospatial data with any other Mapbox tool — ' +
-    "pass the `_mapApp` field from that tool's structuredContent as the input. " +
-    'You can also compose a payload yourself from raw GeoJSON (layers + markers + legend + summary). ' +
-    'The user expects to see a map for any spatial query (routes, isochrones, POI searches, polygon operations, etc.), ' +
-    'so invoke this as the final step whenever a tool returned `_mapApp` data.';
+    'Preferred usage: any other Mapbox tool returns a `_mapApp.ref` URI in ' +
+    'its structuredContent — pass that ref via `payload_refs: ["..."]`. ' +
+    'You can pass multiple refs to merge several datasets (e.g. a search ' +
+    'result + a route) onto one map. ' +
+    'Inline `layers`/`markers`/`legend` fields are also supported for ' +
+    'hand-composed payloads from raw GeoJSON. ' +
+    'Invoke this as the FINAL step whenever a tool returned `_mapApp` data.';
 
   readonly annotations = {
     title: 'Render Map',
@@ -88,18 +95,28 @@ export class RenderMapTool extends BaseTool<
       async () => {
         try {
           const input = RenderMapInputSchema.parse(rawInput);
-          // RenderMapInput's `data: z.unknown()` widens layer geometry beyond
-          // MapAppPayload's strict Geometry union, so cast to assemble the
-          // payload object that flows to the iframe renderer.
-          const payload = input as unknown as MapAppPayload;
 
-          const layerCount = input.layers?.length ?? 0;
-          const markerCount = input.markers?.length ?? 0;
+          const payload = this.assemblePayload(input);
+
+          if (!payload) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: 'RenderMapTool: nothing to render. Pass either `payload_refs` or inline `layers`/`markers`.'
+                }
+              ],
+              isError: true
+            };
+          }
+
+          const layerCount = payload.layers?.length ?? 0;
+          const markerCount = payload.markers?.length ?? 0;
 
           const text =
             `Rendered map with ${layerCount} layer${layerCount === 1 ? '' : 's'}` +
             ` and ${markerCount} marker${markerCount === 1 ? '' : 's'}` +
-            (input.summary ? ` — ${input.summary}` : '') +
+            (payload.summary ? ` — ${payload.summary}` : '') +
             '.';
 
           const content: CallToolResult['content'] = [
@@ -143,7 +160,7 @@ export class RenderMapTool extends BaseTool<
               rendered: true,
               layer_count: layerCount,
               marker_count: markerCount,
-              summary: input.summary,
+              summary: payload.summary,
               _mapApp: payload as unknown as Record<string, unknown>
             },
             isError: false
@@ -168,6 +185,46 @@ export class RenderMapTool extends BaseTool<
         }
       }
     );
+  }
+
+  /**
+   * Resolve `payload_refs` and merge with any inline layers/markers/legend.
+   * Inline `summary` (when set) overrides any summary from the refs.
+   * Returns null if nothing renderable is provided.
+   */
+  private assemblePayload(input: RenderMapInput): MapAppPayload | null {
+    const fromRefs: MapAppPayload[] = [];
+    if (Array.isArray(input.payload_refs)) {
+      for (const ref of input.payload_refs) {
+        const resolved = resolveMapPayloadRef(ref);
+        if (resolved) fromRefs.push(resolved);
+      }
+    }
+
+    const inline: MapAppPayload = {
+      // RenderMapInput's `data: z.unknown()` widens layer geometry beyond
+      // MapAppPayload's strict Geometry union, so cast to assemble the
+      // payload object that flows to the iframe renderer.
+      layers: (input.layers ?? []) as MapAppPayload['layers'],
+      markers: input.markers as MapAppPayload['markers'],
+      legend: input.legend,
+      camera: input.camera as MapAppPayload['camera'],
+      summary: input.summary
+    };
+    const hasInlineContent =
+      (inline.layers && inline.layers.length > 0) ||
+      (inline.markers && inline.markers.length > 0);
+
+    const all: MapAppPayload[] = [...fromRefs];
+    if (hasInlineContent || inline.summary || inline.legend) all.push(inline);
+    if (all.length === 0) return null;
+
+    const merged = mergeMapPayloads(all);
+    // Inline summary/camera/legend take precedence when provided.
+    if (input.summary) merged.summary = input.summary;
+    if (input.camera) merged.camera = inline.camera;
+    if (input.legend) merged.legend = input.legend;
+    return merged;
   }
 }
 

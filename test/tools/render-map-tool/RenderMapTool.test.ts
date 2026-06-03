@@ -80,4 +80,104 @@ describe('RenderMapTool', () => {
     const sc = result.structuredContent as { layer_count: number };
     expect(sc.layer_count).toBe(0);
   });
+
+  it('resolves a payload_ref into a renderable payload', async () => {
+    const { storeMapPayload } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const ref = storeMapPayload({
+      summary: 'Cached route',
+      layers: [
+        {
+          id: 'route',
+          type: 'line',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-77, 38],
+                [-76, 39]
+              ]
+            },
+            properties: {}
+          }
+        }
+      ]
+    });
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ payload_refs: [ref] });
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      layer_count: number;
+      summary?: string;
+    };
+    expect(sc.layer_count).toBe(1);
+    expect(sc.summary).toBe('Cached route');
+  });
+
+  it('merges multiple payload_refs into a single map', async () => {
+    const { storeMapPayload } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const a = storeMapPayload({
+      summary: 'Iso A',
+      layers: [
+        {
+          id: 'a',
+          type: 'fill',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [-77, 38],
+                  [-76, 38],
+                  [-76, 39],
+                  [-77, 39],
+                  [-77, 38]
+                ]
+              ]
+            },
+            properties: {}
+          }
+        }
+      ]
+    });
+    const b = storeMapPayload({
+      summary: 'Iso B',
+      layers: [
+        {
+          id: 'a', // colliding id → should be renamed during merge
+          type: 'fill',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [-78, 38],
+                  [-77, 38],
+                  [-77, 39],
+                  [-78, 39],
+                  [-78, 38]
+                ]
+              ]
+            },
+            properties: {}
+          }
+        }
+      ]
+    });
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ payload_refs: [a, b] });
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      layer_count: number;
+      summary?: string;
+    };
+    expect(sc.layer_count).toBe(2);
+    expect(sc.summary).toBe('Iso A · Iso B');
+  });
 });

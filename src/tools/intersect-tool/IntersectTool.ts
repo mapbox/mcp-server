@@ -12,6 +12,7 @@ import {
 } from './IntersectTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { buildPolygonOpsMapPayload } from '../union-tool/buildPolygonOpsMapPayload.js';
+import { storeMapPayload } from '../../utils/storeMapPayload.js';
 
 export class IntersectTool extends BaseTool<
   typeof IntersectInputSchema,
@@ -81,7 +82,7 @@ export class IntersectTool extends BaseTool<
           const sc: Record<string, unknown> = {
             ...(validated as unknown as Record<string, unknown>)
           };
-          if (mapPayload) sc._mapApp = mapPayload;
+          if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
 
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();

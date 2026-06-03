@@ -1120,21 +1120,27 @@ describe('DirectionsTool', () => {
 
       expect(result.isError).toBe(false);
       // No inline UI block — content is text-only; rendering is the LLM's
-      // job via render_map_tool with the _mapApp payload passed through.
+      // job via render_map_tool with the _mapApp ref passed through.
       expect(result.content.length).toBe(1);
       expect((result.content[0] as { type: string }).type).toBe('text');
 
-      type Payload = {
-        summary?: string;
-        layers?: Array<{ id: string; type: string }>;
-        markers?: Array<{ style?: string }>;
-      };
-      const sc = result.structuredContent as { _mapApp?: Payload } | undefined;
-      const mapApp = sc?._mapApp;
-      expect(mapApp?.layers?.[0]?.id).toBe('route');
-      expect(mapApp?.layers?.[0]?.type).toBe('line');
-      expect(mapApp?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
-      expect(mapApp?.summary).toMatch(/mi/);
+      // The full payload is stashed server-side; the tool only surfaces a
+      // short ref the LLM can pass to render_map_tool.
+      const sc = result.structuredContent as
+        | { _mapApp?: { ref?: string } }
+        | undefined;
+      const ref = sc?._mapApp?.ref;
+      expect(typeof ref).toBe('string');
+      expect(ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+      // Dereferencing the ref returns the original payload.
+      const { resolveMapPayloadRef } =
+        await import('../../../src/utils/storeMapPayload.js');
+      const payload = resolveMapPayloadRef(ref!);
+      expect(payload?.layers?.[0]?.id).toBe('route');
+      expect(payload?.layers?.[0]?.type).toBe('line');
+      expect(payload?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
+      expect(payload?.summary).toMatch(/mi/);
     });
   });
 });

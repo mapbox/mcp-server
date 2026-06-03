@@ -12,6 +12,7 @@ import type {
   MapboxFeature
 } from '../../schemas/geojson.js';
 import { buildSearchMapPayload } from '../search-and-geocode-tool/buildSearchMapPayload.js';
+import { storeMapPayload } from '../../utils/storeMapPayload.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -200,7 +201,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     const sc: Record<string, unknown> = {
       ...(data as unknown as Record<string, unknown>)
     };
-    if (payload) sc._mapApp = payload;
+    if (payload) sc._mapApp = { ref: storeMapPayload(payload) };
 
     return {
       content: [{ type: 'text', text: baseText }],

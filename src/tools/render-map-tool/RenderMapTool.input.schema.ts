@@ -79,28 +79,41 @@ const cameraSchema = z.object({
 });
 
 export const RenderMapInputSchema = z.object({
+  /**
+   * Preferred way to pass data from another Mapbox tool. Every geo tool
+   * stashes its map payload server-side and returns a short ref in
+   * `structuredContent._mapApp.ref` — pass that ref (or several, to merge
+   * multiple datasets onto one map) here. Avoids streaming thousands of
+   * coordinate pairs back through the model.
+   */
+  payload_refs: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Array of map-payload URIs returned by other Mapbox tools in their structuredContent._mapApp.ref field. Pass one ref to render a single tool result; pass multiple to merge several datasets onto one map (e.g. an isochrone + a route).'
+    ),
   summary: z
     .string()
     .optional()
     .describe(
-      'Short header chip shown in the top-left of the map (e.g. "Route: 12.4 mi, 23 min")'
+      'Short header chip shown in the top-left of the map (e.g. "Route: 12.4 mi, 23 min"). Overrides any summary in payload_refs.'
     ),
   layers: z
     .array(layerSchema)
-    .default([])
+    .optional()
     .describe(
-      'Layers to add to the map in order. Empty array is allowed if the payload only has markers.'
+      'Inline layers to add to the map. Use this only when composing a payload from raw GeoJSON; for tool results, pass payload_refs instead.'
     ),
   markers: z
     .array(markerSchema)
     .optional()
     .describe(
-      'Point markers to drop on the map (start/end, numbered visits, POI pins, etc.)'
+      'Inline point markers (start/end, numbered visits, POI pins, etc.). Use only for hand-composed payloads.'
     ),
   legend: z
     .array(legendEntrySchema)
     .optional()
-    .describe('Bottom-left legend rows (color swatch + label)'),
+    .describe('Inline legend rows. Use only for hand-composed payloads.'),
   camera: cameraSchema
     .optional()
     .describe(

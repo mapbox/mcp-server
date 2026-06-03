@@ -11,6 +11,7 @@ import {
   type GroundLocationOutput
 } from './GroundLocationTool.output.schema.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
+import { storeMapPayload } from '../../utils/storeMapPayload.js';
 
 type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
 
@@ -381,7 +382,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     const sc: Record<string, unknown> = {
       ...(output as unknown as Record<string, unknown>)
     };
-    if (mapPayload) sc._mapApp = mapPayload;
+    if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
 
     return {
       content: [{ type: 'text', text: this.formatOutput(output, strategy) }],

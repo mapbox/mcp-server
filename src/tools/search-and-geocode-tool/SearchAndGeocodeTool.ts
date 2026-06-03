@@ -15,6 +15,7 @@ import type {
 } from '../../schemas/geojson.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { buildSearchMapPayload } from './buildSearchMapPayload.js';
+import { storeMapPayload } from '../../utils/storeMapPayload.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -327,7 +328,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
 
     const sc = {
       ...((base.structuredContent ?? {}) as Record<string, unknown>),
-      _mapApp: payload
+      _mapApp: { ref: storeMapPayload(payload) }
     };
     return { ...base, structuredContent: sc };
   }

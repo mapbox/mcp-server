@@ -19,6 +19,7 @@ import {
   decodePolylineWithFallback,
   type MapAppPayload
 } from '../../utils/mapAppPayload.js';
+import { storeMapPayload } from '../../utils/storeMapPayload.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -331,9 +332,14 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
           legs: undefined
         }))
       };
-      // Attach the map-app payload so the iframe can still render the route
-      // even though geometry was stripped from the response body.
-      if (mapPayloadFull) summaryStructuredContent._mapApp = mapPayloadFull;
+      // Stash the map payload server-side and only return a short ref so
+      // the LLM doesn't have to re-emit thousands of coordinate pairs as
+      // input to render_map_tool.
+      if (mapPayloadFull) {
+        summaryStructuredContent._mapApp = {
+          ref: storeMapPayload(mapPayloadFull)
+        };
+      }
 
       return {
         content: [{ type: 'text', text: summaryText }],
@@ -342,15 +348,15 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       };
     }
 
-    // Small response - return normally.
-    // The map payload rides on structuredContent._mapApp so the LLM can
-    // pass it through to `render_map_tool` to display the route on a live
-    // Mapbox GL JS map.
+    // Small response - return normally. The map payload is stored
+    // server-side; structuredContent._mapApp carries a short ref the LLM
+    // can pass to `render_map_tool` to display the route on a live Mapbox
+    // GL JS map (avoids re-emitting the full polyline through the model).
     const mapPayload = mapPayloadFull;
     return {
       content: [{ type: 'text', text: responseText }],
       structuredContent: mapPayload
-        ? { ...validatedData, _mapApp: mapPayload }
+        ? { ...validatedData, _mapApp: { ref: storeMapPayload(mapPayload) } }
         : validatedData,
       isError: false
     };
