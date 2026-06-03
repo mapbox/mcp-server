@@ -69,9 +69,7 @@ export function renderMapAppHtml(params: {
   #error {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     color: #d32f2f; background: #ffebee; border-radius: 8px;
-    padding: 20px; max-width: 520px; text-align: left; z-index: 10;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px; white-space: pre-line;
+    padding: 20px; max-width: 400px; text-align: center; z-index: 10;
   }
   .marker-badge {
     width: 28px; height: 28px; border-radius: 50%;
@@ -212,30 +210,7 @@ ${initialDataScript}
       stageRender(payload);
       return;
     }
-    // Diagnostic: dump the keys the host actually forwarded so we can see
-    // whether structuredContent / _meta / content survived the bridge.
-    var diag = describeResult(result);
-    showError('No map payload found.\\n\\n' + diag);
-  }
-
-  function describeResult(result) {
-    if (!result || typeof result !== 'object') return 'result: ' + typeof result;
-    var lines = ['Top-level keys: ' + Object.keys(result).join(', ')];
-    if (result.structuredContent) {
-      lines.push('structuredContent keys: ' +
-        Object.keys(result.structuredContent).join(', '));
-    }
-    if (result._meta) {
-      lines.push('_meta keys: ' + Object.keys(result._meta).join(', '));
-      if (result._meta.ui) {
-        lines.push('_meta.ui keys: ' + Object.keys(result._meta.ui).join(', '));
-      }
-    }
-    if (Array.isArray(result.content)) {
-      lines.push('content[] types: ' +
-        result.content.map(function(c) { return c && c.type; }).join(', '));
-    }
-    return lines.join('\\n');
+    showError('Tool result did not contain a map payload.');
   }
 
   function extractPayload(result) {
