@@ -205,7 +205,27 @@ ${initialDataScript}
 
   // --- Tool result extraction ----------------------------------------------
   function handleToolResult(result) {
-    var payload = extractPayload(result);
+    var ref = extractPayloadRef(result);
+    if (ref) {
+      // Fetch the actual payload via resources/read against the host.
+      // We use refs (not inline payloads) because full payloads can be
+      // 100s of KB for long routes / detailed isochrones, which doesn't
+      // round-trip reliably through host postMessage bridges.
+      sendRequest('resources/read', { uri: ref }).then(
+        function(rr) {
+          var fetched = readResourceJson(rr);
+          if (fetched && looksLikePayload(fetched)) stageRender(fetched);
+          else showError('Map payload was empty or malformed.');
+        },
+        function(err) {
+          showError('Could not read map payload: ' +
+            (err && err.message ? err.message : err));
+        }
+      );
+      return;
+    }
+    // Backwards-compatible path: payload is inlined in structuredContent.
+    var payload = extractInlinePayload(result);
     if (payload) {
       stageRender(payload);
       return;
@@ -213,17 +233,21 @@ ${initialDataScript}
     showError('Tool result did not contain a map payload.');
   }
 
-  function extractPayload(result) {
+  function extractPayloadRef(result) {
     if (!result) return null;
-    // Primary contract: structuredContent._mapApp. Lives here because
-    // structuredContent is guaranteed to flow through to the iframe via
-    // ui/notifications/tool-result, whereas hosts vary in whether they
-    // forward CallToolResult._meta.
+    var sc = result.structuredContent;
+    if (sc && sc._mapApp && typeof sc._mapApp.ref === 'string') {
+      return sc._mapApp.ref;
+    }
+    return null;
+  }
+
+  function extractInlinePayload(result) {
+    if (!result) return null;
     var sc = result.structuredContent;
     if (sc && sc._mapApp && looksLikePayload(sc._mapApp)) {
       return sc._mapApp;
     }
-    // Belt-and-suspenders: _meta.ui.payload per the MCP Apps spec.
     if (result._meta && result._meta.ui && looksLikePayload(result._meta.ui.payload)) {
       return result._meta.ui.payload;
     }

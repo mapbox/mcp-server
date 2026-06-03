@@ -50,13 +50,20 @@ describe('RenderMapTool', () => {
       rendered: boolean;
       layer_count: number;
       marker_count: number;
-      _mapApp?: { layers: unknown[]; markers: unknown[] };
+      _mapApp?: { ref?: string };
     };
     expect(sc.rendered).toBe(true);
     expect(sc.layer_count).toBe(1);
     expect(sc.marker_count).toBe(2);
-    expect(sc._mapApp?.layers).toHaveLength(1);
-    expect(sc._mapApp?.markers).toHaveLength(2);
+    // The merged payload is stashed server-side; structuredContent only
+    // surfaces a ref so even a 300KB payload round-trips through the host
+    // bridge without truncation.
+    expect(sc._mapApp?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const stored = resolveMapPayloadRef(sc._mapApp!.ref!);
+    expect(stored?.layers).toHaveLength(1);
+    expect(stored?.markers).toHaveLength(2);
   });
 
   it('rejects coordinates that are not [lng, lat] pairs', async () => {

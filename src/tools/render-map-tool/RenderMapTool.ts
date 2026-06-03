@@ -18,7 +18,8 @@ import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 import {
   resolveMapPayloadRef,
-  mergeMapPayloads
+  mergeMapPayloads,
+  storeMapPayload
 } from '../../utils/storeMapPayload.js';
 import type { HttpRequest } from '../../utils/types.js';
 
@@ -152,8 +153,12 @@ export class RenderMapTool extends BaseTool<
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
-          // structuredContent._mapApp lets MCP App hosts (and any iframe
-          // listening on this tool's tool-result) extract the payload.
+          // Stash the merged payload server-side and surface only a ref in
+          // structuredContent. A full payload (think 300KB for a long route
+          // or large isochrone) doesn't round-trip reliably through the host
+          // bridge to the iframe — the iframe dereferences via
+          // `resources/read` against TemporaryDataResource instead.
+          const mergedRef = storeMapPayload(payload);
           return {
             content,
             structuredContent: {
@@ -161,7 +166,7 @@ export class RenderMapTool extends BaseTool<
               layer_count: layerCount,
               marker_count: markerCount,
               summary: payload.summary,
-              _mapApp: payload as unknown as Record<string, unknown>
+              _mapApp: { ref: mergedRef }
             },
             isError: false
           };
