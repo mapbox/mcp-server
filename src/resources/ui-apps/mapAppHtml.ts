@@ -251,6 +251,22 @@ ${initialDataScript}
     } else {
       lines.push('structuredContent: <missing>');
     }
+    if (Array.isArray(result.content)) {
+      lines.push('content[] length: ' + result.content.length);
+      result.content.forEach(function(c, i) {
+        if (!c) { lines.push('  [' + i + ']: null'); return; }
+        var type = c.type;
+        var preview = '';
+        if (type === 'text' && typeof c.text === 'string') {
+          preview = ' "' + c.text.slice(0, 80).replace(/\\n/g, '⏎') + '"';
+        } else if (type === 'resource' && c.resource) {
+          preview = ' uri=' + (c.resource.uri || '?');
+        }
+        lines.push('  [' + i + '] ' + type + preview);
+      });
+    } else {
+      lines.push('content: <missing or not array>');
+    }
     return lines.join('\\n');
   }
 
