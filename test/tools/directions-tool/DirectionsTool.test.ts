@@ -1066,12 +1066,10 @@ describe('DirectionsTool', () => {
   });
 
   describe('MCP App + MCP-UI integration', () => {
-    it('declares meta.ui.resourceUri pointing to the directions-app resource', () => {
+    it('declares meta.ui.resourceUri pointing to the generic map-app resource', () => {
       const { httpRequest } = setupHttpRequest();
       const tool = new DirectionsTool({ httpRequest });
-      expect(tool.meta?.ui?.resourceUri).toBe(
-        'ui://mapbox/directions-app/index.html'
-      );
+      expect(tool.meta?.ui?.resourceUri).toBe('ui://mapbox/map-app/index.html');
     });
 
     it('adds an inline MCP-UI rawHtml resource for small geojson responses', async () => {
@@ -1153,6 +1151,27 @@ describe('DirectionsTool', () => {
         // Initial-data block should carry the baked-in geometry
         expect(uiBlock?.resource?.text).toContain('initial-data');
         expect(uiBlock?.resource?.text).toContain('LineString');
+
+        // The tool also publishes a MapAppPayload at _meta.ui.payload so the
+        // MCP Apps iframe can render via postMessage.
+        const meta = (result as { _meta?: unknown })._meta as
+          | {
+              ui?: {
+                payload?: {
+                  summary?: string;
+                  layers?: Array<{ id: string; type: string }>;
+                  markers?: Array<{ style?: string }>;
+                };
+              };
+            }
+          | undefined;
+        expect(meta?.ui?.payload?.layers?.[0]?.id).toBe('route');
+        expect(meta?.ui?.payload?.layers?.[0]?.type).toBe('line');
+        expect(meta?.ui?.payload?.markers?.map((m) => m.style)).toEqual([
+          'start',
+          'end'
+        ]);
+        expect(meta?.ui?.payload?.summary).toMatch(/mi/);
       } finally {
         process.env.MAPBOX_ACCESS_TOKEN = realToken;
       }

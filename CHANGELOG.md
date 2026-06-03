@@ -1,5 +1,23 @@
 ## Unreleased
 
+### New Features
+
+- **Generic Mapbox MCP App** — added a single `MapAppUIResource`
+  (`ui://mapbox/map-app/index.html`) that any tool can point
+  `_meta.ui.resourceUri` at. Tools emit a `MapAppPayload`
+  (`src/utils/mapAppPayload.ts`) at `result._meta.ui.payload` and the
+  generic iframe translates each layer/marker/legend entry into a Mapbox
+  GL JS call. The payload is a thin pass-through to the Style spec's
+  `paint`/`layout` objects — no per-tool template required. The same
+  module also powers the inline MCP-UI rawHtml path. Polyline decoding
+  moves tool-side via `decodePolyline`/`decodePolylineWithFallback`, so
+  the iframe never sees encoded geometry.
+- **`directions_tool` migrated to the generic map app** — `DirectionsTool`
+  now builds a `MapAppPayload` (route line + start/end markers + summary)
+  instead of producing its own bespoke HTML. The
+  `DirectionsAppUIResource` is kept registered for backward compatibility
+  but the tool no longer references it.
+
 ### Security
 
 - chore: upgrade @opentelemetry/\* packages to latest (fixes protobufjs GHSA-xq3m-2v4x-88gg critical CVE) (#183)

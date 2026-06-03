@@ -18,7 +18,11 @@ import type { HttpRequest } from '../..//utils/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { isMcpUiEnabled } from '../../config/toolConfig.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderDirectionsAppHtml } from '../../resources/ui-apps/directionsAppHtml.js';
+import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
+import {
+  decodePolylineWithFallback,
+  type MapAppPayload
+} from '../../utils/mapAppPayload.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -41,7 +45,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
   };
   readonly meta = {
     ui: {
-      resourceUri: 'ui://mapbox/directions-app/index.html',
+      resourceUri: 'ui://mapbox/map-app/index.html',
       csp: {
         connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
         resourceDomains: ['https://api.mapbox.com']
@@ -350,16 +354,22 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       { type: 'text', text: responseText }
     ];
 
+    const mapPayload = buildDirectionsMapPayload(validatedData);
+
     // Legacy MCP-UI: inline a rawHtml UIResource so non-MCP-Apps clients
-    // also get a live GL JS map. Only works when the response actually
-    // carries a renderable GeoJSON geometry — i.e. geometries=geojson.
-    if (isMcpUiEnabled()) {
-      const inlineHtml = await tryRenderInlineUiHtml(
-        validatedData,
+    // also get a live GL JS map. Uses the same generic renderer as the
+    // MCP Apps resource, with the payload baked in as initial-data.
+    if (isMcpUiEnabled() && mapPayload) {
+      const publicToken = await resolveMapboxPublicToken({
         accessToken,
-        this.httpRequest
-      );
-      if (inlineHtml) {
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+        httpRequest: this.httpRequest
+      });
+      if (publicToken) {
+        const inlineHtml = renderMapAppHtml({
+          publicToken,
+          initialData: mapPayload
+        });
         content.push(
           createUIResource({
             uri: `ui://mapbox/directions/${randomUUID()}`,
@@ -373,66 +383,82 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       }
     }
 
-    return {
+    const result: CallToolResult = {
       content,
       structuredContent: validatedData,
       isError: false
     };
+    if (mapPayload) {
+      result._meta = { ui: { payload: mapPayload } };
+    }
+    return result;
   }
 }
 
 /**
- * Try to render the same DirectionsAppHtml as the MCP Apps resource, but
- * with the route geometry baked in so MCP-UI clients (which don't fetch
- * external resources) can render inline. Returns undefined when the
- * response has no GeoJSON geometry to render or no public token can be
- * resolved — the caller falls back to text-only output.
+ * Build a generic `MapAppPayload` from a Directions API response:
+ *   - one `line` layer for the route
+ *   - start/end markers (badge style)
+ *   - summary chip with miles + minutes
+ *
+ * Returns null when the response has no renderable geometry (e.g.
+ * `geometries=none` was requested or the polyline failed to decode).
  */
-async function tryRenderInlineUiHtml(
-  data: DirectionsResponse,
-  accessToken: string,
-  httpRequest: HttpRequest
-): Promise<string | undefined> {
+function buildDirectionsMapPayload(
+  data: DirectionsResponse
+): MapAppPayload | null {
   const route = data.routes?.[0];
-  const geometry = route?.geometry;
-  // Accept either a GeoJSON LineString object or a polyline string — the
-  // iframe normalizes both shapes before rendering.
-  const hasGeojson =
-    geometry &&
-    typeof geometry === 'object' &&
-    (geometry as { type?: string }).type === 'LineString' &&
-    Array.isArray((geometry as { coordinates?: unknown }).coordinates);
-  const hasPolyline = typeof geometry === 'string' && geometry.length > 0;
-  if (!hasGeojson && !hasPolyline) {
-    return undefined;
-  }
+  if (!route) return null;
 
-  const publicToken = await resolveMapboxPublicToken({
-    accessToken,
-    apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
-    httpRequest
-  });
-  if (!publicToken) return undefined;
+  // Normalize geometry to GeoJSON LineString — handles both
+  // geometries=geojson (object) and geometries=polyline/polyline6 (string).
+  let coords: [number, number][] | null = null;
+  const g = route.geometry as unknown;
+  if (
+    g &&
+    typeof g === 'object' &&
+    (g as { type?: string }).type === 'LineString' &&
+    Array.isArray((g as { coordinates?: unknown }).coordinates)
+  ) {
+    coords = (g as { coordinates: [number, number][] }).coordinates;
+  } else if (typeof g === 'string' && g.length > 0) {
+    coords = decodePolylineWithFallback(g);
+  }
+  if (!coords || coords.length === 0) return null;
 
   const summaryParts: string[] = [];
-  if (typeof route?.distance === 'number') {
+  if (typeof route.distance === 'number') {
     summaryParts.push(`${(route.distance / 1609.34).toFixed(1)} mi`);
   }
-  if (typeof route?.duration === 'number') {
+  if (typeof route.duration === 'number') {
     summaryParts.push(`${Math.round(route.duration / 60)} min`);
   }
   const summary = summaryParts.length
     ? `Route: ${summaryParts.join(', ')}`
     : 'Route';
 
-  return renderDirectionsAppHtml({
-    publicToken,
-    initialData: {
-      geometry: geometry as unknown as {
-        type: string;
-        coordinates: [number, number][];
-      },
-      summary
-    }
-  });
+  return {
+    summary,
+    layers: [
+      {
+        id: 'route',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: coords },
+          properties: {}
+        },
+        paint: { 'line-color': '#3b82f6', 'line-width': 5 },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      }
+    ],
+    markers: [
+      { coordinates: coords[0], style: 'start', popup: 'Start' },
+      {
+        coordinates: coords[coords.length - 1],
+        style: 'end',
+        popup: 'End'
+      }
+    ]
+  };
 }
