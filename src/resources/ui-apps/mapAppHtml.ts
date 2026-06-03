@@ -207,13 +207,23 @@ ${initialDataScript}
 
   // --- Tool result extraction ----------------------------------------------
   function handleToolResult(result) {
+    loadingEl.textContent = 'tool-result received — extracting payload ref…';
     var ref = extractPayloadRef(result);
     if (ref) {
+      loadingEl.textContent = 'Fetching map payload ' + ref + '…';
       sendRequest('resources/read', { uri: ref }).then(
         function(rr) {
+          loadingEl.textContent = 'Got resource response — parsing…';
           var fetched = readResourceJson(rr);
-          if (fetched && looksLikePayload(fetched)) stageRender(fetched);
-          else showError('Map payload was empty or malformed.');
+          if (fetched && looksLikePayload(fetched)) {
+            loadingEl.textContent = 'Rendering payload…';
+            stageRender(fetched);
+          } else {
+            showError(
+              'Map payload was empty or malformed.\\n\\n' +
+              'Parsed: ' + (fetched ? Object.keys(fetched).join(',') : '<null>')
+            );
+          }
         },
         function(err) {
           showError('Could not read map payload: ' +
