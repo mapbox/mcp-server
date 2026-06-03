@@ -53,6 +53,15 @@ export function buildSearchMapPayload(params: {
     });
   }
 
+  // Also emit a circle layer underneath the markers so the payload has
+  // both `layers` and `markers` populated (some MCP hosts render the card
+  // differently when layers is empty even if markers aren't).
+  const features: Array<{
+    type: 'Feature';
+    geometry: { type: 'Point'; coordinates: [number, number] };
+    properties: { idx: number; label: string };
+  }> = [];
+
   points.forEach((f, i) => {
     const props = f.properties ?? {};
     const popupParts = [`${i + 1}. ${props.name ?? 'Result'}`];
@@ -61,12 +70,18 @@ export function buildSearchMapPayload(params: {
     if (typeof props.distance === 'number') {
       popupParts.push(`${Math.round(props.distance)} m`);
     }
+    const coords = f.geometry!.coordinates as [number, number];
     markers.push({
-      coordinates: f.geometry!.coordinates as [number, number],
+      coordinates: coords,
       style: 'numbered',
       label: String(i + 1),
       color: '#f97316',
       popup: popupParts.join(' — ')
+    });
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: coords },
+      properties: { idx: i + 1, label: props.name ?? `Result ${i + 1}` }
     });
   });
 
@@ -74,5 +89,24 @@ export function buildSearchMapPayload(params: {
     ? `${points.length} result${points.length !== 1 ? 's' : ''} for "${query}"`
     : `${points.length} result${points.length !== 1 ? 's' : ''}`;
 
-  return { summary, layers: [], markers };
+  const layers: MapAppPayload['layers'] =
+    features.length > 0
+      ? [
+          {
+            id: 'search-results',
+            type: 'circle',
+            data: { type: 'FeatureCollection', features },
+            paint: {
+              'circle-radius': 6,
+              'circle-color': '#f97316',
+              'circle-opacity': 0.15,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#f97316',
+              'circle-stroke-opacity': 0.4
+            }
+          }
+        ]
+      : [];
+
+  return { summary, layers, markers };
 }
