@@ -309,15 +309,12 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
             'SearchAndGeocodeTool: User declined to select a specific result'
           );
         }
-      } catch (elicitError) {
+      } catch {
         // Elicitation isn't supported by every MCP client (Claude Desktop
         // doesn't, for example). Falling back to "return all results" is the
-        // expected behavior in that case, not a warning — log at debug so the
-        // host doesn't flag the tool call as failed in its UI.
-        this.log(
-          'debug',
-          `SearchAndGeocodeTool: Elicitation unavailable, returning all results: ${elicitError instanceof Error ? elicitError.message : 'Unknown error'}`
-        );
+        // expected behavior — silent, since Claude Desktop's UI flags tool
+        // calls that emit notifications/message at any level as visually
+        // failed even when the JSON-RPC response is isError: false.
       }
     }
 
