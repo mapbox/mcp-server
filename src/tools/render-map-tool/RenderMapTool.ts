@@ -120,8 +120,18 @@ export class RenderMapTool extends BaseTool<
             (payload.summary ? ` — ${payload.summary}` : '') +
             '.';
 
+          // Stash the merged payload server-side first so we can include
+          // the ref in the visible content. Claude Desktop strips
+          // structuredContent from MCP App iframe postMessages, so the
+          // iframe scans content[] for a sentinel-tagged ref URI.
+          const mergedRef = storeMapPayload(payload);
+
           const content: CallToolResult['content'] = [
-            { type: 'text' as const, text }
+            { type: 'text' as const, text },
+            {
+              type: 'text' as const,
+              text: `[[MAPBOX_RENDER_REF]] ${mergedRef}`
+            }
           ];
 
           // Inline MCP-UI fallback for hosts that don't speak the MCP Apps
@@ -153,12 +163,6 @@ export class RenderMapTool extends BaseTool<
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
-          // Stash the merged payload server-side and surface only a ref in
-          // structuredContent. A full payload (think 300KB for a long route
-          // or large isochrone) doesn't round-trip reliably through the host
-          // bridge to the iframe — the iframe dereferences via
-          // `resources/read` against TemporaryDataResource instead.
-          const mergedRef = storeMapPayload(payload);
           return {
             content,
             structuredContent: {

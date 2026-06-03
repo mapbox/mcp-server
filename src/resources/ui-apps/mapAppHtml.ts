@@ -244,11 +244,31 @@ ${initialDataScript}
     return lines.join('\\n');
   }
 
+  // Claude Desktop strips structuredContent from tool-result postMessages
+  // before forwarding to MCP App iframes — only content and isError
+  // survive. So the ref has to ride inside a content[] text item, prefixed
+  // with a sentinel the iframe recognizes.
+  var REF_SENTINEL = '[[MAPBOX_RENDER_REF]]';
+  var REF_URI_RE = new RegExp('mapbox://temp/map-payload-[0-9a-fA-F-]+');
+
   function extractPayloadRef(result) {
     if (!result) return null;
+    // structuredContent path: spec-compliant, kept as fallback for hosts
+    // that DO forward structuredContent.
     var sc = result.structuredContent;
     if (sc && sc.mapboxRender && typeof sc.mapboxRender.ref === 'string') {
       return sc.mapboxRender.ref;
+    }
+    // content[] path: scan text items for the sentinel + ref URI.
+    if (result.content && result.content.length) {
+      for (var i = 0; i < result.content.length; i++) {
+        var c = result.content[i];
+        if (c && c.type === 'text' && typeof c.text === 'string' &&
+            c.text.indexOf(REF_SENTINEL) !== -1) {
+          var m = c.text.match(REF_URI_RE);
+          if (m) return m[0];
+        }
+      }
     }
     return null;
   }
