@@ -1069,7 +1069,9 @@ describe('DirectionsTool', () => {
     it('declares meta.ui.resourceUri pointing to the generic map-app resource', () => {
       const { httpRequest } = setupHttpRequest();
       const tool = new DirectionsTool({ httpRequest });
-      expect(tool.meta?.ui?.resourceUri).toBe('ui://mapbox/map-app/index.html');
+      expect(tool.meta?.ui?.resourceUri).toBe(
+        'ui://mapbox/map-app/directions/index.html'
+      );
     });
 
     it('adds an inline MCP-UI rawHtml resource for small geojson responses', async () => {

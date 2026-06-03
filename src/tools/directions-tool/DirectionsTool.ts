@@ -45,7 +45,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
   };
   readonly meta = {
     ui: {
-      resourceUri: 'ui://mapbox/map-app/index.html',
+      resourceUri: 'ui://mapbox/map-app/directions/index.html',
       csp: {
         connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
         resourceDomains: ['https://api.mapbox.com']
