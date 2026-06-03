@@ -39,21 +39,30 @@ export const OptimizationInputSchema = z
       .optional()
       .default('any')
       .describe(
-        'Location to start the trip. "any" allows any coordinate, "first" forces the first coordinate as start. When roundtrip=false this MUST be "first".'
+        'Location to start the trip. ' +
+          'IMPORTANT: If you set roundtrip=false you MUST set source="first" (and destination="last"). ' +
+          'The Mapbox V1 API rejects roundtrip=false with source="any". ' +
+          '"any" allows the optimizer to pick any coordinate as the start (only valid when roundtrip=true).'
       ),
     destination: z
       .enum(['any', 'last'])
       .optional()
       .default('any')
       .describe(
-        'Location to end the trip. "any" allows any coordinate, "last" forces the last coordinate as end. When roundtrip=false this MUST be "last".'
+        'Location to end the trip. ' +
+          'IMPORTANT: If you set roundtrip=false you MUST set destination="last" (and source="first"). ' +
+          'The Mapbox V1 API rejects roundtrip=false with destination="any". ' +
+          '"any" allows the optimizer to pick any coordinate as the end (only valid when roundtrip=true).'
       ),
     roundtrip: z
       .boolean()
       .optional()
       .default(true)
       .describe(
-        'Whether to return to the starting point. Set to false for one-way trips. When false, source must be "first" AND destination must be "last".'
+        'Whether to return to the starting point. ' +
+          'Default true returns a closed loop through the coordinates. ' +
+          'Set false for one-way trips — REQUIRES source="first" AND destination="last" together. ' +
+          'Passing roundtrip=false without both endpoint constraints will fail.'
       ),
     geometries: z
       .enum(['geojson', 'polyline', 'polyline6'])

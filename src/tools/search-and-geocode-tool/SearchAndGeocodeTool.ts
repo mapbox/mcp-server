@@ -120,11 +120,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Starting search with input: ${JSON.stringify(input)}`
-    );
-
     const url = new URL(
       `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/forward`
     );
@@ -187,11 +182,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       );
     }
 
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
-    );
-
     const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
@@ -225,11 +215,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       // Graceful fallback to raw data
       data = rawData as SearchBoxResponse;
     }
-
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Successfully completed search, found ${data.features?.length || 0} results`
-    );
 
     // Check if we have multiple results that might be ambiguous
     if (
