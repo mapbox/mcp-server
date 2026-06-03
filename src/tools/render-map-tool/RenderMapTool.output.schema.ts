@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
 
 /**
- * Output schema for `render_map_tool`. `_mapApp.ref` is declared because
+ * Output schema for `render_map_tool`. `mapboxRender.ref` is declared because
  * strict client-side validators may strip undeclared fields from the
  * structuredContent — even with `.passthrough()` on the Zod side — and the
  * iframe needs to see the ref to fetch the merged payload via
@@ -17,7 +17,7 @@ export const RenderMapOutputSchema = z
     layer_count: z.number().int(),
     marker_count: z.number().int(),
     summary: z.string().optional(),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

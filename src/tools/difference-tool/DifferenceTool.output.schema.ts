@@ -18,7 +18,7 @@ export const DifferenceOutputSchema = z
       .describe(
         'GeoJSON geometry of the remaining area (polygon1 minus polygon2), or null if polygon2 fully covers polygon1'
       ),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

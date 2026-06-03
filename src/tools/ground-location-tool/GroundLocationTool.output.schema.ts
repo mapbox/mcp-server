@@ -38,7 +38,7 @@ export const GroundLocationOutputSchema = z
     citations: z
       .array(z.string())
       .describe('Mapbox APIs used to produce this grounded response'),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

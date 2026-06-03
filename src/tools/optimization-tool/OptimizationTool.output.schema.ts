@@ -95,7 +95,7 @@ export const OptimizationOutputSchema = z
       .string()
       .optional()
       .describe('Error message if code is not "Ok"'),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

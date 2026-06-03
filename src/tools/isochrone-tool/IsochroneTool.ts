@@ -182,7 +182,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
       let largeText = summaryText;
       if (mapPayload) {
         const ref = storeMapPayload(mapPayload);
-        summaryStructured._mapApp = { ref };
+        summaryStructured.mapboxRender = { ref };
         largeText += renderHint(ref);
       }
       return {
@@ -214,7 +214,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
     let smallText = text;
     if (mapPayload) {
       const ref = storeMapPayload(mapPayload);
-      sc._mapApp = { ref };
+      sc.mapboxRender = { ref };
       smallText += renderHint(ref);
     }
 

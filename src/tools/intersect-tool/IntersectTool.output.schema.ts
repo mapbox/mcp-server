@@ -12,7 +12,7 @@ export const IntersectOutputSchema = z
       .record(z.string(), z.unknown())
       .nullable()
       .describe('GeoJSON geometry of the intersection, or null if no overlap'),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

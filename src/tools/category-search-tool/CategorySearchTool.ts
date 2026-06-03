@@ -204,7 +204,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     let textOut = baseText;
     if (payload) {
       const ref = storeMapPayload(payload);
-      sc._mapApp = { ref };
+      sc.mapboxRender = { ref };
       // Don't append the human-readable hint when the user requested JSON
       // output — it would break round-trip parsing. Callers that pass
       // json_string usually already know about render_map_tool.

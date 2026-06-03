@@ -196,7 +196,7 @@ export const CategorySearchResponseSchema = z
     type: z.literal('FeatureCollection'),
     features: z.array(FeatureSchema),
     attribution: z.string(),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

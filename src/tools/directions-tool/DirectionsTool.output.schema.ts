@@ -367,7 +367,7 @@ const CleanedWaypointSchema = z.object({
   metadata: WaypointMetadataSchema.nullable().optional()
 });
 
-// Main Directions API response schema. `_mapApp` is declared so hosts that
+// Main Directions API response schema. `mapboxRender` is declared so hosts that
 // strictly validate tool results against the published JSON Schema don't
 // flag the response as malformed when the field is attached.
 import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
@@ -378,7 +378,7 @@ export const DirectionsResponseSchema = z
     waypoints: z.array(CleanedWaypointSchema).optional(), // Modified waypoints with renamed fields
     code: z.string().optional(), // Removed by cleanResponseData for token efficiency
     uuid: z.string().optional(), // Removed by cleanResponseData for token efficiency
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

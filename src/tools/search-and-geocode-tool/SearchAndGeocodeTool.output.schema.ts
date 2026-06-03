@@ -155,7 +155,7 @@ export const SearchBoxResponseSchema = z.object({
   type: z.literal('FeatureCollection'),
   features: z.array(SearchBoxFeatureSchema),
   attribution: z.string().optional(),
-  _mapApp: MapAppRefSchema.optional()
+  mapboxRender: MapAppRefSchema.optional()
 });
 
 export type SearchBoxResponse = z.infer<typeof SearchBoxResponseSchema>;

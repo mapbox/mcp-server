@@ -28,7 +28,7 @@ import type { HttpRequest } from '../../utils/types.js';
  *
  * Every other Mapbox tool that returns geospatial output stashes a
  * `MapAppPayload` server-side and surfaces a short ref in its
- * `structuredContent._mapApp.ref`. The LLM hands those refs to this tool
+ * `structuredContent.mapboxRender.ref`. The LLM hands those refs to this tool
  * to display the data on a live Mapbox GL JS map.
  *
  * Two reasons it's a separate tool:
@@ -46,13 +46,13 @@ export class RenderMapTool extends BaseTool<
   readonly name = 'render_map_tool';
   readonly description =
     'Display a live, interactive Mapbox GL JS map. ' +
-    'Preferred usage: any other Mapbox tool returns a `_mapApp.ref` URI in ' +
+    'Preferred usage: any other Mapbox tool returns a `mapboxRender.ref` URI in ' +
     'its structuredContent — pass that ref via `payload_refs: ["..."]`. ' +
     'You can pass multiple refs to merge several datasets (e.g. a search ' +
     'result + a route) onto one map. ' +
     'Inline `layers`/`markers`/`legend` fields are also supported for ' +
     'hand-composed payloads from raw GeoJSON. ' +
-    'Invoke this as the FINAL step whenever a tool returned `_mapApp` data.';
+    'Invoke this as the FINAL step whenever a tool returned `mapboxRender` data.';
 
   readonly annotations = {
     title: 'Render Map',
@@ -166,7 +166,7 @@ export class RenderMapTool extends BaseTool<
               layer_count: layerCount,
               marker_count: markerCount,
               summary: payload.summary,
-              _mapApp: { ref: mergedRef }
+              mapboxRender: { ref: mergedRef }
             },
             isError: false
           };

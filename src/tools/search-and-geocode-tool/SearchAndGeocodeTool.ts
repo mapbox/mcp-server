@@ -306,7 +306,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   }
 
   /**
-   * Attach a `_mapApp` payload to structuredContent so the LLM can pass it
+   * Attach a `mapboxRender` payload to structuredContent so the LLM can pass it
    * to `render_map_tool` to visualize results on a live Mapbox GL JS map.
    */
   private withMapPayload(
@@ -329,7 +329,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     const ref = storeMapPayload(payload);
     const sc = {
       ...((base.structuredContent ?? {}) as Record<string, unknown>),
-      _mapApp: { ref }
+      mapboxRender: { ref }
     };
     // Append the render hint to the first text content so the LLM sees the
     // exact ref string and doesn't hallucinate a URI.

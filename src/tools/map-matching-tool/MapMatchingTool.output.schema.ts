@@ -46,7 +46,7 @@ const MatchingSchema = z.object({
     .optional()
 });
 
-// Main output schema. `_mapApp` is declared so strict client-side validators
+// Main output schema. `mapboxRender` is declared so strict client-side validators
 // don't flag the response as malformed.
 import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
 
@@ -55,7 +55,7 @@ export const MapMatchingOutputSchema = z
     code: z.string(),
     matchings: z.array(MatchingSchema),
     tracepoints: z.array(TracepointSchema.nullable()),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

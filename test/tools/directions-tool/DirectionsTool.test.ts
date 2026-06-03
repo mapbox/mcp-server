@@ -1074,7 +1074,7 @@ describe('DirectionsTool', () => {
       ).toBeUndefined();
     });
 
-    it('attaches _mapApp payload to structuredContent for small geojson responses', async () => {
+    it('attaches mapboxRender payload to structuredContent for small geojson responses', async () => {
       const fakeResponse = {
         routes: [
           {
@@ -1120,16 +1120,16 @@ describe('DirectionsTool', () => {
 
       expect(result.isError).toBe(false);
       // No inline UI block — content is text-only; rendering is the LLM's
-      // job via render_map_tool with the _mapApp ref passed through.
+      // job via render_map_tool with the mapboxRender ref passed through.
       expect(result.content.length).toBe(1);
       expect((result.content[0] as { type: string }).type).toBe('text');
 
       // The full payload is stashed server-side; the tool only surfaces a
       // short ref the LLM can pass to render_map_tool.
       const sc = result.structuredContent as
-        | { _mapApp?: { ref?: string } }
+        | { mapboxRender?: { ref?: string } }
         | undefined;
-      const ref = sc?._mapApp?.ref;
+      const ref = sc?.mapboxRender?.ref;
       expect(typeof ref).toBe('string');
       expect(ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
 

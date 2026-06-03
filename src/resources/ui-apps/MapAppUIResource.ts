@@ -18,7 +18,7 @@ import { renderMapAppHtml } from './mapAppHtml.js';
  *
  * Only one tool (`render_map_tool`) points `_meta.ui.resourceUri` at this
  * resource. All other Mapbox tools just return data; the LLM passes their
- * `_mapApp` payload to `render_map_tool` to display it. This sidesteps the
+ * `mapboxRender` payload to `render_map_tool` to display it. This sidesteps the
  * chain-position rendering quirk in MCP App hosts (where intermediate
  * tools in a chain don't get to render their own iframe).
  */

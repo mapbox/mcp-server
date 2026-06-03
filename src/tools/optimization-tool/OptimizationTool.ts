@@ -176,7 +176,7 @@ export class OptimizationTool extends MapboxApiBasedTool<
       let textOut = text;
       if (mapPayload) {
         const ref = storeMapPayload(mapPayload);
-        sc._mapApp = { ref };
+        sc.mapboxRender = { ref };
         textOut += renderHint(ref);
       }
 

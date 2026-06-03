@@ -385,7 +385,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     let textOut = this.formatOutput(output, strategy);
     if (mapPayload) {
       const ref = storeMapPayload(mapPayload);
-      sc._mapApp = { ref };
+      sc.mapboxRender = { ref };
       textOut += renderHint(ref);
     }
 

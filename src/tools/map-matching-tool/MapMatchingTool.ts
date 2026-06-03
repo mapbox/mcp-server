@@ -141,7 +141,7 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     let textOut = JSON.stringify(validatedData, null, 2);
     if (mapPayload) {
       const ref = storeMapPayload(mapPayload);
-      sc._mapApp = { ref };
+      sc.mapboxRender = { ref };
       textOut += renderHint(ref);
     }
 

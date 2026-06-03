@@ -236,8 +236,8 @@ ${initialDataScript}
   function extractPayloadRef(result) {
     if (!result) return null;
     var sc = result.structuredContent;
-    if (sc && sc._mapApp && typeof sc._mapApp.ref === 'string') {
-      return sc._mapApp.ref;
+    if (sc && sc.mapboxRender && typeof sc.mapboxRender.ref === 'string') {
+      return sc.mapboxRender.ref;
     }
     return null;
   }
@@ -245,8 +245,8 @@ ${initialDataScript}
   function extractInlinePayload(result) {
     if (!result) return null;
     var sc = result.structuredContent;
-    if (sc && sc._mapApp && looksLikePayload(sc._mapApp)) {
-      return sc._mapApp;
+    if (sc && sc.mapboxRender && looksLikePayload(sc.mapboxRender)) {
+      return sc.mapboxRender;
     }
     if (result._meta && result._meta.ui && looksLikePayload(result._meta.ui.payload)) {
       return result._meta.ui.payload;

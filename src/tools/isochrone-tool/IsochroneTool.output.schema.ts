@@ -59,7 +59,7 @@ export const IsochroneResponseSchema = z
   .object({
     type: z.literal('FeatureCollection'),
     features: z.array(IsochroneFeatureSchema),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

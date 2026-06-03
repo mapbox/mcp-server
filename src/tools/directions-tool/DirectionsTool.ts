@@ -339,7 +339,7 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       let largeText = summaryText;
       if (mapPayloadFull) {
         const ref = storeMapPayload(mapPayloadFull);
-        summaryStructuredContent._mapApp = { ref };
+        summaryStructuredContent.mapboxRender = { ref };
         largeText += renderHint(ref);
       }
 
@@ -351,7 +351,7 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
     }
 
     // Small response - return normally. The map payload is stored
-    // server-side; structuredContent._mapApp carries a short ref the LLM
+    // server-side; structuredContent.mapboxRender carries a short ref the LLM
     // can pass to `render_map_tool` to display the route on a live Mapbox
     // GL JS map (avoids re-emitting the full polyline through the model).
     const mapPayload = mapPayloadFull;
@@ -364,7 +364,7 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
         }
       ],
       structuredContent: smallRef
-        ? { ...validatedData, _mapApp: { ref: smallRef } }
+        ? { ...validatedData, mapboxRender: { ref: smallRef } }
         : validatedData,
       isError: false
     };

@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 /**
  * Input schema for `render_map_tool` — a `MapAppPayload` describing what to
- * draw. The LLM either passes through the `_mapApp` field returned by any
+ * draw. The LLM either passes through the `mapboxRender` field returned by any
  * Mapbox geo tool, or composes a payload from raw GeoJSON.
  *
  * Mirrors the runtime `MapAppPayload` type (src/utils/mapAppPayload.ts) but
@@ -82,7 +82,7 @@ export const RenderMapInputSchema = z.object({
   /**
    * Preferred way to pass data from another Mapbox tool. Every geo tool
    * stashes its map payload server-side and returns a short ref in
-   * `structuredContent._mapApp.ref` — pass that ref (or several, to merge
+   * `structuredContent.mapboxRender.ref` — pass that ref (or several, to merge
    * multiple datasets onto one map) here. Avoids streaming thousands of
    * coordinate pairs back through the model.
    */
@@ -90,7 +90,7 @@ export const RenderMapInputSchema = z.object({
     .array(z.string())
     .optional()
     .describe(
-      'Array of map-payload URIs returned by other Mapbox tools in their structuredContent._mapApp.ref field. Pass one ref to render a single tool result; pass multiple to merge several datasets onto one map (e.g. an isochrone + a route).'
+      'Array of map-payload URIs returned by other Mapbox tools in their structuredContent.mapboxRender.ref field. Pass one ref to render a single tool result; pass multiple to merge several datasets onto one map (e.g. an isochrone + a route).'
     ),
   summary: z
     .string()

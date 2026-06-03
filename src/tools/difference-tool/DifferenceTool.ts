@@ -87,7 +87,7 @@ export class DifferenceTool extends BaseTool<
           let textOut = text;
           if (mapPayload) {
             const ref = storeMapPayload(mapPayload);
-            sc._mapApp = { ref };
+            sc.mapboxRender = { ref };
             textOut += renderHint(ref);
           }
 

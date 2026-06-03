@@ -13,7 +13,7 @@ export const UnionOutputSchema = z
         'GeoJSON geometry of the merged polygon (Polygon or MultiPolygon)'
       ),
     type: z.string().describe('Geometry type: Polygon or MultiPolygon'),
-    _mapApp: MapAppRefSchema.optional()
+    mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();
 

@@ -7,7 +7,7 @@ import { temporaryResourceManager } from './temporaryResourceManager.js';
 import type { MapAppPayload } from './mapAppPayload.js';
 
 /**
- * Schema for the `_mapApp` field that data tools attach to their
+ * Schema for the `mapboxRender` field that data tools attach to their
  * structuredContent. Each tool declares this on its output schema so
  * Claude Desktop (and any other host that strictly validates tool results
  * against the published output schema) doesn't flag the response.
@@ -53,7 +53,7 @@ export function storeMapPayload(payload: MapAppPayload): string {
  * One-line render hint that data tools append to their text output. Tells the
  * LLM the EXACT shape of the next call so it doesn't hallucinate a ref URI.
  * (Seen in the wild: Sonnet inventing `mapbox-isochrone-tool-result://0` when
- * only structuredContent._mapApp.ref had the real `mapbox://temp/map-payload-…`
+ * only structuredContent.mapboxRender.ref had the real `mapbox://temp/map-payload-…`
  * URI — including the literal string in the visible text fixes that.)
  */
 export function renderHint(ref: string): string {
