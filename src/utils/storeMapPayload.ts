@@ -29,6 +29,20 @@ export function storeMapPayload(payload: MapAppPayload): string {
 }
 
 /**
+ * One-line render hint that data tools append to their text output. Tells the
+ * LLM the EXACT shape of the next call so it doesn't hallucinate a ref URI.
+ * (Seen in the wild: Sonnet inventing `mapbox-isochrone-tool-result://0` when
+ * only structuredContent._mapApp.ref had the real `mapbox://temp/map-payload-…`
+ * URI — including the literal string in the visible text fixes that.)
+ */
+export function renderHint(ref: string): string {
+  return (
+    `\n\n📍 To show this on a live Mapbox GL JS map, call:\n` +
+    `   render_map_tool({ "payload_refs": ["${ref}"] })`
+  );
+}
+
+/**
  * Resolve a `mapbox://temp/map-payload-...` ref back to its `MapAppPayload`.
  * Returns null if the ref is unknown or expired.
  */

@@ -12,7 +12,7 @@ import type {
   MapboxFeature
 } from '../../schemas/geojson.js';
 import { buildSearchMapPayload } from '../search-and-geocode-tool/buildSearchMapPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -201,10 +201,20 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     const sc: Record<string, unknown> = {
       ...(data as unknown as Record<string, unknown>)
     };
-    if (payload) sc._mapApp = { ref: storeMapPayload(payload) };
+    let textOut = baseText;
+    if (payload) {
+      const ref = storeMapPayload(payload);
+      sc._mapApp = { ref };
+      // Don't append the human-readable hint when the user requested JSON
+      // output — it would break round-trip parsing. Callers that pass
+      // json_string usually already know about render_map_tool.
+      if (input.format !== 'json_string') {
+        textOut += renderHint(ref);
+      }
+    }
 
     return {
-      content: [{ type: 'text', text: baseText }],
+      content: [{ type: 'text', text: textOut }],
       structuredContent: sc,
       isError: false
     };

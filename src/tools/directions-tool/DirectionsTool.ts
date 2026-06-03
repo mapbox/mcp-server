@@ -19,7 +19,7 @@ import {
   decodePolylineWithFallback,
   type MapAppPayload
 } from '../../utils/mapAppPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -334,15 +334,17 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       };
       // Stash the map payload server-side and only return a short ref so
       // the LLM doesn't have to re-emit thousands of coordinate pairs as
-      // input to render_map_tool.
+      // input to render_map_tool. Echo the ref in the visible text so the
+      // LLM doesn't hallucinate the URI.
+      let largeText = summaryText;
       if (mapPayloadFull) {
-        summaryStructuredContent._mapApp = {
-          ref: storeMapPayload(mapPayloadFull)
-        };
+        const ref = storeMapPayload(mapPayloadFull);
+        summaryStructuredContent._mapApp = { ref };
+        largeText += renderHint(ref);
       }
 
       return {
-        content: [{ type: 'text', text: summaryText }],
+        content: [{ type: 'text', text: largeText }],
         structuredContent: summaryStructuredContent,
         isError: false
       };
@@ -353,10 +355,16 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
     // can pass to `render_map_tool` to display the route on a live Mapbox
     // GL JS map (avoids re-emitting the full polyline through the model).
     const mapPayload = mapPayloadFull;
+    const smallRef = mapPayload ? storeMapPayload(mapPayload) : null;
     return {
-      content: [{ type: 'text', text: responseText }],
-      structuredContent: mapPayload
-        ? { ...validatedData, _mapApp: { ref: storeMapPayload(mapPayload) } }
+      content: [
+        {
+          type: 'text',
+          text: responseText + (smallRef ? renderHint(smallRef) : '')
+        }
+      ],
+      structuredContent: smallRef
+        ? { ...validatedData, _mapApp: { ref: smallRef } }
         : validatedData,
       isError: false
     };

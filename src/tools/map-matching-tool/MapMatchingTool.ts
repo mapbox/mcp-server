@@ -15,7 +15,7 @@ import {
   decodePolylineWithFallback,
   type MapAppPayload
 } from '../../utils/mapAppPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
@@ -138,10 +138,15 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     const sc: Record<string, unknown> = {
       ...(validatedData as unknown as Record<string, unknown>)
     };
-    if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
+    let textOut = JSON.stringify(validatedData, null, 2);
+    if (mapPayload) {
+      const ref = storeMapPayload(mapPayload);
+      sc._mapApp = { ref };
+      textOut += renderHint(ref);
+    }
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      content: [{ type: 'text', text: textOut }],
       structuredContent: sc,
       isError: false
     };

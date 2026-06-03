@@ -15,7 +15,7 @@ import type {
 } from '../../schemas/geojson.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { buildSearchMapPayload } from './buildSearchMapPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -326,10 +326,18 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     });
     if (!payload) return base;
 
+    const ref = storeMapPayload(payload);
     const sc = {
       ...((base.structuredContent ?? {}) as Record<string, unknown>),
-      _mapApp: { ref: storeMapPayload(payload) }
+      _mapApp: { ref }
     };
-    return { ...base, structuredContent: sc };
+    // Append the render hint to the first text content so the LLM sees the
+    // exact ref string and doesn't hallucinate a URI.
+    const content = (base.content ?? []).map((c, i) =>
+      i === 0 && c.type === 'text'
+        ? { ...c, text: (c.text as string) + renderHint(ref) }
+        : c
+    );
+    return { ...base, content, structuredContent: sc };
   }
 }

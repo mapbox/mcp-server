@@ -12,7 +12,7 @@ import {
 } from './DifferenceTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { buildPolygonOpsMapPayload } from '../union-tool/buildPolygonOpsMapPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 export class DifferenceTool extends BaseTool<
   typeof DifferenceInputSchema,
@@ -23,7 +23,9 @@ export class DifferenceTool extends BaseTool<
     'Subtract one polygon from another, returning the area in polygon1 that is not covered by polygon2. ' +
     'Useful for computing exclusion zones, finding uncovered service areas, or "what is in zone A but not zone B?". ' +
     'Returns null geometry if polygon2 fully covers polygon1. ' +
-    'Works offline without API calls.';
+    'Works offline without API calls. ' +
+    'INPUT SHAPE: `polygon1` and `polygon2` are each an array of rings; each ring is an array of [lng, lat] pairs. ' +
+    'When chaining with isochrone_tool, extract `feature.geometry.coordinates` from each isochrone Feature (with `polygons=true`).';
 
   readonly annotations = {
     title: 'Difference of Polygons',
@@ -82,13 +84,18 @@ export class DifferenceTool extends BaseTool<
           const sc: Record<string, unknown> = {
             ...(validated as unknown as Record<string, unknown>)
           };
-          if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
+          let textOut = text;
+          if (mapPayload) {
+            const ref = storeMapPayload(mapPayload);
+            sc._mapApp = { ref };
+            textOut += renderHint(ref);
+          }
 
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
           return {
-            content: [{ type: 'text' as const, text }],
+            content: [{ type: 'text' as const, text: textOut }],
             structuredContent: sc,
             isError: false
           };

@@ -18,7 +18,7 @@ import {
   decodePolylineWithFallback,
   type MapAppPayload
 } from '../../utils/mapAppPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 /**
  * OptimizationTool - Find optimal route through multiple coordinates (V1 API)
@@ -173,10 +173,15 @@ export class OptimizationTool extends MapboxApiBasedTool<
       const sc: Record<string, unknown> = {
         ...(validatedResult as unknown as Record<string, unknown>)
       };
-      if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
+      let textOut = text;
+      if (mapPayload) {
+        const ref = storeMapPayload(mapPayload);
+        sc._mapApp = { ref };
+        textOut += renderHint(ref);
+      }
 
       return {
-        content: [{ type: 'text' as const, text }],
+        content: [{ type: 'text' as const, text: textOut }],
         structuredContent: sc,
         isError: false
       };

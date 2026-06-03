@@ -12,7 +12,7 @@ import {
 } from './UnionTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { buildPolygonOpsMapPayload } from './buildPolygonOpsMapPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 export class UnionTool extends BaseTool<
   typeof UnionInputSchema,
@@ -23,7 +23,10 @@ export class UnionTool extends BaseTool<
     'Merge two or more polygons into a single unified geometry. ' +
     'Useful for combining service areas, delivery zones, isochrones, or coverage regions. ' +
     'Returns a Polygon or MultiPolygon if the inputs do not overlap. ' +
-    'Works offline without API calls.';
+    'Works offline without API calls. ' +
+    'INPUT SHAPE: pass `polygons` as an array of polygons. Each polygon is an array of rings; each ring is an array of [lng, lat] pairs. ' +
+    'When chaining with isochrone_tool, extract `feature.geometry.coordinates` from each isochrone Feature — that is already a valid Polygon value. ' +
+    'Skip features whose `geometry.type === "MultiPolygon"` (pass each inner Polygon separately) or whose `geometry.type === "LineString"` (set isochrone_tool `polygons=true` to get Polygon output instead).';
 
   readonly annotations = {
     title: 'Union Polygons',
@@ -70,13 +73,18 @@ export class UnionTool extends BaseTool<
           const sc: Record<string, unknown> = {
             ...(validated as unknown as Record<string, unknown>)
           };
-          if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
+          let textOut = text;
+          if (mapPayload) {
+            const ref = storeMapPayload(mapPayload);
+            sc._mapApp = { ref };
+            textOut += renderHint(ref);
+          }
 
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
           return {
-            content: [{ type: 'text' as const, text }],
+            content: [{ type: 'text' as const, text: textOut }],
             structuredContent: sc,
             isError: false
           };

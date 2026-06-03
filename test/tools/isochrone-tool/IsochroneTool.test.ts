@@ -103,7 +103,11 @@ describe('IsochroneTool', () => {
     assertHeadersSent(mockHttpRequest);
     expect(result.content[0].type).toEqual('text');
     if (result.content[0].type == 'text') {
-      expect(result.content[0].text).toEqual(JSON.stringify(geojson, null, 2));
+      // The tool may append a render-map hint pointing at the stored payload;
+      // assert the body starts with the JSON-stringified response.
+      expect(result.content[0].text).toContain(
+        JSON.stringify(geojson, null, 2)
+      );
     }
   });
 

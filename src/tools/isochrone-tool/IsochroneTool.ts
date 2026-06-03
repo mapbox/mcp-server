@@ -13,7 +13,7 @@ import {
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
-import { storeMapPayload } from '../../utils/storeMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 
 const HEX6_RE = /^[0-9a-fA-F]{6}$/;
 function sanitizeHex(raw: unknown, fallback: string): string {
@@ -178,11 +178,15 @@ export class IsochroneTool extends MapboxApiBasedTool<
         (data as { features?: unknown[] }).features?.length ?? 0;
       const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full GeoJSON if needed.`;
 
-      const summaryStructured: Record<string, unknown> = mapPayload
-        ? { _mapApp: { ref: storeMapPayload(mapPayload) } }
-        : {};
+      const summaryStructured: Record<string, unknown> = {};
+      let largeText = summaryText;
+      if (mapPayload) {
+        const ref = storeMapPayload(mapPayload);
+        summaryStructured._mapApp = { ref };
+        largeText += renderHint(ref);
+      }
       return {
-        content: [{ type: 'text', text: summaryText }],
+        content: [{ type: 'text', text: largeText }],
         structuredContent: summaryStructured,
         isError: false
       };
@@ -207,10 +211,15 @@ export class IsochroneTool extends MapboxApiBasedTool<
     const sc: Record<string, unknown> = {
       ...(validated as unknown as Record<string, unknown>)
     };
-    if (mapPayload) sc._mapApp = { ref: storeMapPayload(mapPayload) };
+    let smallText = text;
+    if (mapPayload) {
+      const ref = storeMapPayload(mapPayload);
+      sc._mapApp = { ref };
+      smallText += renderHint(ref);
+    }
 
     return {
-      content: [{ type: 'text', text }],
+      content: [{ type: 'text', text: smallText }],
       structuredContent: sc,
       isError: false
     };
