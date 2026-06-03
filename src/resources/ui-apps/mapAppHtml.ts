@@ -69,7 +69,9 @@ export function renderMapAppHtml(params: {
   #error {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     color: #d32f2f; background: #ffebee; border-radius: 8px;
-    padding: 20px; max-width: 400px; text-align: center; z-index: 10;
+    padding: 20px; max-width: 520px; text-align: left; z-index: 10;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; white-space: pre-line;
   }
   .marker-badge {
     width: 28px; height: 28px; border-radius: 50%;
@@ -207,10 +209,6 @@ ${initialDataScript}
   function handleToolResult(result) {
     var ref = extractPayloadRef(result);
     if (ref) {
-      // Fetch the actual payload via resources/read against the host.
-      // We use refs (not inline payloads) because full payloads can be
-      // 100s of KB for long routes / detailed isochrones, which doesn't
-      // round-trip reliably through host postMessage bridges.
       sendRequest('resources/read', { uri: ref }).then(
         function(rr) {
           var fetched = readResourceJson(rr);
@@ -224,13 +222,26 @@ ${initialDataScript}
       );
       return;
     }
-    // Backwards-compatible path: payload is inlined in structuredContent.
     var payload = extractInlinePayload(result);
     if (payload) {
       stageRender(payload);
       return;
     }
-    showError('Tool result did not contain a map payload.');
+    showError(
+      'Tool result did not contain a map payload.\\n\\n' + describeResult(result)
+    );
+  }
+
+  function describeResult(result) {
+    if (!result || typeof result !== 'object') return 'result: ' + typeof result;
+    var lines = ['Top keys: ' + Object.keys(result).join(', ')];
+    if (result.structuredContent) {
+      lines.push('structuredContent keys: ' +
+        Object.keys(result.structuredContent).join(', '));
+    } else {
+      lines.push('structuredContent: <missing>');
+    }
+    return lines.join('\\n');
   }
 
   function extractPayloadRef(result) {
