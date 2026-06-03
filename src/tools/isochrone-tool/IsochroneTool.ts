@@ -1,9 +1,8 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
-import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -13,9 +12,6 @@ import {
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
-import { isMcpUiEnabled } from '../../config/toolConfig.js';
-import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 
 const HEX6_RE = /^[0-9a-fA-F]{6}$/;
@@ -42,16 +38,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-  readonly meta = {
-    ui: {
-      resourceUri: 'ui://mapbox/map-app/isochrone/index.html',
-      csp: {
-        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
-        resourceDomains: ['https://api.mapbox.com']
-      }
-    }
-  };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: IsochroneInputSchema,
@@ -194,13 +180,11 @@ export class IsochroneTool extends MapboxApiBasedTool<
       const summaryStructured: Record<string, unknown> = mapPayload
         ? { _mapApp: mapPayload }
         : {};
-      const result: CallToolResult = {
+      return {
         content: [{ type: 'text', text: summaryText }],
         structuredContent: summaryStructured,
         isError: false
       };
-      if (mapPayload) result._meta = { ui: { payload: mapPayload } };
-      return result;
     }
 
     const parsedData = IsochroneResponseSchema.safeParse(data);
@@ -219,44 +203,16 @@ export class IsochroneTool extends MapboxApiBasedTool<
       ? this.formatIsochroneResponse(parsedData.data)
       : responseText;
 
-    const content: CallToolResult['content'] = [{ type: 'text', text }];
-
-    if (isMcpUiEnabled() && mapPayload) {
-      const publicToken = await resolveMapboxPublicToken({
-        accessToken,
-        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
-        httpRequest: this.httpRequest
-      });
-      if (publicToken) {
-        const inlineHtml = renderMapAppHtml({
-          publicToken,
-          initialData: mapPayload
-        });
-        content.push(
-          createUIResource({
-            uri: `ui://mapbox/isochrone/${randomUUID()}`,
-            content: { type: 'rawHtml', htmlString: inlineHtml },
-            encoding: 'text',
-            uiMetadata: {
-              'preferred-frame-size': ['100%', '500px']
-            }
-          })
-        );
-      }
-    }
-
     const sc: Record<string, unknown> = {
       ...(validated as unknown as Record<string, unknown>)
     };
     if (mapPayload) sc._mapApp = mapPayload;
 
-    const result: CallToolResult = {
-      content,
+    return {
+      content: [{ type: 'text', text }],
       structuredContent: sc,
       isError: false
     };
-    if (mapPayload) result._meta = { ui: { payload: mapPayload } };
-    return result;
   }
 }
 

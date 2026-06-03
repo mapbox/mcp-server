@@ -2,9 +2,8 @@
 // Licensed under the MIT License.
 
 import { URLSearchParams } from 'node:url';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
-import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { cleanResponseData } from './cleanResponseData.js';
@@ -16,9 +15,6 @@ import {
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
-import { isMcpUiEnabled } from '../../config/toolConfig.js';
-import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
 import {
   decodePolylineWithFallback,
   type MapAppPayload
@@ -43,16 +39,6 @@ export class DirectionsTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-  readonly meta = {
-    ui: {
-      resourceUri: 'ui://mapbox/map-app/directions/index.html',
-      csp: {
-        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
-        resourceDomains: ['https://api.mapbox.com']
-      }
-    }
-  };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: DirectionsInputSchema,
@@ -349,65 +335,25 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       // even though geometry was stripped from the response body.
       if (mapPayloadFull) summaryStructuredContent._mapApp = mapPayloadFull;
 
-      const result: CallToolResult = {
+      return {
         content: [{ type: 'text', text: summaryText }],
         structuredContent: summaryStructuredContent,
         isError: false
       };
-      if (mapPayloadFull) {
-        result._meta = { ui: { payload: mapPayloadFull } };
-      }
-      return result;
     }
 
-    // Small response - return normally
-    const content: CallToolResult['content'] = [
-      { type: 'text', text: responseText }
-    ];
-
+    // Small response - return normally.
+    // The map payload rides on structuredContent._mapApp so the LLM can
+    // pass it through to `render_map_tool` to display the route on a live
+    // Mapbox GL JS map.
     const mapPayload = mapPayloadFull;
-
-    // Legacy MCP-UI: inline a rawHtml UIResource so non-MCP-Apps clients
-    // also get a live GL JS map. Uses the same generic renderer as the
-    // MCP Apps resource, with the payload baked in as initial-data.
-    if (isMcpUiEnabled() && mapPayload) {
-      const publicToken = await resolveMapboxPublicToken({
-        accessToken,
-        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
-        httpRequest: this.httpRequest
-      });
-      if (publicToken) {
-        const inlineHtml = renderMapAppHtml({
-          publicToken,
-          initialData: mapPayload
-        });
-        content.push(
-          createUIResource({
-            uri: `ui://mapbox/directions/${randomUUID()}`,
-            content: { type: 'rawHtml', htmlString: inlineHtml },
-            encoding: 'text',
-            uiMetadata: {
-              'preferred-frame-size': ['100%', '500px']
-            }
-          })
-        );
-      }
-    }
-
-    const result: CallToolResult = {
-      content,
+    return {
+      content: [{ type: 'text', text: responseText }],
       structuredContent: mapPayload
         ? { ...validatedData, _mapApp: mapPayload }
         : validatedData,
       isError: false
     };
-    if (mapPayload) {
-      // Also publish at _meta.ui.payload per the MCP Apps spec — hosts that
-      // forward _meta will pick it up there; the structuredContent._mapApp
-      // copy is the guaranteed-delivery fallback.
-      result._meta = { ui: { payload: mapPayload } };
-    }
-    return result;
   }
 }
 

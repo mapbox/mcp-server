@@ -2,32 +2,31 @@
 
 ### New Features
 
-- **Generic Mapbox MCP App** — added a single `MapAppUIResource`
-  (`ui://mapbox/map-app/index.html`) that any tool can point
-  `_meta.ui.resourceUri` at. Tools emit a `MapAppPayload`
-  (`src/utils/mapAppPayload.ts`) at `result._meta.ui.payload` and the
-  generic iframe translates each layer/marker/legend entry into a Mapbox
-  GL JS call. The payload is a thin pass-through to the Style spec's
-  `paint`/`layout` objects — no per-tool template required. The same
-  module also powers the inline MCP-UI rawHtml path. Polyline decoding
-  moves tool-side via `decodePolyline`/`decodePolylineWithFallback`, so
-  the iframe never sees encoded geometry.
-- **`directions_tool` migrated to the generic map app** — `DirectionsTool`
-  now builds a `MapAppPayload` (route line + start/end markers + summary)
-  instead of producing its own bespoke HTML. The
-  `DirectionsAppUIResource` is kept registered for backward compatibility
-  but the tool no longer references it.
-- **Six more tools migrated to the generic map app** — `isochrone_tool`,
-  `optimization_tool`, `search_and_geocode_tool`, `category_search_tool`,
-  `map_matching_tool`, `ground_location_tool`, plus the three offline
-  polygon-op tools (`union_tool`, `intersect_tool`, `difference_tool`)
-  now each emit a `MapAppPayload` instead of producing per-tool HTML.
-  Each tool's payload builder is ~20-80 lines: layered fills for
-  isochrone contours, numbered visit markers for optimization,
-  result/POI pins for search and ground-location, dashed+solid lines
-  for map-matching, and operation-keyed legends for polygon ops.
-  Polygon ops tools require `MAPBOX_PUBLIC_TOKEN` to be set for inline
-  MCP-UI emission (they're offline tools with no access token in scope).
+- **`render_map_tool` — single visualization primitive** for Mapbox MCP. Takes
+  a `MapAppPayload` and displays a live Mapbox GL JS map. All other geo
+  tools (directions, isochrone, optimization, search, map-matching,
+  ground-location, polygon-ops) return a ready-to-render `_mapApp` payload
+  on their `structuredContent`; the LLM passes it to `render_map_tool` to
+  show a map. This is the only tool that declares `_meta.ui.resourceUri`,
+  so MCP App hosts (which only fully render the iframe for the last tool
+  in a chained sequence) always render successfully — the visualization
+  step is terminal by design.
+- **`MapAppPayload` schema** (`src/utils/mapAppPayload.ts`) — the wire
+  format between data tools and `render_map_tool`. Thin pass-through over
+  Mapbox Style spec `paint`/`layout` objects so any layer/marker/legend
+  combination expressible in GL JS is expressible in the payload.
+- **Per-tool payload builders** — `buildDirectionsMapPayload`,
+  `buildIsochroneMapPayload`, `buildOptimizationMapPayload`,
+  `buildSearchMapPayload`, `buildMapMatchingPayload`,
+  `buildGroundLocationPayload`, `buildPolygonOpsMapPayload`. Each is a
+  pure function over its tool's response: ~20-80 lines, no HTML, no
+  iframe wiring.
+- **Shared `renderMapAppHtml`** (`src/resources/ui-apps/mapAppHtml.ts`) —
+  one ~330-line iframe template that consumes any `MapAppPayload`. Used
+  by both the MCP Apps resource (`MapAppUIResource`) and any client that
+  wants to bake initial data in.
+- **Polyline decoding moves tool-side** via `decodePolyline` /
+  `decodePolylineWithFallback` so the iframe only ever receives GeoJSON.
 
 ### Security
 

@@ -1,9 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -12,9 +10,6 @@ import {
   GroundLocationOutputSchema,
   type GroundLocationOutput
 } from './GroundLocationTool.output.schema.js';
-import { isMcpUiEnabled } from '../../config/toolConfig.js';
-import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 
 type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
@@ -85,16 +80,6 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-  readonly meta = {
-    ui: {
-      resourceUri: 'ui://mapbox/map-app/ground-location/index.html',
-      csp: {
-        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
-        resourceDomains: ['https://api.mapbox.com']
-      }
-    }
-  };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: GroundLocationInputSchema,
@@ -393,44 +378,16 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     const output = validated.success ? validated.data : result;
 
     const mapPayload = buildGroundLocationPayload(output);
-    const content: CallToolResult['content'] = [
-      { type: 'text', text: this.formatOutput(output, strategy) }
-    ];
-
-    if (isMcpUiEnabled() && mapPayload) {
-      const publicToken = await resolveMapboxPublicToken({
-        accessToken,
-        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
-        httpRequest: this.httpRequest
-      });
-      if (publicToken) {
-        const inlineHtml = renderMapAppHtml({
-          publicToken,
-          initialData: mapPayload
-        });
-        content.push(
-          createUIResource({
-            uri: `ui://mapbox/ground-location/${randomUUID()}`,
-            content: { type: 'rawHtml', htmlString: inlineHtml },
-            encoding: 'text',
-            uiMetadata: { 'preferred-frame-size': ['100%', '500px'] }
-          })
-        );
-      }
-    }
-
     const sc: Record<string, unknown> = {
       ...(output as unknown as Record<string, unknown>)
     };
     if (mapPayload) sc._mapApp = mapPayload;
 
-    const callResult: CallToolResult = {
-      content,
+    return {
+      content: [{ type: 'text', text: this.formatOutput(output, strategy) }],
       structuredContent: sc,
       isError: false
     };
-    if (mapPayload) callResult._meta = { ui: { payload: mapPayload } };
-    return callResult;
   }
 }
 

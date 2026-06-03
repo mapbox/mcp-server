@@ -1,9 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomUUID } from 'node:crypto';
 import { SpanStatusCode } from '@opentelemetry/api';
-import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import {
   OptimizationInputSchema,
@@ -16,9 +14,6 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolExecutionContext } from '../../utils/tracing.js';
 import type { HttpRequest } from '../../utils/types.js';
-import { isMcpUiEnabled } from '../../config/toolConfig.js';
-import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderMapAppHtml } from '../../resources/ui-apps/mapAppHtml.js';
 import {
   decodePolylineWithFallback,
   type MapAppPayload
@@ -47,16 +42,6 @@ export class OptimizationTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-  readonly meta = {
-    ui: {
-      resourceUri: 'ui://mapbox/map-app/optimization/index.html',
-      csp: {
-        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
-        resourceDomains: ['https://api.mapbox.com']
-      }
-    }
-  };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: OptimizationInputSchema,
@@ -184,44 +169,16 @@ export class OptimizationTool extends MapboxApiBasedTool<
       );
 
       const mapPayload = buildOptimizationMapPayload(validatedResult);
-      const content: CallToolResult['content'] = [
-        { type: 'text' as const, text }
-      ];
-
-      if (isMcpUiEnabled() && mapPayload) {
-        const publicToken = await resolveMapboxPublicToken({
-          accessToken,
-          apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
-          httpRequest: this.httpRequest
-        });
-        if (publicToken) {
-          const inlineHtml = renderMapAppHtml({
-            publicToken,
-            initialData: mapPayload
-          });
-          content.push(
-            createUIResource({
-              uri: `ui://mapbox/optimization/${randomUUID()}`,
-              content: { type: 'rawHtml', htmlString: inlineHtml },
-              encoding: 'text',
-              uiMetadata: { 'preferred-frame-size': ['100%', '500px'] }
-            })
-          );
-        }
-      }
-
       const sc: Record<string, unknown> = {
         ...(validatedResult as unknown as Record<string, unknown>)
       };
       if (mapPayload) sc._mapApp = mapPayload;
 
-      const result: CallToolResult = {
-        content,
+      return {
+        content: [{ type: 'text' as const, text }],
         structuredContent: sc,
         isError: false
       };
-      if (mapPayload) result._meta = { ui: { payload: mapPayload } };
-      return result;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

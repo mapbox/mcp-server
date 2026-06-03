@@ -1065,16 +1065,16 @@ describe('DirectionsTool', () => {
     });
   });
 
-  describe('MCP App + MCP-UI integration', () => {
-    it('declares meta.ui.resourceUri pointing to the generic map-app resource', () => {
+  describe('Map payload integration', () => {
+    it('does not declare meta.ui.resourceUri (rendering goes through render_map_tool)', () => {
       const { httpRequest } = setupHttpRequest();
       const tool = new DirectionsTool({ httpRequest });
-      expect(tool.meta?.ui?.resourceUri).toBe(
-        'ui://mapbox/map-app/directions/index.html'
-      );
+      expect(
+        (tool as { meta?: { ui?: { resourceUri?: string } } }).meta
+      ).toBeUndefined();
     });
 
-    it('adds an inline MCP-UI rawHtml resource for small geojson responses', async () => {
+    it('attaches _mapApp payload to structuredContent for small geojson responses', async () => {
       const fakeResponse = {
         routes: [
           {
@@ -1096,88 +1096,45 @@ describe('DirectionsTool', () => {
         ],
         code: 'Ok'
       };
-      const tokensListResponse = [
-        {
-          usage: 'pk',
-          default: true,
-          token: 'pk.fake-public-token'
-        }
-      ];
 
-      const httpRequestFn = vi.fn(async (url: string) => {
-        if (url.includes('tokens/v2/')) {
-          return {
+      const httpRequestFn = vi.fn(
+        async () =>
+          ({
             ok: true,
             status: 200,
             statusText: 'OK',
-            json: async () => tokensListResponse,
-            text: async () => JSON.stringify(tokensListResponse)
-          } as Response;
-        }
-        return {
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => fakeResponse,
-          text: async () => JSON.stringify(fakeResponse)
-        } as Response;
+            json: async () => fakeResponse,
+            text: async () => JSON.stringify(fakeResponse)
+          }) as Response
+      );
+
+      const result = await new DirectionsTool({
+        httpRequest: httpRequestFn
+      }).run({
+        coordinates: [
+          { longitude: -74.0, latitude: 40.7 },
+          { longitude: -74.01, latitude: 40.71 }
+        ],
+        geometries: 'geojson'
       });
 
-      // Mapbox sk.* tokens are 3 dot-segments: sk.<base64-payload>.<signature>
-      const realToken = process.env.MAPBOX_ACCESS_TOKEN;
-      const payload = Buffer.from(JSON.stringify({ u: 'testuser' })).toString(
-        'base64'
-      );
-      process.env.MAPBOX_ACCESS_TOKEN = `sk.${payload}.signature`;
+      expect(result.isError).toBe(false);
+      // No inline UI block — content is text-only; rendering is the LLM's
+      // job via render_map_tool with the _mapApp payload passed through.
+      expect(result.content.length).toBe(1);
+      expect((result.content[0] as { type: string }).type).toBe('text');
 
-      try {
-        const result = await new DirectionsTool({
-          httpRequest: httpRequestFn
-        }).run({
-          coordinates: [
-            { longitude: -74.0, latitude: 40.7 },
-            { longitude: -74.01, latitude: 40.71 }
-          ],
-          geometries: 'geojson'
-        });
-
-        expect(result.isError).toBe(false);
-        // Expect at least the response text + the MCP-UI resource block
-        expect(result.content.length).toBeGreaterThanOrEqual(2);
-        const uiBlock = result.content.find(
-          (c) => (c as { type?: string }).type === 'resource'
-        ) as { resource?: { text?: string; mimeType?: string } } | undefined;
-        expect(uiBlock).toBeDefined();
-        expect(uiBlock?.resource?.text).toContain('mapbox-gl.js');
-        expect(uiBlock?.resource?.text).toContain('pk.fake-public-token');
-        // Initial-data block should carry the baked-in geometry
-        expect(uiBlock?.resource?.text).toContain('initial-data');
-        expect(uiBlock?.resource?.text).toContain('LineString');
-
-        // The tool publishes the MapAppPayload via structuredContent._mapApp
-        // (guaranteed-delivery path) AND _meta.ui.payload (spec path). The
-        // iframe reads the former first because hosts vary in whether they
-        // forward _meta through ui/notifications/tool-result.
-        type Payload = {
-          summary?: string;
-          layers?: Array<{ id: string; type: string }>;
-          markers?: Array<{ style?: string }>;
-        };
-        const sc = result.structuredContent as
-          | { _mapApp?: Payload }
-          | undefined;
-        const mapApp = sc?._mapApp;
-        expect(mapApp?.layers?.[0]?.id).toBe('route');
-        expect(mapApp?.layers?.[0]?.type).toBe('line');
-        expect(mapApp?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
-        expect(mapApp?.summary).toMatch(/mi/);
-
-        const meta = (result as { _meta?: { ui?: { payload?: Payload } } })
-          ._meta;
-        expect(meta?.ui?.payload?.layers?.[0]?.id).toBe('route');
-      } finally {
-        process.env.MAPBOX_ACCESS_TOKEN = realToken;
-      }
+      type Payload = {
+        summary?: string;
+        layers?: Array<{ id: string; type: string }>;
+        markers?: Array<{ style?: string }>;
+      };
+      const sc = result.structuredContent as { _mapApp?: Payload } | undefined;
+      const mapApp = sc?._mapApp;
+      expect(mapApp?.layers?.[0]?.id).toBe('route');
+      expect(mapApp?.layers?.[0]?.type).toBe('line');
+      expect(mapApp?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
+      expect(mapApp?.summary).toMatch(/mi/);
     });
   });
 });
