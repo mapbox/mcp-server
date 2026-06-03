@@ -135,4 +135,62 @@ describe('IsochroneTool', () => {
     expect(result.content[0].type).toEqual('text');
     expect(result.isError).toBe(true);
   });
+
+  it('stores a mapboxRender payload that includes a fill+line per contour', async () => {
+    const isochrone = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            contour: 10,
+            fillColor: '6b7280',
+            fillOpacity: 0.3,
+            metric: 'time'
+          },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [-74.01, 40.71],
+                [-74.0, 40.71],
+                [-74.0, 40.72],
+                [-74.01, 40.72],
+                [-74.01, 40.71]
+              ]
+            ]
+          }
+        }
+      ]
+    };
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      json: async () => isochrone
+    });
+
+    const result = await new IsochroneTool({ httpRequest }).run({
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_minutes: [10],
+      polygons: true,
+      generalize: 1000
+    });
+
+    expect(result.isError).toBe(false);
+
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('render_map_tool');
+    expect(text).toContain(sc.mapboxRender!.ref!);
+
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    // One fill + one line per polygon contour, plus origin marker.
+    expect(payload?.layers?.map((l) => l.type)).toEqual(['fill', 'line']);
+    expect(payload?.markers).toHaveLength(1);
+    expect(payload?.markers?.[0].coordinates).toEqual([-74.006, 40.7128]);
+  });
 });

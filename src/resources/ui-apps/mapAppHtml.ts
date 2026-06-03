@@ -69,9 +69,7 @@ export function renderMapAppHtml(params: {
   #error {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     color: #d32f2f; background: #ffebee; border-radius: 8px;
-    padding: 20px; max-width: 520px; text-align: left; z-index: 10;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px; white-space: pre-line;
+    padding: 20px; max-width: 400px; text-align: center; z-index: 10;
   }
   .marker-badge {
     width: 28px; height: 28px; border-radius: 50%;
@@ -207,23 +205,13 @@ ${initialDataScript}
 
   // --- Tool result extraction ----------------------------------------------
   function handleToolResult(result) {
-    loadingEl.textContent = 'tool-result received — extracting payload ref…';
     var ref = extractPayloadRef(result);
     if (ref) {
-      loadingEl.textContent = 'Fetching map payload ' + ref + '…';
       sendRequest('resources/read', { uri: ref }).then(
         function(rr) {
-          loadingEl.textContent = 'Got resource response — parsing…';
           var fetched = readResourceJson(rr);
-          if (fetched && looksLikePayload(fetched)) {
-            loadingEl.textContent = 'Rendering payload…';
-            stageRender(fetched);
-          } else {
-            showError(
-              'Map payload was empty or malformed.\\n\\n' +
-              'Parsed: ' + (fetched ? Object.keys(fetched).join(',') : '<null>')
-            );
-          }
+          if (fetched && looksLikePayload(fetched)) stageRender(fetched);
+          else showError('Map payload was empty or malformed.');
         },
         function(err) {
           showError('Could not read map payload: ' +
@@ -237,37 +225,7 @@ ${initialDataScript}
       stageRender(payload);
       return;
     }
-    showError(
-      'Tool result did not contain a map payload.\\n\\n' + describeResult(result)
-    );
-  }
-
-  function describeResult(result) {
-    if (!result || typeof result !== 'object') return 'result: ' + typeof result;
-    var lines = ['Top keys: ' + Object.keys(result).join(', ')];
-    if (result.structuredContent) {
-      lines.push('structuredContent keys: ' +
-        Object.keys(result.structuredContent).join(', '));
-    } else {
-      lines.push('structuredContent: <missing>');
-    }
-    if (Array.isArray(result.content)) {
-      lines.push('content[] length: ' + result.content.length);
-      result.content.forEach(function(c, i) {
-        if (!c) { lines.push('  [' + i + ']: null'); return; }
-        var type = c.type;
-        var preview = '';
-        if (type === 'text' && typeof c.text === 'string') {
-          preview = ' "' + c.text.slice(0, 80).replace(/\\n/g, '⏎') + '"';
-        } else if (type === 'resource' && c.resource) {
-          preview = ' uri=' + (c.resource.uri || '?');
-        }
-        lines.push('  [' + i + '] ' + type + preview);
-      });
-    } else {
-      lines.push('content: <missing or not array>');
-    }
-    return lines.join('\\n');
+    showError('Tool result did not contain a map payload.');
   }
 
   // Claude Desktop strips structuredContent from tool-result postMessages

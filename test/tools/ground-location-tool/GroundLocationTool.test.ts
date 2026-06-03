@@ -267,4 +267,32 @@ describe('GroundLocationTool', () => {
     );
     expect(categoryCall?.[0]).toContain('limit=15');
   });
+
+  it('stores a mapboxRender payload with origin pin and POI markers', async () => {
+    const { tool } = setupMockHttp({
+      'geocode/v6/reverse': geocodeResponse,
+      'search/searchbox/v1/category': categoryResponse,
+      'isochrone/v1': isochroneResponse
+    });
+
+    const result = await tool.run({
+      longitude: -122.419,
+      latitude: 37.759,
+      query: 'coffee'
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    // First marker is the grounded origin; subsequent are numbered POIs.
+    expect(payload?.markers?.[0]?.style).toBe('pin');
+    expect(payload?.markers?.[0]?.popup).toBe('Mission District');
+    expect(payload?.markers?.slice(1).map((m) => m.style)).toEqual([
+      'numbered'
+    ]);
+  });
 });

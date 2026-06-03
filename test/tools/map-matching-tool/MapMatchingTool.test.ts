@@ -245,4 +245,66 @@ describe('MapMatchingTool', () => {
     const callUrl = mockHttpRequest.mock.calls[0][0] as string;
     expect(callUrl).toContain('geometries=geojson');
   });
+
+  it('stores a mapboxRender payload with raw + matched line layers', async () => {
+    const fakeResp = {
+      code: 'Ok',
+      matchings: [
+        {
+          confidence: 0.9,
+          distance: 200,
+          duration: 60,
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-122.4194, 37.7749],
+              [-122.4195, 37.775]
+            ]
+          }
+        }
+      ],
+      tracepoints: [
+        {
+          name: '',
+          location: [-122.4194, 37.7749],
+          matchings_index: 0,
+          alternatives_count: 0
+        },
+        {
+          name: '',
+          location: [-122.4195, 37.775],
+          matchings_index: 0,
+          alternatives_count: 0
+        }
+      ]
+    };
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      json: async () => fakeResp
+    });
+
+    const result = await new MapMatchingTool({ httpRequest }).run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      profile: 'driving'
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    expect(payload?.layers?.map((l) => l.id)).toEqual([
+      'raw-trace',
+      'matched-route'
+    ]);
+    expect(payload?.legend?.map((e) => e.label)).toEqual([
+      'Raw trace',
+      'Matched route'
+    ]);
+  });
 });

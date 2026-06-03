@@ -617,4 +617,62 @@ describe('SearchAndGeocodeTool', () => {
       ]);
     });
   });
+
+  describe('map render payload', () => {
+    it('stores a mapboxRender payload with numbered POI markers and search-center pin', async () => {
+      const fakeResp = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {
+              name: 'Blue Bottle',
+              full_address: '66 Mint St',
+              feature_type: 'poi',
+              context: {}
+            },
+            geometry: { type: 'Point', coordinates: [-122.39, 37.78] }
+          },
+          {
+            type: 'Feature',
+            properties: {
+              name: 'Sightglass',
+              full_address: '270 7th St',
+              feature_type: 'poi',
+              context: {}
+            },
+            geometry: { type: 'Point', coordinates: [-122.41, 37.77] }
+          }
+        ]
+      };
+      const { httpRequest } = setupHttpRequest({
+        ok: true,
+        json: async () => fakeResp
+      });
+      const result = await new SearchAndGeocodeTool({ httpRequest }).run({
+        q: 'coffee',
+        proximity: { longitude: -122.4194, latitude: 37.7749 }
+      });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as {
+        mapboxRender?: { ref?: string };
+      };
+      expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('render_map_tool');
+      expect(text).toContain(sc.mapboxRender!.ref!);
+
+      const { resolveMapPayloadRef } =
+        await import('../../../src/utils/storeMapPayload.js');
+      const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+      // First marker is the search-center pin; rest are numbered POIs.
+      expect(payload?.markers?.[0]?.style).toBe('pin');
+      expect(payload?.markers?.slice(1).map((m) => m.style)).toEqual([
+        'numbered',
+        'numbered'
+      ]);
+    });
+  });
 });

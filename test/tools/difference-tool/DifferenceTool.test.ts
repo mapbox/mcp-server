@@ -177,4 +177,36 @@ describe('DifferenceTool', () => {
       'fully covers'
     );
   });
+
+  it('stores a mapboxRender payload with input fills + difference result', async () => {
+    const result = await tool.run({
+      polygon1: [
+        [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+          [0, 4],
+          [0, 0]
+        ]
+      ],
+      polygon2: [
+        [
+          [1, 1],
+          [3, 1],
+          [3, 3],
+          [1, 3],
+          [1, 1]
+        ]
+      ]
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    expect(payload?.legend?.[1]?.label).toBe('difference result');
+  });
 });

@@ -438,4 +438,43 @@ describe('CategorySearchTool', () => {
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
   });
+
+  it('stores a mapboxRender payload with numbered POI markers', async () => {
+    const fakeResp = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            mapbox_id: 'id-1',
+            name: 'Cafe Reveille',
+            feature_type: 'poi',
+            context: { country: { name: 'United States' } },
+            coordinates: { longitude: -122.41, latitude: 37.78 }
+          },
+          geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+        }
+      ],
+      attribution: '© Mapbox'
+    };
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      json: async () => fakeResp
+    });
+    const result = await new CategorySearchTool({ httpRequest }).run({
+      category: 'cafe',
+      proximity: { longitude: -122.42, latitude: 37.78 }
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    // Search-center pin + 1 numbered marker
+    expect(payload?.markers?.[0]?.style).toBe('pin');
+    expect(payload?.markers?.[1]?.style).toBe('numbered');
+  });
 });

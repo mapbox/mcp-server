@@ -3,13 +3,11 @@
 
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { z } from 'zod';
-import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { isMcpUiEnabled } from '../../config/toolConfig.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 
 // Images larger than this threshold are stored as temporary resources instead
@@ -161,22 +159,6 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       // Image is small enough to inline as base64
       const base64Data = Buffer.from(buffer).toString('base64');
       content.push({ type: 'image', data: base64Data, mimeType });
-    }
-
-    // Conditionally add MCP-UI resource if enabled (backward compatibility)
-    if (isMcpUiEnabled()) {
-      const uiResource = createUIResource({
-        uri: `ui://mapbox/static-map/${input.style}/${lng},${lat},${input.zoom}`,
-        content: {
-          type: 'externalUrl',
-          iframeUrl: url
-        },
-        encoding: 'text',
-        uiMetadata: {
-          'preferred-frame-size': [`${width}px`, `${height}px`]
-        }
-      });
-      content.push(uiResource);
     }
 
     return {
