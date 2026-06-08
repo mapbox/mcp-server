@@ -722,8 +722,8 @@ describe('StaticMapImageTool', () => {
     });
   });
 
-  describe('MCP-UI support', () => {
-    it('includes UIResource when MCP-UI is enabled (default)', async () => {
+  describe('credential safety', () => {
+    it('never includes the Mapbox access token in any content item', async () => {
       const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
@@ -734,70 +734,30 @@ describe('StaticMapImageTool', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(3); // URL + image + UIResource
-      expect(result.content[0].type).toBe('text');
-      expect(result.content[1].type).toBe('image');
-      expect(result.content[2].type).toBe('resource');
-      if (result.content[2].type === 'resource') {
-        expect(result.content[2].resource.uri).toMatch(
-          /^ui:\/\/mapbox\/static-map\//
-        );
-      }
+
+      // The Mapbox access token must never appear in any content item —
+      // not in text, not in image URLs, not embedded in resource bodies.
+      const tokenValue = process.env.MAPBOX_ACCESS_TOKEN!;
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('access_token=');
+      expect(serialized).not.toContain(tokenValue);
     });
 
-    it('does not include UIResource when MCP-UI is disabled', async () => {
-      // Set environment variable to disable MCP-UI
-      const originalEnv = process.env.ENABLE_MCP_UI;
-      process.env.ENABLE_MCP_UI = 'false';
-
-      try {
-        const { httpRequest } = setupHttpRequest();
-
-        const result = await new StaticMapImageTool({ httpRequest }).run({
-          center: { longitude: -74.006, latitude: 40.7128 },
-          zoom: 12,
-          size: { width: 600, height: 400 },
-          style: 'mapbox/streets-v12'
-        });
-
-        expect(result.isError).toBe(false);
-        expect(result.content).toHaveLength(2); // URL + image, no UIResource
-        expect(result.content[0].type).toBe('text');
-      } finally {
-        // Restore environment variable
-        if (originalEnv !== undefined) {
-          process.env.ENABLE_MCP_UI = originalEnv;
-        } else {
-          delete process.env.ENABLE_MCP_UI;
-        }
-      }
-    });
-
-    it('UIResource includes correct iframe URL and dimensions', async () => {
+    it('returns only text + image content (no externalUrl iframe)', async () => {
       const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
-        center: { longitude: -122.4194, latitude: 37.7749 },
-        zoom: 13,
-        size: { width: 800, height: 600 },
-        style: 'mapbox/satellite-streets-v12'
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12'
       });
 
       expect(result.isError).toBe(false);
-      // UIResource is at index 2 (after URL text and base64 image)
-      if (result.content[2]?.type === 'resource') {
-        expect(result.content[2].resource.uri).toContain(
-          '-122.4194,37.7749,13'
-        );
-        // Check that UIMetadata has preferred dimensions
-        if ('uiMetadata' in result.content[2].resource) {
-          const metadata = result.content[2].resource.uiMetadata as Record<
-            string,
-            unknown
-          >;
-          expect(metadata['preferred-frame-size']).toEqual(['800px', '600px']);
-        }
-      }
+      expect(result.content).toHaveLength(2);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[1].type).toBe('image');
+      expect(result.content.some((c) => c.type === 'resource')).toBe(false);
     });
   });
 });
