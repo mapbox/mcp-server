@@ -5,6 +5,7 @@
 import { CategoryListResource } from './category-list/CategoryListResource.js';
 import { TemporaryDataResource } from './temporary/TemporaryDataResource.js';
 import { StaticMapUIResource } from './ui-apps/StaticMapUIResource.js';
+import { DirectionsAppUIResource } from './ui-apps/DirectionsAppUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
 
@@ -14,6 +15,7 @@ export const ALL_RESOURCES = [
   new CategoryListResource({ httpRequest }),
   new TemporaryDataResource(),
   new StaticMapUIResource(),
+  new DirectionsAppUIResource({ httpRequest }),
   new VersionResource()
 ] as const;
 

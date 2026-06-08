@@ -2,8 +2,10 @@
 
 ### Security
 
+- **static_map_image_tool**: Stop embedding the Mapbox access token in tool results. Previously the tool returned a `createUIResource({ iframeUrl })` whose URL carried the caller's `?access_token=` query param, leaking the secret token via the MCP-UI resource item. The credentialed URL is now only used server-side to fetch the image, which is returned inline as base64. The tool's `meta.ui.resourceUri` declaration is removed (the iframe path required the credentialed URL to function and cannot be reinstated without leaking). A regression test asserts the access token does not appear in any content item.
 - chore: upgrade @opentelemetry/\* packages to latest (fixes protobufjs GHSA-xq3m-2v4x-88gg critical CVE) (#183)
 - **CVE-2026-33750**: Added `overrides` for `brace-expansion` to `^2.0.3` — eliminates vulnerable `1.1.14` installs nested under `@eslint/config-array`, `@eslint/eslintrc`, and `eslint` via `minimatch@3.1.5`
+- **CVE-2026-33750 (Docker)**: Upgrade npm to `11.16.0` in Dockerfile — `node:22-slim` ships with npm 10.9.8 which bundles `brace-expansion` 2.0.2 internally; upgrading npm replaces it with 5.0.6 (patched)
 
 ### Breaking Changes
 
@@ -17,13 +19,28 @@
 
 ### New Features
 
+- **`directions_tool` now renders as a live Mapbox GL JS map** for both the MCP Apps spec and legacy MCP-UI clients:
+  - **MCP Apps**: the tool declares `_meta.ui.resourceUri` pointing to a new `DirectionsAppUIResource` (`ui://mapbox/directions-app/index.html`). MCP App–capable hosts (Claude Desktop, VS Code, Cursor) render the route via postMessage handoff.
+  - **MCP-UI**: when `geometries=geojson` is requested and the response carries a renderable LineString, an inline `rawHtml` UIResource is added to the tool's `content[]` (gated by the existing `ENABLE_MCP_UI`/`--disable-mcp-ui` flag, like `static_map_image_tool`).
+  - **One source of truth**: both pathways render the same HTML produced by `renderDirectionsAppHtml` — for MCP Apps the resource serves a generic version and the iframe receives the tool result via postMessage; for MCP-UI the tool bakes the route geometry into the HTML before returning. No more "GL JS map for one client, static image for the other."
+  - **Public token**: resolved server-side via `GET /tokens/v2/{user}?default=true` (requires `tokens:read` on the `sk.*` token) with `MAPBOX_PUBLIC_TOKEN` env var fallback. Non-MCP-App hosts that also have MCP-UI disabled ignore both UI hints and consume the existing text/structuredContent payload unchanged.
+  - **Graceful degradation**: responses without renderable geometry (>50KB temporary-resource path, `geometries=none`, `geometries=polyline*`) skip the inline rawHtml block and show a "no geometry to render" message in the MCP App iframe.
+  - **CSP**: `_meta.ui.csp.workerDomains: ['blob:']` so MCP App hosts grant Mapbox GL JS the iframe sandbox permissions it needs.
 - **MCP Completions capability**: Add auto-completion support for prompt arguments per MCP spec (2025-11-25). Clients can now suggest values when users fill in prompt parameters (#176)
   - `category` argument on `find-places-nearby` — 482 Mapbox Search API categories
   - `mode` argument on `get-directions`, `search-along-route`, `show-reachable-areas` — driving, driving-traffic, walking, cycling
+- **ground_location_tool MCP sampling**: Use MCP sampling to classify the grounding strategy (`routing` / `neighborhood` / `poi` / `region`) and shape downstream Geocoding, Search, and Isochrone calls accordingly. Falls back to `neighborhood` when the client doesn't support sampling.
+
+### Security
+
+- **static_map_image_tool**: Validate custom-marker URLs to reject loopback, private, link-local, and cloud-metadata IP addresses, preventing SSRF via the Mapbox Static Images API (CWE-918)
 
 ### Fixes
 
 - **Prompt descriptions**: Add missing `driving-traffic` transport mode to `get-directions`, `search-along-route`, and `show-reachable-areas` prompt descriptions
+- **ground_location_tool**: Use `mapbox/` prefix for isochrone profiles and add `driving-traffic` support
+- **ground_location_tool**: Reverse geocode now returns neighborhood/locality/place name instead of street address by default
+- **ground_location_tool**: Strengthened tool description to prefer it over `reverse_geocode_tool` for location context queries
 
 ## 0.11.0 - 2026-04-01
 
