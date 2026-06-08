@@ -2,6 +2,7 @@
 
 ### Security
 
+- **static_map_image_tool**: Stop embedding the Mapbox access token in tool results. Previously the tool returned a `createUIResource({ iframeUrl })` whose URL carried the caller's `?access_token=` query param, leaking the secret token via the MCP-UI resource item. The credentialed URL is now only used server-side to fetch the image, which is returned inline as base64. The tool's `meta.ui.resourceUri` declaration is removed (the iframe path required the credentialed URL to function and cannot be reinstated without leaking). A regression test asserts the access token does not appear in any content item.
 - chore: upgrade @opentelemetry/\* packages to latest (fixes protobufjs GHSA-xq3m-2v4x-88gg critical CVE) (#183)
 - **CVE-2026-33750**: Added `overrides` for `brace-expansion` to `^2.0.3` — eliminates vulnerable `1.1.14` installs nested under `@eslint/config-array`, `@eslint/eslintrc`, and `eslint` via `minimatch@3.1.5`
 - **CVE-2026-33750 (Docker)**: Upgrade npm to `11.16.0` in Dockerfile — `node:22-slim` ships with npm 10.9.8 which bundles `brace-expansion` 2.0.2 internally; upgrading npm replaces it with 5.0.6 (patched)
