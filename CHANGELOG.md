@@ -1,6 +1,6 @@
 ## Unreleased
 
-### Chores
+### Dependencies
 
 - **Normalize line endings to LF**: Added `.gitattributes` (`* text=auto eol=lf`) and `"endOfLine": "lf"` to the Prettier config so Windows contributors no longer hit CRLF/Prettier failures when running `npm run lint`.
 
