@@ -10,6 +10,7 @@ import {
 } from '../../utils/httpPipelineUtils.js';
 import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
 import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
+import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
@@ -1157,5 +1158,64 @@ describe('DirectionsTool', () => {
         process.env.MAPBOX_ACCESS_TOKEN = realToken;
       }
     });
+  });
+});
+
+describe('DirectionsTool — temporary resource ownership', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    temporaryResourceManager.clear();
+  });
+
+  // Build a Mapbox-style JWT whose payload carries the username (`u`).
+  function tokenFor(username: string): string {
+    const payload = Buffer.from(JSON.stringify({ u: username })).toString(
+      'base64'
+    );
+    return `pk.${payload}.sig`;
+  }
+
+  it('stores the temp resource with owner = the calling account (real token round-trip)', async () => {
+    // A geojson response large enough (>50KB) to be stored as a temp resource.
+    const bigGeometry = {
+      type: 'LineString',
+      coordinates: Array.from({ length: 4000 }, (_, i) => [
+        i * 0.001,
+        i * 0.001
+      ])
+    };
+    const largeResponse = {
+      code: 'Ok',
+      routes: [{ distance: 1, duration: 1, geometry: bigGeometry }],
+      waypoints: []
+    };
+    const { httpRequest } = setupHttpRequest({
+      json: async () => largeResponse
+    });
+
+    const token = tokenFor('account-zhuwenlong');
+    const result = await new DirectionsTool({ httpRequest }).run(
+      {
+        coordinates: [
+          { longitude: -73.989, latitude: 40.733 },
+          { longitude: -73.979, latitude: 40.743 }
+        ],
+        geometries: 'geojson'
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    // The transcript should point to a temp resource...
+    const text = (result.content ?? [])
+      .map((c) => (c as { text?: string }).text ?? '')
+      .join('\n');
+    const uri = text.match(/mapbox:\/\/temp\/[^\s`]+/)?.[0];
+    expect(uri).toBeTruthy();
+
+    // ...and that resource must be owned by the account from the token, not
+    // undefined — proving the tool wires `owner` from the real accessToken.
+    const stored = temporaryResourceManager.get(uri as string);
+    expect(stored?.owner).toBe('account-zhuwenlong');
   });
 });
