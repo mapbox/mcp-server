@@ -43,6 +43,7 @@
 
 ### Fixes
 
+- **CLI metadata flags**: Handle `--help` and `--version` before server startup so users can inspect usage and version information without requiring Mapbox environment configuration.
 - **Prompt descriptions**: Add missing `driving-traffic` transport mode to `get-directions`, `search-along-route`, and `show-reachable-areas` prompt descriptions
 - **ground_location_tool**: Use `mapbox/` prefix for isochrone profiles and add `driving-traffic` support
 - **ground_location_tool**: Reverse geocode now returns neighborhood/locality/place name instead of street address by default
