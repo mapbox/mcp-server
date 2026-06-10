@@ -16,6 +16,7 @@ import {
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 import { isMcpUiEnabled } from '../../config/toolConfig.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
 import { renderDirectionsAppHtml } from '../../resources/ui-apps/directionsAppHtml.js';
@@ -297,10 +298,15 @@ export class DirectionsTool extends MapboxApiBasedTool<
       const resourceId = randomBytes(16).toString('hex');
       const resourceUri = `mapbox://temp/directions-${resourceId}`;
 
-      temporaryResourceManager.create(resourceId, resourceUri, validatedData, {
-        toolName: this.name,
-        size: responseSize
-      });
+      temporaryResourceManager.create(
+        resourceId,
+        resourceUri,
+        validatedData,
+        { toolName: this.name, size: responseSize },
+        undefined,
+        undefined,
+        getUserNameFromToken(accessToken)
+      );
 
       // Extract summary information
       const route = validatedData.routes?.[0];

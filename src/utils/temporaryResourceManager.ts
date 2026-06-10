@@ -16,6 +16,13 @@ export interface TemporaryResource {
   byteSize: number;
   created: number;
   ttl: number;
+  /**
+   * Account (Mapbox username) that created this resource. Reads are restricted
+   * to the same account so one account cannot read another account's temporary
+   * data. Undefined means no owner could be determined, in which case reads
+   * fail closed.
+   */
+  owner?: string;
   metadata?: {
     toolName?: string;
     size?: number;
@@ -45,7 +52,8 @@ export class TemporaryResourceManager {
     data: unknown,
     metadata?: TemporaryResource['metadata'],
     ttl?: number,
-    mimeType?: string
+    mimeType?: string,
+    owner?: string
   ): TemporaryResource {
     const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
     const byteSize = Buffer.byteLength(dataStr, 'utf8');
@@ -69,6 +77,7 @@ export class TemporaryResourceManager {
       byteSize,
       created: Date.now(),
       ttl: ttl ?? this.defaultTTL,
+      owner,
       metadata
     };
 

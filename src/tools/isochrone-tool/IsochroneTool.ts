@@ -12,6 +12,7 @@ import {
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -161,10 +162,15 @@ export class IsochroneTool extends MapboxApiBasedTool<
       const resourceId = randomBytes(16).toString('hex');
       const resourceUri = `mapbox://temp/isochrone-${resourceId}`;
 
-      temporaryResourceManager.create(resourceId, resourceUri, data, {
-        toolName: this.name,
-        size: responseSize
-      });
+      temporaryResourceManager.create(
+        resourceId,
+        resourceUri,
+        data,
+        { toolName: this.name, size: responseSize },
+        undefined,
+        undefined,
+        getUserNameFromToken(accessToken)
+      );
 
       const contourCount =
         (data as { features?: unknown[] }).features?.length ?? 0;
