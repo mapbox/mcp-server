@@ -4,6 +4,10 @@
 
 - **Temporary resources** (`mapbox://temp/...`) are now scoped to the account that created them: a read by a different account returns the standard not-found response. Token resolution mirrors the tools (request auth, then the env token for stdio/single-user), so local reads are unaffected. Adds regression tests.
 
+### Dependencies
+
+- **Normalize line endings to LF**: Added `.gitattributes` (`* text=auto eol=lf`) and `"endOfLine": "lf"` to the Prettier config so Windows contributors no longer hit CRLF/Prettier failures when running `npm run lint`.
+
 ## 0.12.2-dev - 2026-06-10
 
 ### Security
