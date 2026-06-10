@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.12.1-dev - 2026-06-10
+
 ### Changed
 
 - **Temporary resources** (`mapbox://temp/...`) are now scoped to the account that created them: a read by a different account returns the standard not-found response. Token resolution mirrors the tools (request auth, then the env token for stdio/single-user), so local reads are unaffected. Adds regression tests.
