@@ -4,6 +4,11 @@
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  McpServer,
+  RegisteredTool
+} from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestTaskStore } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { GroundLocationInputSchema } from './GroundLocationTool.input.schema.js';
 import {
@@ -86,6 +91,163 @@ export class GroundLocationTool extends MapboxApiBasedTool<
       outputSchema: GroundLocationOutputSchema,
       httpRequest: params.httpRequest
     });
+  }
+
+  override installTo(server: McpServer): RegisteredTool {
+    this.server = server;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inputShape = (this.inputSchema as unknown as { shape: any }).shape;
+    return server.experimental.tasks.registerToolTask(
+      this.name,
+      {
+        title: this.annotations.title,
+        description: this.description,
+        inputSchema: inputShape,
+        outputSchema: this.outputSchema,
+        annotations: this.annotations,
+        execution: { taskSupport: 'required' }
+      },
+      {
+        createTask: async (
+          args: z.infer<typeof GroundLocationInputSchema>,
+          extra
+        ) => {
+          const accessToken =
+            extra.authInfo?.token || MapboxApiBasedTool.mapboxAccessToken;
+          if (!accessToken || !this.isValidJwtFormat(accessToken)) {
+            throw new Error(
+              'No valid access token. Provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var.'
+            );
+          }
+          const task = await extra.taskStore.createTask({ ttl: 60_000 });
+          void this.runTaskBackground(
+            args,
+            accessToken,
+            task.taskId,
+            extra.taskStore
+          );
+          return { task };
+        },
+        getTask: async (_args, extra) => {
+          return extra.taskStore.getTask(extra.taskId);
+        },
+        getTaskResult: async (_args, extra) => {
+          return extra.taskStore.getTaskResult(
+            extra.taskId
+          ) as Promise<CallToolResult>;
+        }
+      }
+    );
+  }
+
+  private async runTaskBackground(
+    rawArgs: z.infer<typeof GroundLocationInputSchema>,
+    accessToken: string,
+    taskId: string,
+    taskStore: RequestTaskStore
+  ): Promise<void> {
+    try {
+      const {
+        longitude,
+        latitude,
+        query,
+        profile,
+        contours_minutes,
+        limit,
+        language
+      } = GroundLocationInputSchema.parse(rawArgs);
+      const citations: string[] = ['Mapbox Geocoding API'];
+
+      // Kick off sampling + a fast initial geocode in parallel so the place name
+      // is available as soon as possible regardless of sampling latency.
+      const [strategy, initialGeocode] = await Promise.all([
+        this.classifyGroundingStrategy(query, longitude, latitude),
+        this.reverseGeocode(
+          longitude,
+          latitude,
+          accessToken,
+          'neighborhood,locality,place',
+          language
+        )
+      ]);
+
+      // Refine geocode types now that we know the strategy.
+      const geocodeTypes =
+        strategy === 'routing'
+          ? 'address,poi'
+          : strategy === 'region'
+            ? 'region,district,place'
+            : 'neighborhood,locality,place';
+
+      const geocodeResult =
+        geocodeTypes !== 'neighborhood,locality,place'
+          ? await this.reverseGeocode(
+              longitude,
+              latitude,
+              accessToken,
+              geocodeTypes,
+              language
+            )
+          : initialGeocode;
+
+      // Fan out POIs + isochrone now that strategy is known.
+      const [poisResult, isochroneResult] = await Promise.all([
+        query || strategy === 'poi'
+          ? this.categorySearch(
+              query ?? 'place',
+              longitude,
+              latitude,
+              strategy === 'poi' ? Math.max(limit, 15) : limit,
+              accessToken,
+              language
+            ).then((pois) => {
+              if (pois?.length) citations.push('Mapbox Search API');
+              return pois;
+            })
+          : Promise.resolve(undefined),
+        strategy === 'region' || strategy === 'neighborhood'
+          ? this.isochrone(
+              longitude,
+              latitude,
+              profile,
+              contours_minutes,
+              accessToken
+            ).then((iso) => {
+              if (iso) citations.push('Mapbox Isochrone API');
+              return iso;
+            })
+          : Promise.resolve(undefined)
+      ]);
+
+      const result: GroundLocationOutput = {
+        place: geocodeResult.place,
+        full_address: geocodeResult.full_address,
+        longitude,
+        latitude,
+        nearby_pois: poisResult ?? undefined,
+        isochrone: isochroneResult ?? undefined,
+        citations
+      };
+
+      const validated = GroundLocationOutputSchema.safeParse(result);
+      const output = validated.success ? validated.data : result;
+
+      await taskStore.storeTaskResult(taskId, 'completed', {
+        content: [{ type: 'text', text: this.formatOutput(output, strategy) }],
+        structuredContent: output as unknown as Record<string, unknown>,
+        isError: false
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      try {
+        await taskStore.storeTaskResult(taskId, 'failed', {
+          content: [{ type: 'text', text: message }],
+          isError: true
+        });
+      } catch {
+        // Task may have been cancelled before we could store the failure.
+      }
+    }
   }
 
   /**

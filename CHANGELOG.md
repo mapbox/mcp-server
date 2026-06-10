@@ -1,5 +1,9 @@
 ## Unreleased
 
+### New Features
+
+- **`ground_location_tool` task-based streaming** (experimental): Convert `ground_location_tool` to use the MCP tasks extension (`server.experimental.tasks.registerToolTask`). The tool now returns a task handle immediately on `tools/call` instead of blocking until all API calls complete. Reverse geocoding and sampling classification run in parallel in the background; POI search and isochrone follow once the strategy is known. Requires a task-capable client (`taskSupport: 'required'`). The server is configured with `InMemoryTaskStore` to support task lifecycle management. See issue #197.
+
 ### Security
 
 - **static_map_image_tool**: Stop embedding the Mapbox access token in tool results. Previously the tool returned a `createUIResource({ iframeUrl })` whose URL carried the caller's `?access_token=` query param, leaking the secret token via the MCP-UI resource item. The credentialed URL is now only used server-side to fetch the image, which is returned inline as base64. The tool's `meta.ui.resourceUri` declaration is removed (the iframe path required the credentialed URL to function and cannot be reinstated without leaking). A regression test asserts the access token does not appear in any content item.

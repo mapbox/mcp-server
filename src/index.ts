@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs';
 import { SpanStatusCode } from '@opentelemetry/api';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   registerAppResource,
@@ -107,7 +108,8 @@ const server = new McpServer(
       resources: {},
       prompts: {},
       logging: {}
-    }
+    },
+    taskStore: new InMemoryTaskStore()
   }
 );
 

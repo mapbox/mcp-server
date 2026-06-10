@@ -7,6 +7,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { GroundLocationTool } from '../../../src/tools/ground-location-tool/GroundLocationTool.js';
+import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks';
 
 const geocodeResponse = {
   features: [
@@ -266,5 +267,106 @@ describe('GroundLocationTool', () => {
       c[0].includes('category/restaurant')
     );
     expect(categoryCall?.[0]).toContain('limit=15');
+  });
+});
+
+describe('GroundLocationTool — task-based flow', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function buildTaskStore() {
+    const store = new InMemoryTaskStore();
+    const requestId = 1;
+    const request = {
+      method: 'tools/call',
+      params: { name: 'ground_location_tool', arguments: {} }
+    };
+    // Wrap in a RequestTaskStore-compatible shim bound to a fixed session.
+    const taskStore = {
+      createTask: (params: { ttl?: number }) =>
+        store.createTask(params, requestId, request),
+      getTask: (taskId: string) =>
+        store.getTask(taskId).then((t) => {
+          if (!t) throw new Error(`task not found: ${taskId}`);
+          return t;
+        }),
+      storeTaskResult: (
+        taskId: string,
+        status: 'completed' | 'failed',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        result: any
+      ) => store.storeTaskResult(taskId, status, result),
+      getTaskResult: (taskId: string) => store.getTaskResult(taskId),
+      updateTaskStatus: (
+        taskId: string,
+        status: Parameters<typeof store.updateTaskStatus>[1]
+      ) => store.updateTaskStatus(taskId, status),
+      listTasks: (cursor?: string) => store.listTasks(cursor)
+    };
+    return taskStore;
+  }
+
+  it('creates task immediately and resolves with place name', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('geocode/v6/reverse'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => geocodeResponse
+        });
+      if (url.includes('isochrone/v1'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => isochroneResponse
+        });
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+    const tool = new GroundLocationTool({
+      httpRequest: mockFetch as unknown as typeof httpRequest
+    });
+
+    const taskStore = buildTaskStore();
+    const task = await taskStore.createTask({ ttl: 60_000 });
+
+    // Simulate what createTask handler does
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (tool as any).runTaskBackground(
+      { longitude: -122.419, latitude: 37.759 },
+      process.env.MAPBOX_ACCESS_TOKEN,
+      task.taskId,
+      taskStore
+    );
+
+    const completedTask = await taskStore.getTask(task.taskId);
+    expect(completedTask.status).toBe('completed');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = (await taskStore.getTaskResult(task.taskId)) as any;
+    expect(result.isError).toBe(false);
+    const text = result.content[0].text as string;
+    expect(text).toContain('Mission District');
+  });
+
+  it('stores failed result when API errors out', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const mockFetch = vi.fn().mockRejectedValue(new Error('network error'));
+    const tool = new GroundLocationTool({
+      httpRequest: mockFetch as unknown as typeof httpRequest
+    });
+
+    const taskStore = buildTaskStore();
+    const task = await taskStore.createTask({ ttl: 60_000 });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (tool as any).runTaskBackground(
+      { longitude: -122.419, latitude: 37.759 },
+      process.env.MAPBOX_ACCESS_TOKEN,
+      task.taskId,
+      taskStore
+    );
+
+    const completedTask = await taskStore.getTask(task.taskId);
+    expect(completedTask.status).toBe('failed');
   });
 });
