@@ -105,7 +105,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
         inputSchema: inputShape,
         outputSchema: this.outputSchema,
         annotations: this.annotations,
-        execution: { taskSupport: 'required' }
+        execution: { taskSupport: 'optional' }
       },
       {
         createTask: async (
@@ -119,7 +119,12 @@ export class GroundLocationTool extends MapboxApiBasedTool<
               'No valid access token. Provide via Bearer auth or MAPBOX_ACCESS_TOKEN env var.'
             );
           }
-          const task = await extra.taskStore.createTask({ ttl: 60_000 });
+          // pollInterval is set low so the SDK automatic polling path (used for
+          // clients that do not support tasks) has minimal extra latency.
+          const task = await extra.taskStore.createTask({
+            ttl: 60_000,
+            pollInterval: 50
+          });
           void this.runTaskBackground(
             args,
             accessToken,

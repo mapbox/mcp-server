@@ -369,4 +369,40 @@ describe('GroundLocationTool — task-based flow', () => {
     const completedTask = await taskStore.getTask(task.taskId);
     expect(completedTask.status).toBe('failed');
   });
+
+  it('non-task clients still get a result via runTaskBackground', async () => {
+    const { httpRequest } = setupHttpRequest();
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('geocode/v6/reverse'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => geocodeResponse
+        });
+      if (url.includes('isochrone/v1'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => isochroneResponse
+        });
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+    const tool = new GroundLocationTool({
+      httpRequest: mockFetch as unknown as typeof httpRequest
+    });
+
+    const taskStore = buildTaskStore();
+    const task = await taskStore.createTask({ ttl: 60_000, pollInterval: 50 });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (tool as any).runTaskBackground(
+      { longitude: -122.419, latitude: 37.759 },
+      process.env.MAPBOX_ACCESS_TOKEN,
+      task.taskId,
+      taskStore
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = (await taskStore.getTaskResult(task.taskId)) as any;
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toContain('Mission District');
+  });
 });

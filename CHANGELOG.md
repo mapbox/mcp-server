@@ -2,7 +2,7 @@
 
 ### New Features
 
-- **`ground_location_tool` task-based streaming** (experimental): Convert `ground_location_tool` to use the MCP tasks extension (`server.experimental.tasks.registerToolTask`). The tool now returns a task handle immediately on `tools/call` instead of blocking until all API calls complete. Reverse geocoding and sampling classification run in parallel in the background; POI search and isochrone follow once the strategy is known. Requires a task-capable client (`taskSupport: 'required'`). The server is configured with `InMemoryTaskStore` to support task lifecycle management. See issue #197.
+- **`ground_location_tool` task-based streaming** (experimental): Convert `ground_location_tool` to use the MCP tasks extension (`server.experimental.tasks.registerToolTask`). The tool now returns a task handle immediately on `tools/call` instead of blocking until all API calls complete. Reverse geocoding and sampling classification run in parallel in the background; POI search and isochrone follow once the strategy is known. Task-capable clients get streaming updates; clients without task support get the same synchronous result as before via the SDK automatic polling path (`taskSupport: 'optional'`). The server is configured with `InMemoryTaskStore` to support task lifecycle management. See issue #197.
 
 ### Security
 
