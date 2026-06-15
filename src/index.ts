@@ -30,6 +30,7 @@ import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
+import { handleCliMetadataArgs } from './cli.js';
 import {
   initializeTracing,
   shutdownTracing,
@@ -61,6 +62,20 @@ if (existsSync(envPath)) {
 }
 
 const versionInfo = getVersionInfo();
+const cliMetadataResult = handleCliMetadataArgs(
+  process.argv.slice(2),
+  versionInfo
+);
+
+if (cliMetadataResult.handled) {
+  if (cliMetadataResult.output) {
+    process.stdout.write(cliMetadataResult.output);
+  }
+  if (cliMetadataResult.error) {
+    process.stderr.write(cliMetadataResult.error);
+  }
+  process.exit(cliMetadataResult.exitCode);
+}
 
 // Parse configuration from command-line arguments
 const config = parseToolConfigFromArgs();

@@ -1,5 +1,23 @@
 ## Unreleased
 
+## 0.12.5 - 2026-06-15
+
+### Changed
+
+- **Docker**: Remove `libgnutls30` from the runtime image via `dpkg --remove --force-depends`. The package is only depended on by `apt`, which is not needed at runtime. `libgnutls30` is not called by Node.js (which uses OpenSSL for TLS) and was present solely as a transitive system dependency of the Debian slim base.
+
+## 0.12.3 - 2026-06-11
+
+### Changed
+
+- **Temporary resources** (`mapbox://temp/...`) are now scoped to the account that created them: a read by a different account returns the standard not-found response. Token resolution mirrors the tools (request auth, then the env token for stdio/single-user), so local reads are unaffected. Adds regression tests.
+
+### Dependencies
+
+- **Normalize line endings to LF**: Added `.gitattributes` (`* text=auto eol=lf`) and `"endOfLine": "lf"` to the Prettier config so Windows contributors no longer hit CRLF/Prettier failures when running `npm run lint`.
+
+## 0.12.2-dev - 2026-06-10
+
 ### Security
 
 - **static_map_image_tool**: Stop embedding the Mapbox access token in tool results. Previously the tool returned a `createUIResource({ iframeUrl })` whose URL carried the caller's `?access_token=` query param, leaking the secret token via the MCP-UI resource item. The credentialed URL is now only used server-side to fetch the image, which is returned inline as base64. The tool's `meta.ui.resourceUri` declaration is removed (the iframe path required the credentialed URL to function and cannot be reinstated without leaking). A regression test asserts the access token does not appear in any content item.
@@ -37,6 +55,7 @@
 
 ### Fixes
 
+- **CLI metadata flags**: Handle `--help` and `--version` before server startup so users can inspect usage and version information without requiring Mapbox environment configuration.
 - **Prompt descriptions**: Add missing `driving-traffic` transport mode to `get-directions`, `search-along-route`, and `show-reachable-areas` prompt descriptions
 - **ground_location_tool**: Use `mapbox/` prefix for isochrone profiles and add `driving-traffic` support
 - **ground_location_tool**: Reverse geocode now returns neighborhood/locality/place name instead of street address by default
