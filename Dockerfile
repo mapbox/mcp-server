@@ -1,5 +1,9 @@
 FROM node:22-slim
 
+# Remove gnutls from the runtime image. libgnutls30 is only depended on by apt,
+# which is not needed at runtime. Force-remove after all apt operations are done.
+RUN dpkg --remove --force-depends libgnutls30
+
 # Upgrade npm to fix CVE-2026-33750 (brace-expansion < 2.0.3 bundled in npm 10.x)
 RUN npm install -g npm@11.16.0
 
