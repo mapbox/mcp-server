@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Changed
+
+- **Docker**: Remove `libgnutls30` from the runtime image via `dpkg --remove --force-depends`. The package is only depended on by `apt`, which is not needed at runtime. `libgnutls30` is not called by Node.js (which uses OpenSSL for TLS) and was present solely as a transitive system dependency of the Debian slim base.
+
 ## 0.12.3 - 2026-06-11
 
 ### Changed
