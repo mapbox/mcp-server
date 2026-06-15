@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Changed
+
+- **Docker**: Migrate base image from `node:22-slim` (Debian Bookworm) to `node:22-alpine`. Alpine carries no gnutls library and uses OpenSSL directly, removing a class of OS-level package vulnerabilities present in the Debian slim image. Also swaps `npm install` for `npm ci` in the install step for reproducible, lockfile-exact builds.
+
 ## 0.12.3 - 2026-06-11
 
 ### Changed

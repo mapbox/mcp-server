@@ -1,4 +1,4 @@
-FROM node:22-slim
+FROM node:22-alpine
 
 # Upgrade npm to fix CVE-2026-33750 (brace-expansion < 2.0.3 bundled in npm 10.x)
 RUN npm install -g npm@11.16.0
@@ -10,7 +10,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies - completely skip prepare scripts during Docker build
-RUN npm install --ignore-scripts
+RUN npm ci --ignore-scripts
 
 # Copy the rest of the application
 COPY . .
