@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/mapbox-mcp-server-badge.png)](https://mseep.ai/app/mapbox-mcp-server)
+
 # Mapbox MCP Server
 
 [![npm version](https://img.shields.io/npm/v/@mapbox/mcp-server)](https://www.npmjs.com/package/@mapbox/mcp-server)
