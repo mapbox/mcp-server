@@ -25,9 +25,11 @@ let cachedPublicToken: CachedToken | null = null;
  * Resolution order:
  * 1. If the access token is already a pk.* token, use it directly.
  * 2. Reuse a cached pk.* token while it has >5 min TTL remaining.
- * 3. If the access token is an sk.* token, call
+ * 3. If the access token is an sk.* or tk.* token, call
  *    GET /tokens/v2/{user}?default=true to fetch the user's default public
- *    token (requires `tokens:read` scope on the bearer).
+ *    token (requires `tokens:read` scope on the bearer). OAuth-issued bearers
+ *    are tk.* temporary tokens, so this is the path exercised in hosted
+ *    (OAuth) deployments — without it, granting `tokens:read` has no effect.
  * 4. Fall back to the MAPBOX_PUBLIC_TOKEN env var.
  *
  * Returns undefined if none of the above produces a pk.* token.
@@ -48,7 +50,7 @@ export async function resolveMapboxPublicToken(params: {
     return cachedPublicToken.token;
   }
 
-  if (accessToken.startsWith('sk.')) {
+  if (accessToken.startsWith('sk.') || accessToken.startsWith('tk.')) {
     const username = getUserNameFromToken(accessToken);
     if (username) {
       try {
@@ -72,6 +74,12 @@ export async function resolveMapboxPublicToken(params: {
             };
             return defaultPk.token;
           }
+        } else {
+          // A non-ok response (e.g. 401/403 from a missing `tokens:read` scope)
+          // would otherwise fall through silently to the env-var fallback.
+          console.warn(
+            `resolveMapboxPublicToken: Tokens API returned HTTP ${response.status}; falling back to MAPBOX_PUBLIC_TOKEN env var`
+          );
         }
       } catch (err) {
         // Network failures and JSON parse errors land here. Surface a warning
