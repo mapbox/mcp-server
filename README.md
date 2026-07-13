@@ -607,3 +607,9 @@ This MCP server is officially maintained by Mapbox, Inc. We provide:
 ---
 
 [MIT License](LICENSE.md)
+
+## Discovery
+
+[![Beacon Verified](https://registry-ruby.vercel.app/api/v1/agents/mapbox%2Fmcp-server/badge.svg)](https://portal-five-phi-54.vercel.app/?q=mapbox%2Fmcp-server)
+
+Listed on [Beacon](https://portal-five-phi-54.vercel.app) — searchable index of open-source MCP servers.

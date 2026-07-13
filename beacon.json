@@ -1,0 +1,22 @@
+{
+  "beacon_manifest": "0.1",
+  "id": "mapbox/mcp-server",
+  "name": "Mcp Server",
+  "description": "Open-source AI agent \u2014 mapbox, model, context, protocol.",
+  "capabilities": [
+    "mapbox",
+    "model",
+    "context",
+    "protocol",
+    "mcp",
+    "server"
+  ],
+  "interfaces": [
+    {
+      "type": "mcp",
+      "endpoint": "https://github.com/mapbox/mcp-server"
+    }
+  ],
+  "source": "https://github.com/mapbox/mcp-server",
+  "homepage": "https://github.com/mapbox/mcp-server"
+}
