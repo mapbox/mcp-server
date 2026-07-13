@@ -17,8 +17,7 @@ interface CachedToken {
 
 const PUBLIC_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
 
-// Keyed by username (falling back to the raw access token when a username
-// can't be derived) so that concurrent requests from different accounts
+// Keyed by username so that concurrent requests from different accounts
 // never share each other's cached pk.* token.
 const publicTokenCache = new Map<string, CachedToken>();
 
@@ -51,15 +50,14 @@ export async function resolveMapboxPublicToken(params: {
 
   if (accessToken.startsWith('sk.') || accessToken.startsWith('tk.')) {
     const username = getUserNameFromToken(accessToken);
-    const cacheKey = username ?? accessToken;
-
-    const now = Date.now();
-    const cached = publicTokenCache.get(cacheKey);
-    if (cached && cached.expiresAt - now > 5 * 60 * 1000) {
-      return cached.token;
-    }
 
     if (username) {
+      const now = Date.now();
+      const cached = publicTokenCache.get(username);
+      if (cached && cached.expiresAt - now > 5 * 60 * 1000) {
+        return cached.token;
+      }
+
       try {
         const tokensUrl = new URL(`${apiEndpoint}tokens/v2/${username}`);
         tokensUrl.searchParams.set('default', 'true');
@@ -75,7 +73,7 @@ export async function resolveMapboxPublicToken(params: {
             (entry) => entry?.usage === 'pk' && typeof entry.token === 'string'
           );
           if (defaultPk?.token) {
-            publicTokenCache.set(cacheKey, {
+            publicTokenCache.set(username, {
               token: defaultPk.token,
               expiresAt: now + PUBLIC_TOKEN_TTL_MS
             });
