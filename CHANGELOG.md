@@ -1,5 +1,10 @@
 ## Unreleased
 
+### Fixed
+
+- **Public token resolution**: `resolveMapboxPublicToken` now also resolves a public token for `tk.*` (OAuth-issued temporary) bearers, not just `sk.*` bearers. Previously, granting the `tokens:read` scope to an OAuth client had no effect because the Tokens API lookup was skipped for `tk.*` tokens, causing GL JS preview tools (e.g. Directions) to fail with "No Mapbox public token available" even when `tokens:read` was granted.
+- **Public token cache is now per-user**: the resolved public token cache was previously a single global slot shared by every request. It's now keyed by the token's account, so concurrent requests from different accounts can no longer receive each other's cached public token.
+
 ## 0.12.5 - 2026-06-15
 
 ### Changed
