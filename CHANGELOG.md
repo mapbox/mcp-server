@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Documentation
+
+- **CONTRIBUTING**: Clarify that unsolicited PRs adding third-party directory/discovery listings (e.g. README badges, `beacon.json`-style manifests) are out of scope and will be closed without review (#225).
+
 ## 0.12.6 - 2026-07-13
 
 ### Fixed
