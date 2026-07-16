@@ -28,8 +28,38 @@
 - **Polyline decoding moves tool-side** via `decodePolyline` /
   `decodePolylineWithFallback` so the iframe only ever receives GeoJSON.
 
+### Documentation
+
+- **CONTRIBUTING**: Clarify that unsolicited PRs adding third-party directory/discovery listings (e.g. README badges, `beacon.json`-style manifests) are out of scope and will be closed without review (#225).
+
+## 0.12.6 - 2026-07-13
+
+### Fixed
+
+- **Public token resolution**: `resolveMapboxPublicToken` now also resolves a public token for `tk.*` (OAuth-issued temporary) bearers, not just `sk.*` bearers. Previously, granting the `tokens:read` scope to an OAuth client had no effect because the Tokens API lookup was skipped for `tk.*` tokens, causing GL JS preview tools (e.g. Directions) to fail with "No Mapbox public token available" even when `tokens:read` was granted.
+- **Public token cache is now per-user**: the resolved public token cache was previously a single global slot shared by every request. It's now keyed by the token's account, so concurrent requests from different accounts can no longer receive each other's cached public token.
+
+## 0.12.5 - 2026-06-15
+
+### Changed
+
+- **Docker**: Remove `libgnutls30` from the runtime image via `dpkg --remove --force-depends`. The package is only depended on by `apt`, which is not needed at runtime. `libgnutls30` is not called by Node.js (which uses OpenSSL for TLS) and was present solely as a transitive system dependency of the Debian slim base.
+
+## 0.12.3 - 2026-06-11
+
+### Changed
+
+- **Temporary resources** (`mapbox://temp/...`) are now scoped to the account that created them: a read by a different account returns the standard not-found response. Token resolution mirrors the tools (request auth, then the env token for stdio/single-user), so local reads are unaffected. Adds regression tests.
+
+### Dependencies
+
+- **Normalize line endings to LF**: Added `.gitattributes` (`* text=auto eol=lf`) and `"endOfLine": "lf"` to the Prettier config so Windows contributors no longer hit CRLF/Prettier failures when running `npm run lint`.
+
+## 0.12.2-dev - 2026-06-10
+
 ### Security
 
+- **static_map_image_tool**: Stop embedding the Mapbox access token in tool results. Previously the tool returned a `createUIResource({ iframeUrl })` whose URL carried the caller's `?access_token=` query param, leaking the secret token via the MCP-UI resource item. The credentialed URL is now only used server-side to fetch the image, which is returned inline as base64. The tool's `meta.ui.resourceUri` declaration is removed (the iframe path required the credentialed URL to function and cannot be reinstated without leaking). A regression test asserts the access token does not appear in any content item.
 - chore: upgrade @opentelemetry/\* packages to latest (fixes protobufjs GHSA-xq3m-2v4x-88gg critical CVE) (#183)
 - **CVE-2026-33750**: Added `overrides` for `brace-expansion` to `^2.0.3` — eliminates vulnerable `1.1.14` installs nested under `@eslint/config-array`, `@eslint/eslintrc`, and `eslint` via `minimatch@3.1.5`
 - **CVE-2026-33750 (Docker)**: Upgrade npm to `11.16.0` in Dockerfile — `node:22-slim` ships with npm 10.9.8 which bundles `brace-expansion` 2.0.2 internally; upgrading npm replaces it with 5.0.6 (patched)
@@ -64,6 +94,7 @@
 
 ### Fixes
 
+- **CLI metadata flags**: Handle `--help` and `--version` before server startup so users can inspect usage and version information without requiring Mapbox environment configuration.
 - **Prompt descriptions**: Add missing `driving-traffic` transport mode to `get-directions`, `search-along-route`, and `show-reachable-areas` prompt descriptions
 - **ground_location_tool**: Use `mapbox/` prefix for isochrone profiles and add `driving-traffic` support
 - **ground_location_tool**: Reverse geocode now returns neighborhood/locality/place name instead of street address by default

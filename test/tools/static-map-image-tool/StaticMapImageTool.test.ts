@@ -739,4 +739,43 @@ describe('StaticMapImageTool', () => {
       expect(result.content[1].type).toBe('image');
     });
   });
+
+  describe('credential safety', () => {
+    it('never includes the Mapbox access token in any content item', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12'
+      });
+
+      expect(result.isError).toBe(false);
+
+      // The Mapbox access token must never appear in any content item —
+      // not in text, not in image URLs, not embedded in resource bodies.
+      const tokenValue = process.env.MAPBOX_ACCESS_TOKEN!;
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('access_token=');
+      expect(serialized).not.toContain(tokenValue);
+    });
+
+    it('returns only text + image content (no externalUrl iframe)', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12'
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content).toHaveLength(2);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[1].type).toBe('image');
+      expect(result.content.some((c) => c.type === 'resource')).toBe(false);
+    });
+  });
 });

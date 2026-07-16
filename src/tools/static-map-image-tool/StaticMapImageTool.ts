@@ -9,6 +9,7 @@ import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js'
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // Images larger than this threshold are stored as temporary resources instead
 // of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
@@ -27,15 +28,6 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
-  };
-  readonly meta = {
-    ui: {
-      resourceUri: 'ui://mapbox/static-map/index.html',
-      csp: {
-        connectDomains: ['https://api.mapbox.com'],
-        resourceDomains: ['https://api.mapbox.com']
-      }
-    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -143,14 +135,14 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       const resourceId = randomBytes(16).toString('hex');
       const resourceUri = `mapbox://temp/static-map-${resourceId}`;
       const base64Data = Buffer.from(buffer).toString('base64');
-      temporaryResourceManager.create(
-        resourceId,
-        resourceUri,
-        base64Data,
-        { toolName: this.name, size: buffer.byteLength },
-        undefined,
-        mimeType
-      );
+      temporaryResourceManager.create({
+        id: resourceId,
+        uri: resourceUri,
+        data: base64Data,
+        metadata: { toolName: this.name, size: buffer.byteLength },
+        mimeType,
+        owner: getUserNameFromToken(accessToken)
+      });
       content.push({
         type: 'text',
         text: `⚠️ Image (${Math.round(buffer.byteLength / 1024)}KB) stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes`

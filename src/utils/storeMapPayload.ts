@@ -43,8 +43,11 @@ export function storeMapPayload(payload: MapAppPayload): string {
   // 30-minute TTL is the temporaryResourceManager default — same as the
   // directions/isochrone large-response stash, so the lifetime story is
   // consistent across uses.
-  temporaryResourceManager.create(id, uri, payload, {
-    toolName: 'map-payload'
+  temporaryResourceManager.create({
+    id,
+    uri,
+    data: payload,
+    metadata: { toolName: 'map-payload' }
   });
   return uri;
 }

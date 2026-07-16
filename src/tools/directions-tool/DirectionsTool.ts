@@ -20,6 +20,7 @@ import {
   type MapAppPayload
 } from '../../utils/mapAppPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -292,9 +293,12 @@ export class DirectionsTool extends MapboxApiBasedTool<
       const resourceId = randomBytes(16).toString('hex');
       const resourceUri = `mapbox://temp/directions-${resourceId}`;
 
-      temporaryResourceManager.create(resourceId, resourceUri, validatedData, {
-        toolName: this.name,
-        size: responseSize
+      temporaryResourceManager.create({
+        id: resourceId,
+        uri: resourceUri,
+        data: validatedData,
+        metadata: { toolName: this.name, size: responseSize },
+        owner: getUserNameFromToken(accessToken)
       });
 
       // Extract summary information

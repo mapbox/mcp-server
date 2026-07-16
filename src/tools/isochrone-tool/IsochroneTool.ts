@@ -14,6 +14,7 @@ import {
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 const HEX6_RE = /^[0-9a-fA-F]{6}$/;
 function sanitizeHex(raw: unknown, fallback: string): string {
@@ -169,9 +170,12 @@ export class IsochroneTool extends MapboxApiBasedTool<
       const resourceId = randomBytes(16).toString('hex');
       const resourceUri = `mapbox://temp/isochrone-${resourceId}`;
 
-      temporaryResourceManager.create(resourceId, resourceUri, data, {
-        toolName: this.name,
-        size: responseSize
+      temporaryResourceManager.create({
+        id: resourceId,
+        uri: resourceUri,
+        data,
+        metadata: { toolName: this.name, size: responseSize },
+        owner: getUserNameFromToken(accessToken)
       });
 
       const contourCount =
