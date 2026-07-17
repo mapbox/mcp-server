@@ -3,6 +3,7 @@
 ### Documentation
 
 - **CONTRIBUTING**: Clarify that unsolicited PRs adding third-party directory/discovery listings (e.g. README badges, `beacon.json`-style manifests) are out of scope and will be closed without review (#225).
+- **directions_tool**: Strengthen the tool and `geometries` parameter descriptions to make clear that the attached map preview UI can only draw a route when `geometries="geojson"` is requested, and to guide the model toward requesting it whenever the user expects a visual/map response.
 
 ## 0.12.6 - 2026-07-13
 

@@ -30,9 +30,13 @@ export class DirectionsTool extends MapboxApiBasedTool<
   name = 'directions_tool';
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
-    'For route planning and distance calculations, use geometries="none" to get compact responses. ' +
-    'Only request full geometry (geometries="geojson") when you need to visualize the route on a map ' +
-    'or provide detailed turn-by-turn navigation instructions.';
+    'This tool always attaches an interactive map preview UI to its result, but the map can only draw ' +
+    'the route if geometries="geojson" was requested — with the default geometries="none" the map has ' +
+    'no route data and will show an error. ' +
+    'Use geometries="none" (default) only for pure text/data answers (distance, duration, turn-by-turn ' +
+    'instructions) where the user does not need to see the route. ' +
+    'Use geometries="geojson" whenever the user asks to see, view, show, draw, preview, or visualize the ' +
+    'route on a map, or whenever any visual/map output is expected — even if not explicitly requested.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
