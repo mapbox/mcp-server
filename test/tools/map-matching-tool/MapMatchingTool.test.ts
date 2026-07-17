@@ -10,6 +10,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { MapMatchingTool } from '../../../src/tools/map-matching-tool/MapMatchingTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 const sampleMapMatchingResponse = {
   code: 'Ok',
@@ -283,13 +284,18 @@ describe('MapMatchingTool', () => {
       json: async () => fakeResp
     });
 
-    const result = await new MapMatchingTool({ httpRequest }).run({
-      coordinates: [
-        { longitude: -122.4194, latitude: 37.7749 },
-        { longitude: -122.4195, latitude: 37.775 }
-      ],
-      profile: 'driving'
-    });
+    const token = tokenFor('account-test-map-matching');
+    const result = await new MapMatchingTool({ httpRequest }).run(
+      {
+        coordinates: [
+          { longitude: -122.4194, latitude: 37.7749 },
+          { longitude: -122.4195, latitude: 37.775 }
+        ],
+        profile: 'driving'
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
@@ -297,7 +303,10 @@ describe('MapMatchingTool', () => {
 
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-map-matching'
+    );
     expect(payload?.layers?.map((l) => l.id)).toEqual([
       'raw-trace',
       'matched-route'

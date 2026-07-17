@@ -12,6 +12,7 @@ import {
 } from './GroundLocationTool.output.schema.js';
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
 
@@ -384,7 +385,10 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     };
     let textOut = this.formatOutput(output, strategy);
     if (mapPayload) {
-      const ref = storeMapPayload(mapPayload);
+      const ref = storeMapPayload(
+        mapPayload,
+        getUserNameFromToken(accessToken)
+      );
       sc.mapboxRender = { ref };
       textOut += renderHint(ref);
     }

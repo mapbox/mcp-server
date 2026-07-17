@@ -10,6 +10,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { IsochroneTool } from '../../../src/tools/isochrone-tool/IsochroneTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('IsochroneTool', () => {
   afterEach(() => {
@@ -168,13 +169,18 @@ describe('IsochroneTool', () => {
       json: async () => isochrone
     });
 
-    const result = await new IsochroneTool({ httpRequest }).run({
-      coordinates: { longitude: -74.006, latitude: 40.7128 },
-      profile: 'mapbox/driving',
-      contours_minutes: [10],
-      polygons: true,
-      generalize: 1000
-    });
+    const token = tokenFor('account-test-isochrone');
+    const result = await new IsochroneTool({ httpRequest }).run(
+      {
+        coordinates: { longitude: -74.006, latitude: 40.7128 },
+        profile: 'mapbox/driving',
+        contours_minutes: [10],
+        polygons: true,
+        generalize: 1000
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
 
@@ -187,7 +193,10 @@ describe('IsochroneTool', () => {
 
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-isochrone'
+    );
     // One fill + one line per polygon contour, plus origin marker.
     expect(payload?.layers?.map((l) => l.type)).toEqual(['fill', 'line']);
     expect(payload?.markers).toHaveLength(1);

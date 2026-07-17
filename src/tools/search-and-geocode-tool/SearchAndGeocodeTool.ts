@@ -16,6 +16,7 @@ import type {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { buildSearchMapPayload } from './buildSearchMapPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -270,7 +271,8 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
               isError: false
             },
             singleResult,
-            input
+            input,
+            accessToken
           );
         } else if (result.action === 'decline') {
           // User declined to select - return all results as before
@@ -301,7 +303,8 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
         isError: false
       },
       data,
-      input
+      input,
+      accessToken
     );
   }
 
@@ -312,7 +315,8 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
   private withMapPayload(
     base: CallToolResult,
     data: unknown,
-    input: z.infer<typeof SearchAndGeocodeInputSchema>
+    input: z.infer<typeof SearchAndGeocodeInputSchema>,
+    accessToken: string
   ): CallToolResult {
     const proximity =
       input.proximity &&
@@ -326,7 +330,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     });
     if (!payload) return base;
 
-    const ref = storeMapPayload(payload);
+    const ref = storeMapPayload(payload, getUserNameFromToken(accessToken));
     const sc = {
       ...((base.structuredContent ?? {}) as Record<string, unknown>),
       mapboxRender: { ref }

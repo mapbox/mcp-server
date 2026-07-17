@@ -3,6 +3,7 @@
 
 import { intersect, polygon, featureCollection } from '@turf/turf';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { IntersectInputSchema } from './IntersectTool.input.schema.js';
@@ -13,6 +14,7 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { buildPolygonOpsMapPayload } from '../union-tool/buildPolygonOpsMapPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 export class IntersectTool extends BaseTool<
   typeof IntersectInputSchema,
@@ -42,7 +44,14 @@ export class IntersectTool extends BaseTool<
     });
   }
 
-  async run(rawInput: unknown): Promise<CallToolResult> {
+  async run(
+    rawInput: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    extra?: RequestHandlerExtra<any, any>
+  ): Promise<CallToolResult> {
+    const accessToken =
+      extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
+    const owner = accessToken ? getUserNameFromToken(accessToken) : undefined;
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(
       trace.setSpan(context.active(), toolContext.span),
@@ -86,7 +95,7 @@ export class IntersectTool extends BaseTool<
           };
           let textOut = text;
           if (mapPayload) {
-            const ref = storeMapPayload(mapPayload);
+            const ref = storeMapPayload(mapPayload, owner);
             sc.mapboxRender = { ref };
             textOut += renderHint(ref);
           }

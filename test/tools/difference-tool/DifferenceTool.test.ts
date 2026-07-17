@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { DifferenceTool } from '../../../src/tools/difference-tool/DifferenceTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('DifferenceTool', () => {
   const tool = new DifferenceTool();
@@ -179,26 +180,31 @@ describe('DifferenceTool', () => {
   });
 
   it('stores a mapboxRender payload with input fills + difference result', async () => {
-    const result = await tool.run({
-      polygon1: [
-        [
-          [0, 0],
-          [4, 0],
-          [4, 4],
-          [0, 4],
-          [0, 0]
+    const token = tokenFor('account-test-difference');
+    const result = await tool.run(
+      {
+        polygon1: [
+          [
+            [0, 0],
+            [4, 0],
+            [4, 4],
+            [0, 4],
+            [0, 0]
+          ]
+        ],
+        polygon2: [
+          [
+            [1, 1],
+            [3, 1],
+            [3, 3],
+            [1, 3],
+            [1, 1]
+          ]
         ]
-      ],
-      polygon2: [
-        [
-          [1, 1],
-          [3, 1],
-          [3, 3],
-          [1, 3],
-          [1, 1]
-        ]
-      ]
-    });
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
@@ -206,7 +212,10 @@ describe('DifferenceTool', () => {
 
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-difference'
+    );
     expect(payload?.legend?.[1]?.label).toBe('difference result');
   });
 });

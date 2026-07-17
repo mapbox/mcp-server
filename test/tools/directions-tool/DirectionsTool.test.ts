@@ -11,6 +11,7 @@ import {
 import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
 import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
@@ -1109,15 +1110,20 @@ describe('DirectionsTool', () => {
           }) as Response
       );
 
+      const token = tokenFor('account-test-directions');
       const result = await new DirectionsTool({
         httpRequest: httpRequestFn
-      }).run({
-        coordinates: [
-          { longitude: -74.0, latitude: 40.7 },
-          { longitude: -74.01, latitude: 40.71 }
-        ],
-        geometries: 'geojson'
-      });
+      }).run(
+        {
+          coordinates: [
+            { longitude: -74.0, latitude: 40.7 },
+            { longitude: -74.01, latitude: 40.71 }
+          ],
+          geometries: 'geojson'
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
 
       expect(result.isError).toBe(false);
       // No inline UI block — content is text-only; rendering is the LLM's
@@ -1134,10 +1140,10 @@ describe('DirectionsTool', () => {
       expect(typeof ref).toBe('string');
       expect(ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
 
-      // Dereferencing the ref returns the original payload.
+      // Dereferencing the ref (as the same account) returns the original payload.
       const { resolveMapPayloadRef } =
         await import('../../../src/utils/storeMapPayload.js');
-      const payload = resolveMapPayloadRef(ref!);
+      const payload = resolveMapPayloadRef(ref!, 'account-test-directions');
       expect(payload?.layers?.[0]?.id).toBe('route');
       expect(payload?.layers?.[0]?.type).toBe('line');
       expect(payload?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
@@ -1151,14 +1157,6 @@ describe('DirectionsTool — temporary resource ownership', () => {
     vi.restoreAllMocks();
     temporaryResourceManager.clear();
   });
-
-  // Build a Mapbox-style JWT whose payload carries the username (`u`).
-  function tokenFor(username: string): string {
-    const payload = Buffer.from(JSON.stringify({ u: username })).toString(
-      'base64'
-    );
-    return `pk.${payload}.sig`;
-  }
 
   it('stores the temp resource with owner = the calling account (real token round-trip)', async () => {
     // A geojson response large enough (>50KB) to be stored as a temp resource.

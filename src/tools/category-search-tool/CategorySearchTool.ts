@@ -13,6 +13,7 @@ import type {
 } from '../../schemas/geojson.js';
 import { buildSearchMapPayload } from '../search-and-geocode-tool/buildSearchMapPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -203,7 +204,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     };
     let textOut = baseText;
     if (payload) {
-      const ref = storeMapPayload(payload);
+      const ref = storeMapPayload(payload, getUserNameFromToken(accessToken));
       sc.mapboxRender = { ref };
       // Don't append the human-readable hint when the user requested JSON
       // output — it would break round-trip parsing. Callers that pass

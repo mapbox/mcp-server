@@ -7,6 +7,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { GroundLocationTool } from '../../../src/tools/ground-location-tool/GroundLocationTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 const geocodeResponse = {
   features: [
@@ -275,11 +276,16 @@ describe('GroundLocationTool', () => {
       'isochrone/v1': isochroneResponse
     });
 
-    const result = await tool.run({
-      longitude: -122.419,
-      latitude: 37.759,
-      query: 'coffee'
-    });
+    const token = tokenFor('account-test-ground-location');
+    const result = await tool.run(
+      {
+        longitude: -122.419,
+        latitude: 37.759,
+        query: 'coffee'
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
@@ -287,7 +293,10 @@ describe('GroundLocationTool', () => {
 
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-ground-location'
+    );
     // First marker is the grounded origin; subsequent are numbered POIs.
     expect(payload?.markers?.[0]?.style).toBe('pin');
     expect(payload?.markers?.[0]?.popup).toBe('Mission District');

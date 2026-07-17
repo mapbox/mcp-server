@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { UnionTool } from '../../../src/tools/union-tool/UnionTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('UnionTool', () => {
   const tool = new UnionTool();
@@ -163,28 +164,33 @@ describe('UnionTool', () => {
   });
 
   it('stores a mapboxRender payload with input fills + result fill', async () => {
-    const result = await tool.run({
-      polygons: [
-        [
+    const token = tokenFor('account-test-union');
+    const result = await tool.run(
+      {
+        polygons: [
           [
-            [0, 0],
-            [2, 0],
-            [2, 2],
-            [0, 2],
-            [0, 0]
-          ]
-        ],
-        [
+            [
+              [0, 0],
+              [2, 0],
+              [2, 2],
+              [0, 2],
+              [0, 0]
+            ]
+          ],
           [
-            [1, 1],
-            [3, 1],
-            [3, 3],
-            [1, 3],
-            [1, 1]
+            [
+              [1, 1],
+              [3, 1],
+              [3, 3],
+              [1, 3],
+              [1, 1]
+            ]
           ]
         ]
-      ]
-    });
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
@@ -192,7 +198,10 @@ describe('UnionTool', () => {
 
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-union'
+    );
     // 2 inputs × (fill + line) + result (fill + line) = 6 layers
     expect(payload?.layers).toHaveLength(6);
     expect(payload?.legend?.[1]?.label).toBe('union result');

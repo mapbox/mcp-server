@@ -19,6 +19,7 @@ import {
   type MapAppPayload
 } from '../../utils/mapAppPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 /**
  * OptimizationTool - Find optimal route through multiple coordinates (V1 API)
@@ -175,7 +176,10 @@ export class OptimizationTool extends MapboxApiBasedTool<
       };
       let textOut = text;
       if (mapPayload) {
-        const ref = storeMapPayload(mapPayload);
+        const ref = storeMapPayload(
+          mapPayload,
+          getUserNameFromToken(accessToken)
+        );
         sc.mapboxRender = { ref };
         textOut += renderHint(ref);
       }

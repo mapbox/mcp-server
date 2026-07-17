@@ -6,6 +6,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { RenderMapTool } from '../../../src/tools/render-map-tool/RenderMapTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('RenderMapTool', () => {
   afterEach(() => {
@@ -19,31 +20,36 @@ describe('RenderMapTool', () => {
 
   it('echoes layer + marker counts in the result', async () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const result = await tool.run({
-      summary: 'Test trip',
-      layers: [
-        {
-          id: 'route',
-          type: 'line',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: [
-                [-77, 38],
-                [-76, 39]
-              ]
+    const token = tokenFor('account-test-render-map');
+    const result = await tool.run(
+      {
+        summary: 'Test trip',
+        layers: [
+          {
+            id: 'route',
+            type: 'line',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-77, 38],
+                  [-76, 39]
+                ]
+              },
+              properties: {}
             },
-            properties: {}
-          },
-          paint: { 'line-color': '#3b82f6', 'line-width': 5 }
-        }
-      ],
-      markers: [
-        { coordinates: [-77, 38], style: 'start' },
-        { coordinates: [-76, 39], style: 'end' }
-      ]
-    });
+            paint: { 'line-color': '#3b82f6', 'line-width': 5 }
+          }
+        ],
+        markers: [
+          { coordinates: [-77, 38], style: 'start' },
+          { coordinates: [-76, 39], style: 'end' }
+        ]
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as {
@@ -61,7 +67,10 @@ describe('RenderMapTool', () => {
     expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const stored = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const stored = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-render-map'
+    );
     expect(stored?.layers).toHaveLength(1);
     expect(stored?.markers).toHaveLength(2);
   });
@@ -91,29 +100,38 @@ describe('RenderMapTool', () => {
   it('resolves a payload_ref into a renderable payload', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const ref = storeMapPayload({
-      summary: 'Cached route',
-      layers: [
-        {
-          id: 'route',
-          type: 'line',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: [
-                [-77, 38],
-                [-76, 39]
-              ]
-            },
-            properties: {}
+    const owner = 'account-test-render-map-ref';
+    const ref = storeMapPayload(
+      {
+        summary: 'Cached route',
+        layers: [
+          {
+            id: 'route',
+            type: 'line',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-77, 38],
+                  [-76, 39]
+                ]
+              },
+              properties: {}
+            }
           }
-        }
-      ]
-    });
+        ]
+      },
+      owner
+    );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const result = await tool.run({ payload_refs: [ref] });
+    const token = tokenFor(owner);
+    const result = await tool.run(
+      { payload_refs: [ref] },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as {
       layer_count: number;
@@ -126,59 +144,71 @@ describe('RenderMapTool', () => {
   it('merges multiple payload_refs into a single map', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const a = storeMapPayload({
-      summary: 'Iso A',
-      layers: [
-        {
-          id: 'a',
-          type: 'fill',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [
-                [
-                  [-77, 38],
-                  [-76, 38],
-                  [-76, 39],
-                  [-77, 39],
-                  [-77, 38]
+    const owner = 'account-test-render-map-merge';
+    const a = storeMapPayload(
+      {
+        summary: 'Iso A',
+        layers: [
+          {
+            id: 'a',
+            type: 'fill',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  [
+                    [-77, 38],
+                    [-76, 38],
+                    [-76, 39],
+                    [-77, 39],
+                    [-77, 38]
+                  ]
                 ]
-              ]
-            },
-            properties: {}
+              },
+              properties: {}
+            }
           }
-        }
-      ]
-    });
-    const b = storeMapPayload({
-      summary: 'Iso B',
-      layers: [
-        {
-          id: 'a', // colliding id → should be renamed during merge
-          type: 'fill',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [
-                [
-                  [-78, 38],
-                  [-77, 38],
-                  [-77, 39],
-                  [-78, 39],
-                  [-78, 38]
+        ]
+      },
+      owner
+    );
+    const b = storeMapPayload(
+      {
+        summary: 'Iso B',
+        layers: [
+          {
+            id: 'a', // colliding id → should be renamed during merge
+            type: 'fill',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  [
+                    [-78, 38],
+                    [-77, 38],
+                    [-77, 39],
+                    [-78, 39],
+                    [-78, 38]
+                  ]
                 ]
-              ]
-            },
-            properties: {}
+              },
+              properties: {}
+            }
           }
-        }
-      ]
-    });
+        ]
+      },
+      owner
+    );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const result = await tool.run({ payload_refs: [a, b] });
+    const token = tokenFor(owner);
+    const result = await tool.run(
+      { payload_refs: [a, b] },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as {
       layer_count: number;

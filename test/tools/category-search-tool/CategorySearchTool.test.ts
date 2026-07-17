@@ -10,6 +10,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { CategorySearchTool } from '../../../src/tools/category-search-tool/CategorySearchTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('CategorySearchTool', () => {
   afterEach(() => {
@@ -461,10 +462,15 @@ describe('CategorySearchTool', () => {
       ok: true,
       json: async () => fakeResp
     });
-    const result = await new CategorySearchTool({ httpRequest }).run({
-      category: 'cafe',
-      proximity: { longitude: -122.42, latitude: 37.78 }
-    });
+    const token = tokenFor('account-test-category-search');
+    const result = await new CategorySearchTool({ httpRequest }).run(
+      {
+        category: 'cafe',
+        proximity: { longitude: -122.42, latitude: 37.78 }
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
@@ -472,7 +478,10 @@ describe('CategorySearchTool', () => {
 
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-category-search'
+    );
     // Search-center pin + 1 numbered marker
     expect(payload?.markers?.[0]?.style).toBe('pin');
     expect(payload?.markers?.[1]?.style).toBe('numbered');

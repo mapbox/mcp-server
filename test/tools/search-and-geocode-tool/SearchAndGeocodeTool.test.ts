@@ -9,6 +9,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { SearchAndGeocodeTool } from '../../../src/tools/search-and-geocode-tool/SearchAndGeocodeTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('SearchAndGeocodeTool', () => {
   afterEach(() => {
@@ -649,10 +650,15 @@ describe('SearchAndGeocodeTool', () => {
         ok: true,
         json: async () => fakeResp
       });
-      const result = await new SearchAndGeocodeTool({ httpRequest }).run({
-        q: 'coffee',
-        proximity: { longitude: -122.4194, latitude: 37.7749 }
-      });
+      const token = tokenFor('account-test-search-and-geocode');
+      const result = await new SearchAndGeocodeTool({ httpRequest }).run(
+        {
+          q: 'coffee',
+          proximity: { longitude: -122.4194, latitude: 37.7749 }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
 
       expect(result.isError).toBe(false);
       const sc = result.structuredContent as {
@@ -666,7 +672,10 @@ describe('SearchAndGeocodeTool', () => {
 
       const { resolveMapPayloadRef } =
         await import('../../../src/utils/storeMapPayload.js');
-      const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+      const payload = resolveMapPayloadRef(
+        sc.mapboxRender!.ref!,
+        'account-test-search-and-geocode'
+      );
       // First marker is the search-center pin; rest are numbered POIs.
       expect(payload?.markers?.[0]?.style).toBe('pin');
       expect(payload?.markers?.slice(1).map((m) => m.style)).toEqual([

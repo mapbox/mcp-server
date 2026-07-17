@@ -342,7 +342,10 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
       // LLM doesn't hallucinate the URI.
       let largeText = summaryText;
       if (mapPayloadFull) {
-        const ref = storeMapPayload(mapPayloadFull);
+        const ref = storeMapPayload(
+          mapPayloadFull,
+          getUserNameFromToken(accessToken)
+        );
         summaryStructuredContent.mapboxRender = { ref };
         largeText += renderHint(ref);
       }
@@ -359,7 +362,9 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
     // can pass to `render_map_tool` to display the route on a live Mapbox
     // GL JS map (avoids re-emitting the full polyline through the model).
     const mapPayload = mapPayloadFull;
-    const smallRef = mapPayload ? storeMapPayload(mapPayload) : null;
+    const smallRef = mapPayload
+      ? storeMapPayload(mapPayload, getUserNameFromToken(accessToken))
+      : null;
     return {
       content: [
         {

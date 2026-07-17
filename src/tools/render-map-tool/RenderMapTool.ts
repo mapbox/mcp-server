@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -16,6 +17,7 @@ import {
   mergeMapPayloads,
   storeMapPayload
 } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 import type { HttpRequest } from '../../utils/types.js';
 
 /**
@@ -85,7 +87,14 @@ export class RenderMapTool extends BaseTool<
       (() => process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/');
   }
 
-  async run(rawInput: unknown): Promise<CallToolResult> {
+  async run(
+    rawInput: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    extra?: RequestHandlerExtra<any, any>
+  ): Promise<CallToolResult> {
+    const accessToken =
+      extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
+    const owner = accessToken ? getUserNameFromToken(accessToken) : undefined;
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(
       trace.setSpan(context.active(), toolContext.span),
@@ -93,7 +102,7 @@ export class RenderMapTool extends BaseTool<
         try {
           const input = RenderMapInputSchema.parse(rawInput);
 
-          const payload = this.assemblePayload(input);
+          const payload = this.assemblePayload(input, owner);
 
           if (!payload) {
             return {
@@ -124,7 +133,7 @@ export class RenderMapTool extends BaseTool<
           // no inline rawHtml (Claude Desktop already opens the iframe
           // via meta.ui.resourceUri, so the rawHtml duplicate just bloats
           // the response and trips the host's "too large" trim).
-          const mergedRef = storeMapPayload(payload);
+          const mergedRef = storeMapPayload(payload, owner);
 
           const content: CallToolResult['content'] = [
             { type: 'text' as const, text },
@@ -175,11 +184,14 @@ export class RenderMapTool extends BaseTool<
    * Inline `summary` (when set) overrides any summary from the refs.
    * Returns null if nothing renderable is provided.
    */
-  private assemblePayload(input: RenderMapInput): MapAppPayload | null {
+  private assemblePayload(
+    input: RenderMapInput,
+    owner: string | undefined
+  ): MapAppPayload | null {
     const fromRefs: MapAppPayload[] = [];
     if (Array.isArray(input.payload_refs)) {
       for (const ref of input.payload_refs) {
-        const resolved = resolveMapPayloadRef(ref);
+        const resolved = resolveMapPayloadRef(ref, owner);
         if (resolved) fromRefs.push(resolved);
       }
     }

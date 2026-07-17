@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { IntersectTool } from '../../../src/tools/intersect-tool/IntersectTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('IntersectTool', () => {
   const tool = new IntersectTool();
@@ -179,26 +180,31 @@ describe('IntersectTool', () => {
   });
 
   it('stores a mapboxRender payload with input fills + intersection result', async () => {
-    const result = await tool.run({
-      polygon1: [
-        [
-          [0, 0],
-          [2, 0],
-          [2, 2],
-          [0, 2],
-          [0, 0]
+    const token = tokenFor('account-test-intersect');
+    const result = await tool.run(
+      {
+        polygon1: [
+          [
+            [0, 0],
+            [2, 0],
+            [2, 2],
+            [0, 2],
+            [0, 0]
+          ]
+        ],
+        polygon2: [
+          [
+            [1, 1],
+            [3, 1],
+            [3, 3],
+            [1, 3],
+            [1, 1]
+          ]
         ]
-      ],
-      polygon2: [
-        [
-          [1, 1],
-          [3, 1],
-          [3, 3],
-          [1, 3],
-          [1, 1]
-        ]
-      ]
-    });
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
@@ -206,7 +212,10 @@ describe('IntersectTool', () => {
 
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(sc.mapboxRender!.ref!);
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-intersect'
+    );
     expect(payload?.legend?.[1]?.label).toBe('intersect result');
   });
 });

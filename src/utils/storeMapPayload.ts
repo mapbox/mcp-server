@@ -36,8 +36,18 @@ const TEMP_URI_PREFIX = 'mapbox://temp/map-payload-';
  * 20–30 seconds per render and risks Anthropic API timeouts on big
  * payloads (e.g. polygon-op chains). Passing a ref instead keeps the LLM's
  * emission down to a few tokens.
+ *
+ * `owner` must be the same account identifier (`getUserNameFromToken`) the
+ * caller resolves for its own token — `TemporaryDataResource.read()` fails
+ * closed on an unowned resource, so omitting this makes the ref permanently
+ * unreadable via the real `resources/read` path the render iframe uses (it
+ * always 404s), even though callers that read the manager directly (like
+ * `resolveMapPayloadRef`) wouldn't notice anything wrong.
  */
-export function storeMapPayload(payload: MapAppPayload): string {
+export function storeMapPayload(
+  payload: MapAppPayload,
+  owner?: string
+): string {
   const id = randomUUID();
   const uri = `${TEMP_URI_PREFIX}${id}`;
   // 30-minute TTL is the temporaryResourceManager default — same as the
@@ -47,6 +57,7 @@ export function storeMapPayload(payload: MapAppPayload): string {
     id,
     uri,
     data: payload,
+    owner,
     metadata: { toolName: 'map-payload' }
   });
   return uri;
@@ -68,12 +79,21 @@ export function renderHint(ref: string): string {
 
 /**
  * Resolve a `mapbox://temp/map-payload-...` ref back to its `MapAppPayload`.
- * Returns null if the ref is unknown or expired.
+ * Returns null if the ref is unknown, expired, or owned by a different
+ * account than `owner` — this is the same account-scoping enforced by
+ * `TemporaryDataResource.read()` (a caller passing another account's ref
+ * would otherwise have it silently merged and re-served under their own
+ * ref, bypassing the read-side check entirely since this goes straight to
+ * the manager rather than through `resources/read`).
  */
-export function resolveMapPayloadRef(ref: string): MapAppPayload | null {
+export function resolveMapPayloadRef(
+  ref: string,
+  owner: string | undefined
+): MapAppPayload | null {
   if (!ref.startsWith(TEMP_URI_PREFIX)) return null;
   const entry = temporaryResourceManager.get(ref);
   if (!entry || !entry.data) return null;
+  if (!entry.owner || !owner || entry.owner !== owner) return null;
   return entry.data as MapAppPayload;
 }
 

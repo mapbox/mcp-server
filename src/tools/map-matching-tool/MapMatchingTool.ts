@@ -16,6 +16,7 @@ import {
   type MapAppPayload
 } from '../../utils/mapAppPayload.js';
 import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
@@ -140,7 +141,10 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     };
     let textOut = JSON.stringify(validatedData, null, 2);
     if (mapPayload) {
-      const ref = storeMapPayload(mapPayload);
+      const ref = storeMapPayload(
+        mapPayload,
+        getUserNameFromToken(accessToken)
+      );
       sc.mapboxRender = { ref };
       textOut += renderHint(ref);
     }
