@@ -1,14 +1,13 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { URLSearchParams } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { cleanResponseData } from './cleanResponseData.js';
-import { formatIsoDateTime } from '../../utils/dateUtils.js';
+import { buildDirectionsRequestUrl } from './buildDirectionsRequestUrl.js';
 import { DirectionsInputSchema } from './DirectionsTool.input.schema.js';
 import {
   DirectionsResponseSchema,
@@ -30,13 +29,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
   name = 'directions_tool';
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
-    'This tool always attaches an interactive map preview UI to its result, but the map can only draw ' +
-    'the route if geometries="geojson" was requested — with the default geometries="none" the map has ' +
-    'no route data and will show an error. ' +
-    'Use geometries="none" (default) only for pure text/data answers (distance, duration, turn-by-turn ' +
-    'instructions) where the user does not need to see the route. ' +
-    'Use geometries="geojson" whenever the user asks to see, view, show, draw, preview, or visualize the ' +
-    'route on a map, or whenever any visual/map output is expected — even if not explicitly requested.';
+    'This tool always attaches an interactive map preview UI to its result; the map fetches and ' +
+    'renders its own route independently, so it works regardless of the geometries parameter. ' +
+    'Use geometries="none" (default) for compact text/data responses (distance, duration, ' +
+    'turn-by-turn instructions). Use geometries="geojson" only when you need the raw route ' +
+    'coordinates in the response yourself.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
@@ -195,71 +192,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
       };
     }
 
-    const joined = input.coordinates
-      .map(({ longitude, latitude }) => `${longitude},${latitude}`)
-      .join(';');
-    const encodedCoords = encodeURIComponent(joined);
-
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    queryParams.append('access_token', accessToken);
-    // Only add geometries parameter if not 'none'
-    if (input.geometries !== 'none') {
-      queryParams.append('geometries', input.geometries);
-    }
-    queryParams.append('alternatives', input.alternatives.toString());
-
-    // Add annotations parameter
-    if (input.routing_profile === 'mapbox/driving-traffic') {
-      // congestion is available only when driving
-      queryParams.append('annotations', 'distance,congestion,speed');
-    } else {
-      queryParams.append('annotations', 'distance,speed');
-    }
-    // For annotations to work, overview must be set to 'full'
-    queryParams.append('overview', 'full');
-
-    // Add depart_at or arrive_by parameter if provided, converting format if needed
-    if (input.depart_at) {
-      const formattedDateTime = formatIsoDateTime(input.depart_at);
-      queryParams.append('depart_at', formattedDateTime);
-    } else if (input.arrive_by) {
-      const formattedDateTime = formatIsoDateTime(input.arrive_by);
-      queryParams.append('arrive_by', formattedDateTime);
-    }
-
-    // Add vehicle dimension parameters if provided
-    if (input.max_height !== undefined) {
-      queryParams.append('max_height', input.max_height.toString());
-    }
-
-    if (input.max_width !== undefined) {
-      queryParams.append('max_width', input.max_width.toString());
-    }
-
-    if (input.max_weight !== undefined) {
-      queryParams.append('max_weight', input.max_weight.toString());
-    }
-
-    queryParams.append('steps', 'true');
-    let queryString = queryParams.toString();
-
-    // Add exclude parameter if provided (ensuring proper encoding of special characters)
-    if (input.exclude) {
-      // Custom encoding function to match the expected format in tests
-      const customEncodeForExclude = (str: string) => {
-        return str
-          .replace(/,/g, '%2C') // Encode comma
-          .replace(/\(/g, '%28') // Encode opening parenthesis
-          .replace(/\)/g, '%29') // Encode closing parenthesis
-          .replace(/ /g, '%20'); // Encode space as %20, not +
-      };
-
-      const excludeEncoded = customEncodeForExclude(input.exclude);
-      queryString += `&exclude=${excludeEncoded}`;
-    }
-
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions/v5/${input.routing_profile}/${encodedCoords}?${queryString}`;
+    const url = buildDirectionsRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
     const response = await this.httpRequest(url);
 
@@ -290,6 +227,25 @@ export class DirectionsTool extends MapboxApiBasedTool<
         `DirectionsTool: Response validation failed: ${error}`
       );
       validatedData = cleanedData as DirectionsResponse;
+    }
+
+    let uiResourceBlock: CallToolResult['content'][number] | undefined;
+    if (isMcpUiEnabled()) {
+      const inlineHtml = await tryRenderInlineUiHtml(
+        input,
+        accessToken,
+        this.httpRequest
+      );
+      if (inlineHtml) {
+        uiResourceBlock = createUIResource({
+          uri: `ui://mapbox/directions/${randomUUID()}`,
+          content: { type: 'rawHtml', htmlString: inlineHtml },
+          encoding: 'text',
+          uiMetadata: {
+            'preferred-frame-size': ['100%', '500px']
+          }
+        });
+      }
     }
 
     // Check response size and conditionally create temporary resource
@@ -346,8 +302,13 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
         }))
       };
 
+      const content: CallToolResult['content'] = [
+        { type: 'text', text: summaryText }
+      ];
+      if (uiResourceBlock) content.push(uiResourceBlock);
+
       return {
-        content: [{ type: 'text', text: summaryText }],
+        content,
         structuredContent: summaryStructuredContent,
         isError: false
       };
@@ -357,29 +318,7 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
     const content: CallToolResult['content'] = [
       { type: 'text', text: responseText }
     ];
-
-    // Legacy MCP-UI: inline a rawHtml UIResource so non-MCP-Apps clients
-    // also get a live GL JS map. Only works when the response actually
-    // carries a renderable GeoJSON geometry — i.e. geometries=geojson.
-    if (isMcpUiEnabled()) {
-      const inlineHtml = await tryRenderInlineUiHtml(
-        validatedData,
-        accessToken,
-        this.httpRequest
-      );
-      if (inlineHtml) {
-        content.push(
-          createUIResource({
-            uri: `ui://mapbox/directions/${randomUUID()}`,
-            content: { type: 'rawHtml', htmlString: inlineHtml },
-            encoding: 'text',
-            uiMetadata: {
-              'preferred-frame-size': ['100%', '500px']
-            }
-          })
-        );
-      }
-    }
+    if (uiResourceBlock) content.push(uiResourceBlock);
 
     return {
       content,
@@ -390,31 +329,18 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
 }
 
 /**
- * Try to render the same DirectionsAppHtml as the MCP Apps resource, but
- * with the route geometry baked in so MCP-UI clients (which don't fetch
- * external resources) can render inline. Returns undefined when the
- * response has no GeoJSON geometry to render or no public token can be
- * resolved — the caller falls back to text-only output.
+ * Render the same DirectionsAppHtml as the MCP Apps resource, but with the
+ * call's input parameters baked in so the iframe can self-fetch the route
+ * from the Directions API — MCP-UI clients don't fetch external resources,
+ * so this is what makes the map work for them too. Attached unconditionally;
+ * the only failure mode is no public token being resolvable, in which case
+ * the caller falls back to text-only output.
  */
 async function tryRenderInlineUiHtml(
-  data: DirectionsResponse,
+  input: z.infer<typeof DirectionsInputSchema>,
   accessToken: string,
   httpRequest: HttpRequest
 ): Promise<string | undefined> {
-  const route = data.routes?.[0];
-  const geometry = route?.geometry;
-  // Accept either a GeoJSON LineString object or a polyline string — the
-  // iframe normalizes both shapes before rendering.
-  const hasGeojson =
-    geometry &&
-    typeof geometry === 'object' &&
-    (geometry as { type?: string }).type === 'LineString' &&
-    Array.isArray((geometry as { coordinates?: unknown }).coordinates);
-  const hasPolyline = typeof geometry === 'string' && geometry.length > 0;
-  if (!hasGeojson && !hasPolyline) {
-    return undefined;
-  }
-
   const publicToken = await resolveMapboxPublicToken({
     accessToken,
     apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
@@ -422,25 +348,21 @@ async function tryRenderInlineUiHtml(
   });
   if (!publicToken) return undefined;
 
-  const summaryParts: string[] = [];
-  if (typeof route?.distance === 'number') {
-    summaryParts.push(`${(route.distance / 1609.34).toFixed(1)} mi`);
-  }
-  if (typeof route?.duration === 'number') {
-    summaryParts.push(`${Math.round(route.duration / 60)} min`);
-  }
-  const summary = summaryParts.length
-    ? `Route: ${summaryParts.join(', ')}`
-    : 'Route';
-
   return renderDirectionsAppHtml({
     publicToken,
+    apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
     initialData: {
-      geometry: geometry as unknown as {
-        type: string;
-        coordinates: [number, number][];
-      },
-      summary
+      params: {
+        coordinates: input.coordinates,
+        routing_profile: input.routing_profile,
+        alternatives: input.alternatives,
+        exclude: input.exclude,
+        depart_at: input.depart_at,
+        arrive_by: input.arrive_by,
+        max_height: input.max_height,
+        max_width: input.max_width,
+        max_weight: input.max_weight
+      }
     }
   });
 }

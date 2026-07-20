@@ -1075,17 +1075,23 @@ describe('DirectionsTool', () => {
       );
     });
 
-    it('adds an inline MCP-UI rawHtml resource for small geojson responses', async () => {
-      const fakeResponse = {
+    async function runWithTokens(
+      geometries?: 'geojson' | 'none',
+      responseOverride?: Record<string, unknown>
+    ) {
+      const fakeResponse = responseOverride ?? {
         routes: [
           {
-            geometry: {
-              type: 'LineString',
-              coordinates: [
-                [-74.0, 40.7],
-                [-74.01, 40.71]
-              ]
-            },
+            geometry:
+              geometries === 'geojson'
+                ? {
+                    type: 'LineString',
+                    coordinates: [
+                      [-74.0, 40.7],
+                      [-74.01, 40.71]
+                    ]
+                  }
+                : undefined,
             distance: 1500,
             duration: 180,
             legs: []
@@ -1098,11 +1104,7 @@ describe('DirectionsTool', () => {
         code: 'Ok'
       };
       const tokensListResponse = [
-        {
-          usage: 'pk',
-          default: true,
-          token: 'pk.fake-public-token'
-        }
+        { usage: 'pk', default: true, token: 'pk.fake-public-token' }
       ];
 
       const httpRequestFn = vi.fn(async (url: string) => {
@@ -1132,31 +1134,82 @@ describe('DirectionsTool', () => {
       process.env.MAPBOX_ACCESS_TOKEN = `sk.${payload}.signature`;
 
       try {
-        const result = await new DirectionsTool({
+        return await new DirectionsTool({
           httpRequest: httpRequestFn
         }).run({
           coordinates: [
             { longitude: -74.0, latitude: 40.7 },
             { longitude: -74.01, latitude: 40.71 }
           ],
-          geometries: 'geojson'
+          ...(geometries ? { geometries } : {})
         });
-
-        expect(result.isError).toBe(false);
-        // Expect at least the response text + the MCP-UI resource block
-        expect(result.content.length).toBeGreaterThanOrEqual(2);
-        const uiBlock = result.content.find(
-          (c) => (c as { type?: string }).type === 'resource'
-        ) as { resource?: { text?: string; mimeType?: string } } | undefined;
-        expect(uiBlock).toBeDefined();
-        expect(uiBlock?.resource?.text).toContain('mapbox-gl.js');
-        expect(uiBlock?.resource?.text).toContain('pk.fake-public-token');
-        // Initial-data block should carry the baked-in geometry
-        expect(uiBlock?.resource?.text).toContain('initial-data');
-        expect(uiBlock?.resource?.text).toContain('LineString');
       } finally {
         process.env.MAPBOX_ACCESS_TOKEN = realToken;
       }
+    }
+
+    it('adds an inline MCP-UI rawHtml resource baked with the call input, not response geometry', async () => {
+      const result = await runWithTokens('geojson');
+
+      expect(result.isError).toBe(false);
+      expect(result.content.length).toBeGreaterThanOrEqual(2);
+      const uiBlock = result.content.find(
+        (c) => (c as { type?: string }).type === 'resource'
+      ) as { resource?: { text?: string; mimeType?: string } } | undefined;
+      expect(uiBlock).toBeDefined();
+      expect(uiBlock?.resource?.text).toContain('mapbox-gl.js');
+      expect(uiBlock?.resource?.text).toContain('pk.fake-public-token');
+      // Initial-data block should carry the call's input params, not geometry.
+      expect(uiBlock?.resource?.text).toContain('"params"');
+      expect(uiBlock?.resource?.text).toContain('"longitude":-74');
+    });
+
+    it('still attaches the inline UI resource when geometries="none" (map self-fetches)', async () => {
+      const result = await runWithTokens('none');
+
+      expect(result.isError).toBe(false);
+      const uiBlock = result.content.find(
+        (c) => (c as { type?: string }).type === 'resource'
+      ) as { resource?: { text?: string } } | undefined;
+      expect(uiBlock).toBeDefined();
+      expect(uiBlock?.resource?.text).toContain('"params"');
+    });
+
+    it('still attaches the inline UI resource when the response is large enough to trigger the temp-resource/summary path', async () => {
+      // A geojson response large enough (>50KB) to be stored as a temp resource.
+      const bigGeometry = {
+        type: 'LineString',
+        coordinates: Array.from({ length: 4000 }, (_, i) => [
+          i * 0.001,
+          i * 0.001
+        ])
+      };
+      const largeResponse = {
+        routes: [{ distance: 1500, duration: 180, geometry: bigGeometry }],
+        waypoints: [
+          { location: [-74.0, 40.7], name: '' },
+          { location: [-74.01, 40.71], name: '' }
+        ],
+        code: 'Ok'
+      };
+
+      const result = await runWithTokens('geojson', largeResponse);
+
+      expect(result.isError).toBe(false);
+
+      // Confirm we actually exercised the large-response summary path...
+      const textBlock = result.content.find(
+        (c) => (c as { type?: string }).type === 'text'
+      ) as { text?: string } | undefined;
+      expect(textBlock?.text).toContain('exceeds context limit');
+      expect(textBlock?.text).toMatch(/mapbox:\/\/temp\//);
+
+      // ...and that the inline UI resource is still attached alongside it.
+      const uiBlock = result.content.find(
+        (c) => (c as { type?: string }).type === 'resource'
+      ) as { resource?: { text?: string } } | undefined;
+      expect(uiBlock).toBeDefined();
+      expect(uiBlock?.resource?.text).toContain('"params"');
     });
   });
 });

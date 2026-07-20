@@ -65,6 +65,9 @@ describe('DirectionsAppUIResource', () => {
       'pk.eyJ1IjoidGVzdHVzZXIifQ.fake-public-token'
     );
     expect(entry.text as string).toContain('mapbox-gl.js');
+    expect(entry.text as string).toContain(
+      'var API_ENDPOINT = "https://api.mapbox.com/";'
+    );
 
     const meta = (entry as { _meta?: unknown })._meta as
       | { ui?: { csp?: { workerDomains?: string[] } } }

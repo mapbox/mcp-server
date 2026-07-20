@@ -14,26 +14,39 @@
  *
  * 2. **Legacy MCP-UI spec** — `directions_tool` inlines a `rawHtml`
  *    UIResource into its content array (gated by `isMcpUiEnabled()`). The
- *    HTML is generated at tool-execute time with the route geometry already
- *    baked in as an `initialData` script block, so the iframe renders
- *    immediately without needing the host to deliver the tool result.
+ *    HTML is generated at tool-execute time with the call's input params
+ *    baked in as an `initialData` script block; the iframe uses those params
+ *    to self-fetch the route from the Directions API, so it never depends on
+ *    the host delivering the tool result.
  *
  * One source of truth for the rendering logic; two slim entry conditions.
  */
 
 export const MAPBOX_GL_VERSION = '3.12.0';
 
+export interface DirectionsAppInitialParams {
+  coordinates: { longitude: number; latitude: number }[];
+  routing_profile?: string;
+  alternatives?: boolean;
+  exclude?: string;
+  depart_at?: string;
+  arrive_by?: string;
+  max_height?: number;
+  max_width?: number;
+  max_weight?: number;
+}
+
 export interface DirectionsAppInitialData {
-  geometry: { type: string; coordinates: [number, number][] };
-  summary?: string;
+  params: DirectionsAppInitialParams;
 }
 
 export function renderDirectionsAppHtml(params: {
   publicToken: string;
+  apiEndpoint: string;
   glVersion?: string;
   initialData?: DirectionsAppInitialData;
 }): string {
-  const { publicToken, initialData } = params;
+  const { publicToken, apiEndpoint, initialData } = params;
   const glVersion = params.glVersion ?? MAPBOX_GL_VERSION;
 
   const initialDataScript = initialData
@@ -84,6 +97,7 @@ ${initialDataScript}
 <script>
 (function() {
   var TOKEN = ${JSON.stringify(publicToken)};
+  var API_ENDPOINT = ${JSON.stringify(apiEndpoint)};
 
   var loadingEl = document.getElementById('loading');
   var errorEl = document.getElementById('error');
@@ -96,6 +110,117 @@ ${initialDataScript}
   // Track markers across re-renders so we can remove them before drawing the
   // next route — otherwise a second tool-result delivery stacks pins.
   var routeMarkers = [];
+  var routeRendered = false;
+  var selfFetchStarted = false;
+
+  // -------------------------------------------------------------------------
+  // Self-fetch: build a Directions API request directly from the tool call's
+  // input parameters and fetch the route ourselves, so this map never
+  // depends on the tool response carrying geometries="geojson".
+  //
+  // Mirrors src/tools/directions-tool/buildDirectionsRequestUrl.ts — kept in
+  // sync by the parity test in
+  // test/tools/directions-tool/directionsUrlParity.test.ts. Always forces
+  // geometries=geojson regardless of what the tool call itself requested.
+  // -------------------------------------------------------------------------
+  function formatIsoDateTimeClient(dateTime) {
+    var noTzWithSeconds = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$/;
+    if (noTzWithSeconds.test(dateTime)) {
+      return dateTime.substring(0, dateTime.lastIndexOf(':'));
+    }
+    return dateTime;
+  }
+
+  function encodeExcludeClient(value) {
+    return value
+      .replace(/,/g, '%2C')
+      .replace(/\\(/g, '%28')
+      .replace(/\\)/g, '%29')
+      .replace(/ /g, '%20');
+  }
+
+  function buildDirectionsApiUrl(params, publicToken, apiEndpoint) {
+    var coords = params.coordinates
+      .map(function(c) { return c.longitude + ',' + c.latitude; })
+      .join(';');
+    var encodedCoords = encodeURIComponent(coords);
+    var profile = params.routing_profile || 'mapbox/driving-traffic';
+
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    qp.append('geometries', 'geojson');
+    qp.append('alternatives', params.alternatives ? 'true' : 'false');
+    qp.append(
+      'annotations',
+      profile === 'mapbox/driving-traffic'
+        ? 'distance,congestion,speed'
+        : 'distance,speed'
+    );
+    qp.append('overview', 'full');
+
+    if (params.depart_at) {
+      qp.append('depart_at', formatIsoDateTimeClient(params.depart_at));
+    } else if (params.arrive_by) {
+      qp.append('arrive_by', formatIsoDateTimeClient(params.arrive_by));
+    }
+    if (params.max_height !== undefined && params.max_height !== null) {
+      qp.append('max_height', String(params.max_height));
+    }
+    if (params.max_width !== undefined && params.max_width !== null) {
+      qp.append('max_width', String(params.max_width));
+    }
+    if (params.max_weight !== undefined && params.max_weight !== null) {
+      qp.append('max_weight', String(params.max_weight));
+    }
+    qp.append('steps', 'true');
+
+    var queryString = qp.toString();
+    if (params.exclude) {
+      queryString += '&exclude=' + encodeExcludeClient(params.exclude);
+    }
+
+    return apiEndpoint + 'directions/v5/' + profile + '/' + encodedCoords + '?' + queryString;
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildDirectionsApiUrl = buildDirectionsApiUrl;
+
+  function fetchRouteFromDirectionsApi(params) {
+    if (!TOKEN || !params || !params.coordinates) return;
+    selfFetchStarted = true;
+    var url = buildDirectionsApiUrl(params, TOKEN, API_ENDPOINT);
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function() { return null; })
+            .then(function(body) {
+              var msg =
+                body && body.message
+                  ? body.message
+                  : 'Directions API error (' + res.status + ')';
+              throw new Error(msg);
+            });
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        if (routeRendered) return;
+        var route = data && data.routes && data.routes[0];
+        var picked = route ? pickRouteGeometry(route) : null;
+        if (picked) {
+          renderRoute(picked);
+        } else {
+          showError('Directions API returned no route.');
+        }
+      })
+      .catch(function(err) {
+        if (routeRendered) return;
+        showError(
+          'Could not fetch route: ' + (err && err.message ? err.message : err)
+        );
+      });
+  }
 
   // -------------------------------------------------------------------------
   // MCP App postMessage protocol (skipped silently in MCP-UI rawHtml mode)
@@ -128,6 +253,9 @@ ${initialDataScript}
       if (message.error) handlers.reject(new Error(message.error.message));
       else handlers.resolve(message.result);
       return;
+    }
+    if (message.method === 'ui/notifications/tool-input' && message.params) {
+      fetchRouteFromDirectionsApi(message.params.arguments);
     }
     if (message.method === 'ui/notifications/tool-result' && message.params) {
       handleToolResult(message.params);
@@ -192,29 +320,22 @@ ${initialDataScript}
   initMap();
 
   // -------------------------------------------------------------------------
-  // Initial data path (MCP-UI rawHtml): geometry was baked in server-side.
-  // Accepts the same geometry shapes as extractRoute (GeoJSON or polyline).
+  // Initial data path (MCP-UI rawHtml): the tool call's input params were
+  // baked in server-side. Self-fetch the route from the Directions API
+  // rather than relying on baked-in geometry from the tool response.
   // -------------------------------------------------------------------------
   function consumeInitialData() {
     var el = document.getElementById('initial-data');
     if (!el || !el.textContent) return;
     try {
       var data = JSON.parse(el.textContent);
-      if (!data || !data.geometry) return;
-      // Reuse pickRouteGeometry by wrapping the baked-in payload as a route.
-      var route = pickRouteGeometry({
-        geometry: data.geometry,
-        distance: data.distance,
-        duration: data.duration
-      });
-      if (route) {
-        if (data.summary) route.summary = data.summary;
-        drawRoute(route);
-      }
+      if (!data || !data.params) return;
+      fetchRouteFromDirectionsApi(data.params);
     } catch (_) { /* ignore */ }
   }
 
   function handleToolResult(result) {
+    if (routeRendered) return;
     var route = extractRoute(result);
     if (route) {
       renderRoute(route);
@@ -230,6 +351,7 @@ ${initialDataScript}
       loadingEl.textContent = 'Fetching full route…';
       sendRequest('resources/read', { uri: tempUri }).then(
         function(rr) {
+          if (routeRendered) return;
           var fetched = readResourceJson(rr);
           var fetchedRoute = fetched ? extractRoute({ structuredContent: fetched }) : null;
           if (fetchedRoute) {
@@ -239,16 +361,23 @@ ${initialDataScript}
           }
         },
         function(err) {
+          if (routeRendered) return;
           showError('Could not read temporary resource: ' + (err && err.message ? err.message : err));
         }
       );
       return;
     }
 
+    // Self-fetch (kicked off by the earlier tool-input notification) is
+    // either still in flight or already reported its own error via its
+    // .catch() handler — either way, this isn't the right error to show.
+    if (selfFetchStarted) return;
+
     showError('Could not find route data in tool result.');
   }
 
   function renderRoute(route) {
+    routeRendered = true;
     if (route.summary) {
       summaryEl.textContent = route.summary;
       summaryEl.style.display = 'block';
@@ -403,6 +532,8 @@ ${initialDataScript}
       errorEl.style.display = 'block';
       return;
     }
+
+    errorEl.style.display = 'none';
 
     if (route.summary && summaryEl.style.display === 'none') {
       summaryEl.textContent = route.summary;
