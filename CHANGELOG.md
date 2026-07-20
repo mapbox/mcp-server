@@ -3,6 +3,7 @@
 ### Fixed
 
 - **directions_tool**: The map preview UI (both the MCP Apps resource and the legacy MCP-UI inline UI) now fetches its own route directly from the Directions API using the tool call's input parameters, instead of depending on the tool response carrying `geometries="geojson"`. Previously, the map showed an error whenever the default `geometries="none"` was used because no route data was returned to draw. The map now works regardless of the `geometries` value, so text/data responses can stay compact by default without ever breaking the preview.
+- **directions_tool map preview**: Replaced the one-shot render latch with per-call render cycles, so a host that reuses the same iframe across sequential `directions_tool` calls gets the new route instead of the first one forever, and hardened the iframe's postMessage handling — messages are only accepted from the embedding host (sender pinning), and untrusted input that gets interpolated into the Directions request URL (`coordinates`, `routing_profile`, `exclude`) is validated before the self-fetch runs, mirroring the server-side zod guarantees.
 
 ### Documentation
 

@@ -110,8 +110,15 @@ ${initialDataScript}
   // Track markers across re-renders so we can remove them before drawing the
   // next route — otherwise a second tool-result delivery stacks pins.
   var routeMarkers = [];
-  var routeRendered = false;
-  var selfFetchStarted = false;
+  // One render "cycle" per tool call delivered to this iframe. A new
+  // tool-input (or baked initial-data) delivery starts a new cycle by
+  // bumping \`generation\`; async callbacks that captured an older value are
+  // stale and must not touch the UI. This dedupes self-fetch vs tool-result
+  // within one call WITHOUT permanently blocking later calls that reuse
+  // this same iframe instance.
+  var generation = 0;
+  var renderedGeneration = -1; // generation whose route is on screen (-1 = none)
+  var selfFetchGeneration = -1; // generation that started a self-fetch (-1 = none)
 
   // -------------------------------------------------------------------------
   // Self-fetch: build a Directions API request directly from the tool call's
@@ -184,9 +191,42 @@ ${initialDataScript}
   // Exposed so the parity test (Node vm sandbox) can call this in isolation.
   window.__buildDirectionsApiUrl = buildDirectionsApiUrl;
 
+  // Params arrive via postMessage and are untrusted: they get interpolated
+  // into the request URL, so validate the pieces our encoding does not
+  // neutralize. routing_profile is spliced into the URL path unencoded, and
+  // encodeExcludeClient only escapes ',', '(', ')' and spaces — characters
+  // like '&' or '../' path segments would otherwise let a hostile sibling
+  // frame reshape the request. Server-side input is zod-validated before it
+  // reaches buildDirectionsRequestUrl; this mirrors those guarantees for
+  // the client copy.
+  function isSafeDirectionsParams(params) {
+    if (!params || !Array.isArray(params.coordinates)) return false;
+    if (params.coordinates.length < 2) return false;
+    for (var i = 0; i < params.coordinates.length; i++) {
+      var c = params.coordinates[i];
+      if (!c || typeof c.longitude !== 'number' || !isFinite(c.longitude)) return false;
+      if (typeof c.latitude !== 'number' || !isFinite(c.latitude)) return false;
+    }
+    if (params.routing_profile !== undefined && params.routing_profile !== null) {
+      if (typeof params.routing_profile !== 'string') return false;
+      if (!/^mapbox\\/[a-z-]+$/.test(params.routing_profile)) return false;
+    }
+    if (params.exclude !== undefined && params.exclude !== null) {
+      if (typeof params.exclude !== 'string') return false;
+      if (!/^[A-Za-z0-9_,.() -]+$/.test(params.exclude)) return false;
+    }
+    return true;
+  }
+
   function fetchRouteFromDirectionsApi(params) {
-    if (!TOKEN || !params || !params.coordinates) return;
-    selfFetchStarted = true;
+    // Every delivery (tool-input notification or baked initial-data) starts
+    // a new render cycle, even when the guard below prevents the fetch from
+    // actually running — the new call must still invalidate the previous
+    // cycle's in-flight callbacks and error-suppression state.
+    generation++;
+    if (!TOKEN || !isSafeDirectionsParams(params)) return;
+    var gen = generation; // captured by the callbacks below
+    selfFetchGeneration = gen; // marked only when the fetch actually proceeds
     var url = buildDirectionsApiUrl(params, TOKEN, API_ENDPOINT);
     fetch(url)
       .then(function(res) {
@@ -205,7 +245,8 @@ ${initialDataScript}
         return res.json();
       })
       .then(function(data) {
-        if (routeRendered) return;
+        if (gen !== generation) return; // stale: a newer call started
+        if (renderedGeneration === gen) return; // cycle already drawn (tool-result won)
         var route = data && data.routes && data.routes[0];
         var picked = route ? pickRouteGeometry(route) : null;
         if (picked) {
@@ -215,7 +256,8 @@ ${initialDataScript}
         }
       })
       .catch(function(err) {
-        if (routeRendered) return;
+        if (gen !== generation) return;
+        if (renderedGeneration === gen) return;
         showError(
           'Could not fetch route: ' + (err && err.message ? err.message : err)
         );
@@ -244,6 +286,14 @@ ${initialDataScript}
   }
 
   window.addEventListener('message', function(event) {
+    // Only the embedding host (parent frame) is a legitimate sender. Any
+    // frame in the page can obtain this window's reference and postMessage
+    // crafted notifications; pinning the source window blocks that while
+    // staying host-agnostic — the host's origin is unknowable at
+    // HTML-generation time, so an origin allowlist isn't possible for a
+    // portable MCP App. (Standalone/top-level, window.parent === window,
+    // so self-posted messages still work for manual testing.)
+    if (event.source !== window.parent) return;
     var message = event.data;
     if (!message || typeof message !== 'object') return;
 
@@ -335,9 +385,17 @@ ${initialDataScript}
   }
 
   function handleToolResult(result) {
-    if (routeRendered) return;
+    // A tool-result that isn't paired with this cycle's self-fetch (no
+    // tool-input was delivered for it — e.g. hosts that only send
+    // tool-result) represents a new tool call, so it starts its own render
+    // cycle. A paired result belongs to the cycle its tool-input opened;
+    // bumping for it would wrongly invalidate the in-flight self-fetch.
+    if (selfFetchGeneration !== generation) generation++;
     var route = extractRoute(result);
     if (route) {
+      // Authoritative geometry: always (re)render — drawRoute removes the
+      // previous route's layers/markers, which is what lets a host reuse
+      // one iframe across sequential directions_tool calls.
       renderRoute(route);
       return;
     }
@@ -348,36 +406,39 @@ ${initialDataScript}
     // MCP Apps host resources/read bridge.
     var tempUri = findTempResourceUri(result);
     if (tempUri) {
+      var gen = generation;
       loadingEl.textContent = 'Fetching full route…';
       sendRequest('resources/read', { uri: tempUri }).then(
         function(rr) {
-          if (routeRendered) return;
+          if (gen !== generation) return; // stale: a newer call started
           var fetched = readResourceJson(rr);
           var fetchedRoute = fetched ? extractRoute({ structuredContent: fetched }) : null;
           if (fetchedRoute) {
             renderRoute(fetchedRoute);
-          } else {
+          } else if (renderedGeneration !== gen) {
             showError('Could not parse route from the temporary resource.');
           }
         },
         function(err) {
-          if (routeRendered) return;
+          if (gen !== generation || renderedGeneration === gen) return;
           showError('Could not read temporary resource: ' + (err && err.message ? err.message : err));
         }
       );
       return;
     }
 
-    // Self-fetch (kicked off by the earlier tool-input notification) is
-    // either still in flight or already reported its own error via its
-    // .catch() handler — either way, this isn't the right error to show.
-    if (selfFetchStarted) return;
+    // No geometry in this result. Suppress the hard error only when this
+    // cycle's self-fetch is handling it (in flight, already rendered, or it
+    // already reported its own error via its .catch() handler). An unpaired
+    // result opened a fresh cycle above, so a route left over from an
+    // earlier call never suppresses this error.
+    if (selfFetchGeneration === generation) return;
 
     showError('Could not find route data in tool result.');
   }
 
   function renderRoute(route) {
-    routeRendered = true;
+    renderedGeneration = generation;
     if (route.summary) {
       summaryEl.textContent = route.summary;
       summaryEl.style.display = 'block';
