@@ -14,7 +14,11 @@ import type { MapAppPayload } from '../../utils/mapAppPayload.js';
  * GL JS call. No tool-specific code lives in this file.
  */
 
-export const MAPBOX_GL_VERSION = '3.12.0';
+// Verified against the current latest stable release (3.26.0, as of this
+// writing) in a real browser: Map/NavigationControl/addSource/addLayer/
+// Marker/Popup/fitBounds/flyTo all work with zero console errors, so there's
+// no reason to stay pinned to an old version.
+export const MAPBOX_GL_VERSION = '3.26.0';
 
 export function renderMapAppHtml(params: {
   publicToken: string;
