@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.12.7-dev - 2026-07-20
+
 ### Fixed
 
 - **directions_tool**: The map preview UI (both the MCP Apps resource and the legacy MCP-UI inline UI) now fetches its own route directly from the Directions API using the tool call's input parameters, instead of depending on the tool response carrying `geometries="geojson"`. Previously, the map showed an error whenever the default `geometries="none"` was used because no route data was returned to draw. The map now works regardless of the `geometries` value, so text/data responses can stay compact by default without ever breaking the preview.
