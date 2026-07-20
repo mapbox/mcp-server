@@ -20,8 +20,9 @@ import { renderDirectionsAppHtml } from './directionsAppHtml.js';
  * event and renders the route from `structuredContent.routes[0]`.
  *
  * The legacy MCP-UI pathway (inline `rawHtml` on the tool result) uses the
- * same HTML template via `renderDirectionsAppHtml` with geometry baked in at
- * tool-execute time.
+ * same HTML template via `renderDirectionsAppHtml` with the call's input
+ * params baked in at tool-execute time; the iframe self-fetches the route
+ * from the Directions API using those params.
  */
 export class DirectionsAppUIResource extends BaseResource {
   readonly name = 'Directions App UI';
@@ -60,7 +61,8 @@ export class DirectionsAppUIResource extends BaseResource {
     });
 
     const html = renderDirectionsAppHtml({
-      publicToken: publicToken ?? ''
+      publicToken: publicToken ?? '',
+      apiEndpoint: this.apiEndpoint()
     });
 
     return {

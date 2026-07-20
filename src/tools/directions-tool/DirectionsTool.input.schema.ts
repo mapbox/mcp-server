@@ -143,8 +143,12 @@ export const DirectionsInputSchema = z.object({
     .default('none')
     .describe(
       'The format of the returned geometry. Options: \n' +
-        '- none (default): no geometry object is returned at all, use this if you do not need all of the intermediate coordinates.\n' +
-        '- geojson: as GeoJSON LineString (might be very long as there could be a lot of points)'
+        '- none (default): no geometry object is returned in the response. The map preview UI ' +
+        'still renders the route on its own; use this whenever you do not need the raw ' +
+        'coordinates yourself.\n' +
+        '- geojson: as GeoJSON LineString (might be very long as there could be a lot of ' +
+        'points). Only needed when you (the caller) require the coordinates directly — not ' +
+        'required for the map preview to work.'
     ),
   max_height: z
     .number()

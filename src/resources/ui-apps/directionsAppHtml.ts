@@ -14,26 +14,39 @@
  *
  * 2. **Legacy MCP-UI spec** — `directions_tool` inlines a `rawHtml`
  *    UIResource into its content array (gated by `isMcpUiEnabled()`). The
- *    HTML is generated at tool-execute time with the route geometry already
- *    baked in as an `initialData` script block, so the iframe renders
- *    immediately without needing the host to deliver the tool result.
+ *    HTML is generated at tool-execute time with the call's input params
+ *    baked in as an `initialData` script block; the iframe uses those params
+ *    to self-fetch the route from the Directions API, so it never depends on
+ *    the host delivering the tool result.
  *
  * One source of truth for the rendering logic; two slim entry conditions.
  */
 
 export const MAPBOX_GL_VERSION = '3.12.0';
 
+export interface DirectionsAppInitialParams {
+  coordinates: { longitude: number; latitude: number }[];
+  routing_profile?: string;
+  alternatives?: boolean;
+  exclude?: string;
+  depart_at?: string;
+  arrive_by?: string;
+  max_height?: number;
+  max_width?: number;
+  max_weight?: number;
+}
+
 export interface DirectionsAppInitialData {
-  geometry: { type: string; coordinates: [number, number][] };
-  summary?: string;
+  params: DirectionsAppInitialParams;
 }
 
 export function renderDirectionsAppHtml(params: {
   publicToken: string;
+  apiEndpoint: string;
   glVersion?: string;
   initialData?: DirectionsAppInitialData;
 }): string {
-  const { publicToken, initialData } = params;
+  const { publicToken, apiEndpoint, initialData } = params;
   const glVersion = params.glVersion ?? MAPBOX_GL_VERSION;
 
   const initialDataScript = initialData
@@ -84,6 +97,7 @@ ${initialDataScript}
 <script>
 (function() {
   var TOKEN = ${JSON.stringify(publicToken)};
+  var API_ENDPOINT = ${JSON.stringify(apiEndpoint)};
 
   var loadingEl = document.getElementById('loading');
   var errorEl = document.getElementById('error');
@@ -96,6 +110,159 @@ ${initialDataScript}
   // Track markers across re-renders so we can remove them before drawing the
   // next route — otherwise a second tool-result delivery stacks pins.
   var routeMarkers = [];
+  // One render "cycle" per tool call delivered to this iframe. A new
+  // tool-input (or baked initial-data) delivery starts a new cycle by
+  // bumping \`generation\`; async callbacks that captured an older value are
+  // stale and must not touch the UI. This dedupes self-fetch vs tool-result
+  // within one call WITHOUT permanently blocking later calls that reuse
+  // this same iframe instance.
+  var generation = 0;
+  var renderedGeneration = -1; // generation whose route is on screen (-1 = none)
+  var selfFetchGeneration = -1; // generation that started a self-fetch (-1 = none)
+
+  // -------------------------------------------------------------------------
+  // Self-fetch: build a Directions API request directly from the tool call's
+  // input parameters and fetch the route ourselves, so this map never
+  // depends on the tool response carrying geometries="geojson".
+  //
+  // Mirrors src/tools/directions-tool/buildDirectionsRequestUrl.ts — kept in
+  // sync by the parity test in
+  // test/tools/directions-tool/directionsUrlParity.test.ts. Always forces
+  // geometries=geojson regardless of what the tool call itself requested.
+  // -------------------------------------------------------------------------
+  function formatIsoDateTimeClient(dateTime) {
+    var noTzWithSeconds = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$/;
+    if (noTzWithSeconds.test(dateTime)) {
+      return dateTime.substring(0, dateTime.lastIndexOf(':'));
+    }
+    return dateTime;
+  }
+
+  function encodeExcludeClient(value) {
+    return value
+      .replace(/,/g, '%2C')
+      .replace(/\\(/g, '%28')
+      .replace(/\\)/g, '%29')
+      .replace(/ /g, '%20');
+  }
+
+  function buildDirectionsApiUrl(params, publicToken, apiEndpoint) {
+    var coords = params.coordinates
+      .map(function(c) { return c.longitude + ',' + c.latitude; })
+      .join(';');
+    var encodedCoords = encodeURIComponent(coords);
+    var profile = params.routing_profile || 'mapbox/driving-traffic';
+
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    qp.append('geometries', 'geojson');
+    qp.append('alternatives', params.alternatives ? 'true' : 'false');
+    qp.append(
+      'annotations',
+      profile === 'mapbox/driving-traffic'
+        ? 'distance,congestion,speed'
+        : 'distance,speed'
+    );
+    qp.append('overview', 'full');
+
+    if (params.depart_at) {
+      qp.append('depart_at', formatIsoDateTimeClient(params.depart_at));
+    } else if (params.arrive_by) {
+      qp.append('arrive_by', formatIsoDateTimeClient(params.arrive_by));
+    }
+    if (params.max_height !== undefined && params.max_height !== null) {
+      qp.append('max_height', String(params.max_height));
+    }
+    if (params.max_width !== undefined && params.max_width !== null) {
+      qp.append('max_width', String(params.max_width));
+    }
+    if (params.max_weight !== undefined && params.max_weight !== null) {
+      qp.append('max_weight', String(params.max_weight));
+    }
+    qp.append('steps', 'true');
+
+    var queryString = qp.toString();
+    if (params.exclude) {
+      queryString += '&exclude=' + encodeExcludeClient(params.exclude);
+    }
+
+    return apiEndpoint + 'directions/v5/' + profile + '/' + encodedCoords + '?' + queryString;
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildDirectionsApiUrl = buildDirectionsApiUrl;
+
+  // Params arrive via postMessage and are untrusted: they get interpolated
+  // into the request URL, so validate the pieces our encoding does not
+  // neutralize. routing_profile is spliced into the URL path unencoded, and
+  // encodeExcludeClient only escapes ',', '(', ')' and spaces — characters
+  // like '&' or '../' path segments would otherwise let a hostile sibling
+  // frame reshape the request. Server-side input is zod-validated before it
+  // reaches buildDirectionsRequestUrl; this mirrors those guarantees for
+  // the client copy.
+  function isSafeDirectionsParams(params) {
+    if (!params || !Array.isArray(params.coordinates)) return false;
+    if (params.coordinates.length < 2) return false;
+    for (var i = 0; i < params.coordinates.length; i++) {
+      var c = params.coordinates[i];
+      if (!c || typeof c.longitude !== 'number' || !isFinite(c.longitude)) return false;
+      if (typeof c.latitude !== 'number' || !isFinite(c.latitude)) return false;
+    }
+    if (params.routing_profile !== undefined && params.routing_profile !== null) {
+      if (typeof params.routing_profile !== 'string') return false;
+      if (!/^mapbox\\/[a-z-]+$/.test(params.routing_profile)) return false;
+    }
+    if (params.exclude !== undefined && params.exclude !== null) {
+      if (typeof params.exclude !== 'string') return false;
+      if (!/^[A-Za-z0-9_,.() -]+$/.test(params.exclude)) return false;
+    }
+    return true;
+  }
+
+  function fetchRouteFromDirectionsApi(params) {
+    // Every delivery (tool-input notification or baked initial-data) starts
+    // a new render cycle, even when the guard below prevents the fetch from
+    // actually running — the new call must still invalidate the previous
+    // cycle's in-flight callbacks and error-suppression state.
+    generation++;
+    if (!TOKEN || !isSafeDirectionsParams(params)) return;
+    var gen = generation; // captured by the callbacks below
+    selfFetchGeneration = gen; // marked only when the fetch actually proceeds
+    var url = buildDirectionsApiUrl(params, TOKEN, API_ENDPOINT);
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function() { return null; })
+            .then(function(body) {
+              var msg =
+                body && body.message
+                  ? body.message
+                  : 'Directions API error (' + res.status + ')';
+              throw new Error(msg);
+            });
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        if (gen !== generation) return; // stale: a newer call started
+        if (renderedGeneration === gen) return; // cycle already drawn (tool-result won)
+        var route = data && data.routes && data.routes[0];
+        var picked = route ? pickRouteGeometry(route) : null;
+        if (picked) {
+          renderRoute(picked);
+        } else {
+          showError('Directions API returned no route.');
+        }
+      })
+      .catch(function(err) {
+        if (gen !== generation) return;
+        if (renderedGeneration === gen) return;
+        showError(
+          'Could not fetch route: ' + (err && err.message ? err.message : err)
+        );
+      });
+  }
 
   // -------------------------------------------------------------------------
   // MCP App postMessage protocol (skipped silently in MCP-UI rawHtml mode)
@@ -119,6 +286,14 @@ ${initialDataScript}
   }
 
   window.addEventListener('message', function(event) {
+    // Only the embedding host (parent frame) is a legitimate sender. Any
+    // frame in the page can obtain this window's reference and postMessage
+    // crafted notifications; pinning the source window blocks that while
+    // staying host-agnostic — the host's origin is unknowable at
+    // HTML-generation time, so an origin allowlist isn't possible for a
+    // portable MCP App. (Standalone/top-level, window.parent === window,
+    // so self-posted messages still work for manual testing.)
+    if (event.source !== window.parent) return;
     var message = event.data;
     if (!message || typeof message !== 'object') return;
 
@@ -128,6 +303,9 @@ ${initialDataScript}
       if (message.error) handlers.reject(new Error(message.error.message));
       else handlers.resolve(message.result);
       return;
+    }
+    if (message.method === 'ui/notifications/tool-input' && message.params) {
+      fetchRouteFromDirectionsApi(message.params.arguments);
     }
     if (message.method === 'ui/notifications/tool-result' && message.params) {
       handleToolResult(message.params);
@@ -192,31 +370,32 @@ ${initialDataScript}
   initMap();
 
   // -------------------------------------------------------------------------
-  // Initial data path (MCP-UI rawHtml): geometry was baked in server-side.
-  // Accepts the same geometry shapes as extractRoute (GeoJSON or polyline).
+  // Initial data path (MCP-UI rawHtml): the tool call's input params were
+  // baked in server-side. Self-fetch the route from the Directions API
+  // rather than relying on baked-in geometry from the tool response.
   // -------------------------------------------------------------------------
   function consumeInitialData() {
     var el = document.getElementById('initial-data');
     if (!el || !el.textContent) return;
     try {
       var data = JSON.parse(el.textContent);
-      if (!data || !data.geometry) return;
-      // Reuse pickRouteGeometry by wrapping the baked-in payload as a route.
-      var route = pickRouteGeometry({
-        geometry: data.geometry,
-        distance: data.distance,
-        duration: data.duration
-      });
-      if (route) {
-        if (data.summary) route.summary = data.summary;
-        drawRoute(route);
-      }
+      if (!data || !data.params) return;
+      fetchRouteFromDirectionsApi(data.params);
     } catch (_) { /* ignore */ }
   }
 
   function handleToolResult(result) {
+    // A tool-result that isn't paired with this cycle's self-fetch (no
+    // tool-input was delivered for it — e.g. hosts that only send
+    // tool-result) represents a new tool call, so it starts its own render
+    // cycle. A paired result belongs to the cycle its tool-input opened;
+    // bumping for it would wrongly invalidate the in-flight self-fetch.
+    if (selfFetchGeneration !== generation) generation++;
     var route = extractRoute(result);
     if (route) {
+      // Authoritative geometry: always (re)render — drawRoute removes the
+      // previous route's layers/markers, which is what lets a host reuse
+      // one iframe across sequential directions_tool calls.
       renderRoute(route);
       return;
     }
@@ -227,28 +406,39 @@ ${initialDataScript}
     // MCP Apps host resources/read bridge.
     var tempUri = findTempResourceUri(result);
     if (tempUri) {
+      var gen = generation;
       loadingEl.textContent = 'Fetching full route…';
       sendRequest('resources/read', { uri: tempUri }).then(
         function(rr) {
+          if (gen !== generation) return; // stale: a newer call started
           var fetched = readResourceJson(rr);
           var fetchedRoute = fetched ? extractRoute({ structuredContent: fetched }) : null;
           if (fetchedRoute) {
             renderRoute(fetchedRoute);
-          } else {
+          } else if (renderedGeneration !== gen) {
             showError('Could not parse route from the temporary resource.');
           }
         },
         function(err) {
+          if (gen !== generation || renderedGeneration === gen) return;
           showError('Could not read temporary resource: ' + (err && err.message ? err.message : err));
         }
       );
       return;
     }
 
+    // No geometry in this result. Suppress the hard error only when this
+    // cycle's self-fetch is handling it (in flight, already rendered, or it
+    // already reported its own error via its .catch() handler). An unpaired
+    // result opened a fresh cycle above, so a route left over from an
+    // earlier call never suppresses this error.
+    if (selfFetchGeneration === generation) return;
+
     showError('Could not find route data in tool result.');
   }
 
   function renderRoute(route) {
+    renderedGeneration = generation;
     if (route.summary) {
       summaryEl.textContent = route.summary;
       summaryEl.style.display = 'block';
@@ -403,6 +593,8 @@ ${initialDataScript}
       errorEl.style.display = 'block';
       return;
     }
+
+    errorEl.style.display = 'none';
 
     if (route.summary && summaryEl.style.display === 'none') {
       summaryEl.textContent = route.summary;
