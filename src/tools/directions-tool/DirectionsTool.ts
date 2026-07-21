@@ -1,13 +1,12 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { URLSearchParams } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { cleanResponseData } from './cleanResponseData.js';
-import { formatIsoDateTime } from '../../utils/dateUtils.js';
+import { buildDirectionsRequestUrl } from './buildDirectionsRequestUrl.js';
 import { DirectionsInputSchema } from './DirectionsTool.input.schema.js';
 import {
   DirectionsResponseSchema,
@@ -31,9 +30,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
   name = 'directions_tool';
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
-    'For route planning and distance calculations, use geometries="none" to get compact responses. ' +
-    'Only request full geometry (geometries="geojson") when you need to visualize the route on a map ' +
-    'or provide detailed turn-by-turn navigation instructions.';
+    'Returns a `mapboxRender.ref` in structuredContent regardless of the geometries value - pass ' +
+    'it to render_map_tool to display the route on a live Mapbox GL JS map. ' +
+    'Use geometries="none" (default) for compact text/data responses (distance, duration, ' +
+    'turn-by-turn instructions). Use geometries="geojson" only when you need the raw route ' +
+    'coordinates in the response yourself - the map preview works either way.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
@@ -182,71 +183,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
       };
     }
 
-    const joined = input.coordinates
-      .map(({ longitude, latitude }) => `${longitude},${latitude}`)
-      .join(';');
-    const encodedCoords = encodeURIComponent(joined);
-
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    queryParams.append('access_token', accessToken);
-    // Only add geometries parameter if not 'none'
-    if (input.geometries !== 'none') {
-      queryParams.append('geometries', input.geometries);
-    }
-    queryParams.append('alternatives', input.alternatives.toString());
-
-    // Add annotations parameter
-    if (input.routing_profile === 'mapbox/driving-traffic') {
-      // congestion is available only when driving
-      queryParams.append('annotations', 'distance,congestion,speed');
-    } else {
-      queryParams.append('annotations', 'distance,speed');
-    }
-    // For annotations to work, overview must be set to 'full'
-    queryParams.append('overview', 'full');
-
-    // Add depart_at or arrive_by parameter if provided, converting format if needed
-    if (input.depart_at) {
-      const formattedDateTime = formatIsoDateTime(input.depart_at);
-      queryParams.append('depart_at', formattedDateTime);
-    } else if (input.arrive_by) {
-      const formattedDateTime = formatIsoDateTime(input.arrive_by);
-      queryParams.append('arrive_by', formattedDateTime);
-    }
-
-    // Add vehicle dimension parameters if provided
-    if (input.max_height !== undefined) {
-      queryParams.append('max_height', input.max_height.toString());
-    }
-
-    if (input.max_width !== undefined) {
-      queryParams.append('max_width', input.max_width.toString());
-    }
-
-    if (input.max_weight !== undefined) {
-      queryParams.append('max_weight', input.max_weight.toString());
-    }
-
-    queryParams.append('steps', 'true');
-    let queryString = queryParams.toString();
-
-    // Add exclude parameter if provided (ensuring proper encoding of special characters)
-    if (input.exclude) {
-      // Custom encoding function to match the expected format in tests
-      const customEncodeForExclude = (str: string) => {
-        return str
-          .replace(/,/g, '%2C') // Encode comma
-          .replace(/\(/g, '%28') // Encode opening parenthesis
-          .replace(/\)/g, '%29') // Encode closing parenthesis
-          .replace(/ /g, '%20'); // Encode space as %20, not +
-      };
-
-      const excludeEncoded = customEncodeForExclude(input.exclude);
-      queryString += `&exclude=${excludeEncoded}`;
-    }
-
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}directions/v5/${input.routing_profile}/${encodedCoords}?${queryString}`;
+    const url = buildDirectionsRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
     const response = await this.httpRequest(url);
 
@@ -286,7 +227,19 @@ export class DirectionsTool extends MapboxApiBasedTool<
 
     // Build the map-app payload from the full geometry before we conditionally
     // strip it for the large-response path — the iframe needs the route line.
-    const mapPayloadFull = buildDirectionsMapPayload(validatedData);
+    // The tool's own response may have geometries="none" (the default, to
+    // keep route coordinates out of the model's context) - when so, fetch a
+    // second, map-only response with geometry forced on, so the map preview
+    // never depends on what the caller itself requested.
+    const mapPayloadFull = buildDirectionsMapPayload(
+      input.geometries === 'geojson'
+        ? validatedData
+        : await fetchDirectionsGeometryForMap(
+            input,
+            accessToken,
+            this.httpRequest
+          )
+    );
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
       // Create temporary resource for large response
@@ -381,18 +334,45 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
 }
 
 /**
+ * Fetch a map-only Directions response with geometry forced on, for callers
+ * whose own `input.geometries` isn't already `'geojson'` — so the map
+ * preview never depends on what geometry format the caller itself
+ * requested. Returns null on any fetch/parse failure (the map payload
+ * builder treats that the same as "no route to draw").
+ */
+async function fetchDirectionsGeometryForMap(
+  input: z.infer<typeof DirectionsInputSchema>,
+  accessToken: string,
+  httpRequest: HttpRequest
+): Promise<DirectionsResponse | null> {
+  const url = buildDirectionsRequestUrl({
+    input,
+    accessToken,
+    apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+    geometriesOverride: 'geojson'
+  });
+  const response = await httpRequest(url);
+  if (!response.ok) return null;
+  try {
+    return (await response.json()) as DirectionsResponse;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Build a generic `MapAppPayload` from a Directions API response:
  *   - one `line` layer for the route
  *   - start/end markers (badge style)
  *   - summary chip with miles + minutes
  *
- * Returns null when the response has no renderable geometry (e.g.
- * `geometries=none` was requested or the polyline failed to decode).
+ * Returns null when the response has no renderable geometry (e.g. the
+ * polyline failed to decode) or no response was provided at all.
  */
 function buildDirectionsMapPayload(
-  data: DirectionsResponse
+  data: DirectionsResponse | null
 ): MapAppPayload | null {
-  const route = data.routes?.[0];
+  const route = data?.routes?.[0];
   if (!route) return null;
 
   // Normalize geometry to GeoJSON LineString — handles both

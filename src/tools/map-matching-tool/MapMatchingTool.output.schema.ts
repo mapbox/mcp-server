@@ -47,14 +47,15 @@ const MatchingSchema = z.object({
 });
 
 // Main output schema. `mapboxRender` is declared so strict client-side validators
-// don't flag the response as malformed.
+// don't flag the response as malformed. `matchings`/`tracepoints` are optional
+// since the API omits both for a `code: "NoMatch"` response (see MapMatchingTool.ts).
 import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
 
 export const MapMatchingOutputSchema = z
   .object({
     code: z.string(),
-    matchings: z.array(MatchingSchema),
-    tracepoints: z.array(TracepointSchema.nullable()),
+    matchings: z.array(MatchingSchema).optional(),
+    tracepoints: z.array(TracepointSchema.nullable()).optional(),
     mapboxRender: MapAppRefSchema.optional()
   })
   .passthrough();

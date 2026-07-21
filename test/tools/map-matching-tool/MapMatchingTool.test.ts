@@ -229,6 +229,55 @@ describe('MapMatchingTool', () => {
     expect(callUrl).toContain('/matching/v5/mapbox/cycling/');
   });
 
+  it('returns a graceful error when the API cannot match the trace', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => ({ code: 'NoMatch' })
+    });
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4783, latitude: 37.8199 }
+      ],
+      profile: 'walking'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('NoMatch')
+    });
+  });
+
+  it('returns a graceful error when the API responds Ok but with a schema-invalid payload', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => ({
+        code: 'Ok',
+        // confidence must be between 0 and 1 - this violates MapMatchingOutputSchema
+        matchings: [{ confidence: 5, distance: 100, duration: 10 }],
+        tracepoints: []
+      })
+    });
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      profile: 'driving'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining("didn't match the expected format")
+    });
+  });
+
   it('uses geojson geometries by default', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => sampleMapMatchingResponse

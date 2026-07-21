@@ -36,7 +36,7 @@ describe('DirectionsTool', () => {
       ]
     });
 
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('constructs correct URL with required parameters', async () => {
@@ -53,7 +53,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain('directions/v5/mapbox/driving-traffic');
     expect(calledUrl).toContain('-73.989%2C40.733%3B-73.979%2C40.743');
     expect(calledUrl).toContain('access_token=');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('includes all optional parameters in URL', async () => {
@@ -100,7 +100,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain('alternatives=false');
     expect(calledUrl).toContain('annotations=distance%2Ccongestion%2Cspeed');
     expect(calledUrl).not.toContain('exclude=');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('handles geometries=none', async () => {
@@ -120,7 +120,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain('alternatives=false');
     expect(calledUrl).toContain('annotations=distance%2Ccongestion%2Cspeed');
     expect(calledUrl).not.toContain('exclude=');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('handles exclude parameter with point format', async () => {
@@ -142,7 +142,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain(
       `exclude=toll${comma}point${openPar}-73.95${space}40.75${closePar}`
     );
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('handles fetch errors gracefully', async () => {
@@ -221,7 +221,7 @@ describe('DirectionsTool', () => {
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('-73.989%2C40.733%3B-73.979%2C40.743');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('successfully processes exactly 25 coordinates (maximum allowed)', async () => {
@@ -246,7 +246,7 @@ describe('DirectionsTool', () => {
       expect(calledUrl).toContain(expectedCoord);
     }
 
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   describe('exclude parameter and routing profile validations', () => {
@@ -543,7 +543,10 @@ describe('DirectionsTool', () => {
           isError: true
         });
 
-        const calledUrlTraffic = mockHttpRequest.mock.calls[1][0];
+        // Each tool.run() now makes 2 requests (the tool's own call, plus a
+        // map-only re-fetch for the render_map_tool payload) - the second
+        // run()'s own request is therefore calls[2], not calls[1].
+        const calledUrlTraffic = mockHttpRequest.mock.calls[2][0];
         expect(calledUrlTraffic).toContain('max_height=3.2');
       });
 
@@ -838,7 +841,7 @@ describe('DirectionsTool', () => {
         arrive_by: validDateTime
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
       const calledUrl = mockHttpRequest.mock.calls[0][0] as string;
       expect(calledUrl).toContain(
         `arrive_by=${encodeURIComponent(validDateTime)}`
@@ -914,7 +917,7 @@ describe('DirectionsTool', () => {
         arrive_by: '2025-06-05T10:30:00Z'
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
       mockHttpRequest.mockClear();
 
       // Test with timezone offset format
@@ -927,7 +930,7 @@ describe('DirectionsTool', () => {
         arrive_by: '2025-06-05T10:30:00+02:00'
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
       mockHttpRequest.mockClear();
 
       // Test with simple time format (no seconds, no timezone)
@@ -940,7 +943,7 @@ describe('DirectionsTool', () => {
         arrive_by: '2025-06-05T10:30'
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
     });
 
     it('rejects invalid formats for arrive_by', async () => {
@@ -1076,8 +1079,14 @@ describe('DirectionsTool', () => {
       ).toBeUndefined();
     });
 
-    it('attaches mapboxRender payload to structuredContent for small geojson responses', async () => {
-      const fakeResponse = {
+    // Mock returns geometry only when the requested URL actually asks for
+    // geojson - mirrors the real Directions API, and is what lets us verify
+    // fetchDirectionsGeometryForMap's separate re-fetch (which always
+    // requests geometries=geojson) independently of the tool's own request.
+    function mockHttpRequestForGeometry(
+      responseOverride?: Record<string, unknown>
+    ) {
+      const withGeometry = responseOverride ?? {
         routes: [
           {
             geometry: {
@@ -1098,18 +1107,29 @@ describe('DirectionsTool', () => {
         ],
         code: 'Ok'
       };
+      const withoutGeometry = {
+        ...withGeometry,
+        routes: (withGeometry.routes as Array<Record<string, unknown>>).map(
+          (route) => ({ ...route, geometry: undefined })
+        )
+      };
 
-      const httpRequestFn = vi.fn(
-        async () =>
-          ({
-            ok: true,
-            status: 200,
-            statusText: 'OK',
-            json: async () => fakeResponse,
-            text: async () => JSON.stringify(fakeResponse)
-          }) as Response
-      );
+      return vi.fn(async (url: string) => {
+        const response = url.includes('geometries=geojson')
+          ? withGeometry
+          : withoutGeometry;
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => response,
+          text: async () => JSON.stringify(response)
+        } as Response;
+      });
+    }
 
+    it('attaches mapboxRender payload to structuredContent for small geojson responses', async () => {
+      const httpRequestFn = mockHttpRequestForGeometry();
       const token = tokenFor('account-test-directions');
       const result = await new DirectionsTool({
         httpRequest: httpRequestFn
@@ -1148,6 +1168,98 @@ describe('DirectionsTool', () => {
       expect(payload?.layers?.[0]?.type).toBe('line');
       expect(payload?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
       expect(payload?.summary).toMatch(/mi/);
+    });
+
+    it('still attaches a mapboxRender payload when geometries="none" (fetches full geometry separately for the map)', async () => {
+      const httpRequestFn = mockHttpRequestForGeometry();
+      const token = tokenFor('account-test-directions-none');
+      const result = await new DirectionsTool({
+        httpRequest: httpRequestFn
+      }).run(
+        {
+          coordinates: [
+            { longitude: -74.0, latitude: 40.7 },
+            { longitude: -74.01, latitude: 40.71 }
+          ],
+          geometries: 'none'
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
+
+      expect(result.isError).toBe(false);
+      // The tool's own response stays compact - no geometry echoed back.
+      expect(result.content[0]).toMatchObject({ type: 'text' });
+      expect((result.content[0] as { text: string }).text).not.toContain(
+        'LineString'
+      );
+
+      const sc = result.structuredContent as
+        | { mapboxRender?: { ref?: string } }
+        | undefined;
+      const ref = sc?.mapboxRender?.ref;
+      expect(typeof ref).toBe('string');
+
+      const { resolveMapPayloadRef } =
+        await import('../../../src/utils/storeMapPayload.js');
+      const payload = resolveMapPayloadRef(
+        ref!,
+        'account-test-directions-none'
+      );
+      expect(payload?.layers?.[0]?.id).toBe('route');
+      // Fetched via the second, map-only request - confirms two calls were made.
+      expect(httpRequestFn).toHaveBeenCalledTimes(2);
+      expect(httpRequestFn.mock.calls[1][0]).toContain('geometries=geojson');
+    });
+
+    it('still attaches a mapboxRender payload when the response is large enough to trigger the temp-resource/summary path', async () => {
+      // A geojson response large enough (>50KB) to be stored as a temp resource.
+      const bigGeometry = {
+        type: 'LineString',
+        coordinates: Array.from({ length: 4000 }, (_, i) => [
+          i * 0.001,
+          i * 0.001
+        ])
+      };
+      const largeResponse = {
+        routes: [{ distance: 1500, duration: 180, geometry: bigGeometry }],
+        waypoints: [
+          { location: [-74.0, 40.7], name: '' },
+          { location: [-74.01, 40.71], name: '' }
+        ],
+        code: 'Ok'
+      };
+      const httpRequestFn = mockHttpRequestForGeometry(largeResponse);
+      const token = tokenFor('account-test-directions-large');
+
+      const result = await new DirectionsTool({
+        httpRequest: httpRequestFn
+      }).run(
+        {
+          coordinates: [
+            { longitude: -74.0, latitude: 40.7 },
+            { longitude: -74.01, latitude: 40.71 }
+          ],
+          geometries: 'geojson'
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
+
+      expect(result.isError).toBe(false);
+
+      // Confirm we actually exercised the large-response summary path...
+      const textBlock = result.content.find(
+        (c) => (c as { type?: string }).type === 'text'
+      ) as { text?: string } | undefined;
+      expect(textBlock?.text).toContain('exceeds context limit');
+      expect(textBlock?.text).toMatch(/mapbox:\/\/temp\//);
+
+      // ...and that a mapboxRender ref is still attached alongside it.
+      const sc = result.structuredContent as
+        | { mapboxRender?: { ref?: string } }
+        | undefined;
+      expect(sc?.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
     });
   });
 });

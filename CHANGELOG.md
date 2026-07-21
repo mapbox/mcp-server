@@ -28,6 +28,18 @@
 - **Polyline decoding moves tool-side** via `decodePolyline` /
   `decodePolylineWithFallback` so the iframe only ever receives GeoJSON.
 
+### Fixed
+
+- **map_matching_tool**: When the Map Matching API can't match a trace (e.g. `code: "NoMatch"` for distant/unmatchable coordinates), the tool now returns a clear `isError` text result instead of crashing with `MCP error -32602: Output validation error` — the API omits `tracepoints`/`matchings` in this case, which previously violated the tool's output schema and was returned as `structuredContent` anyway, triggering the MCP SDK's output validation. The same schema-violating `structuredContent` could also be returned for a `code: "Ok"` response that otherwise failed schema validation (e.g. a `confidence` out of range); that fallback now also returns a graceful `isError` result instead of the raw invalid payload. `tracepoints` and `matchings` are also now `.optional()` in the output schema as a defensive measure. (AGI-1021)
+- **directions_tool map preview**: `buildDirectionsMapPayload` now always fetches full geometry for the map (via `buildDirectionsRequestUrl`'s `geometriesOverride: 'geojson'`) regardless of the `geometries` the caller requested, porting forward the fix from 0.12.7's per-tool directions UI (which this release's generic `render_map_tool` replaces) — the map preview no longer depends on the tool's own response carrying `geometries="geojson"`.
+
+## 0.12.7 - 2026-07-20
+
+### Fixed
+
+- **directions_tool**: The map preview UI (both the MCP Apps resource and the legacy MCP-UI inline UI) now fetches its own route directly from the Directions API using the tool call's input parameters, instead of depending on the tool response carrying `geometries="geojson"`. Previously, the map showed an error whenever the default `geometries="none"` was used because no route data was returned to draw. The map now works regardless of the `geometries` value, so text/data responses can stay compact by default without ever breaking the preview.
+- **directions_tool map preview**: Replaced the one-shot render latch with per-call render cycles, so a host that reuses the same iframe across sequential `directions_tool` calls gets the new route instead of the first one forever, and hardened the iframe's postMessage handling — messages are only accepted from the embedding host (sender pinning), and untrusted input that gets interpolated into the Directions request URL (`coordinates`, `routing_profile`, `exclude`) is validated before the self-fetch runs, mirroring the server-side zod guarantees.
+
 ### Documentation
 
 - **CONTRIBUTING**: Clarify that unsolicited PRs adding third-party directory/discovery listings (e.g. README badges, `beacon.json`-style manifests) are out of scope and will be closed without review (#225).
