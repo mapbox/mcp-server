@@ -17,6 +17,7 @@
     "generate-version": "node scripts/build-helpers.cjs generate-version",
     "inspect:build": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js",
     "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" npx -y tsx src/index.ts",
+    "dev:http": "npx -y tsx scripts/dev-http-server.ts",
     "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\" --fix",
     "postinstall": "patch-package || (cd ../../.. && node ./node_modules/patch-package/index.js --patch-dir ./node_modules/@mapbox/mcp-server/patches) || true",
