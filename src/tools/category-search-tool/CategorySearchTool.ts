@@ -11,6 +11,9 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
+import { buildSearchMapPayload } from '../search-and-geocode-tool/buildSearchMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -28,7 +31,6 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: CategorySearchInputSchema,
@@ -181,18 +183,41 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       data = rawData as MapboxFeatureCollection;
     }
 
-    if (input.format === 'json_string') {
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
-    } else {
-      return {
-        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
+    const baseText =
+      input.format === 'json_string'
+        ? JSON.stringify(data, null, 2)
+        : this.formatGeoJsonToText(data);
+
+    const proximity =
+      input.proximity &&
+      typeof (input.proximity as { longitude?: number }).longitude === 'number'
+        ? (input.proximity as { longitude: number; latitude: number })
+        : undefined;
+    const payload = buildSearchMapPayload({
+      data,
+      query: input.category,
+      proximity
+    });
+
+    const sc: Record<string, unknown> = {
+      ...(data as unknown as Record<string, unknown>)
+    };
+    let textOut = baseText;
+    if (payload) {
+      const ref = storeMapPayload(payload, getUserNameFromToken(accessToken));
+      sc.mapboxRender = { ref };
+      // Don't append the human-readable hint when the user requested JSON
+      // output — it would break round-trip parsing. Callers that pass
+      // json_string usually already know about render_map_tool.
+      if (input.format !== 'json_string') {
+        textOut += renderHint(ref);
+      }
     }
+
+    return {
+      content: [{ type: 'text', text: textOut }],
+      structuredContent: sc,
+      isError: false
+    };
   }
 }

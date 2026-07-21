@@ -14,6 +14,12 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolExecutionContext } from '../../utils/tracing.js';
 import type { HttpRequest } from '../../utils/types.js';
+import {
+  decodePolylineWithFallback,
+  type MapAppPayload
+} from '../../utils/mapAppPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 /**
  * OptimizationTool - Find optimal route through multiple coordinates (V1 API)
@@ -38,7 +44,6 @@ export class OptimizationTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: OptimizationInputSchema,
@@ -165,9 +170,23 @@ export class OptimizationTool extends MapboxApiBasedTool<
         validatedResult.waypoints.length
       );
 
+      const mapPayload = buildOptimizationMapPayload(validatedResult);
+      const sc: Record<string, unknown> = {
+        ...(validatedResult as unknown as Record<string, unknown>)
+      };
+      let textOut = text;
+      if (mapPayload) {
+        const ref = storeMapPayload(
+          mapPayload,
+          getUserNameFromToken(accessToken)
+        );
+        sc.mapboxRender = { ref };
+        textOut += renderHint(ref);
+      }
+
       return {
-        content: [{ type: 'text' as const, text }],
-        structuredContent: validatedResult,
+        content: [{ type: 'text' as const, text: textOut }],
+        structuredContent: sc,
         isError: false
       };
     } catch (error) {
@@ -186,4 +205,79 @@ export class OptimizationTool extends MapboxApiBasedTool<
       };
     }
   }
+}
+
+/**
+ * Build a `MapAppPayload` from an Optimization API response: a single trip
+ * line plus numbered visit-order markers (start=green, end=red, middle=blue).
+ * Polyline-encoded geometries are decoded tool-side so the iframe only ever
+ * receives GeoJSON.
+ */
+function buildOptimizationMapPayload(
+  result: OptimizationOutput
+): MapAppPayload | null {
+  const trip = result.trips?.[0];
+  if (!trip) return null;
+
+  let coords: [number, number][] | null = null;
+  const g = trip.geometry as unknown;
+  if (
+    g &&
+    typeof g === 'object' &&
+    (g as { type?: string }).type === 'LineString' &&
+    Array.isArray((g as { coordinates?: unknown }).coordinates)
+  ) {
+    coords = (g as { coordinates: [number, number][] }).coordinates;
+  } else if (typeof g === 'string' && g.length > 0) {
+    coords = decodePolylineWithFallback(g);
+  }
+  if (!coords || coords.length === 0) return null;
+
+  // Stops in optimized visit order: sort waypoints by waypoint_index.
+  const ordered = (result.waypoints ?? [])
+    .map((wp, inputIndex) => ({ wp, inputIndex }))
+    .sort((a, b) => a.wp.waypoint_index - b.wp.waypoint_index);
+
+  const markers: MapAppPayload['markers'] = ordered.map((entry, i) => {
+    const isStart = i === 0;
+    const isEnd = i === ordered.length - 1;
+    const label = String(i + 1);
+    const color = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#2563eb';
+    const popupParts = [`Stop ${i + 1} (input #${entry.inputIndex})`];
+    // wp.name is the snapped road name, not a place name — label accordingly.
+    if (entry.wp.name) popupParts.push(`on ${entry.wp.name}`);
+    return {
+      coordinates: entry.wp.location as [number, number],
+      style: 'numbered',
+      label,
+      color,
+      popup: popupParts.join(' — ')
+    };
+  });
+
+  const miles = (trip.distance / 1609.34).toFixed(1);
+  const minutes = Math.round(trip.duration / 60);
+  const summary = `Optimized trip: ${miles} mi, ${minutes} min`;
+
+  return {
+    summary,
+    layers: [
+      {
+        id: 'trip',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: coords },
+          properties: {}
+        },
+        paint: {
+          'line-color': '#3b82f6',
+          'line-width': 5,
+          'line-opacity': 0.85
+        },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      }
+    ],
+    markers
+  };
 }

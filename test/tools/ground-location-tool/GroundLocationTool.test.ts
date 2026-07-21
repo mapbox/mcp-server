@@ -7,6 +7,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { GroundLocationTool } from '../../../src/tools/ground-location-tool/GroundLocationTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 const geocodeResponse = {
   features: [
@@ -266,5 +267,41 @@ describe('GroundLocationTool', () => {
       c[0].includes('category/restaurant')
     );
     expect(categoryCall?.[0]).toContain('limit=15');
+  });
+
+  it('stores a mapboxRender payload with origin pin and POI markers', async () => {
+    const { tool } = setupMockHttp({
+      'geocode/v6/reverse': geocodeResponse,
+      'search/searchbox/v1/category': categoryResponse,
+      'isochrone/v1': isochroneResponse
+    });
+
+    const token = tokenFor('account-test-ground-location');
+    const result = await tool.run(
+      {
+        longitude: -122.419,
+        latitude: 37.759,
+        query: 'coffee'
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-ground-location'
+    );
+    // First marker is the grounded origin; subsequent are numbered POIs.
+    expect(payload?.markers?.[0]?.style).toBe('pin');
+    expect(payload?.markers?.[0]?.popup).toBe('Mission District');
+    expect(payload?.markers?.slice(1).map((m) => m.style)).toEqual([
+      'numbered'
+    ]);
   });
 });

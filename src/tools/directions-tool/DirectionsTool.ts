@@ -1,9 +1,8 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
-import { createUIResource } from '@mcp-ui/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { cleanResponseData } from './cleanResponseData.js';
@@ -15,10 +14,12 @@ import {
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import {
+  decodePolylineWithFallback,
+  type MapAppPayload
+} from '../../utils/mapAppPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 import { getUserNameFromToken } from '../../utils/jwtUtils.js';
-import { isMcpUiEnabled } from '../../config/toolConfig.js';
-import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderDirectionsAppHtml } from '../../resources/ui-apps/directionsAppHtml.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -29,11 +30,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
   name = 'directions_tool';
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
-    'This tool always attaches an interactive map preview UI to its result; the map fetches and ' +
-    'renders its own route independently, so it works regardless of the geometries parameter. ' +
+    'Returns a `mapboxRender.ref` in structuredContent regardless of the geometries value - pass ' +
+    'it to render_map_tool to display the route on a live Mapbox GL JS map. ' +
     'Use geometries="none" (default) for compact text/data responses (distance, duration, ' +
     'turn-by-turn instructions). Use geometries="geojson" only when you need the raw route ' +
-    'coordinates in the response yourself.';
+    'coordinates in the response yourself - the map preview works either way.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
@@ -41,16 +42,6 @@ export class DirectionsTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-  readonly meta = {
-    ui: {
-      resourceUri: 'ui://mapbox/directions-app/index.html',
-      csp: {
-        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
-        resourceDomains: ['https://api.mapbox.com']
-      }
-    }
-  };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: DirectionsInputSchema,
@@ -229,29 +220,26 @@ export class DirectionsTool extends MapboxApiBasedTool<
       validatedData = cleanedData as DirectionsResponse;
     }
 
-    let uiResourceBlock: CallToolResult['content'][number] | undefined;
-    if (isMcpUiEnabled()) {
-      const inlineHtml = await tryRenderInlineUiHtml(
-        input,
-        accessToken,
-        this.httpRequest
-      );
-      if (inlineHtml) {
-        uiResourceBlock = createUIResource({
-          uri: `ui://mapbox/directions/${randomUUID()}`,
-          content: { type: 'rawHtml', htmlString: inlineHtml },
-          encoding: 'text',
-          uiMetadata: {
-            'preferred-frame-size': ['100%', '500px']
-          }
-        });
-      }
-    }
-
     // Check response size and conditionally create temporary resource
     const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
     const responseText = JSON.stringify(validatedData, null, 2);
     const responseSize = responseText.length;
+
+    // Build the map-app payload from the full geometry before we conditionally
+    // strip it for the large-response path — the iframe needs the route line.
+    // The tool's own response may have geometries="none" (the default, to
+    // keep route coordinates out of the model's context) - when so, fetch a
+    // second, map-only response with geometry forced on, so the map preview
+    // never depends on what the caller itself requested.
+    const mapPayloadFull = buildDirectionsMapPayload(
+      input.geometries === 'geojson'
+        ? validatedData
+        : await fetchDirectionsGeometryForMap(
+            input,
+            accessToken,
+            this.httpRequest
+          )
+    );
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
       // Create temporary resource for large response
@@ -282,7 +270,7 @@ Waypoints: ${waypointCount}
 ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull geometry and details stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full details if needed.\nOr ask to read the resource by its URI.` : ''}`;
 
       // Create minimal structured content for validation (without large geometry)
-      const summaryStructuredContent = {
+      const summaryStructuredContent: Record<string, unknown> = {
         ...validatedData,
         routes: validatedData.routes?.map((route) => ({
           distance: route.distance,
@@ -301,68 +289,141 @@ ${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round
           legs: undefined
         }))
       };
-
-      const content: CallToolResult['content'] = [
-        { type: 'text', text: summaryText }
-      ];
-      if (uiResourceBlock) content.push(uiResourceBlock);
+      // Stash the map payload server-side and only return a short ref so
+      // the LLM doesn't have to re-emit thousands of coordinate pairs as
+      // input to render_map_tool. Echo the ref in the visible text so the
+      // LLM doesn't hallucinate the URI.
+      let largeText = summaryText;
+      if (mapPayloadFull) {
+        const ref = storeMapPayload(
+          mapPayloadFull,
+          getUserNameFromToken(accessToken)
+        );
+        summaryStructuredContent.mapboxRender = { ref };
+        largeText += renderHint(ref);
+      }
 
       return {
-        content,
+        content: [{ type: 'text', text: largeText }],
         structuredContent: summaryStructuredContent,
         isError: false
       };
     }
 
-    // Small response - return normally
-    const content: CallToolResult['content'] = [
-      { type: 'text', text: responseText }
-    ];
-    if (uiResourceBlock) content.push(uiResourceBlock);
-
+    // Small response - return normally. The map payload is stored
+    // server-side; structuredContent.mapboxRender carries a short ref the LLM
+    // can pass to `render_map_tool` to display the route on a live Mapbox
+    // GL JS map (avoids re-emitting the full polyline through the model).
+    const mapPayload = mapPayloadFull;
+    const smallRef = mapPayload
+      ? storeMapPayload(mapPayload, getUserNameFromToken(accessToken))
+      : null;
     return {
-      content,
-      structuredContent: validatedData,
+      content: [
+        {
+          type: 'text',
+          text: responseText + (smallRef ? renderHint(smallRef) : '')
+        }
+      ],
+      structuredContent: smallRef
+        ? { ...validatedData, mapboxRender: { ref: smallRef } }
+        : validatedData,
       isError: false
     };
   }
 }
 
 /**
- * Render the same DirectionsAppHtml as the MCP Apps resource, but with the
- * call's input parameters baked in so the iframe can self-fetch the route
- * from the Directions API — MCP-UI clients don't fetch external resources,
- * so this is what makes the map work for them too. Attached unconditionally;
- * the only failure mode is no public token being resolvable, in which case
- * the caller falls back to text-only output.
+ * Fetch a map-only Directions response with geometry forced on, for callers
+ * whose own `input.geometries` isn't already `'geojson'` — so the map
+ * preview never depends on what geometry format the caller itself
+ * requested. Returns null on any fetch/parse failure (the map payload
+ * builder treats that the same as "no route to draw").
  */
-async function tryRenderInlineUiHtml(
+async function fetchDirectionsGeometryForMap(
   input: z.infer<typeof DirectionsInputSchema>,
   accessToken: string,
   httpRequest: HttpRequest
-): Promise<string | undefined> {
-  const publicToken = await resolveMapboxPublicToken({
+): Promise<DirectionsResponse | null> {
+  const url = buildDirectionsRequestUrl({
+    input,
     accessToken,
     apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
-    httpRequest
+    geometriesOverride: 'geojson'
   });
-  if (!publicToken) return undefined;
+  const response = await httpRequest(url);
+  if (!response.ok) return null;
+  try {
+    return (await response.json()) as DirectionsResponse;
+  } catch {
+    return null;
+  }
+}
 
-  return renderDirectionsAppHtml({
-    publicToken,
-    apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
-    initialData: {
-      params: {
-        coordinates: input.coordinates,
-        routing_profile: input.routing_profile,
-        alternatives: input.alternatives,
-        exclude: input.exclude,
-        depart_at: input.depart_at,
-        arrive_by: input.arrive_by,
-        max_height: input.max_height,
-        max_width: input.max_width,
-        max_weight: input.max_weight
+/**
+ * Build a generic `MapAppPayload` from a Directions API response:
+ *   - one `line` layer for the route
+ *   - start/end markers (badge style)
+ *   - summary chip with miles + minutes
+ *
+ * Returns null when the response has no renderable geometry (e.g. the
+ * polyline failed to decode) or no response was provided at all.
+ */
+function buildDirectionsMapPayload(
+  data: DirectionsResponse | null
+): MapAppPayload | null {
+  const route = data?.routes?.[0];
+  if (!route) return null;
+
+  // Normalize geometry to GeoJSON LineString — handles both
+  // geometries=geojson (object) and geometries=polyline/polyline6 (string).
+  let coords: [number, number][] | null = null;
+  const g = route.geometry as unknown;
+  if (
+    g &&
+    typeof g === 'object' &&
+    (g as { type?: string }).type === 'LineString' &&
+    Array.isArray((g as { coordinates?: unknown }).coordinates)
+  ) {
+    coords = (g as { coordinates: [number, number][] }).coordinates;
+  } else if (typeof g === 'string' && g.length > 0) {
+    coords = decodePolylineWithFallback(g);
+  }
+  if (!coords || coords.length === 0) return null;
+
+  const summaryParts: string[] = [];
+  if (typeof route.distance === 'number') {
+    summaryParts.push(`${(route.distance / 1609.34).toFixed(1)} mi`);
+  }
+  if (typeof route.duration === 'number') {
+    summaryParts.push(`${Math.round(route.duration / 60)} min`);
+  }
+  const summary = summaryParts.length
+    ? `Route: ${summaryParts.join(', ')}`
+    : 'Route';
+
+  return {
+    summary,
+    layers: [
+      {
+        id: 'route',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: coords },
+          properties: {}
+        },
+        paint: { 'line-color': '#3b82f6', 'line-width': 5 },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
       }
-    }
-  });
+    ],
+    markers: [
+      { coordinates: coords[0], style: 'start', popup: 'Start' },
+      {
+        coordinates: coords[coords.length - 1],
+        style: 'end',
+        popup: 'End'
+      }
+    ]
+  };
 }

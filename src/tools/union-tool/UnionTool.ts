@@ -3,6 +3,7 @@
 
 import { union, polygon, featureCollection } from '@turf/turf';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { UnionInputSchema } from './UnionTool.input.schema.js';
@@ -11,6 +12,9 @@ import {
   type UnionOutput
 } from './UnionTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { buildPolygonOpsMapPayload } from './buildPolygonOpsMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 export class UnionTool extends BaseTool<
   typeof UnionInputSchema,
@@ -21,7 +25,10 @@ export class UnionTool extends BaseTool<
     'Merge two or more polygons into a single unified geometry. ' +
     'Useful for combining service areas, delivery zones, isochrones, or coverage regions. ' +
     'Returns a Polygon or MultiPolygon if the inputs do not overlap. ' +
-    'Works offline without API calls.';
+    'Works offline without API calls. ' +
+    'INPUT SHAPE: pass `polygons` as an array of polygons. Each polygon is an array of rings; each ring is an array of [lng, lat] pairs. ' +
+    'When chaining with isochrone_tool, extract `feature.geometry.coordinates` from each isochrone Feature — that is already a valid Polygon value. ' +
+    'Skip features whose `geometry.type === "MultiPolygon"` (pass each inner Polygon separately) or whose `geometry.type === "LineString"` (set isochrone_tool `polygons=true` to get Polygon output instead).';
 
   readonly annotations = {
     title: 'Union Polygons',
@@ -30,12 +37,18 @@ export class UnionTool extends BaseTool<
     idempotentHint: true,
     openWorldHint: false
   };
-
   constructor() {
     super({ inputSchema: UnionInputSchema, outputSchema: UnionOutputSchema });
   }
 
-  async run(rawInput: unknown): Promise<CallToolResult> {
+  async run(
+    rawInput: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    extra?: RequestHandlerExtra<any, any>
+  ): Promise<CallToolResult> {
+    const accessToken =
+      extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
+    const owner = accessToken ? getUserNameFromToken(accessToken) : undefined;
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(
       trace.setSpan(context.active(), toolContext.span),
@@ -60,12 +73,28 @@ export class UnionTool extends BaseTool<
             `Result type: ${validated.type}\n` +
             `GeoJSON geometry:\n${JSON.stringify(validated.geometry, null, 2)}`;
 
+          const mapPayload = buildPolygonOpsMapPayload({
+            operation: 'union',
+            inputs: polys as Array<{ type: 'Feature'; geometry: unknown }>,
+            result: merged as { type: 'Feature'; geometry: unknown },
+            summary: `Union of ${input.polygons.length} polygons`
+          });
+          const sc: Record<string, unknown> = {
+            ...(validated as unknown as Record<string, unknown>)
+          };
+          let textOut = text;
+          if (mapPayload) {
+            const ref = storeMapPayload(mapPayload, owner);
+            sc.mapboxRender = { ref };
+            textOut += renderHint(ref);
+          }
+
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
           return {
-            content: [{ type: 'text' as const, text }],
-            structuredContent: validated,
+            content: [{ type: 'text' as const, text: textOut }],
+            structuredContent: sc,
             isError: false
           };
         } catch (error) {

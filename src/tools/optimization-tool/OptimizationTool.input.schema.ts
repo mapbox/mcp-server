@@ -20,65 +20,85 @@ const profileSchema = z
  * The V1 Optimization API finds the optimal (shortest by travel time) route
  * through a set of coordinates, solving the Traveling Salesman Problem.
  */
-export const OptimizationInputSchema = z.object({
-  coordinates: z
-    .array(coordinateSchema)
-    .min(2, 'At least 2 coordinates are required')
-    .max(12, 'Maximum 12 coordinates allowed for V1 API')
-    .describe(
-      'Array of {longitude, latitude} coordinate pairs to optimize a route through. ' +
-        'The V1 API supports 2-12 coordinates and returns the optimal visiting order.'
-    ),
-  profile: profileSchema
-    .optional()
-    .default('mapbox/driving')
-    .describe('Routing profile to use for optimization'),
-  source: z
-    .enum(['any', 'first'])
-    .optional()
-    .default('any')
-    .describe(
-      'Location to start the trip. "any" allows any coordinate, "first" forces the first coordinate as start.'
-    ),
-  destination: z
-    .enum(['any', 'last'])
-    .optional()
-    .default('any')
-    .describe(
-      'Location to end the trip. "any" allows any coordinate, "last" forces the last coordinate as end.'
-    ),
-  roundtrip: z
-    .boolean()
-    .optional()
-    .default(true)
-    .describe(
-      'Whether to return to the starting point. Set to false for one-way trips.'
-    ),
-  geometries: z
-    .enum(['geojson', 'polyline', 'polyline6'])
-    .optional()
-    .default('geojson')
-    .describe('Format for route geometry'),
-  overview: z
-    .enum(['full', 'simplified', 'false'])
-    .optional()
-    .default('simplified')
-    .describe('Detail level of route geometry'),
-  steps: z
-    .boolean()
-    .optional()
-    .default(false)
-    .describe('Whether to include turn-by-turn instructions'),
-  annotations: z
-    .array(z.enum(['duration', 'distance', 'speed']))
-    .optional()
-    .describe('Additional metadata to include for each route segment'),
-  language: z
-    .string()
-    .optional()
-    .describe(
-      'Language for instructions (if steps=true). ISO 639-1 code (e.g., "en", "es").'
-    )
-});
+export const OptimizationInputSchema = z
+  .object({
+    coordinates: z
+      .array(coordinateSchema)
+      .min(2, 'At least 2 coordinates are required')
+      .max(12, 'Maximum 12 coordinates allowed for V1 API')
+      .describe(
+        'Array of {longitude, latitude} coordinate pairs to optimize a route through. ' +
+          'The V1 API supports 2-12 coordinates and returns the optimal visiting order.'
+      ),
+    profile: profileSchema
+      .optional()
+      .default('mapbox/driving')
+      .describe('Routing profile to use for optimization'),
+    source: z
+      .enum(['any', 'first'])
+      .optional()
+      .default('any')
+      .describe(
+        'Location to start the trip. ' +
+          'IMPORTANT: If you set roundtrip=false you MUST set source="first" (and destination="last"). ' +
+          'The Mapbox V1 API rejects roundtrip=false with source="any". ' +
+          '"any" allows the optimizer to pick any coordinate as the start (only valid when roundtrip=true).'
+      ),
+    destination: z
+      .enum(['any', 'last'])
+      .optional()
+      .default('any')
+      .describe(
+        'Location to end the trip. ' +
+          'IMPORTANT: If you set roundtrip=false you MUST set destination="last" (and source="first"). ' +
+          'The Mapbox V1 API rejects roundtrip=false with destination="any". ' +
+          '"any" allows the optimizer to pick any coordinate as the end (only valid when roundtrip=true).'
+      ),
+    roundtrip: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe(
+        'Whether to return to the starting point. ' +
+          'Default true returns a closed loop through the coordinates. ' +
+          'Set false for one-way trips — REQUIRES source="first" AND destination="last" together. ' +
+          'Passing roundtrip=false without both endpoint constraints will fail.'
+      ),
+    geometries: z
+      .enum(['geojson', 'polyline', 'polyline6'])
+      .optional()
+      .default('geojson')
+      .describe('Format for route geometry'),
+    overview: z
+      .enum(['full', 'simplified', 'false'])
+      .optional()
+      .default('simplified')
+      .describe('Detail level of route geometry'),
+    steps: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Whether to include turn-by-turn instructions'),
+    annotations: z
+      .array(z.enum(['duration', 'distance', 'speed']))
+      .optional()
+      .describe('Additional metadata to include for each route segment'),
+    language: z
+      .string()
+      .optional()
+      .describe(
+        'Language for instructions (if steps=true). ISO 639-1 code (e.g., "en", "es").'
+      )
+  })
+  .refine(
+    (data) =>
+      data.roundtrip !== false ||
+      (data.source === 'first' && data.destination === 'last'),
+    {
+      message:
+        "When roundtrip=false, source must be 'first' AND destination must be 'last' (Mapbox V1 Optimization API requires both endpoints fixed for one-way trips).",
+      path: ['roundtrip']
+    }
+  );
 
 export type OptimizationInput = z.infer<typeof OptimizationInputSchema>;

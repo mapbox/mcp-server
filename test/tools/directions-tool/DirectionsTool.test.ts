@@ -11,6 +11,7 @@ import {
 import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
 import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
@@ -35,7 +36,7 @@ describe('DirectionsTool', () => {
       ]
     });
 
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('constructs correct URL with required parameters', async () => {
@@ -52,7 +53,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain('directions/v5/mapbox/driving-traffic');
     expect(calledUrl).toContain('-73.989%2C40.733%3B-73.979%2C40.743');
     expect(calledUrl).toContain('access_token=');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('includes all optional parameters in URL', async () => {
@@ -99,7 +100,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain('alternatives=false');
     expect(calledUrl).toContain('annotations=distance%2Ccongestion%2Cspeed');
     expect(calledUrl).not.toContain('exclude=');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('handles geometries=none', async () => {
@@ -119,7 +120,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain('alternatives=false');
     expect(calledUrl).toContain('annotations=distance%2Ccongestion%2Cspeed');
     expect(calledUrl).not.toContain('exclude=');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('handles exclude parameter with point format', async () => {
@@ -141,7 +142,7 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain(
       `exclude=toll${comma}point${openPar}-73.95${space}40.75${closePar}`
     );
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('handles fetch errors gracefully', async () => {
@@ -220,7 +221,7 @@ describe('DirectionsTool', () => {
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain('-73.989%2C40.733%3B-73.979%2C40.743');
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   it('successfully processes exactly 25 coordinates (maximum allowed)', async () => {
@@ -245,7 +246,7 @@ describe('DirectionsTool', () => {
       expect(calledUrl).toContain(expectedCoord);
     }
 
-    assertHeadersSent(mockHttpRequest);
+    assertHeadersSent(mockHttpRequest, { expectedCalls: 2 });
   });
 
   describe('exclude parameter and routing profile validations', () => {
@@ -542,7 +543,10 @@ describe('DirectionsTool', () => {
           isError: true
         });
 
-        const calledUrlTraffic = mockHttpRequest.mock.calls[1][0];
+        // Each tool.run() now makes 2 requests (the tool's own call, plus a
+        // map-only re-fetch for the render_map_tool payload) - the second
+        // run()'s own request is therefore calls[2], not calls[1].
+        const calledUrlTraffic = mockHttpRequest.mock.calls[2][0];
         expect(calledUrlTraffic).toContain('max_height=3.2');
       });
 
@@ -837,7 +841,7 @@ describe('DirectionsTool', () => {
         arrive_by: validDateTime
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
       const calledUrl = mockHttpRequest.mock.calls[0][0] as string;
       expect(calledUrl).toContain(
         `arrive_by=${encodeURIComponent(validDateTime)}`
@@ -913,7 +917,7 @@ describe('DirectionsTool', () => {
         arrive_by: '2025-06-05T10:30:00Z'
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
       mockHttpRequest.mockClear();
 
       // Test with timezone offset format
@@ -926,7 +930,7 @@ describe('DirectionsTool', () => {
         arrive_by: '2025-06-05T10:30:00+02:00'
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
       mockHttpRequest.mockClear();
 
       // Test with simple time format (no seconds, no timezone)
@@ -939,7 +943,7 @@ describe('DirectionsTool', () => {
         arrive_by: '2025-06-05T10:30'
       });
 
-      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
     });
 
     it('rejects invalid formats for arrive_by', async () => {
@@ -1066,32 +1070,32 @@ describe('DirectionsTool', () => {
     });
   });
 
-  describe('MCP App + MCP-UI integration', () => {
-    it('declares meta.ui.resourceUri pointing to the directions-app resource', () => {
+  describe('Map payload integration', () => {
+    it('does not declare meta.ui.resourceUri (rendering goes through render_map_tool)', () => {
       const { httpRequest } = setupHttpRequest();
       const tool = new DirectionsTool({ httpRequest });
-      expect(tool.meta?.ui?.resourceUri).toBe(
-        'ui://mapbox/directions-app/index.html'
-      );
+      expect(
+        (tool as { meta?: { ui?: { resourceUri?: string } } }).meta
+      ).toBeUndefined();
     });
 
-    async function runWithTokens(
-      geometries?: 'geojson' | 'none',
+    // Mock returns geometry only when the requested URL actually asks for
+    // geojson - mirrors the real Directions API, and is what lets us verify
+    // fetchDirectionsGeometryForMap's separate re-fetch (which always
+    // requests geometries=geojson) independently of the tool's own request.
+    function mockHttpRequestForGeometry(
       responseOverride?: Record<string, unknown>
     ) {
-      const fakeResponse = responseOverride ?? {
+      const withGeometry = responseOverride ?? {
         routes: [
           {
-            geometry:
-              geometries === 'geojson'
-                ? {
-                    type: 'LineString',
-                    coordinates: [
-                      [-74.0, 40.7],
-                      [-74.01, 40.71]
-                    ]
-                  }
-                : undefined,
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-74.0, 40.7],
+                [-74.01, 40.71]
+              ]
+            },
             distance: 1500,
             duration: 180,
             legs: []
@@ -1103,79 +1107,112 @@ describe('DirectionsTool', () => {
         ],
         code: 'Ok'
       };
-      const tokensListResponse = [
-        { usage: 'pk', default: true, token: 'pk.fake-public-token' }
-      ];
+      const withoutGeometry = {
+        ...withGeometry,
+        routes: (withGeometry.routes as Array<Record<string, unknown>>).map(
+          (route) => ({ ...route, geometry: undefined })
+        )
+      };
 
-      const httpRequestFn = vi.fn(async (url: string) => {
-        if (url.includes('tokens/v2/')) {
-          return {
-            ok: true,
-            status: 200,
-            statusText: 'OK',
-            json: async () => tokensListResponse,
-            text: async () => JSON.stringify(tokensListResponse)
-          } as Response;
-        }
+      return vi.fn(async (url: string) => {
+        const response = url.includes('geometries=geojson')
+          ? withGeometry
+          : withoutGeometry;
         return {
           ok: true,
           status: 200,
           statusText: 'OK',
-          json: async () => fakeResponse,
-          text: async () => JSON.stringify(fakeResponse)
+          json: async () => response,
+          text: async () => JSON.stringify(response)
         } as Response;
       });
+    }
 
-      // Mapbox sk.* tokens are 3 dot-segments: sk.<base64-payload>.<signature>
-      const realToken = process.env.MAPBOX_ACCESS_TOKEN;
-      const payload = Buffer.from(JSON.stringify({ u: 'testuser' })).toString(
-        'base64'
-      );
-      process.env.MAPBOX_ACCESS_TOKEN = `sk.${payload}.signature`;
-
-      try {
-        return await new DirectionsTool({
-          httpRequest: httpRequestFn
-        }).run({
+    it('attaches mapboxRender payload to structuredContent for small geojson responses', async () => {
+      const httpRequestFn = mockHttpRequestForGeometry();
+      const token = tokenFor('account-test-directions');
+      const result = await new DirectionsTool({
+        httpRequest: httpRequestFn
+      }).run(
+        {
           coordinates: [
             { longitude: -74.0, latitude: 40.7 },
             { longitude: -74.01, latitude: 40.71 }
           ],
-          ...(geometries ? { geometries } : {})
-        });
-      } finally {
-        process.env.MAPBOX_ACCESS_TOKEN = realToken;
-      }
-    }
-
-    it('adds an inline MCP-UI rawHtml resource baked with the call input, not response geometry', async () => {
-      const result = await runWithTokens('geojson');
+          geometries: 'geojson'
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
 
       expect(result.isError).toBe(false);
-      expect(result.content.length).toBeGreaterThanOrEqual(2);
-      const uiBlock = result.content.find(
-        (c) => (c as { type?: string }).type === 'resource'
-      ) as { resource?: { text?: string; mimeType?: string } } | undefined;
-      expect(uiBlock).toBeDefined();
-      expect(uiBlock?.resource?.text).toContain('mapbox-gl.js');
-      expect(uiBlock?.resource?.text).toContain('pk.fake-public-token');
-      // Initial-data block should carry the call's input params, not geometry.
-      expect(uiBlock?.resource?.text).toContain('"params"');
-      expect(uiBlock?.resource?.text).toContain('"longitude":-74');
+      // No inline UI block — content is text-only; rendering is the LLM's
+      // job via render_map_tool with the mapboxRender ref passed through.
+      expect(result.content.length).toBe(1);
+      expect((result.content[0] as { type: string }).type).toBe('text');
+
+      // The full payload is stashed server-side; the tool only surfaces a
+      // short ref the LLM can pass to render_map_tool.
+      const sc = result.structuredContent as
+        | { mapboxRender?: { ref?: string } }
+        | undefined;
+      const ref = sc?.mapboxRender?.ref;
+      expect(typeof ref).toBe('string');
+      expect(ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+      // Dereferencing the ref (as the same account) returns the original payload.
+      const { resolveMapPayloadRef } =
+        await import('../../../src/utils/storeMapPayload.js');
+      const payload = resolveMapPayloadRef(ref!, 'account-test-directions');
+      expect(payload?.layers?.[0]?.id).toBe('route');
+      expect(payload?.layers?.[0]?.type).toBe('line');
+      expect(payload?.markers?.map((m) => m.style)).toEqual(['start', 'end']);
+      expect(payload?.summary).toMatch(/mi/);
     });
 
-    it('still attaches the inline UI resource when geometries="none" (map self-fetches)', async () => {
-      const result = await runWithTokens('none');
+    it('still attaches a mapboxRender payload when geometries="none" (fetches full geometry separately for the map)', async () => {
+      const httpRequestFn = mockHttpRequestForGeometry();
+      const token = tokenFor('account-test-directions-none');
+      const result = await new DirectionsTool({
+        httpRequest: httpRequestFn
+      }).run(
+        {
+          coordinates: [
+            { longitude: -74.0, latitude: 40.7 },
+            { longitude: -74.01, latitude: 40.71 }
+          ],
+          geometries: 'none'
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
 
       expect(result.isError).toBe(false);
-      const uiBlock = result.content.find(
-        (c) => (c as { type?: string }).type === 'resource'
-      ) as { resource?: { text?: string } } | undefined;
-      expect(uiBlock).toBeDefined();
-      expect(uiBlock?.resource?.text).toContain('"params"');
+      // The tool's own response stays compact - no geometry echoed back.
+      expect(result.content[0]).toMatchObject({ type: 'text' });
+      expect((result.content[0] as { text: string }).text).not.toContain(
+        'LineString'
+      );
+
+      const sc = result.structuredContent as
+        | { mapboxRender?: { ref?: string } }
+        | undefined;
+      const ref = sc?.mapboxRender?.ref;
+      expect(typeof ref).toBe('string');
+
+      const { resolveMapPayloadRef } =
+        await import('../../../src/utils/storeMapPayload.js');
+      const payload = resolveMapPayloadRef(
+        ref!,
+        'account-test-directions-none'
+      );
+      expect(payload?.layers?.[0]?.id).toBe('route');
+      // Fetched via the second, map-only request - confirms two calls were made.
+      expect(httpRequestFn).toHaveBeenCalledTimes(2);
+      expect(httpRequestFn.mock.calls[1][0]).toContain('geometries=geojson');
     });
 
-    it('still attaches the inline UI resource when the response is large enough to trigger the temp-resource/summary path', async () => {
+    it('still attaches a mapboxRender payload when the response is large enough to trigger the temp-resource/summary path', async () => {
       // A geojson response large enough (>50KB) to be stored as a temp resource.
       const bigGeometry = {
         type: 'LineString',
@@ -1192,8 +1229,22 @@ describe('DirectionsTool', () => {
         ],
         code: 'Ok'
       };
+      const httpRequestFn = mockHttpRequestForGeometry(largeResponse);
+      const token = tokenFor('account-test-directions-large');
 
-      const result = await runWithTokens('geojson', largeResponse);
+      const result = await new DirectionsTool({
+        httpRequest: httpRequestFn
+      }).run(
+        {
+          coordinates: [
+            { longitude: -74.0, latitude: 40.7 },
+            { longitude: -74.01, latitude: 40.71 }
+          ],
+          geometries: 'geojson'
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
 
       expect(result.isError).toBe(false);
 
@@ -1204,12 +1255,11 @@ describe('DirectionsTool', () => {
       expect(textBlock?.text).toContain('exceeds context limit');
       expect(textBlock?.text).toMatch(/mapbox:\/\/temp\//);
 
-      // ...and that the inline UI resource is still attached alongside it.
-      const uiBlock = result.content.find(
-        (c) => (c as { type?: string }).type === 'resource'
-      ) as { resource?: { text?: string } } | undefined;
-      expect(uiBlock).toBeDefined();
-      expect(uiBlock?.resource?.text).toContain('"params"');
+      // ...and that a mapboxRender ref is still attached alongside it.
+      const sc = result.structuredContent as
+        | { mapboxRender?: { ref?: string } }
+        | undefined;
+      expect(sc?.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
     });
   });
 });
@@ -1219,14 +1269,6 @@ describe('DirectionsTool — temporary resource ownership', () => {
     vi.restoreAllMocks();
     temporaryResourceManager.clear();
   });
-
-  // Build a Mapbox-style JWT whose payload carries the username (`u`).
-  function tokenFor(username: string): string {
-    const payload = Buffer.from(JSON.stringify({ u: username })).toString(
-      'base64'
-    );
-    return `pk.${payload}.sig`;
-  }
 
   it('stores the temp resource with owner = the calling account (real token round-trip)', async () => {
     // A geojson response large enough (>50KB) to be stored as a temp resource.

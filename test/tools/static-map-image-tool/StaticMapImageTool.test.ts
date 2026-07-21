@@ -722,6 +722,24 @@ describe('StaticMapImageTool', () => {
     });
   });
 
+  describe('content shape', () => {
+    it('returns URL text + base64 image (no MCP-UI fallback)', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12'
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content).toHaveLength(2);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[1].type).toBe('image');
+    });
+  });
+
   describe('credential safety', () => {
     it('never includes the Mapbox access token in any content item', async () => {
       const { httpRequest } = setupHttpRequest();

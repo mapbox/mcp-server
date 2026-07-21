@@ -149,10 +149,13 @@ const SearchBoxFeatureSchema = z.object({
 });
 
 // Main Search Box API response schema
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
 export const SearchBoxResponseSchema = z.object({
   type: z.literal('FeatureCollection'),
   features: z.array(SearchBoxFeatureSchema),
-  attribution: z.string().optional()
+  attribution: z.string().optional(),
+  mapboxRender: MapAppRefSchema.optional()
 });
 
 export type SearchBoxResponse = z.infer<typeof SearchBoxResponseSchema>;

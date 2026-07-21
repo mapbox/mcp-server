@@ -3,6 +3,7 @@
 
 import { difference, polygon, featureCollection } from '@turf/turf';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { DifferenceInputSchema } from './DifferenceTool.input.schema.js';
@@ -11,6 +12,9 @@ import {
   type DifferenceOutput
 } from './DifferenceTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { buildPolygonOpsMapPayload } from '../union-tool/buildPolygonOpsMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 export class DifferenceTool extends BaseTool<
   typeof DifferenceInputSchema,
@@ -21,7 +25,9 @@ export class DifferenceTool extends BaseTool<
     'Subtract one polygon from another, returning the area in polygon1 that is not covered by polygon2. ' +
     'Useful for computing exclusion zones, finding uncovered service areas, or "what is in zone A but not zone B?". ' +
     'Returns null geometry if polygon2 fully covers polygon1. ' +
-    'Works offline without API calls.';
+    'Works offline without API calls. ' +
+    'INPUT SHAPE: `polygon1` and `polygon2` are each an array of rings; each ring is an array of [lng, lat] pairs. ' +
+    'When chaining with isochrone_tool, extract `feature.geometry.coordinates` from each isochrone Feature (with `polygons=true`).';
 
   readonly annotations = {
     title: 'Difference of Polygons',
@@ -38,7 +44,14 @@ export class DifferenceTool extends BaseTool<
     });
   }
 
-  async run(rawInput: unknown): Promise<CallToolResult> {
+  async run(
+    rawInput: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    extra?: RequestHandlerExtra<any, any>
+  ): Promise<CallToolResult> {
+    const accessToken =
+      extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
+    const owner = accessToken ? getUserNameFromToken(accessToken) : undefined;
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(
       trace.setSpan(context.active(), toolContext.span),
@@ -63,12 +76,36 @@ export class DifferenceTool extends BaseTool<
             ? `Difference computed (area in polygon1 not covered by polygon2).\nGeometry:\n${JSON.stringify(validated.geometry, null, 2)}`
             : 'No difference: polygon2 fully covers polygon1.';
 
+          const mapPayload = buildPolygonOpsMapPayload({
+            operation: 'difference',
+            inputs: [poly1, poly2] as Array<{
+              type: 'Feature';
+              geometry: unknown;
+            }>,
+            result: (result ?? null) as {
+              type: 'Feature';
+              geometry: unknown;
+            } | null,
+            summary: validated.has_difference
+              ? 'Difference of two polygons (polygon1 minus polygon2)'
+              : 'polygon2 fully covers polygon1 (no difference)'
+          });
+          const sc: Record<string, unknown> = {
+            ...(validated as unknown as Record<string, unknown>)
+          };
+          let textOut = text;
+          if (mapPayload) {
+            const ref = storeMapPayload(mapPayload, owner);
+            sc.mapboxRender = { ref };
+            textOut += renderHint(ref);
+          }
+
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
           return {
-            content: [{ type: 'text' as const, text }],
-            structuredContent: validated,
+            content: [{ type: 'text' as const, text: textOut }],
+            structuredContent: sc,
             isError: false
           };
         } catch (error) {

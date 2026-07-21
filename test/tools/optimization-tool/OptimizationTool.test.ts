@@ -8,6 +8,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 import { OptimizationTool } from '../../../src/tools/optimization-tool/OptimizationTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 // Sample V1 API response
 const sampleV1Response = {
@@ -270,5 +271,51 @@ describe('OptimizationTool V1 API', () => {
     expect(text).toContain('minutes');
     expect(text).toContain('km');
     expect(text).toContain('0 → 1 → 2');
+  });
+
+  it('stores a mapboxRender payload with the trip line and numbered visit markers', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
+    });
+
+    const tool = new OptimizationTool({ httpRequest });
+    const token = tokenFor('account-test-optimization');
+    const result = await tool.run(
+      {
+        coordinates: [
+          { longitude: -122.4194, latitude: 37.7749 },
+          { longitude: -122.4195, latitude: 37.775 },
+          { longitude: -122.4197, latitude: 37.7751 }
+        ]
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('render_map_tool');
+    expect(text).toContain(sc.mapboxRender!.ref!);
+
+    const { resolveMapPayloadRef } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const payload = resolveMapPayloadRef(
+      sc.mapboxRender!.ref!,
+      'account-test-optimization'
+    );
+    expect(payload?.layers?.[0]?.id).toBe('trip');
+    expect(payload?.layers?.[0]?.type).toBe('line');
+    expect(payload?.markers?.map((m) => m.style)).toEqual([
+      'numbered',
+      'numbered',
+      'numbered'
+    ]);
+    expect(payload?.markers?.map((m) => m.label)).toEqual(['1', '2', '3']);
   });
 });

@@ -11,24 +11,22 @@ import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import { BaseResource } from '../BaseResource.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderDirectionsAppHtml } from './directionsAppHtml.js';
+import { renderMapAppHtml } from './mapAppHtml.js';
 
 /**
- * MCP Apps resource for `directions_tool` — serves the HTML at
- * `ui://mapbox/directions-app/index.html`. The iframe waits for the host to
- * deliver the tool result via the `ui/notifications/tool-result` postMessage
- * event and renders the route from `structuredContent.routes[0]`.
+ * Single Mapbox MCP App resource targeted by `render_map_tool`.
  *
- * The legacy MCP-UI pathway (inline `rawHtml` on the tool result) uses the
- * same HTML template via `renderDirectionsAppHtml` with the call's input
- * params baked in at tool-execute time; the iframe self-fetches the route
- * from the Directions API using those params.
+ * Only one tool (`render_map_tool`) points `_meta.ui.resourceUri` at this
+ * resource. All other Mapbox tools just return data; the LLM passes their
+ * `mapboxRender` payload to `render_map_tool` to display it. This sidesteps the
+ * chain-position rendering quirk in MCP App hosts (where intermediate
+ * tools in a chain don't get to render their own iframe).
  */
-export class DirectionsAppUIResource extends BaseResource {
-  readonly name = 'Directions App UI';
-  readonly uri = 'ui://mapbox/directions-app/index.html';
+export class MapAppUIResource extends BaseResource {
+  readonly name = 'Mapbox Map App UI';
+  readonly uri = 'ui://mapbox/map-app/index.html';
   readonly description =
-    'Interactive UI for visualizing a Mapbox directions route with Mapbox GL JS (MCP Apps)';
+    'Generic Mapbox GL JS renderer driven by render_map_tool payloads (MCP Apps)';
   readonly mimeType = RESOURCE_MIME_TYPE;
 
   private readonly httpRequest: HttpRequest;
@@ -60,10 +58,7 @@ export class DirectionsAppUIResource extends BaseResource {
       httpRequest: this.httpRequest
     });
 
-    const html = renderDirectionsAppHtml({
-      publicToken: publicToken ?? '',
-      apiEndpoint: this.apiEndpoint()
-    });
+    const html = renderMapAppHtml({ publicToken: publicToken ?? '' });
 
     return {
       contents: [

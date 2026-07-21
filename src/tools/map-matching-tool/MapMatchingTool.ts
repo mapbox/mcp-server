@@ -11,6 +11,12 @@ import {
   type MapMatchingOutput
 } from './MapMatchingTool.output.schema.js';
 import type { HttpRequest } from '../../utils/types.js';
+import {
+  decodePolylineWithFallback,
+  type MapAppPayload
+} from '../../utils/mapAppPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
@@ -32,7 +38,6 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: MapMatchingInputSchema,
@@ -136,16 +141,9 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     }
 
     // Validate the response against our output schema
+    let validatedData: MapMatchingOutput;
     try {
-      const validatedData = MapMatchingOutputSchema.parse(data);
-
-      return {
-        content: [
-          { type: 'text', text: JSON.stringify(validatedData, null, 2) }
-        ],
-        structuredContent: validatedData,
-        isError: false
-      };
+      validatedData = MapMatchingOutputSchema.parse(data);
     } catch (validationError) {
       // The API responded with code: 'Ok' but the payload still doesn't match
       // our output schema. Never return schema-violating structuredContent -
@@ -166,5 +164,96 @@ export class MapMatchingTool extends MapboxApiBasedTool<
         isError: true
       };
     }
+
+    const mapPayload = buildMapMatchingPayload(validatedData, input);
+    const sc: Record<string, unknown> = {
+      ...(validatedData as unknown as Record<string, unknown>)
+    };
+    let textOut = JSON.stringify(validatedData, null, 2);
+    if (mapPayload) {
+      const ref = storeMapPayload(
+        mapPayload,
+        getUserNameFromToken(accessToken)
+      );
+      sc.mapboxRender = { ref };
+      textOut += renderHint(ref);
+    }
+
+    return {
+      content: [{ type: 'text', text: textOut }],
+      structuredContent: sc,
+      isError: false
+    };
   }
+}
+
+/**
+ * Build a payload showing the raw GPS trace as a dashed orange line and
+ * the matched route as a solid blue line, with a legend explaining both.
+ */
+function buildMapMatchingPayload(
+  data: MapMatchingOutput,
+  input: z.infer<typeof MapMatchingInputSchema>
+): MapAppPayload | null {
+  const match = data.matchings?.[0];
+  if (!match) return null;
+
+  let matchedCoords: [number, number][] | null = null;
+  const g = match.geometry as unknown;
+  if (
+    g &&
+    typeof g === 'object' &&
+    (g as { type?: string }).type === 'LineString' &&
+    Array.isArray((g as { coordinates?: unknown }).coordinates)
+  ) {
+    matchedCoords = (g as { coordinates: [number, number][] }).coordinates;
+  } else if (typeof g === 'string' && g.length > 0) {
+    matchedCoords = decodePolylineWithFallback(g);
+  }
+  if (!matchedCoords || matchedCoords.length === 0) return null;
+
+  const rawCoords: [number, number][] = input.coordinates.map((c) => [
+    c.longitude,
+    c.latitude
+  ]);
+
+  const matched = data.tracepoints?.filter((t) => t != null).length ?? 0;
+  const total = data.tracepoints?.length ?? input.coordinates.length;
+
+  return {
+    summary: `Matched ${matched}/${total} GPS points (confidence ${(match.confidence * 100).toFixed(0)}%)`,
+    layers: [
+      {
+        id: 'raw-trace',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: rawCoords },
+          properties: {}
+        },
+        paint: {
+          'line-color': '#f97316',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.8
+        },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      },
+      {
+        id: 'matched-route',
+        type: 'line',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: matchedCoords },
+          properties: {}
+        },
+        paint: { 'line-color': '#3b82f6', 'line-width': 4 },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      }
+    ],
+    legend: [
+      { label: 'Raw trace', color: '#f97316' },
+      { label: 'Matched route', color: '#3b82f6' }
+    ]
+  };
 }

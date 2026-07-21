@@ -10,6 +10,9 @@ import {
   GroundLocationOutputSchema,
   type GroundLocationOutput
 } from './GroundLocationTool.output.schema.js';
+import type { MapAppPayload } from '../../utils/mapAppPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
 
@@ -79,7 +82,6 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: GroundLocationInputSchema,
@@ -377,10 +379,65 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     const validated = GroundLocationOutputSchema.safeParse(result);
     const output = validated.success ? validated.data : result;
 
+    const mapPayload = buildGroundLocationPayload(output);
+    const sc: Record<string, unknown> = {
+      ...(output as unknown as Record<string, unknown>)
+    };
+    let textOut = this.formatOutput(output, strategy);
+    if (mapPayload) {
+      const ref = storeMapPayload(
+        mapPayload,
+        getUserNameFromToken(accessToken)
+      );
+      sc.mapboxRender = { ref };
+      textOut += renderHint(ref);
+    }
+
     return {
-      content: [{ type: 'text', text: this.formatOutput(output, strategy) }],
-      structuredContent: output as unknown as Record<string, unknown>,
+      content: [{ type: 'text', text: textOut }],
+      structuredContent: sc,
       isError: false
     };
   }
+}
+
+/**
+ * Build a payload showing the grounded origin marker + nearby POIs (numbered
+ * orange pins). Isochrone polygons aren't included inline because the tool
+ * only stores a summary (contour minutes) — the full polygons live in the
+ * separate isochrone tool's response if the user calls it.
+ */
+function buildGroundLocationPayload(
+  out: GroundLocationOutput
+): MapAppPayload | null {
+  const markers: MapAppPayload['markers'] = [
+    {
+      coordinates: [out.longitude, out.latitude],
+      style: 'pin',
+      color: '#0f172a',
+      popup: out.place
+    }
+  ];
+
+  if (out.nearby_pois && out.nearby_pois.length > 0) {
+    out.nearby_pois.forEach((poi, i) => {
+      const parts = [`${i + 1}. ${poi.name}`];
+      if (poi.address) parts.push(poi.address);
+      if (poi.distance_meters)
+        parts.push(`${Math.round(poi.distance_meters)} m`);
+      markers.push({
+        coordinates: [poi.longitude, poi.latitude],
+        style: 'numbered',
+        label: String(i + 1),
+        color: '#f97316',
+        popup: parts.join(' — ')
+      });
+    });
+  }
+
+  return {
+    summary: out.place,
+    layers: [],
+    markers
+  };
 }

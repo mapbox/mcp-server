@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TemporaryDataResource } from '../../../src/resources/temporary/TemporaryDataResource.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
+import { storeMapPayload } from '../../../src/utils/storeMapPayload.js';
 
 // Build a Mapbox-style 3-part JWT whose payload carries the username (`u`).
 function tokenFor(username: string): string {
@@ -145,5 +146,22 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     const other = await resource.read(uri, extraFor(tokenFor('accountB')));
     expect(other.contents[0].blob).toBeUndefined();
     expect(other.contents[0].text).toBe(NOT_FOUND);
+  });
+
+  it('resolves a storeMapPayload ref via the real resources/read path (regression)', async () => {
+    // storeMapPayload() previously never set `owner`, so every map-payload ref
+    // was permanently unreadable via this real read path (always fell through
+    // to NOT_FOUND) even for the account that created it - the iframe would
+    // fail JSON.parse on that text and show "Map payload was empty or
+    // malformed." regardless of the payload's actual shape.
+    const ref = storeMapPayload(
+      { summary: 'Test route', layers: [], markers: [] },
+      'accountA'
+    );
+
+    const result = await resource.read(ref, extraFor(tokenFor('accountA')));
+    const parsed = JSON.parse(result.contents[0].text as string);
+
+    expect(parsed.summary).toBe('Test route');
   });
 });

@@ -14,6 +14,9 @@ import type {
   MapboxFeature
 } from '../../schemas/geojson.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { buildSearchMapPayload } from './buildSearchMapPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -31,7 +34,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: SearchAndGeocodeInputSchema,
@@ -105,11 +107,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Starting search with input: ${JSON.stringify(input)}`
-    );
-
     const url = new URL(
       `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/forward`
     );
@@ -172,11 +169,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       );
     }
 
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
-    );
-
     const response = await this.httpRequest(url.toString());
 
     if (!response.ok) {
@@ -210,11 +202,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       // Graceful fallback to raw data
       data = rawData as SearchBoxResponse;
     }
-
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Successfully completed search, found ${data.features?.length || 0} results`
-    );
 
     // Check if we have multiple results that might be ambiguous
     if (
@@ -270,18 +257,23 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
             features: [selectedFeature]
           };
 
-          return {
-            content: [
-              {
-                type: 'text',
-                text: this.formatGeoJsonToText(
-                  singleResult as MapboxFeatureCollection
-                )
-              }
-            ],
-            structuredContent: singleResult,
-            isError: false
-          };
+          return this.withMapPayload(
+            {
+              content: [
+                {
+                  type: 'text',
+                  text: this.formatGeoJsonToText(
+                    singleResult as MapboxFeatureCollection
+                  )
+                }
+              ],
+              structuredContent: singleResult,
+              isError: false
+            },
+            singleResult,
+            input,
+            accessToken
+          );
         } else if (result.action === 'decline') {
           // User declined to select - return all results as before
           this.log(
@@ -289,25 +281,67 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
             'SearchAndGeocodeTool: User declined to select a specific result'
           );
         }
-      } catch (elicitError) {
-        // If elicitation fails, fall back to returning all results
-        this.log(
-          'warning',
-          `SearchAndGeocodeTool: Elicitation failed: ${elicitError instanceof Error ? elicitError.message : 'Unknown error'}`
-        );
+      } catch {
+        // Elicitation isn't supported by every MCP client (Claude Desktop
+        // doesn't, for example). Falling back to "return all results" is the
+        // expected behavior — silent, since Claude Desktop's UI flags tool
+        // calls that emit notifications/message at any level as visually
+        // failed even when the JSON-RPC response is isError: false.
       }
     }
 
     // Default behavior: return all results
-    return {
-      content: [
-        {
-          type: 'text',
-          text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
-        }
-      ],
-      structuredContent: data,
-      isError: false
+    return this.withMapPayload(
+      {
+        content: [
+          {
+            type: 'text',
+            text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
+          }
+        ],
+        structuredContent: data,
+        isError: false
+      },
+      data,
+      input,
+      accessToken
+    );
+  }
+
+  /**
+   * Attach a `mapboxRender` payload to structuredContent so the LLM can pass it
+   * to `render_map_tool` to visualize results on a live Mapbox GL JS map.
+   */
+  private withMapPayload(
+    base: CallToolResult,
+    data: unknown,
+    input: z.infer<typeof SearchAndGeocodeInputSchema>,
+    accessToken: string
+  ): CallToolResult {
+    const proximity =
+      input.proximity &&
+      typeof (input.proximity as { longitude?: number }).longitude === 'number'
+        ? (input.proximity as { longitude: number; latitude: number })
+        : undefined;
+    const payload = buildSearchMapPayload({
+      data,
+      query: input.q,
+      proximity
+    });
+    if (!payload) return base;
+
+    const ref = storeMapPayload(payload, getUserNameFromToken(accessToken));
+    const sc = {
+      ...((base.structuredContent ?? {}) as Record<string, unknown>),
+      mapboxRender: { ref }
     };
+    // Append the render hint to the first text content so the LLM sees the
+    // exact ref string and doesn't hallucinate a URI.
+    const content = (base.content ?? []).map((c, i) =>
+      i === 0 && c.type === 'text'
+        ? { ...c, text: (c.text as string) + renderHint(ref) }
+        : c
+    );
+    return { ...base, content, structuredContent: sc };
   }
 }

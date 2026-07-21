@@ -80,7 +80,8 @@ describe('Tool Annotations', () => {
       'destination_tool',
       'length_tool',
       'nearest_point_on_line_tool',
-      'convex_tool'
+      'convex_tool',
+      'render_map_tool'
     ];
     const apiTools = tools.filter((tool) => !offlineTools.includes(tool.name));
 
@@ -109,7 +110,8 @@ describe('Tool Annotations', () => {
         'destination_tool',
         'length_tool',
         'nearest_point_on_line_tool',
-        'convex_tool'
+        'convex_tool',
+        'render_map_tool'
       ].includes(tool.name)
     );
 

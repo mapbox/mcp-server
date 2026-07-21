@@ -1,8 +1,37 @@
 ## Unreleased
 
+### New Features
+
+- **`render_map_tool` — single visualization primitive** for Mapbox MCP. Takes
+  a `MapAppPayload` and displays a live Mapbox GL JS map. All other geo
+  tools (directions, isochrone, optimization, search, map-matching,
+  ground-location, polygon-ops) return a ready-to-render `_mapApp` payload
+  on their `structuredContent`; the LLM passes it to `render_map_tool` to
+  show a map. This is the only tool that declares `_meta.ui.resourceUri`,
+  so MCP App hosts (which only fully render the iframe for the last tool
+  in a chained sequence) always render successfully — the visualization
+  step is terminal by design.
+- **`MapAppPayload` schema** (`src/utils/mapAppPayload.ts`) — the wire
+  format between data tools and `render_map_tool`. Thin pass-through over
+  Mapbox Style spec `paint`/`layout` objects so any layer/marker/legend
+  combination expressible in GL JS is expressible in the payload.
+- **Per-tool payload builders** — `buildDirectionsMapPayload`,
+  `buildIsochroneMapPayload`, `buildOptimizationMapPayload`,
+  `buildSearchMapPayload`, `buildMapMatchingPayload`,
+  `buildGroundLocationPayload`, `buildPolygonOpsMapPayload`. Each is a
+  pure function over its tool's response: ~20-80 lines, no HTML, no
+  iframe wiring.
+- **Shared `renderMapAppHtml`** (`src/resources/ui-apps/mapAppHtml.ts`) —
+  one ~330-line iframe template that consumes any `MapAppPayload`. Used
+  by both the MCP Apps resource (`MapAppUIResource`) and any client that
+  wants to bake initial data in.
+- **Polyline decoding moves tool-side** via `decodePolyline` /
+  `decodePolylineWithFallback` so the iframe only ever receives GeoJSON.
+
 ### Fixed
 
 - **map_matching_tool**: When the Map Matching API can't match a trace (e.g. `code: "NoMatch"` for distant/unmatchable coordinates), the tool now returns a clear `isError` text result instead of crashing with `MCP error -32602: Output validation error` — the API omits `tracepoints`/`matchings` in this case, which previously violated the tool's output schema and was returned as `structuredContent` anyway, triggering the MCP SDK's output validation. The same schema-violating `structuredContent` could also be returned for a `code: "Ok"` response that otherwise failed schema validation (e.g. a `confidence` out of range); that fallback now also returns a graceful `isError` result instead of the raw invalid payload. `tracepoints` and `matchings` are also now `.optional()` in the output schema as a defensive measure. (AGI-1021)
+- **directions_tool map preview**: `buildDirectionsMapPayload` now always fetches full geometry for the map (via `buildDirectionsRequestUrl`'s `geometriesOverride: 'geojson'`) regardless of the `geometries` the caller requested, porting forward the fix from 0.12.7's per-tool directions UI (which this release's generic `render_map_tool` replaces) — the map preview no longer depends on the tool's own response carrying `geometries="geojson"`.
 
 ## 0.12.7 - 2026-07-20
 

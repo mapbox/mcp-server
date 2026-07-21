@@ -12,7 +12,16 @@ import {
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import type { MapAppPayload } from '../../utils/mapAppPayload.js';
+import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
 import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+
+const HEX6_RE = /^[0-9a-fA-F]{6}$/;
+function sanitizeHex(raw: unknown, fallback: string): string {
+  if (typeof raw !== 'string') return fallback;
+  const bare = raw.replace(/^#/, '');
+  return HEX6_RE.test(bare) ? `#${bare}` : fallback;
+}
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -31,7 +40,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: IsochroneInputSchema,
@@ -59,7 +67,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
       } else if (props.metric === 'distance') {
         description += ' meters distance';
       } else {
-        // Fallback - try to infer from contour value
         description += props.contour <= 60 ? ' minutes' : ' meters';
       }
 
@@ -153,10 +160,11 @@ export class IsochroneTool extends MapboxApiBasedTool<
 
     const data = await response.json();
 
-    // Check response size and conditionally create temporary resource
-    const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
+    const RESPONSE_SIZE_THRESHOLD = 50 * 1024;
     const responseText = JSON.stringify(data, null, 2);
     const responseSize = responseText.length;
+
+    const mapPayload = buildIsochroneMapPayload(data, input);
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
       const resourceId = randomBytes(16).toString('hex');
@@ -174,37 +182,148 @@ export class IsochroneTool extends MapboxApiBasedTool<
         (data as { features?: unknown[] }).features?.length ?? 0;
       const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full GeoJSON if needed.`;
 
+      const summaryStructured: Record<string, unknown> = {};
+      let largeText = summaryText;
+      if (mapPayload) {
+        const ref = storeMapPayload(
+          mapPayload,
+          getUserNameFromToken(accessToken)
+        );
+        summaryStructured.mapboxRender = { ref };
+        largeText += renderHint(ref);
+      }
       return {
-        content: [{ type: 'text', text: summaryText }],
+        content: [{ type: 'text', text: largeText }],
+        structuredContent: summaryStructured,
         isError: false
       };
     }
 
-    // Validate the response against our schema
     const parsedData = IsochroneResponseSchema.safeParse(data);
+    const validated = parsedData.success
+      ? parsedData.data
+      : (data as IsochroneResponse);
 
-    if (parsedData.success) {
-      // Valid response - use formatted output
-      const formattedText = this.formatIsochroneResponse(parsedData.data);
-      return {
-        content: [{ type: 'text', text: formattedText }],
-        structuredContent: parsedData.data as unknown as Record<
-          string,
-          unknown
-        >,
-        isError: false
-      };
-    } else {
-      // Invalid response - fall back to JSON string for backward compatibility
+    if (!parsedData.success) {
       this.log(
         'warning',
         `IsochroneTool: Response validation failed: ${parsedData.error.message}`
       );
-      return {
-        content: [{ type: 'text', text: responseText }],
-        structuredContent: data as Record<string, unknown>,
-        isError: false
-      };
     }
+
+    const text = parsedData.success
+      ? this.formatIsochroneResponse(parsedData.data)
+      : responseText;
+
+    const sc: Record<string, unknown> = {
+      ...(validated as unknown as Record<string, unknown>)
+    };
+    let smallText = text;
+    if (mapPayload) {
+      const ref = storeMapPayload(
+        mapPayload,
+        getUserNameFromToken(accessToken)
+      );
+      sc.mapboxRender = { ref };
+      smallText += renderHint(ref);
+    }
+
+    return {
+      content: [{ type: 'text', text: smallText }],
+      structuredContent: sc,
+      isError: false
+    };
   }
+}
+
+/**
+ * Build a `MapAppPayload` from a Mapbox Isochrone API response. Each contour
+ * becomes a fill+line layer pair colored per the API-supplied `color`/`fillColor`
+ * (or a teal default), with the origin marked.
+ */
+function buildIsochroneMapPayload(
+  data: unknown,
+  input: z.infer<typeof IsochroneInputSchema>
+): MapAppPayload | null {
+  const fc = data as
+    | {
+        type?: string;
+        features?: Array<{
+          geometry?: { type?: string; coordinates?: unknown };
+          properties?: Record<string, unknown>;
+        }>;
+      }
+    | null
+    | undefined;
+  if (
+    !fc ||
+    fc.type !== 'FeatureCollection' ||
+    !Array.isArray(fc.features) ||
+    fc.features.length === 0
+  ) {
+    return null;
+  }
+
+  // Render contours largest-first → smallest-on-top for a clean layered look.
+  const ordered = fc.features.slice().reverse();
+  const layers: MapAppPayload['layers'] = [];
+  ordered.forEach((feature, i) => {
+    const props = feature.properties ?? {};
+    const color = sanitizeHex(
+      (props as { color?: unknown; fillColor?: unknown }).color ??
+        (props as { fillColor?: unknown }).fillColor,
+      '#3b82f6'
+    );
+    const fillOpacity =
+      typeof props.fillOpacity === 'number' ? props.fillOpacity : 0.25;
+
+    if (feature.geometry?.type === 'Polygon' && feature.geometry.coordinates) {
+      layers.push({
+        id: `iso-fill-${i}`,
+        type: 'fill',
+        data: {
+          type: 'Feature',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          geometry: feature.geometry as any,
+          properties: {}
+        },
+        paint: { 'fill-color': color, 'fill-opacity': fillOpacity }
+      });
+    }
+    layers.push({
+      id: `iso-line-${i}`,
+      type: 'line',
+      data: {
+        type: 'Feature',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        geometry: feature.geometry as any,
+        properties: {}
+      },
+      paint: { 'line-color': color, 'line-width': 2, 'line-opacity': 0.9 },
+      layout: { 'line-join': 'round', 'line-cap': 'round' }
+    });
+  });
+
+  const mode = input.profile.replace('mapbox/', '').replace('-', ' ');
+  let summary = `Isochrone: ${fc.features.length} contour${fc.features.length !== 1 ? 's' : ''}`;
+  if (input.contours_minutes && input.contours_minutes.length > 0) {
+    summary = `Reachable by ${mode}: ${input.contours_minutes.map((m) => `${m} min`).join(', ')}`;
+  } else if (input.contours_meters && input.contours_meters.length > 0) {
+    summary = `Reachable by ${mode}: ${input.contours_meters
+      .map((m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`))
+      .join(', ')}`;
+  }
+
+  return {
+    summary,
+    layers,
+    markers: [
+      {
+        coordinates: [input.coordinates.longitude, input.coordinates.latitude],
+        style: 'pin',
+        color: '#0f172a',
+        popup: 'Origin'
+      }
+    ]
+  };
 }
