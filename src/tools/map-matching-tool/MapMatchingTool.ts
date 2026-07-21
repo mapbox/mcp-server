@@ -119,6 +119,22 @@ export class MapMatchingTool extends MapboxApiBasedTool<
 
     const data = (await response.json()) as MapMatchingOutput;
 
+    // The Map Matching API returns 200 with a non-"Ok" code (e.g. "NoMatch",
+    // "NoSegment") when it can't match the trace, and omits tracepoints/matchings
+    // in that case. Surface this as a tool error rather than structured content
+    // so the MCP SDK's output schema validation is skipped for this response.
+    if (data.code !== 'Ok') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Map Matching API could not match the trace (code: ${data.code}). Try adjusting the coordinates or radiuses.`
+          }
+        ],
+        isError: true
+      };
+    }
+
     // Validate the response against our output schema
     try {
       const validatedData = MapMatchingOutputSchema.parse(data);
@@ -131,16 +147,23 @@ export class MapMatchingTool extends MapboxApiBasedTool<
         isError: false
       };
     } catch (validationError) {
-      // If validation fails, return the raw result anyway with a warning
-      this.log(
-        'warning',
-        `Schema validation warning: ${validationError instanceof Error ? validationError.message : String(validationError)}`
-      );
+      // The API responded with code: 'Ok' but the payload still doesn't match
+      // our output schema. Never return schema-violating structuredContent -
+      // the MCP SDK rejects it with the same -32602 this fix is meant to avoid.
+      const message =
+        validationError instanceof Error
+          ? validationError.message
+          : String(validationError);
+      this.log('warning', `Schema validation warning: ${message}`);
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data,
-        isError: false
+        content: [
+          {
+            type: 'text',
+            text: `Map Matching API returned a response that didn't match the expected format: ${message}`
+          }
+        ],
+        isError: true
       };
     }
   }

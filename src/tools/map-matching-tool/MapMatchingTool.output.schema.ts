@@ -49,8 +49,8 @@ const MatchingSchema = z.object({
 // Main output schema
 export const MapMatchingOutputSchema = z.object({
   code: z.string(),
-  matchings: z.array(MatchingSchema),
-  tracepoints: z.array(TracepointSchema.nullable())
+  matchings: z.array(MatchingSchema).optional(),
+  tracepoints: z.array(TracepointSchema.nullable()).optional()
 });
 
 export type MapMatchingOutput = z.infer<typeof MapMatchingOutputSchema>;
