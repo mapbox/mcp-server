@@ -1,6 +1,8 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { z } from 'zod';
+
 /**
  * Payload format for the generic Mapbox MCP App (`ui://mapbox/map-app/...`).
  *
@@ -96,6 +98,68 @@ export interface MapAppPayload {
   /** Optional fetch-on-render hook for large geometries. */
   defer?: MapAppDeferredLayer;
 }
+
+// Zod mirror of MapAppPayload, kept loose on paint/layout/geometry internals
+// (those are already validated by construction in the payload builders) -
+// this exists so `render_map_tool` can declare the inline payload shape on
+// its output schema without a strict validator stripping it. See
+// RenderMapTool.output.schema.ts for why the inline copy matters.
+const GeometrySchema = z.object({
+  type: z.enum(['Point', 'LineString', 'Polygon', 'MultiPolygon']),
+  coordinates: z.unknown()
+});
+
+const FeatureSchema = z.object({
+  type: z.literal('Feature'),
+  geometry: GeometrySchema,
+  properties: z.record(z.string(), z.unknown()).optional()
+});
+
+const FeatureCollectionSchema = z.object({
+  type: z.literal('FeatureCollection'),
+  features: z.array(FeatureSchema)
+});
+
+const MapAppLayerSchema = z.object({
+  id: z.string(),
+  type: z.enum(['fill', 'line', 'circle', 'symbol']),
+  data: z.union([FeatureSchema, FeatureCollectionSchema]),
+  paint: z.record(z.string(), z.unknown()).optional(),
+  layout: z.record(z.string(), z.unknown()).optional()
+});
+
+const MapAppMarkerSchema = z.object({
+  coordinates: z.tuple([z.number(), z.number()]),
+  style: z.enum(['pin', 'numbered', 'start', 'end']).optional(),
+  label: z.string().optional(),
+  color: z.string().optional(),
+  popup: z.string().optional()
+});
+
+const MapAppLegendEntrySchema = z.object({
+  label: z.string(),
+  color: z.string(),
+  opacity: z.number().optional()
+});
+
+const MapAppCameraSchema = z.object({
+  center: z.tuple([z.number(), z.number()]).optional(),
+  zoom: z.number().optional(),
+  bounds: z
+    .tuple([
+      z.tuple([z.number(), z.number()]),
+      z.tuple([z.number(), z.number()])
+    ])
+    .optional()
+});
+
+export const MapAppPayloadSchema = z.object({
+  summary: z.string().optional(),
+  layers: z.array(MapAppLayerSchema),
+  markers: z.array(MapAppMarkerSchema).optional(),
+  legend: z.array(MapAppLegendEntrySchema).optional(),
+  camera: MapAppCameraSchema.optional()
+});
 
 /**
  * Decode a Mapbox polyline string (precision 5 by default) to a GeoJSON

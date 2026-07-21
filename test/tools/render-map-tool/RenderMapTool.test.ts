@@ -61,9 +61,9 @@ describe('RenderMapTool', () => {
     expect(sc.rendered).toBe(true);
     expect(sc.layer_count).toBe(1);
     expect(sc.marker_count).toBe(2);
-    // The merged payload is stashed server-side; structuredContent only
-    // surfaces a ref so even a 300KB payload round-trips through the host
-    // bridge without truncation.
+    // The merged payload is stashed server-side under a ref for hosts that
+    // support resources/read (and to keep the response tiny for very large
+    // payloads).
     expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
     const { resolveMapPayloadRef } =
       await import('../../../src/utils/storeMapPayload.js');
@@ -73,6 +73,90 @@ describe('RenderMapTool', () => {
     );
     expect(stored?.layers).toHaveLength(1);
     expect(stored?.markers).toHaveLength(2);
+  });
+
+  it('inlines the payload alongside the ref for small payloads (hosts with no resources/read)', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const token = tokenFor('account-test-render-map-inline');
+    const result = await tool.run(
+      {
+        summary: 'Inline test',
+        layers: [
+          {
+            id: 'route',
+            type: 'line',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-77, 38],
+                  [-76, 39]
+                ]
+              },
+              properties: {}
+            }
+          }
+        ],
+        markers: [{ coordinates: [-77, 38], style: 'start' }]
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      mapboxRender?: {
+        ref?: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        layers?: any[];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        markers?: any[];
+        summary?: string;
+      };
+    };
+    // A host (e.g. ChatGPT) that delivers structuredContent to the iframe
+    // but has no resources/read at all can render straight from this,
+    // without ever dereferencing sc.mapboxRender.ref.
+    expect(sc.mapboxRender?.layers).toHaveLength(1);
+    expect(sc.mapboxRender?.layers?.[0]).toMatchObject({ id: 'route' });
+    expect(sc.mapboxRender?.markers).toHaveLength(1);
+    expect(sc.mapboxRender?.summary).toBe('Inline test');
+  });
+
+  it('omits the inline payload for large payloads, keeping only the ref', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const token = tokenFor('account-test-render-map-large');
+    const bigCoordinates: [number, number][] = Array.from(
+      { length: 6000 },
+      (_, i) => [-77 + i * 0.0001, 38 + i * 0.0001]
+    );
+    const result = await tool.run(
+      {
+        summary: 'Huge test',
+        layers: [
+          {
+            id: 'route',
+            type: 'line',
+            data: {
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates: bigCoordinates },
+              properties: {}
+            }
+          }
+        ]
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mapboxRender?: { ref?: string; layers?: any[] };
+    };
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+    expect(sc.mapboxRender?.layers).toBeUndefined();
   });
 
   it('rejects coordinates that are not [lng, lat] pairs', async () => {

@@ -208,7 +208,19 @@ ${initialDataScript}
   }
 
   // --- Tool result extraction ----------------------------------------------
+  // Inline payload is checked FIRST, before the ref: some hosts (e.g.
+  // ChatGPT's MCP Apps bridge) deliver structuredContent to the iframe
+  // intact but have no resources/read equivalent at all, so a ref there
+  // would be permanently unusable even though the actual payload data is
+  // sitting right there in the same tool result. Hosts that strip
+  // structuredContent (e.g. Claude Desktop) never have inline data to find
+  // here, so they fall through to the ref path exactly as before.
   function handleToolResult(result) {
+    var payload = extractInlinePayload(result);
+    if (payload) {
+      stageRender(payload);
+      return;
+    }
     var ref = extractPayloadRef(result);
     if (ref) {
       sendRequest('resources/read', { uri: ref }).then(
@@ -222,11 +234,6 @@ ${initialDataScript}
             (err && err.message ? err.message : err));
         }
       );
-      return;
-    }
-    var payload = extractInlinePayload(result);
-    if (payload) {
-      stageRender(payload);
       return;
     }
     showError('Tool result did not contain a map payload.');

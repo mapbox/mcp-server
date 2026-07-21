@@ -6,6 +6,12 @@ import { z } from 'zod';
 import { temporaryResourceManager } from './temporaryResourceManager.js';
 import type { MapAppPayload } from './mapAppPayload.js';
 
+// Above this size, only the ref is included inline (the ref+resources/read
+// path still works for hosts that support it) - matches the 50KB threshold
+// already used elsewhere (e.g. the directions/isochrone large-response
+// stash) for the same "don't bloat the response" reasoning.
+const MAX_INLINE_PAYLOAD_BYTES = 50 * 1024;
+
 /**
  * Schema for the `mapboxRender` field that data tools attach to their
  * structuredContent. Each tool declares this on its output schema so
@@ -61,6 +67,30 @@ export function storeMapPayload(
     metadata: { toolName: 'map-payload' }
   });
   return uri;
+}
+
+/**
+ * Build the `mapboxRender` field for `render_map_tool`'s own structuredContent
+ * - the one tool result the iframe actually reads. Includes the resolved
+ * payload inline (in addition to `ref`) when it's small enough, because
+ * ChatGPT's MCP Apps bridge delivers `structuredContent` to the iframe intact
+ * but has no `resources/read` equivalent at all - the ref alone is
+ * permanently unusable there. Claude Desktop strips `structuredContent`
+ * before it reaches the iframe, so it's unaffected either way and keeps
+ * using the ref (via the sentinel-tagged text) + `resources/read`.
+ *
+ * Only `render_map_tool` needs this: it's the only tool that declares
+ * `_meta.ui.resourceUri`, so it's the only tool result the iframe ever sees.
+ */
+export function buildMapboxRenderField(
+  ref: string,
+  payload: MapAppPayload
+): { ref: string } & Partial<MapAppPayload> {
+  const byteSize = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+  if (byteSize > MAX_INLINE_PAYLOAD_BYTES) {
+    return { ref };
+  }
+  return { ref, ...payload };
 }
 
 /**

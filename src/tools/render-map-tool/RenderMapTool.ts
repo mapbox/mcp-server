@@ -15,7 +15,8 @@ import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 import {
   resolveMapPayloadRef,
   mergeMapPayloads,
-  storeMapPayload
+  storeMapPayload,
+  buildMapboxRenderField
 } from '../../utils/storeMapPayload.js';
 import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -134,6 +135,11 @@ export class RenderMapTool extends BaseTool<
           // via meta.ui.resourceUri, so the rawHtml duplicate just bloats
           // the response and trips the host's "too large" trim).
           const mergedRef = storeMapPayload(payload, owner);
+          // Also inline the payload (when small) alongside the ref - hosts
+          // like ChatGPT deliver structuredContent to the iframe intact but
+          // have no resources/read equivalent, so the ref alone would be
+          // permanently unusable there.
+          const mapboxRender = buildMapboxRenderField(mergedRef, payload);
 
           const content: CallToolResult['content'] = [
             { type: 'text' as const, text },
@@ -153,7 +159,7 @@ export class RenderMapTool extends BaseTool<
               layer_count: layerCount,
               marker_count: markerCount,
               summary: payload.summary,
-              mapboxRender: { ref: mergedRef }
+              mapboxRender
             },
             isError: false
           };
