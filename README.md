@@ -47,6 +47,7 @@ For more information about Mapbox access tokens, see the [Mapbox documentation o
 For detailed setup instructions for different integrations, refer to the following guides:
 
 - [Claude Desktop Setup](./docs/claude-desktop-setup.md) - Instructions for configuring Claude Desktop to work with this MCP server
+- [Gamut Setup](./docs/gamut-setup.md) - Connecting Gamut AI agents to Mapbox's geospatial tools
 - [Goose Setup](./docs/goose-setup.md) - Setting up Goose AI agent framework
 - [VS Code Setup](./docs/vscode-setup.md) - Setting up a development environment in Visual Studio Code
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
