@@ -57,6 +57,21 @@ For detailed setup instructions for different integrations, refer to the followi
 
 Try these prompts with Claude Desktop or other MCP clients after setup:
 
+### Location Grounding
+
+For coordinate-first queries — _"what's near me"_, _"what neighborhood is this"_, _"what's reachable in N minutes"_ — use `ground_location_tool`. It composes reverse geocoding, category search, and isochrone in a single call, adaptively choosing the right strategy based on the query, and returns typed records (names, addresses, coordinates, distances, reachability polygons) with citations.
+
+Each of the four prompts below exercises a different strategy in one tool call:
+
+- **Neighborhood** — _"What neighborhood is 47.6097, -122.3408, and what's around me?"_
+- **POI** — _"Coffee shops within a 10-minute walk of 40.7580, -73.9855"_
+- **Region** — _"What can I reach in a 15-minute walk from 37.7749, -122.4194?"_
+- **Routing** — _"Closest routable point to drop someone off at 34.0522, -118.2437"_
+
+<!-- TODO: link to grounding blog post once published — see "From answers to addresses: grounding an LLM for location" -->
+
+A detailed walkthrough of the design and the trade-offs against web search is in the works; this section will link to it once published.
+
 ### Location Discovery
 
 - "Find coffee shops within walking distance of the Empire State Building"
