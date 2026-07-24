@@ -273,7 +273,7 @@ describe('OptimizationTool V1 API', () => {
     expect(text).toContain('0 → 1 → 2');
   });
 
-  it('stores a mapboxRender payload with the trip line and numbered visit markers', async () => {
+  it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
     const { httpRequest } = setupHttpRequest({
       ok: true,
       status: 200,
@@ -297,25 +297,30 @@ describe('OptimizationTool V1 API', () => {
     expect(result.isError).toBe(false);
 
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
-    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/optimization\?data=/
+    );
 
     const text = (result.content[0] as { text: string }).text;
     expect(text).toContain('render_map_tool');
     expect(text).toContain(sc.mapboxRender!.ref!);
 
-    const { resolveMapPayloadRef } =
-      await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(
-      sc.mapboxRender!.ref!,
-      'account-test-optimization'
-    );
-    expect(payload?.layers?.[0]?.id).toBe('trip');
-    expect(payload?.layers?.[0]?.type).toBe('line');
-    expect(payload?.markers?.map((m) => m.style)).toEqual([
-      'numbered',
-      'numbered',
-      'numbered'
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'optimization',
+        params: expect.objectContaining({
+          coordinates: [
+            { longitude: -122.4194, latitude: 37.7749 },
+            { longitude: -122.4195, latitude: 37.775 },
+            { longitude: -122.4197, latitude: 37.7751 }
+          ]
+        })
+      }
     ]);
-    expect(payload?.markers?.map((m) => m.label)).toEqual(['1', '2', '3']);
   });
 });

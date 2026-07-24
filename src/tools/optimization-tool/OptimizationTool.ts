@@ -14,12 +14,9 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolExecutionContext } from '../../utils/tracing.js';
 import type { HttpRequest } from '../../utils/types.js';
-import {
-  decodePolylineWithFallback,
-  type MapAppPayload
-} from '../../utils/mapAppPayload.js';
-import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { buildOptimizationRequestUrl } from './buildOptimizationRequestUrl.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 /**
  * OptimizationTool - Find optimal route through multiple coordinates (V1 API)
@@ -58,42 +55,11 @@ export class OptimizationTool extends MapboxApiBasedTool<
     toolContext: ToolExecutionContext
   ): Promise<CallToolResult> {
     try {
-      // Format coordinates for URL: "lon,lat;lon,lat;..."
-      const coordinatesStr = input.coordinates
-        .map((coord) => `${coord.longitude},${coord.latitude}`)
-        .join(';');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        access_token: accessToken
+      const url = buildOptimizationRequestUrl({
+        input,
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
       });
-
-      if (input.source) {
-        params.set('source', input.source);
-      }
-      if (input.destination) {
-        params.set('destination', input.destination);
-      }
-      params.set('roundtrip', String(input.roundtrip));
-
-      if (input.geometries) {
-        params.set('geometries', input.geometries);
-      }
-      if (input.overview) {
-        params.set('overview', input.overview);
-      }
-      if (input.steps !== undefined) {
-        params.set('steps', String(input.steps));
-      }
-      if (input.annotations && input.annotations.length > 0) {
-        params.set('annotations', input.annotations.join(','));
-      }
-      if (input.language) {
-        params.set('language', input.language);
-      }
-
-      // Build URL: GET /optimized-trips/v1/{profile}/{coordinates}
-      const url = `${MapboxApiBasedTool.mapboxApiEndpoint}optimized-trips/v1/${input.profile}/${coordinatesStr}?${params.toString()}`;
 
       toolContext.span.setAttribute(
         'optimization.coordinates_count',
@@ -170,19 +136,30 @@ export class OptimizationTool extends MapboxApiBasedTool<
         validatedResult.waypoints.length
       );
 
-      const mapPayload = buildOptimizationMapPayload(validatedResult);
+      // The map preview fetches its own optimized trip directly from the
+      // Optimization API (client-side, using the iframe's public token)
+      // rather than depend on server-computed geometry stashed behind a
+      // ref — see selfFetchRef.ts. Always forces geometries=geojson and
+      // overview=full for the self-fetch itself (regardless of what the
+      // original call requested — overview defaults to 'simplified' and
+      // could even be 'false', which would otherwise leave the map preview
+      // with no geometry to draw).
+      const ref = buildSelfFetchRef('optimization', {
+        coordinates: input.coordinates,
+        profile: input.profile,
+        source: input.source,
+        destination: input.destination,
+        roundtrip: input.roundtrip,
+        steps: input.steps,
+        annotations: input.annotations,
+        language: input.language
+      });
+
       const sc: Record<string, unknown> = {
-        ...(validatedResult as unknown as Record<string, unknown>)
+        ...(validatedResult as unknown as Record<string, unknown>),
+        mapboxRender: { ref }
       };
-      let textOut = text;
-      if (mapPayload) {
-        const ref = storeMapPayload(
-          mapPayload,
-          getUserNameFromToken(accessToken)
-        );
-        sc.mapboxRender = { ref };
-        textOut += renderHint(ref);
-      }
+      const textOut = text + renderHint(ref);
 
       return {
         content: [{ type: 'text' as const, text: textOut }],
@@ -205,79 +182,4 @@ export class OptimizationTool extends MapboxApiBasedTool<
       };
     }
   }
-}
-
-/**
- * Build a `MapAppPayload` from an Optimization API response: a single trip
- * line plus numbered visit-order markers (start=green, end=red, middle=blue).
- * Polyline-encoded geometries are decoded tool-side so the iframe only ever
- * receives GeoJSON.
- */
-function buildOptimizationMapPayload(
-  result: OptimizationOutput
-): MapAppPayload | null {
-  const trip = result.trips?.[0];
-  if (!trip) return null;
-
-  let coords: [number, number][] | null = null;
-  const g = trip.geometry as unknown;
-  if (
-    g &&
-    typeof g === 'object' &&
-    (g as { type?: string }).type === 'LineString' &&
-    Array.isArray((g as { coordinates?: unknown }).coordinates)
-  ) {
-    coords = (g as { coordinates: [number, number][] }).coordinates;
-  } else if (typeof g === 'string' && g.length > 0) {
-    coords = decodePolylineWithFallback(g);
-  }
-  if (!coords || coords.length === 0) return null;
-
-  // Stops in optimized visit order: sort waypoints by waypoint_index.
-  const ordered = (result.waypoints ?? [])
-    .map((wp, inputIndex) => ({ wp, inputIndex }))
-    .sort((a, b) => a.wp.waypoint_index - b.wp.waypoint_index);
-
-  const markers: MapAppPayload['markers'] = ordered.map((entry, i) => {
-    const isStart = i === 0;
-    const isEnd = i === ordered.length - 1;
-    const label = String(i + 1);
-    const color = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#2563eb';
-    const popupParts = [`Stop ${i + 1} (input #${entry.inputIndex})`];
-    // wp.name is the snapped road name, not a place name — label accordingly.
-    if (entry.wp.name) popupParts.push(`on ${entry.wp.name}`);
-    return {
-      coordinates: entry.wp.location as [number, number],
-      style: 'numbered',
-      label,
-      color,
-      popup: popupParts.join(' — ')
-    };
-  });
-
-  const miles = (trip.distance / 1609.34).toFixed(1);
-  const minutes = Math.round(trip.duration / 60);
-  const summary = `Optimized trip: ${miles} mi, ${minutes} min`;
-
-  return {
-    summary,
-    layers: [
-      {
-        id: 'trip',
-        type: 'line',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: coords },
-          properties: {}
-        },
-        paint: {
-          'line-color': '#3b82f6',
-          'line-width': 5,
-          'line-opacity': 0.85
-        },
-        layout: { 'line-join': 'round', 'line-cap': 'round' }
-      }
-    ],
-    markers
-  };
 }

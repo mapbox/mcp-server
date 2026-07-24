@@ -90,9 +90,9 @@ export interface MapAppDeferredLayer {
  * Mapbox API using its own public token — rather than server-computed
  * geometry passed through a ref. Used by tools whose geometry is a single
  * Mapbox API call away from the tool's own input params (e.g. directions,
- * isochrone, map matching, search, category search), so the map preview
- * never depends on server-side storage that a process restart or a
- * conversation rehydration could invalidate. See
+ * isochrone, map matching, search, category search, trip optimization),
+ * so the map preview never depends on server-side storage that a process
+ * restart or a conversation rehydration could invalidate. See
  * `src/utils/selfFetchRef.ts` and the `selffetch` handling in
  * `mapAppHtml.ts`.
  */
@@ -102,7 +102,8 @@ export interface MapAppSelfFetch {
     | 'isochrone'
     | 'map_matching'
     | 'search'
-    | 'category_search';
+    | 'category_search'
+    | 'optimization';
   params: Record<string, unknown>;
 }
 
@@ -182,7 +183,8 @@ const MapAppSelfFetchSchema = z.object({
     'isochrone',
     'map_matching',
     'search',
-    'category_search'
+    'category_search',
+    'optimization'
   ]),
   params: z.record(z.string(), z.unknown())
 });

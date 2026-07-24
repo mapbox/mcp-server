@@ -537,6 +537,7 @@ ${initialDataScript}
         else if (sf.tool === 'map_matching') selfFetchMapMatching(sf.params);
         else if (sf.tool === 'search') selfFetchSearch(sf.params);
         else if (sf.tool === 'category_search') selfFetchCategorySearch(sf.params);
+        else if (sf.tool === 'optimization') selfFetchOptimization(sf.params);
       });
     }
   }
@@ -1334,6 +1335,158 @@ ${initialDataScript}
       .catch(function(err) {
         showError(
           'Could not fetch category search results: ' + (err && err.message ? err.message : err)
+        );
+      });
+  }
+
+  // --- Self-fetch: trip optimization --------------------------------------
+  // Mirrors src/tools/optimization-tool/buildOptimizationRequestUrl.ts —
+  // kept in sync by the parity test in
+  // test/resources/ui-apps/optimizationSelfFetchUrlParity.test.ts. Always
+  // forces geometries=geojson and overview=full for the self-fetch itself
+  // — overview defaults to 'simplified' (and could even be 'false') on the
+  // original call, either of which would otherwise leave the map preview
+  // with no geometry to draw.
+  var OPTIMIZATION_PROFILES = ['mapbox/driving', 'mapbox/walking', 'mapbox/cycling', 'mapbox/driving-traffic'];
+
+  function buildOptimizationApiUrl(params, publicToken, apiEndpoint) {
+    var coordsString = params.coordinates
+      .map(function(c) { return c.longitude + ',' + c.latitude; })
+      .join(';');
+    var profile = params.profile || 'mapbox/driving';
+
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    if (params.source) {
+      qp.append('source', params.source);
+    }
+    if (params.destination) {
+      qp.append('destination', params.destination);
+    }
+    qp.append('roundtrip', String(params.roundtrip));
+    qp.append('geometries', 'geojson');
+    qp.append('overview', 'full');
+    if (params.steps !== undefined && params.steps !== null) {
+      qp.append('steps', String(params.steps));
+    }
+    if (params.annotations && params.annotations.length > 0) {
+      qp.append('annotations', params.annotations.join(','));
+    }
+    if (params.language) {
+      qp.append('language', params.language);
+    }
+
+    return apiEndpoint + 'optimized-trips/v1/' + profile + '/' + coordsString +
+      '?' + qp.toString();
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildOptimizationApiUrl = buildOptimizationApiUrl;
+
+  // profile is spliced into the URL path unencoded, so it must be one of
+  // the known enum values rather than any string. Coordinates get
+  // interpolated directly too, so must be finite numbers.
+  function isSafeOptimizationParams(params) {
+    if (!params || !Array.isArray(params.coordinates) || params.coordinates.length < 2) {
+      return false;
+    }
+    for (var i = 0; i < params.coordinates.length; i++) {
+      var c = params.coordinates[i];
+      if (!c || typeof c.longitude !== 'number' || !isFinite(c.longitude)) return false;
+      if (typeof c.latitude !== 'number' || !isFinite(c.latitude)) return false;
+    }
+    if (params.profile !== undefined && params.profile !== null) {
+      if (OPTIMIZATION_PROFILES.indexOf(params.profile) === -1) return false;
+    }
+    return true;
+  }
+
+  // Mirrors the deleted server-side buildOptimizationMapPayload (now
+  // client-only since the map preview self-fetches): a single trip line
+  // plus numbered visit-order markers (start=green, end=red, middle=blue).
+  function buildOptimizationMiniPayload(data, params) {
+    var trip = data && data.trips && data.trips[0];
+    if (!trip || !trip.geometry || !Array.isArray(trip.geometry.coordinates) ||
+        trip.geometry.coordinates.length === 0) {
+      return null;
+    }
+
+    var waypoints = data.waypoints || [];
+    var ordered = waypoints.map(function(wp, inputIndex) {
+      return { wp: wp, inputIndex: inputIndex };
+    }).sort(function(a, b) { return a.wp.waypoint_index - b.wp.waypoint_index; });
+
+    var markers = ordered.map(function(entry, i) {
+      var isStart = i === 0;
+      var isEnd = i === ordered.length - 1;
+      var color = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#2563eb';
+      var popupParts = ['Stop ' + (i + 1) + ' (input #' + entry.inputIndex + ')'];
+      // wp.name is the snapped road name, not a place name — label accordingly.
+      if (entry.wp.name) popupParts.push('on ' + entry.wp.name);
+      return {
+        coordinates: entry.wp.location,
+        style: 'numbered',
+        label: String(i + 1),
+        color: color,
+        popup: popupParts.join(' — ')
+      };
+    });
+
+    var miles = (trip.distance / 1609.34).toFixed(1);
+    var minutes = Math.round(trip.duration / 60);
+    var summary = 'Optimized trip: ' + miles + ' mi, ' + minutes + ' min';
+
+    return {
+      summary: summary,
+      layers: [
+        {
+          id: 'selffetch-optimization-trip',
+          type: 'line',
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: trip.geometry.coordinates }, properties: {} },
+          paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 0.85 },
+          layout: { 'line-join': 'round', 'line-cap': 'round' }
+        }
+      ],
+      markers: markers
+    };
+  }
+
+  function selfFetchOptimization(params) {
+    if (!TOKEN || !isSafeOptimizationParams(params)) {
+      showError('Could not fetch optimized trip: missing token or invalid parameters.');
+      return;
+    }
+    var url = buildOptimizationApiUrl(params, TOKEN, API_ENDPOINT);
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function() { return null; })
+            .then(function(body) {
+              var msg =
+                body && body.message
+                  ? body.message
+                  : 'Optimization API error (' + res.status + ')';
+              throw new Error(msg);
+            });
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        if (data && data.code !== 'Ok') {
+          showError('Optimization API error (code: ' + data.code + ').');
+          return;
+        }
+        var mini = buildOptimizationMiniPayload(data, params);
+        if (!mini) {
+          showError('Optimization API returned no trip.');
+          return;
+        }
+        mergeAdditionalPayload(mini);
+      })
+      .catch(function(err) {
+        showError(
+          'Could not fetch optimized trip: ' + (err && err.message ? err.message : err)
         );
       });
   }

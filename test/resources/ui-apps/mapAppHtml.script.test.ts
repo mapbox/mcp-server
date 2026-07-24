@@ -889,3 +889,150 @@ describe('mapAppHtml category search self-fetch', () => {
     );
   });
 });
+
+describe('mapAppHtml optimization self-fetch', () => {
+  it('fetches and draws the trip line + numbered visit markers from a selfFetch descriptor', async () => {
+    const { sendToolResult, setFetchImpl, map, summaryEl, errorEl } =
+      loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    const addSourceSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+    map.addSource = addSourceSpy;
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        code: 'Ok',
+        trips: [
+          {
+            distance: 16093,
+            duration: 1200,
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-122.4194, 37.7749],
+                [-122.4195, 37.775],
+                [-122.4197, 37.7751]
+              ]
+            }
+          }
+        ],
+        waypoints: [
+          { waypoint_index: 0, location: [-122.4194, 37.7749] },
+          { waypoint_index: 1, location: [-122.4195, 37.775] },
+          { waypoint_index: 2, location: [-122.4197, 37.7751] }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/optimization?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'optimization',
+              params: {
+                coordinates: [
+                  { longitude: -122.4194, latitude: 37.7749 },
+                  { longitude: -122.4195, latitude: 37.775 },
+                  { longitude: -122.4197, latitude: 37.7751 }
+                ],
+                profile: 'mapbox/driving',
+                roundtrip: true
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      'optimized-trips/v1/mapbox/driving/'
+    );
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('geometries=geojson');
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('overview=full');
+    expect(addSourceSpy).toHaveBeenCalledWith(
+      'selffetch-optimization-trip',
+      expect.objectContaining({ type: 'geojson' })
+    );
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'selffetch-optimization-trip' })
+    );
+    expect(summaryEl?.textContent).toBe('Optimized trip: 10.0 mi, 20 min');
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('shows an error for a non-Ok code instead of a broken map', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ code: 'NoRoute' })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/optimization?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'optimization',
+              params: {
+                coordinates: [
+                  { longitude: -122.4194, latitude: 37.7749 },
+                  { longitude: -122.4195, latitude: 37.775 }
+                ],
+                roundtrip: true
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(errorEl?.textContent).toContain('Optimization API error');
+  });
+
+  it('never fetches when the selfFetch params are unsafe (e.g. forged profile)', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 599,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/optimization?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'optimization',
+              params: {
+                coordinates: [
+                  { longitude: -122.4194, latitude: 37.7749 },
+                  { longitude: -122.4195, latitude: 37.775 }
+                ],
+                profile: 'mapbox/driving/../../evil',
+                roundtrip: true
+              }
+            }
+          ]
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(errorEl?.textContent).toContain('Could not fetch optimized trip');
+  });
+});
