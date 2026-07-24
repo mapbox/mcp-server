@@ -11,7 +11,8 @@ const SELF_FETCH_TOOLS: readonly SelfFetchTool[] = [
   'directions',
   'isochrone',
   'map_matching',
-  'search'
+  'search',
+  'category_search'
 ];
 
 /**

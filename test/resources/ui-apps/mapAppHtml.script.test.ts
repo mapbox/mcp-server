@@ -804,3 +804,88 @@ describe('mapAppHtml search self-fetch', () => {
     expect(errorEl?.textContent).toContain('Could not fetch search results');
   });
 });
+
+describe('mapAppHtml category search self-fetch', () => {
+  it('fetches and draws numbered POI markers from a selfFetch descriptor', async () => {
+    const { sendToolResult, setFetchImpl, map, summaryEl, errorEl } =
+      loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    const addSourceSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+    map.addSource = addSourceSpy;
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Cafe Reveille' },
+            geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'category_search',
+              params: {
+                category: 'cafe',
+                proximity: { longitude: -122.42, latitude: 37.78 }
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      'search/searchbox/v1/category/cafe'
+    );
+    expect(addSourceSpy).toHaveBeenCalledWith(
+      'selffetch-search-results',
+      expect.objectContaining({ type: 'geojson' })
+    );
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'selffetch-search-results' })
+    );
+    expect(summaryEl?.textContent).toBe('1 result for "cafe"');
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('never fetches when the selfFetch params are unsafe (missing category)', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 599,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [{ tool: 'category_search', params: {} }]
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(errorEl?.textContent).toContain(
+      'Could not fetch category search results'
+    );
+  });
+});

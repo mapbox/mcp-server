@@ -440,7 +440,7 @@ describe('CategorySearchTool', () => {
     expect(tool.outputSchema).toBeTruthy();
   });
 
-  it('stores a mapboxRender payload with numbered POI markers', async () => {
+  it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
     const fakeResp = {
       type: 'FeatureCollection',
       features: [
@@ -474,16 +474,23 @@ describe('CategorySearchTool', () => {
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
-    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
-
-    const { resolveMapPayloadRef } =
-      await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(
-      sc.mapboxRender!.ref!,
-      'account-test-category-search'
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/category_search\?data=/
     );
-    // Search-center pin + 1 numbered marker
-    expect(payload?.markers?.[0]?.style).toBe('pin');
-    expect(payload?.markers?.[1]?.style).toBe('numbered');
+
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'category_search',
+        params: expect.objectContaining({
+          category: 'cafe',
+          proximity: { longitude: -122.42, latitude: 37.78 }
+        })
+      }
+    ]);
   });
 });

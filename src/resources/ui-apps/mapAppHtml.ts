@@ -536,6 +536,7 @@ ${initialDataScript}
         else if (sf.tool === 'isochrone') selfFetchIsochrone(sf.params);
         else if (sf.tool === 'map_matching') selfFetchMapMatching(sf.params);
         else if (sf.tool === 'search') selfFetchSearch(sf.params);
+        else if (sf.tool === 'category_search') selfFetchCategorySearch(sf.params);
       });
     }
   }
@@ -1255,6 +1256,84 @@ ${initialDataScript}
       .catch(function(err) {
         showError(
           'Could not fetch search results: ' + (err && err.message ? err.message : err)
+        );
+      });
+  }
+
+  // --- Self-fetch: category search ---------------------------------------
+  // Mirrors src/tools/category-search-tool/buildCategorySearchRequestUrl.ts
+  // — kept in sync by the parity test in
+  // test/resources/ui-apps/categorySearchSelfFetchUrlParity.test.ts. Shares
+  // buildSearchMiniPayload with the plain search self-fetch above — both
+  // return the same Search Box FeatureCollection shape.
+  function buildCategorySearchApiUrl(params, publicToken, apiEndpoint) {
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    if (params.language) {
+      qp.append('language', params.language);
+    }
+    if (params.limit !== undefined && params.limit !== null) {
+      qp.append('limit', String(params.limit));
+    }
+    if (params.proximity) {
+      qp.append('proximity', params.proximity.longitude + ',' + params.proximity.latitude);
+    }
+    if (params.bbox) {
+      qp.append(
+        'bbox',
+        params.bbox.minLongitude + ',' + params.bbox.minLatitude + ',' +
+          params.bbox.maxLongitude + ',' + params.bbox.maxLatitude
+      );
+    }
+    if (params.country && params.country.length > 0) {
+      qp.append('country', params.country.join(','));
+    }
+    if (params.poi_category_exclusions && params.poi_category_exclusions.length > 0) {
+      qp.append('poi_category_exclusions', params.poi_category_exclusions.join(','));
+    }
+    return apiEndpoint + 'search/searchbox/v1/category/' +
+      encodeURIComponent(params.category) + '?' + qp.toString();
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildCategorySearchApiUrl = buildCategorySearchApiUrl;
+
+  function isSafeCategorySearchParams(params) {
+    return !!params && typeof params.category === 'string' && params.category.length > 0;
+  }
+
+  function selfFetchCategorySearch(params) {
+    if (!TOKEN || !isSafeCategorySearchParams(params)) {
+      showError('Could not fetch category search results: missing token or invalid parameters.');
+      return;
+    }
+    var url = buildCategorySearchApiUrl(params, TOKEN, API_ENDPOINT);
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function() { return null; })
+            .then(function(body) {
+              var msg =
+                body && body.message
+                  ? body.message
+                  : 'Category Search API error (' + res.status + ')';
+              throw new Error(msg);
+            });
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        var mini = buildSearchMiniPayload(data, params.category, params.proximity);
+        if (!mini) {
+          showError('Category Search API returned no results.');
+          return;
+        }
+        mergeAdditionalPayload(mini);
+      })
+      .catch(function(err) {
+        showError(
+          'Could not fetch category search results: ' + (err && err.message ? err.message : err)
         );
       });
   }
