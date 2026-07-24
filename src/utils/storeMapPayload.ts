@@ -56,12 +56,6 @@ export function storeMapPayload(
 ): string {
   const id = randomUUID();
   const uri = `${TEMP_URI_PREFIX}${id}`;
-  // TEMP DIAGNOSTIC (remove once the Claude Desktop rehydration/expiry bug
-  // is root-caused): compare this owner against whatever
-  // TemporaryDataResource.read() logs for the same uri.
-  console.error(
-    `[mapbox-mcp-debug] storeMapPayload: uri=${uri} owner=${owner ?? '<undefined>'}`
-  );
   // 30-minute TTL is the temporaryResourceManager default — same as the
   // directions/isochrone large-response stash, so the lifetime story is
   // consistent across uses.
