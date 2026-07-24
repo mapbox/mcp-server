@@ -441,4 +441,35 @@ describe('RenderMapTool', () => {
     const text = (result.content[0] as { type: 'text'; text: string }).text;
     expect(text).toContain('will also fetch and draw');
   });
+
+  it('passes through an isochrone self-fetch ref with no owner and no prior server-side state (simulated restart)', async () => {
+    const { buildSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const ref = buildSelfFetchRef('isochrone', {
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_minutes: [10]
+    });
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ payload_refs: [ref] });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      layer_count: number;
+      mapboxRender?: { selfFetch?: unknown[] };
+    };
+    expect(sc.layer_count).toBe(0);
+    expect(sc.mapboxRender?.selfFetch).toEqual([
+      {
+        tool: 'isochrone',
+        params: expect.objectContaining({
+          profile: 'mapbox/driving',
+          contours_minutes: [10]
+        })
+      }
+    ]);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('will also fetch and draw');
+  });
 });

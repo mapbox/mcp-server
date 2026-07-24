@@ -7,21 +7,15 @@ import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { IsochroneInputSchema } from './IsochroneTool.input.schema.js';
+import { buildIsochroneRequestUrl } from './buildIsochroneRequestUrl.js';
 import {
   IsochroneResponseSchema,
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
-import type { MapAppPayload } from '../../utils/mapAppPayload.js';
-import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 import { getUserNameFromToken } from '../../utils/jwtUtils.js';
-
-const HEX6_RE = /^[0-9a-fA-F]{6}$/;
-function sanitizeHex(raw: unknown, fallback: string): string {
-  if (typeof raw !== 'string') return fallback;
-  const bare = raw.replace(/^#/, '');
-  return HEX6_RE.test(bare) ? `#${bare}` : fallback;
-}
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -91,10 +85,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
     input: z.infer<typeof IsochroneInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
-    );
-    url.searchParams.append('access_token', accessToken);
     if (
       (!input.contours_minutes || input.contours_minutes.length === 0) &&
       (!input.contours_meters || input.contours_meters.length === 0)
@@ -109,39 +99,12 @@ export class IsochroneTool extends MapboxApiBasedTool<
         isError: true
       };
     }
-    if (input.contours_minutes && input.contours_minutes.length > 0) {
-      url.searchParams.append(
-        'contours_minutes',
-        input.contours_minutes.join(',')
-      );
-    }
-    if (input.contours_meters && input.contours_meters.length > 0) {
-      url.searchParams.append(
-        'contours_meters',
-        input.contours_meters?.join(',')
-      );
-    }
-    if (input.contours_colors && input.contours_colors.length > 0) {
-      url.searchParams.append(
-        'contours_colors',
-        input.contours_colors.join(',')
-      );
-    }
-    if (input.polygons) {
-      url.searchParams.append('polygons', String(input.polygons));
-    }
-    if (input.denoise) {
-      url.searchParams.append('denoise', String(input.denoise));
-    }
-    if (input.generalize) {
-      url.searchParams.append('generalize', String(input.generalize));
-    }
-    if (input.exclude && input.exclude.length > 0) {
-      url.searchParams.append('exclude', input.exclude.join(','));
-    }
-    if (input.depart_at) {
-      url.searchParams.append('depart_at', input.depart_at);
-    }
+
+    const url = buildIsochroneRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
     const response = await this.httpRequest(url);
 
@@ -164,7 +127,25 @@ export class IsochroneTool extends MapboxApiBasedTool<
     const responseText = JSON.stringify(data, null, 2);
     const responseSize = responseText.length;
 
-    const mapPayload = buildIsochroneMapPayload(data, input);
+    // The map preview fetches its own contours directly from the Isochrone
+    // API (client-side, using the iframe's public token) rather than
+    // depend on server-computed geometry stashed behind a ref — see
+    // selfFetchRef.ts. This ref carries only the call's own input params
+    // (already visible to the LLM), so unlike a mapbox://temp/ ref there's
+    // nothing server-side that a restart or a rehydrated conversation
+    // could invalidate.
+    const selfFetchRef = buildSelfFetchRef('isochrone', {
+      profile: input.profile,
+      coordinates: input.coordinates,
+      contours_minutes: input.contours_minutes,
+      contours_meters: input.contours_meters,
+      contours_colors: input.contours_colors,
+      polygons: input.polygons,
+      denoise: input.denoise,
+      generalize: input.generalize,
+      exclude: input.exclude,
+      depart_at: input.depart_at
+    });
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
       const resourceId = randomBytes(16).toString('hex');
@@ -182,16 +163,10 @@ export class IsochroneTool extends MapboxApiBasedTool<
         (data as { features?: unknown[] }).features?.length ?? 0;
       const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full GeoJSON if needed.`;
 
-      const summaryStructured: Record<string, unknown> = {};
-      let largeText = summaryText;
-      if (mapPayload) {
-        const ref = storeMapPayload(
-          mapPayload,
-          getUserNameFromToken(accessToken)
-        );
-        summaryStructured.mapboxRender = { ref };
-        largeText += renderHint(ref);
-      }
+      const summaryStructured: Record<string, unknown> = {
+        mapboxRender: { ref: selfFetchRef }
+      };
+      const largeText = summaryText + renderHint(selfFetchRef);
       return {
         content: [{ type: 'text', text: largeText }],
         structuredContent: summaryStructured,
@@ -216,17 +191,10 @@ export class IsochroneTool extends MapboxApiBasedTool<
       : responseText;
 
     const sc: Record<string, unknown> = {
-      ...(validated as unknown as Record<string, unknown>)
+      ...(validated as unknown as Record<string, unknown>),
+      mapboxRender: { ref: selfFetchRef }
     };
-    let smallText = text;
-    if (mapPayload) {
-      const ref = storeMapPayload(
-        mapPayload,
-        getUserNameFromToken(accessToken)
-      );
-      sc.mapboxRender = { ref };
-      smallText += renderHint(ref);
-    }
+    const smallText = text + renderHint(selfFetchRef);
 
     return {
       content: [{ type: 'text', text: smallText }],
@@ -234,96 +202,4 @@ export class IsochroneTool extends MapboxApiBasedTool<
       isError: false
     };
   }
-}
-
-/**
- * Build a `MapAppPayload` from a Mapbox Isochrone API response. Each contour
- * becomes a fill+line layer pair colored per the API-supplied `color`/`fillColor`
- * (or a teal default), with the origin marked.
- */
-function buildIsochroneMapPayload(
-  data: unknown,
-  input: z.infer<typeof IsochroneInputSchema>
-): MapAppPayload | null {
-  const fc = data as
-    | {
-        type?: string;
-        features?: Array<{
-          geometry?: { type?: string; coordinates?: unknown };
-          properties?: Record<string, unknown>;
-        }>;
-      }
-    | null
-    | undefined;
-  if (
-    !fc ||
-    fc.type !== 'FeatureCollection' ||
-    !Array.isArray(fc.features) ||
-    fc.features.length === 0
-  ) {
-    return null;
-  }
-
-  // Render contours largest-first → smallest-on-top for a clean layered look.
-  const ordered = fc.features.slice().reverse();
-  const layers: MapAppPayload['layers'] = [];
-  ordered.forEach((feature, i) => {
-    const props = feature.properties ?? {};
-    const color = sanitizeHex(
-      (props as { color?: unknown; fillColor?: unknown }).color ??
-        (props as { fillColor?: unknown }).fillColor,
-      '#3b82f6'
-    );
-    const fillOpacity =
-      typeof props.fillOpacity === 'number' ? props.fillOpacity : 0.25;
-
-    if (feature.geometry?.type === 'Polygon' && feature.geometry.coordinates) {
-      layers.push({
-        id: `iso-fill-${i}`,
-        type: 'fill',
-        data: {
-          type: 'Feature',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          geometry: feature.geometry as any,
-          properties: {}
-        },
-        paint: { 'fill-color': color, 'fill-opacity': fillOpacity }
-      });
-    }
-    layers.push({
-      id: `iso-line-${i}`,
-      type: 'line',
-      data: {
-        type: 'Feature',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        geometry: feature.geometry as any,
-        properties: {}
-      },
-      paint: { 'line-color': color, 'line-width': 2, 'line-opacity': 0.9 },
-      layout: { 'line-join': 'round', 'line-cap': 'round' }
-    });
-  });
-
-  const mode = input.profile.replace('mapbox/', '').replace('-', ' ');
-  let summary = `Isochrone: ${fc.features.length} contour${fc.features.length !== 1 ? 's' : ''}`;
-  if (input.contours_minutes && input.contours_minutes.length > 0) {
-    summary = `Reachable by ${mode}: ${input.contours_minutes.map((m) => `${m} min`).join(', ')}`;
-  } else if (input.contours_meters && input.contours_meters.length > 0) {
-    summary = `Reachable by ${mode}: ${input.contours_meters
-      .map((m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`))
-      .join(', ')}`;
-  }
-
-  return {
-    summary,
-    layers,
-    markers: [
-      {
-        coordinates: [input.coordinates.longitude, input.coordinates.latitude],
-        style: 'pin',
-        color: '#0f172a',
-        popup: 'Origin'
-      }
-    ]
-  };
 }

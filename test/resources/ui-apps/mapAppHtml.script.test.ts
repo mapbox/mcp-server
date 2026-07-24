@@ -422,3 +422,109 @@ describe('mapAppHtml directions self-fetch', () => {
     expect(errorEl?.textContent).toContain('Could not fetch route');
   });
 });
+
+describe('mapAppHtml isochrone self-fetch', () => {
+  it('fetches and draws contours itself from a selfFetch descriptor', async () => {
+    const { sendToolResult, setFetchImpl, map, summaryEl, errorEl } =
+      loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    const addSourceSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+    map.addSource = addSourceSpy;
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { contour: 10, fillColor: '6b7280' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [-74.01, 40.71],
+                  [-74.0, 40.71],
+                  [-74.0, 40.72],
+                  [-74.01, 40.72],
+                  [-74.01, 40.71]
+                ]
+              ]
+            }
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/isochrone?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'isochrone',
+              params: {
+                coordinates: { longitude: -74.006, latitude: 40.7128 },
+                profile: 'mapbox/driving',
+                contours_minutes: [10]
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      'isochrone/v1/mapbox/driving/-74.006%2C40.7128'
+    );
+    expect(addSourceSpy).toHaveBeenCalledWith(
+      'selffetch-isochrone-fill-0',
+      expect.objectContaining({ type: 'geojson' })
+    );
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'selffetch-isochrone-fill-0' })
+    );
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'selffetch-isochrone-line-0' })
+    );
+    expect(summaryEl?.textContent).toBe('Reachable by driving: 10 min');
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('never fetches when the selfFetch params are unsafe (e.g. forged profile)', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 599,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/isochrone?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'isochrone',
+              params: {
+                coordinates: { longitude: -74.006, latitude: 40.7128 },
+                profile: 'mapbox/driving/../../evil'
+              }
+            }
+          ]
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(errorEl?.textContent).toContain('Could not fetch isochrone');
+  });
+});

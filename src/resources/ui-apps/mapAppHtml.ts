@@ -525,12 +525,15 @@ ${initialDataScript}
       );
     }
 
-    // Self-fetched layers (e.g. a directions route): the ref only carried
-    // the tool's own input params, so fetch and draw them ourselves now
-    // that the map is up, rather than depend on server-computed geometry.
+    // Self-fetched layers (e.g. a directions route or isochrone contours):
+    // the ref only carried the tool's own input params, so fetch and draw
+    // them ourselves now that the map is up, rather than depend on
+    // server-computed geometry.
     if (Array.isArray(payload.selfFetch)) {
       payload.selfFetch.forEach(function(sf) {
-        if (sf && sf.tool === 'directions') selfFetchDirections(sf.params);
+        if (!sf) return;
+        if (sf.tool === 'directions') selfFetchDirections(sf.params);
+        else if (sf.tool === 'isochrone') selfFetchIsochrone(sf.params);
       });
     }
   }
@@ -770,6 +773,166 @@ ${initialDataScript}
       .catch(function(err) {
         showError(
           'Could not fetch route: ' + (err && err.message ? err.message : err)
+        );
+      });
+  }
+
+  // --- Self-fetch: isochrone --------------------------------------------
+  // Mirrors src/tools/isochrone-tool/buildIsochroneRequestUrl.ts — kept in
+  // sync by the parity test in
+  // test/resources/ui-apps/isochroneSelfFetchUrlParity.test.ts.
+  function buildIsochroneApiUrl(params, publicToken, apiEndpoint) {
+    var profile = params.profile || 'mapbox/driving-traffic';
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    if (params.contours_minutes && params.contours_minutes.length > 0) {
+      qp.append('contours_minutes', params.contours_minutes.join(','));
+    }
+    if (params.contours_meters && params.contours_meters.length > 0) {
+      qp.append('contours_meters', params.contours_meters.join(','));
+    }
+    if (params.contours_colors && params.contours_colors.length > 0) {
+      qp.append('contours_colors', params.contours_colors.join(','));
+    }
+    if (params.polygons) {
+      qp.append('polygons', String(params.polygons));
+    }
+    if (params.denoise) {
+      qp.append('denoise', String(params.denoise));
+    }
+    if (params.generalize) {
+      qp.append('generalize', String(params.generalize));
+    }
+    if (params.exclude && params.exclude.length > 0) {
+      qp.append('exclude', params.exclude.join(','));
+    }
+    if (params.depart_at) {
+      qp.append('depart_at', params.depart_at);
+    }
+    return apiEndpoint + 'isochrone/v1/' + profile + '/' +
+      params.coordinates.longitude + '%2C' + params.coordinates.latitude +
+      '?' + qp.toString();
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildIsochroneApiUrl = buildIsochroneApiUrl;
+
+  // params came from the ref and get interpolated into the request URL —
+  // profile is spliced into the URL path unencoded, so validate it the
+  // same way isSafeDirectionsParams validates routing_profile. Every
+  // other field goes through URLSearchParams.append, which percent-encodes
+  // automatically, so no extra charset validation is needed there.
+  function isSafeIsochroneParams(params) {
+    if (!params || !params.coordinates) return false;
+    var c = params.coordinates;
+    if (typeof c.longitude !== 'number' || !isFinite(c.longitude)) return false;
+    if (typeof c.latitude !== 'number' || !isFinite(c.latitude)) return false;
+    if (params.profile !== undefined && params.profile !== null) {
+      if (typeof params.profile !== 'string') return false;
+      if (!/^mapbox\\/[a-z-]+$/.test(params.profile)) return false;
+    }
+    return true;
+  }
+
+  var ISO_HEX6_RE = /^[0-9a-fA-F]{6}$/;
+  function sanitizeHexClient(raw, fallback) {
+    if (typeof raw !== 'string') return fallback;
+    var bare = raw.replace(/^#/, '');
+    return ISO_HEX6_RE.test(bare) ? '#' + bare : fallback;
+  }
+
+  // Mirrors buildIsochroneMapPayload (formerly server-side in
+  // IsochroneTool.ts, now client-only since the map preview self-fetches).
+  function buildIsochroneMiniPayload(data, params) {
+    var fc = data;
+    if (!fc || fc.type !== 'FeatureCollection' ||
+        !Array.isArray(fc.features) || fc.features.length === 0) {
+      return null;
+    }
+
+    // Render contours largest-first → smallest-on-top for a clean layered look.
+    var ordered = fc.features.slice().reverse();
+    var layers = [];
+    ordered.forEach(function(feature, i) {
+      var props = feature.properties || {};
+      var color = sanitizeHexClient(props.color || props.fillColor, '#3b82f6');
+      var fillOpacity = (typeof props.fillOpacity === 'number') ? props.fillOpacity : 0.25;
+
+      if (feature.geometry && feature.geometry.type === 'Polygon' && feature.geometry.coordinates) {
+        layers.push({
+          id: 'selffetch-isochrone-fill-' + i,
+          type: 'fill',
+          data: { type: 'Feature', geometry: feature.geometry, properties: {} },
+          paint: { 'fill-color': color, 'fill-opacity': fillOpacity }
+        });
+      }
+      layers.push({
+        id: 'selffetch-isochrone-line-' + i,
+        type: 'line',
+        data: { type: 'Feature', geometry: feature.geometry, properties: {} },
+        paint: { 'line-color': color, 'line-width': 2, 'line-opacity': 0.9 },
+        layout: { 'line-join': 'round', 'line-cap': 'round' }
+      });
+    });
+
+    var mode = (params.profile || 'mapbox/driving-traffic').replace('mapbox/', '').replace('-', ' ');
+    var summary = 'Isochrone: ' + fc.features.length + ' contour' + (fc.features.length !== 1 ? 's' : '');
+    if (params.contours_minutes && params.contours_minutes.length > 0) {
+      summary = 'Reachable by ' + mode + ': ' + params.contours_minutes.map(function(m) {
+        return m + ' min';
+      }).join(', ');
+    } else if (params.contours_meters && params.contours_meters.length > 0) {
+      summary = 'Reachable by ' + mode + ': ' + params.contours_meters.map(function(m) {
+        return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m';
+      }).join(', ');
+    }
+
+    return {
+      summary: summary,
+      layers: layers,
+      markers: [
+        {
+          coordinates: [params.coordinates.longitude, params.coordinates.latitude],
+          style: 'pin',
+          color: '#0f172a',
+          popup: 'Origin'
+        }
+      ]
+    };
+  }
+
+  function selfFetchIsochrone(params) {
+    if (!TOKEN || !isSafeIsochroneParams(params)) {
+      showError('Could not fetch isochrone: missing token or invalid parameters.');
+      return;
+    }
+    var url = buildIsochroneApiUrl(params, TOKEN, API_ENDPOINT);
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function() { return null; })
+            .then(function(body) {
+              var msg =
+                body && body.message
+                  ? body.message
+                  : 'Isochrone API error (' + res.status + ')';
+              throw new Error(msg);
+            });
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        var mini = buildIsochroneMiniPayload(data, params);
+        if (!mini) {
+          showError('Isochrone API returned no contours.');
+          return;
+        }
+        mergeAdditionalPayload(mini);
+      })
+      .catch(function(err) {
+        showError(
+          'Could not fetch isochrone: ' + (err && err.message ? err.message : err)
         );
       });
   }

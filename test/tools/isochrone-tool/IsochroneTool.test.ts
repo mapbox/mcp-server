@@ -137,7 +137,7 @@ describe('IsochroneTool', () => {
     expect(result.isError).toBe(true);
   });
 
-  it('stores a mapboxRender payload that includes a fill+line per contour', async () => {
+  it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
     const isochrone = {
       type: 'FeatureCollection',
       features: [
@@ -185,21 +185,30 @@ describe('IsochroneTool', () => {
     expect(result.isError).toBe(false);
 
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
-    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/isochrone\?data=/
+    );
 
     const text = (result.content[0] as { text: string }).text;
     expect(text).toContain('render_map_tool');
     expect(text).toContain(sc.mapboxRender!.ref!);
 
-    const { resolveMapPayloadRef } =
-      await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(
-      sc.mapboxRender!.ref!,
-      'account-test-isochrone'
-    );
-    // One fill + one line per polygon contour, plus origin marker.
-    expect(payload?.layers?.map((l) => l.type)).toEqual(['fill', 'line']);
-    expect(payload?.markers).toHaveLength(1);
-    expect(payload?.markers?.[0].coordinates).toEqual([-74.006, 40.7128]);
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'isochrone',
+        params: expect.objectContaining({
+          coordinates: { longitude: -74.006, latitude: 40.7128 },
+          profile: 'mapbox/driving',
+          contours_minutes: [10],
+          polygons: true,
+          generalize: 1000
+        })
+      }
+    ]);
   });
 });

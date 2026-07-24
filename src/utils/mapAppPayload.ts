@@ -89,14 +89,14 @@ export interface MapAppDeferredLayer {
  * A layer the iframe must fetch and build *itself*, directly from the
  * Mapbox API using its own public token — rather than server-computed
  * geometry passed through a ref. Used by tools whose geometry is a single
- * Mapbox API call away from the tool's own input params (e.g. directions),
- * so the map preview never depends on server-side storage that a process
- * restart or a conversation rehydration could invalidate. See
- * `src/utils/selfFetchRef.ts` and the `selffetch` handling in
+ * Mapbox API call away from the tool's own input params (e.g. directions,
+ * isochrone), so the map preview never depends on server-side storage
+ * that a process restart or a conversation rehydration could invalidate.
+ * See `src/utils/selfFetchRef.ts` and the `selffetch` handling in
  * `mapAppHtml.ts`.
  */
 export interface MapAppSelfFetch {
-  tool: 'directions';
+  tool: 'directions' | 'isochrone';
   params: Record<string, unknown>;
 }
 
@@ -171,7 +171,7 @@ const MapAppCameraSchema = z.object({
 });
 
 const MapAppSelfFetchSchema = z.object({
-  tool: z.literal('directions'),
+  tool: z.enum(['directions', 'isochrone']),
   params: z.record(z.string(), z.unknown())
 });
 
