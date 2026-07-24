@@ -7,6 +7,13 @@ const SELF_FETCH_URI_PREFIX = 'mapbox://selffetch/';
 
 export type SelfFetchTool = MapAppSelfFetch['tool'];
 
+const SELF_FETCH_TOOLS: readonly SelfFetchTool[] = [
+  'directions',
+  'isochrone',
+  'map_matching',
+  'search'
+];
+
 /**
  * Build a ref for a tool whose map preview is fetched by the iframe itself,
  * directly from the Mapbox API using its own public token — rather than
@@ -53,13 +60,7 @@ export function resolveSelfFetchRef(uri: string): MapAppPayload | null {
     return null;
   }
   if (!encoded) return null;
-  if (
-    tool !== 'directions' &&
-    tool !== 'isochrone' &&
-    tool !== 'map_matching'
-  ) {
-    return null;
-  }
+  if (!SELF_FETCH_TOOLS.includes(tool as SelfFetchTool)) return null;
 
   let params: Record<string, unknown>;
   try {
@@ -71,6 +72,6 @@ export function resolveSelfFetchRef(uri: string): MapAppPayload | null {
 
   return {
     layers: [],
-    selfFetch: [{ tool, params }]
+    selfFetch: [{ tool: tool as SelfFetchTool, params }]
   };
 }

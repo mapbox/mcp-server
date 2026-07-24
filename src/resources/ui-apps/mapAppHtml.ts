@@ -525,16 +525,17 @@ ${initialDataScript}
       );
     }
 
-    // Self-fetched layers (e.g. a directions route, isochrone contours, or
-    // a map-matched trace): the ref only carried the tool's own input
-    // params, so fetch and draw them ourselves now that the map is up,
-    // rather than depend on server-computed geometry.
+    // Self-fetched layers (e.g. a directions route, isochrone contours, a
+    // map-matched trace, or search results): the ref only carried the
+    // tool's own input params, so fetch and draw them ourselves now that
+    // the map is up, rather than depend on server-computed geometry.
     if (Array.isArray(payload.selfFetch)) {
       payload.selfFetch.forEach(function(sf) {
         if (!sf) return;
         if (sf.tool === 'directions') selfFetchDirections(sf.params);
         else if (sf.tool === 'isochrone') selfFetchIsochrone(sf.params);
         else if (sf.tool === 'map_matching') selfFetchMapMatching(sf.params);
+        else if (sf.tool === 'search') selfFetchSearch(sf.params);
       });
     }
   }
@@ -1077,6 +1078,183 @@ ${initialDataScript}
       .catch(function(err) {
         showError(
           'Could not fetch map match: ' + (err && err.message ? err.message : err)
+        );
+      });
+  }
+
+  // --- Self-fetch: search / geocode --------------------------------------
+  // Mirrors src/tools/search-and-geocode-tool/buildSearchAndGeocodeRequestUrl.ts
+  // — kept in sync by the parity test in
+  // test/resources/ui-apps/searchSelfFetchUrlParity.test.ts. Every param
+  // goes through URLSearchParams.append (nothing is spliced unencoded into
+  // the URL path), so there's no charset validation to mirror here beyond
+  // requiring "q" to be a string.
+  function buildSearchAndGeocodeApiUrl(params, publicToken, apiEndpoint) {
+    var qp = new URLSearchParams();
+    qp.append('q', params.q);
+    qp.append('access_token', publicToken);
+    if (params.language) {
+      qp.append('language', params.language);
+    }
+    qp.append('limit', '10');
+    if (params.proximity) {
+      qp.append('proximity', params.proximity.longitude + ',' + params.proximity.latitude);
+    }
+    if (params.bbox) {
+      qp.append(
+        'bbox',
+        params.bbox.minLongitude + ',' + params.bbox.minLatitude + ',' +
+          params.bbox.maxLongitude + ',' + params.bbox.maxLatitude
+      );
+    }
+    if (params.country && params.country.length > 0) {
+      qp.append('country', params.country.join(','));
+    }
+    if (params.types && params.types.length > 0) {
+      qp.append('types', params.types.join(','));
+    }
+    if (params.poi_category && params.poi_category.length > 0) {
+      qp.append('poi_category', params.poi_category.join(','));
+    }
+    if (params.auto_complete !== undefined && params.auto_complete !== null) {
+      qp.append('auto_complete', String(params.auto_complete));
+    }
+    if (params.eta_type) {
+      qp.append('eta_type', params.eta_type);
+    }
+    if (params.navigation_profile) {
+      qp.append('navigation_profile', params.navigation_profile);
+    }
+    if (params.origin) {
+      qp.append('origin', params.origin.longitude + ',' + params.origin.latitude);
+    }
+    return apiEndpoint + 'search/searchbox/v1/forward?' + qp.toString();
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildSearchAndGeocodeApiUrl = buildSearchAndGeocodeApiUrl;
+
+  function isSafeSearchParams(params) {
+    return !!params && typeof params.q === 'string' && params.q.length > 0;
+  }
+
+  // Mirrors src/tools/search-and-geocode-tool/buildSearchMapPayload.ts
+  // (formerly server-side, now client-only since the map preview
+  // self-fetches). Shared by search_and_geocode_tool and
+  // category_search_tool self-fetch — both return the same Search Box
+  // FeatureCollection shape.
+  function buildSearchMiniPayload(data, query, proximity) {
+    var fc = data;
+    if (!fc || !Array.isArray(fc.features)) return null;
+
+    var points = fc.features.filter(function(f) {
+      return f.geometry && f.geometry.type === 'Point' &&
+        Array.isArray(f.geometry.coordinates) &&
+        typeof f.geometry.coordinates[0] === 'number' &&
+        typeof f.geometry.coordinates[1] === 'number';
+    });
+    if (points.length === 0 && !proximity) return null;
+
+    var markers = [];
+    if (proximity) {
+      markers.push({
+        coordinates: [proximity.longitude, proximity.latitude],
+        style: 'pin',
+        color: '#0f172a',
+        popup: 'Search center'
+      });
+    }
+
+    var features = [];
+    points.forEach(function(f, i) {
+      var props = f.properties || {};
+      var popupParts = [(i + 1) + '. ' + (props.name || 'Result')];
+      var addr = props.full_address || props.place_formatted;
+      if (addr) popupParts.push(addr);
+      if (typeof props.distance === 'number') {
+        popupParts.push(Math.round(props.distance) + ' m');
+      }
+      var coords = f.geometry.coordinates;
+      markers.push({
+        coordinates: coords,
+        style: 'numbered',
+        label: String(i + 1),
+        color: '#f97316',
+        popup: popupParts.join(' — ')
+      });
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: coords },
+        properties: { idx: i + 1, label: props.name || ('Result ' + (i + 1)) }
+      });
+    });
+
+    var summary = query
+      ? points.length + ' result' + (points.length !== 1 ? 's' : '') + ' for "' + query + '"'
+      : points.length + ' result' + (points.length !== 1 ? 's' : '');
+
+    var layers = features.length > 0 ? [
+      {
+        id: 'selffetch-search-results',
+        type: 'circle',
+        data: { type: 'FeatureCollection', features: features },
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#f97316',
+          'circle-opacity': 0.15,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#f97316',
+          'circle-stroke-opacity': 0.4
+        }
+      }
+    ] : [];
+
+    return { summary: summary, layers: layers, markers: markers };
+  }
+
+  function selfFetchSearch(params) {
+    if (!TOKEN || !isSafeSearchParams(params)) {
+      showError('Could not fetch search results: missing token or invalid parameters.');
+      return;
+    }
+    var url = buildSearchAndGeocodeApiUrl(params, TOKEN, API_ENDPOINT);
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function() { return null; })
+            .then(function(body) {
+              var msg =
+                body && body.message
+                  ? body.message
+                  : 'Search API error (' + res.status + ')';
+              throw new Error(msg);
+            });
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        var fc = data;
+        // Elicitation resolved to one specific result earlier — filter the
+        // freshly-fetched results down to that one. If ranking shifted
+        // enough that it's no longer present, fall back to showing all
+        // fresh results rather than nothing.
+        if (params.selectedMapboxId && fc && Array.isArray(fc.features)) {
+          var match = fc.features.filter(function(f) {
+            return f.properties && f.properties.mapbox_id === params.selectedMapboxId;
+          });
+          if (match.length > 0) fc = { type: 'FeatureCollection', features: match };
+        }
+        var mini = buildSearchMiniPayload(fc, params.q, params.proximity);
+        if (!mini) {
+          showError('Search API returned no results.');
+          return;
+        }
+        mergeAdditionalPayload(mini);
+      })
+      .catch(function(err) {
+        showError(
+          'Could not fetch search results: ' + (err && err.message ? err.message : err)
         );
       });
   }

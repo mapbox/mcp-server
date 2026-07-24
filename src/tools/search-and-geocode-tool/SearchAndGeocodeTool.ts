@@ -14,9 +14,9 @@ import type {
   MapboxFeature
 } from '../../schemas/geojson.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { buildSearchMapPayload } from './buildSearchMapPayload.js';
-import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { buildSearchAndGeocodeRequestUrl } from './buildSearchAndGeocodeRequestUrl.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -107,69 +107,13 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/forward`
-    );
+    const url = buildSearchAndGeocodeRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
-    // Required parameters
-    url.searchParams.append('q', input.q);
-    url.searchParams.append('access_token', accessToken);
-
-    // Optional parameters
-    if (input.language) {
-      url.searchParams.append('language', input.language);
-    }
-
-    // Hard code limit to 10
-    url.searchParams.append('limit', '10');
-
-    // Add proximity if provided (API defaults to IP-based location when omitted)
-    if (input.proximity) {
-      url.searchParams.append(
-        'proximity',
-        `${input.proximity.longitude},${input.proximity.latitude}`
-      );
-    }
-
-    if (input.bbox) {
-      url.searchParams.append(
-        'bbox',
-        `${input.bbox.minLongitude},${input.bbox.minLatitude},${input.bbox.maxLongitude},${input.bbox.maxLatitude}`
-      );
-    }
-
-    if (input.country && input.country.length > 0) {
-      url.searchParams.append('country', input.country.join(','));
-    }
-
-    if (input.types && input.types.length > 0) {
-      url.searchParams.append('types', input.types.join(','));
-    }
-
-    if (input.poi_category && input.poi_category.length > 0) {
-      url.searchParams.append('poi_category', input.poi_category.join(','));
-    }
-
-    if (input.auto_complete !== undefined) {
-      url.searchParams.append('auto_complete', input.auto_complete.toString());
-    }
-
-    if (input.eta_type) {
-      url.searchParams.append('eta_type', input.eta_type);
-    }
-
-    if (input.navigation_profile) {
-      url.searchParams.append('navigation_profile', input.navigation_profile);
-    }
-
-    if (input.origin) {
-      url.searchParams.append(
-        'origin',
-        `${input.origin.longitude},${input.origin.latitude}`
-      );
-    }
-
-    const response = await this.httpRequest(url.toString());
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
       const errorMessage = await this.getErrorMessage(response);
@@ -272,7 +216,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
             },
             singleResult,
             input,
-            accessToken
+            selectedFeature?.properties?.mapbox_id
           );
         } else if (result.action === 'decline') {
           // User declined to select - return all results as before
@@ -303,34 +247,48 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
         isError: false
       },
       data,
-      input,
-      accessToken
+      input
     );
   }
 
   /**
-   * Attach a `mapboxRender` payload to structuredContent so the LLM can pass it
-   * to `render_map_tool` to visualize results on a live Mapbox GL JS map.
+   * Attach a self-fetch `mapboxRender` ref to structuredContent so the map
+   * preview fetches its own results directly from the Search API
+   * client-side (see selfFetchRef.ts) rather than depend on server-side
+   * geometry storage. `selectedMapboxId` is set when elicitation resolved
+   * to a single specific result — the client re-fetches the same query and
+   * filters down to that result's `mapbox_id` (falling back to showing all
+   * fresh results if ranking shifted enough that it's no longer present).
    */
   private withMapPayload(
     base: CallToolResult,
     data: unknown,
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
-    accessToken: string
+    selectedMapboxId?: string
   ): CallToolResult {
-    const proximity =
-      input.proximity &&
-      typeof (input.proximity as { longitude?: number }).longitude === 'number'
-        ? (input.proximity as { longitude: number; latitude: number })
-        : undefined;
-    const payload = buildSearchMapPayload({
-      data,
-      query: input.q,
-      proximity
-    });
-    if (!payload) return base;
+    const fc = data as
+      | { features?: Array<{ geometry?: { type?: string } }> }
+      | null
+      | undefined;
+    const hasPoints =
+      Array.isArray(fc?.features) &&
+      fc.features.some((f) => f.geometry?.type === 'Point');
+    if (!hasPoints && !input.proximity) return base;
 
-    const ref = storeMapPayload(payload, getUserNameFromToken(accessToken));
+    const ref = buildSelfFetchRef('search', {
+      q: input.q,
+      language: input.language,
+      proximity: input.proximity,
+      bbox: input.bbox,
+      country: input.country,
+      types: input.types,
+      poi_category: input.poi_category,
+      auto_complete: input.auto_complete,
+      eta_type: input.eta_type,
+      navigation_profile: input.navigation_profile,
+      origin: input.origin,
+      selectedMapboxId
+    });
     const sc = {
       ...((base.structuredContent ?? {}) as Record<string, unknown>),
       mapboxRender: { ref }

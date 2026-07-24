@@ -517,6 +517,48 @@ describe('SearchAndGeocodeTool', () => {
       expect(features[0].properties.name).toBe('Springfield #2');
     });
 
+    it('carries the selected mapbox_id in the self-fetch ref so the map preview shows just that result', async () => {
+      const mockResponse = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Springfield #1', mapbox_id: 'id-1' },
+            geometry: { type: 'Point', coordinates: [-73, 42] }
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Springfield #2', mapbox_id: 'id-2' },
+            geometry: { type: 'Point', coordinates: [-74, 43] }
+          }
+        ]
+      };
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer({
+        action: 'accept',
+        content: { selectedIndex: '1' }
+      });
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ q: 'Springfield' });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as {
+        mapboxRender?: { ref?: string };
+      };
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+      expect(payload?.selfFetch?.[0]).toMatchObject({
+        tool: 'search',
+        params: expect.objectContaining({ selectedMapboxId: 'id-2' })
+      });
+    });
+
     it('returns all results when user declines elicitation', async () => {
       const mockResponse = createMultipleResultsResponse(4);
       const { httpRequest } = setupHttpRequest({
@@ -620,7 +662,7 @@ describe('SearchAndGeocodeTool', () => {
   });
 
   describe('map render payload', () => {
-    it('stores a mapboxRender payload with numbered POI markers and search-center pin', async () => {
+    it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
       const fakeResp = {
         type: 'FeatureCollection',
         features: [
@@ -664,23 +706,27 @@ describe('SearchAndGeocodeTool', () => {
       const sc = result.structuredContent as {
         mapboxRender?: { ref?: string };
       };
-      expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
+      expect(sc.mapboxRender?.ref).toMatch(
+        /^mapbox:\/\/selffetch\/search\?data=/
+      );
 
       const text = (result.content[0] as { text: string }).text;
       expect(text).toContain('render_map_tool');
       expect(text).toContain(sc.mapboxRender!.ref!);
 
-      const { resolveMapPayloadRef } =
-        await import('../../../src/utils/storeMapPayload.js');
-      const payload = resolveMapPayloadRef(
-        sc.mapboxRender!.ref!,
-        'account-test-search-and-geocode'
-      );
-      // First marker is the search-center pin; rest are numbered POIs.
-      expect(payload?.markers?.[0]?.style).toBe('pin');
-      expect(payload?.markers?.slice(1).map((m) => m.style)).toEqual([
-        'numbered',
-        'numbered'
+      // The ref is self-describing (no server-side store, no owner needed)
+      // — resolving it doesn't depend on this test's `token`/account at all.
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+      expect(payload?.selfFetch).toEqual([
+        {
+          tool: 'search',
+          params: expect.objectContaining({
+            q: 'coffee',
+            proximity: { longitude: -122.4194, latitude: 37.7749 }
+          })
+        }
       ]);
     });
   });

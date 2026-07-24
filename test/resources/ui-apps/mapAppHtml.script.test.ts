@@ -671,3 +671,136 @@ describe('mapAppHtml map matching self-fetch', () => {
     expect(errorEl?.textContent).toContain('Could not fetch map match');
   });
 });
+
+describe('mapAppHtml search self-fetch', () => {
+  it('fetches and draws numbered POI markers + search-center pin from a selfFetch descriptor', async () => {
+    const { sendToolResult, setFetchImpl, map, summaryEl, errorEl } =
+      loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    const addSourceSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+    map.addSource = addSourceSpy;
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Blue Bottle', full_address: '66 Mint St' },
+            geometry: { type: 'Point', coordinates: [-122.39, 37.78] }
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Sightglass', full_address: '270 7th St' },
+            geometry: { type: 'Point', coordinates: [-122.41, 37.77] }
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/search?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'search',
+              params: {
+                q: 'coffee',
+                proximity: { longitude: -122.4194, latitude: 37.7749 }
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      'search/searchbox/v1/forward'
+    );
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('q=coffee');
+    expect(addSourceSpy).toHaveBeenCalledWith(
+      'selffetch-search-results',
+      expect.objectContaining({ type: 'geojson' })
+    );
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'selffetch-search-results' })
+    );
+    expect(summaryEl?.textContent).toBe('2 results for "coffee"');
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('filters to the selected result when selectedMapboxId is set', async () => {
+    const { sendToolResult, setFetchImpl, summaryEl } = loadScriptSandbox();
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Springfield #1', mapbox_id: 'id-1' },
+            geometry: { type: 'Point', coordinates: [-73, 42] }
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Springfield #2', mapbox_id: 'id-2' },
+            geometry: { type: 'Point', coordinates: [-74, 43] }
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/search?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'search',
+              params: { q: 'Springfield', selectedMapboxId: 'id-2' }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    // Only the selected result (Springfield #2) should count toward the
+    // summary, not both fresh results.
+    expect(summaryEl?.textContent).toBe('1 result for "Springfield"');
+  });
+
+  it('never fetches when the selfFetch params are unsafe (missing q)', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 599,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/search?data=abc',
+          layers: [],
+          selfFetch: [{ tool: 'search', params: {} }]
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(errorEl?.textContent).toContain('Could not fetch search results');
+  });
+});
