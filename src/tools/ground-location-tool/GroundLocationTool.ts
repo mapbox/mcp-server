@@ -10,9 +10,10 @@ import {
   GroundLocationOutputSchema,
   type GroundLocationOutput
 } from './GroundLocationTool.output.schema.js';
-import type { MapAppPayload } from '../../utils/mapAppPayload.js';
-import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
+import { buildReverseGeocodeUrl } from './buildReverseGeocodeUrl.js';
+import { buildCategorySearchRequestUrl } from '../category-search-tool/buildCategorySearchRequestUrl.js';
 
 type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
 
@@ -154,17 +155,13 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     types: string,
     language?: string
   ): Promise<{ place: string; full_address?: string }> {
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/geocode/v6/reverse`
-    );
-    url.searchParams.append('longitude', longitude.toString());
-    url.searchParams.append('latitude', latitude.toString());
-    url.searchParams.append('access_token', accessToken);
-    url.searchParams.append('limit', '1');
-    url.searchParams.append('types', types);
-    if (language) url.searchParams.append('language', language);
+    const url = buildReverseGeocodeUrl({
+      input: { longitude, latitude, types, language },
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
-    const response = await this.httpRequest(url.toString());
+    const response = await this.httpRequest(url);
     if (!response.ok) return { place: `${latitude}, ${longitude}` };
 
     const data = (await response.json()) as GeocodingResponse;
@@ -186,15 +183,18 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     accessToken: string,
     language?: string
   ): Promise<GroundLocationOutput['nearby_pois']> {
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/category/${encodeURIComponent(query)}`
-    );
-    url.searchParams.append('access_token', accessToken);
-    url.searchParams.append('proximity', `${longitude},${latitude}`);
-    url.searchParams.append('limit', limit.toString());
-    if (language) url.searchParams.append('language', language);
+    const url = buildCategorySearchRequestUrl({
+      input: {
+        category: query,
+        proximity: { longitude, latitude },
+        limit,
+        language
+      },
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
-    const response = await this.httpRequest(url.toString());
+    const response = await this.httpRequest(url);
     if (!response.ok) return [];
 
     const data = (await response.json()) as CategorySearchResponse;
@@ -379,19 +379,36 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     const validated = GroundLocationOutputSchema.safeParse(result);
     const output = validated.success ? validated.data : result;
 
-    const mapPayload = buildGroundLocationPayload(output);
     const sc: Record<string, unknown> = {
       ...(output as unknown as Record<string, unknown>)
     };
     let textOut = this.formatOutput(output, strategy);
-    if (mapPayload) {
-      const ref = storeMapPayload(
-        mapPayload,
-        getUserNameFromToken(accessToken)
-      );
-      sc.mapboxRender = { ref };
-      textOut += renderHint(ref);
-    }
+
+    // The map preview fetches its own results directly from the Geocoding
+    // and Search Box APIs (client-side, using the iframe's public token)
+    // rather than depend on server-computed geometry stashed behind a ref
+    // — see selfFetchRef.ts. The sampling-derived strategy can't be
+    // recomputed client-side (sampling is an LLM round-trip through the
+    // host, which the iframe can't invoke), so the params it resolved to
+    // (geocodeTypes, and the POI query/limit if a POI fetch is needed) are
+    // baked into the ref instead. Isochrone contours aren't fetched here —
+    // buildGroundLocationPayload never rendered them either, since the
+    // tool only surfaces a contour-minutes summary, not the polygons.
+    const poiNeeded = Boolean(query) || strategy === 'poi';
+    const ref = buildSelfFetchRef('ground_location', {
+      longitude,
+      latitude,
+      geocodeTypes,
+      language,
+      poi: poiNeeded
+        ? {
+            query: query ?? 'place',
+            limit: strategy === 'poi' ? Math.max(limit, 15) : limit
+          }
+        : undefined
+    });
+    sc.mapboxRender = { ref };
+    textOut += renderHint(ref);
 
     return {
       content: [{ type: 'text', text: textOut }],
@@ -399,45 +416,4 @@ export class GroundLocationTool extends MapboxApiBasedTool<
       isError: false
     };
   }
-}
-
-/**
- * Build a payload showing the grounded origin marker + nearby POIs (numbered
- * orange pins). Isochrone polygons aren't included inline because the tool
- * only stores a summary (contour minutes) — the full polygons live in the
- * separate isochrone tool's response if the user calls it.
- */
-function buildGroundLocationPayload(
-  out: GroundLocationOutput
-): MapAppPayload | null {
-  const markers: MapAppPayload['markers'] = [
-    {
-      coordinates: [out.longitude, out.latitude],
-      style: 'pin',
-      color: '#0f172a',
-      popup: out.place
-    }
-  ];
-
-  if (out.nearby_pois && out.nearby_pois.length > 0) {
-    out.nearby_pois.forEach((poi, i) => {
-      const parts = [`${i + 1}. ${poi.name}`];
-      if (poi.address) parts.push(poi.address);
-      if (poi.distance_meters)
-        parts.push(`${Math.round(poi.distance_meters)} m`);
-      markers.push({
-        coordinates: [poi.longitude, poi.latitude],
-        style: 'numbered',
-        label: String(i + 1),
-        color: '#f97316',
-        popup: parts.join(' — ')
-      });
-    });
-  }
-
-  return {
-    summary: out.place,
-    layers: [],
-    markers
-  };
 }

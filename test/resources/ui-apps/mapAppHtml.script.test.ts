@@ -1036,3 +1036,183 @@ describe('mapAppHtml optimization self-fetch', () => {
     expect(errorEl?.textContent).toContain('Could not fetch optimized trip');
   });
 });
+
+describe('mapAppHtml ground location self-fetch', () => {
+  it('fetches the place name and draws origin + numbered POI markers from a selfFetch descriptor', async () => {
+    const { sendToolResult, setFetchImpl, summaryEl, errorEl } =
+      loadScriptSandbox();
+
+    const fetchSpy = vi.fn(async (url: string) => {
+      if (url.includes('geocode/v6/reverse')) {
+        return {
+          ok: true,
+          json: async () => ({
+            features: [
+              {
+                type: 'Feature',
+                properties: { name: 'Mission District' },
+                geometry: { type: 'Point', coordinates: [-122.419, 37.759] }
+              }
+            ]
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {
+                name: 'Four Barrel Coffee',
+                full_address: '375 Valencia St',
+                distance: 120
+              },
+              geometry: { type: 'Point', coordinates: [-122.421, 37.762] }
+            }
+          ]
+        })
+      };
+    });
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/ground_location?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'ground_location',
+              params: {
+                longitude: -122.419,
+                latitude: 37.759,
+                geocodeTypes: 'neighborhood,locality,place',
+                poi: { query: 'coffee', limit: 10 }
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      'search/geocode/v6/reverse'
+    );
+    expect(
+      fetchSpy.mock.calls.some((c) =>
+        String(c[0]).includes('search/searchbox/v1/category/coffee')
+      )
+    ).toBe(true);
+    expect(summaryEl?.textContent).toBe('Mission District');
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('only fetches the reverse geocode when no poi query is present', async () => {
+    const { sendToolResult, setFetchImpl, summaryEl } = loadScriptSandbox();
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Mission District' },
+            geometry: { type: 'Point', coordinates: [-122.419, 37.759] }
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/ground_location?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'ground_location',
+              params: {
+                longitude: -122.419,
+                latitude: 37.759,
+                geocodeTypes: 'neighborhood,locality,place'
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(summaryEl?.textContent).toBe('Mission District');
+  });
+
+  it('falls back to lat/lng as the place name when the reverse geocode fails, but still renders', async () => {
+    const { sendToolResult, setFetchImpl, summaryEl, errorEl } =
+      loadScriptSandbox();
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/ground_location?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'ground_location',
+              params: {
+                longitude: -122.419,
+                latitude: 37.759,
+                geocodeTypes: 'neighborhood,locality,place'
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(summaryEl?.textContent).toBe('37.759, -122.419');
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('never fetches when the selfFetch params are unsafe (missing geocodeTypes)', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 599,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/ground_location?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'ground_location',
+              params: { longitude: -122.419, latitude: 37.759 }
+            }
+          ]
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(errorEl?.textContent).toContain('Could not fetch location context');
+  });
+});

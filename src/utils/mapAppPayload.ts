@@ -103,7 +103,8 @@ export interface MapAppSelfFetch {
     | 'map_matching'
     | 'search'
     | 'category_search'
-    | 'optimization';
+    | 'optimization'
+    | 'ground_location';
   params: Record<string, unknown>;
 }
 
@@ -184,7 +185,8 @@ const MapAppSelfFetchSchema = z.object({
     'map_matching',
     'search',
     'category_search',
-    'optimization'
+    'optimization',
+    'ground_location'
   ]),
   params: z.record(z.string(), z.unknown())
 });

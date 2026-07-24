@@ -15,11 +15,10 @@
   format between data tools and `render_map_tool`. Thin pass-through over
   Mapbox Style spec `paint`/`layout` objects so any layer/marker/legend
   combination expressible in GL JS is expressible in the payload.
-- **Per-tool payload builders** — `buildGroundLocationPayload`,
-  `buildPolygonOpsMapPayload` (still used server-side; see below for the
-  tools that moved their payload building to the iframe instead). Each is
-  a pure function over its tool's response: ~20-80 lines, no HTML, no
-  iframe wiring.
+- **Per-tool payload builders** — `buildPolygonOpsMapPayload` (still used
+  server-side; see below for the tools that moved their payload building
+  to the iframe instead). Each is a pure function over its tool's
+  response: ~20-80 lines, no HTML, no iframe wiring.
 - **Shared `renderMapAppHtml`** (`src/resources/ui-apps/mapAppHtml.ts`) —
   one iframe template that consumes any `MapAppPayload`. Used by both the
   MCP Apps resource (`MapAppUIResource`) and any client that wants to
@@ -31,7 +30,7 @@
 
 - **map_matching_tool**: When the Map Matching API can't match a trace (e.g. `code: "NoMatch"` for distant/unmatchable coordinates), the tool now returns a clear `isError` text result instead of crashing with `MCP error -32602: Output validation error` — the API omits `tracepoints`/`matchings` in this case, which previously violated the tool's output schema and was returned as `structuredContent` anyway, triggering the MCP SDK's output validation. The same schema-violating `structuredContent` could also be returned for a `code: "Ok"` response that otherwise failed schema validation (e.g. a `confidence` out of range); that fallback now also returns a graceful `isError` result instead of the raw invalid payload. `tracepoints` and `matchings` are also now `.optional()` in the output schema as a defensive measure. (AGI-1021)
 - **render_map_tool: map previews no longer break after a server restart or when reopening an old conversation.** Rendering previously depended entirely on in-memory server state (a 30-minute-TTL `Map`) that doesn't survive a process restart — including `render_map_tool`'s own merged-output ref, the one every MCP App host actually re-fetches when a map card is redisplayed. That ref is now self-describing (the whole small payload is encoded directly into the ref) instead of pointing at that ephemeral store, whenever the payload is small enough to inline.
-- **directions_tool, isochrone_tool, map_matching_tool, optimization_tool (v1), search_and_geocode_tool, category_search_tool: map previews now fetch their own data directly from the relevant Mapbox API**, client-side in the iframe, using the same public token already used for map tiles, instead of depending on geometry computed and cached server-side. This also means these previews always reflect fresh data on every render (e.g. current traffic for directions) and no longer depend on the caller's own request options (e.g. `geometries`/`overview` choices) to have geometry to draw.
+- **directions_tool, isochrone_tool, map_matching_tool, optimization_tool (v1), search_and_geocode_tool, category_search_tool, ground_location_tool: map previews now fetch their own data directly from the relevant Mapbox API**, client-side in the iframe, using the same public token already used for map tiles, instead of depending on geometry computed and cached server-side. This also means these previews always reflect fresh data on every render (e.g. current traffic for directions) and no longer depend on the caller's own request options (e.g. `geometries`/`overview` choices) to have geometry to draw. For `ground_location_tool`, the sampling-derived grounding strategy (which decides the geocode types and whether a POI lookup is needed) is resolved once server-side and threaded through the ref, since the iframe can't invoke MCP sampling itself.
 - **union_tool, intersect_tool, difference_tool: map previews are now recomputed from the original input polygons on every render** instead of being cached behind a server-side ref that could expire or vanish on a restart.
 - **render_map_tool: clearer recovery when a `payload_ref` can't be resolved.** Instead of silently dropping the data or returning a bare "nothing to render" error, the LLM is now told to re-run the upstream tool to get a fresh ref. The map preview itself now also shows the server's actual explanation (e.g. "expired") instead of a generic "malformed payload" message.
 

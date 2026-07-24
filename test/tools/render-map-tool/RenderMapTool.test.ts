@@ -557,6 +557,37 @@ describe('RenderMapTool', () => {
     expect(text).toContain('will also fetch and draw');
   });
 
+  it('passes through a ground_location self-fetch ref with no owner and no prior server-side state (simulated restart)', async () => {
+    const { buildSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const ref = buildSelfFetchRef('ground_location', {
+      longitude: -122.419,
+      latitude: 37.759,
+      geocodeTypes: 'neighborhood,locality,place',
+      poi: { query: 'coffee', limit: 10 }
+    });
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ payload_refs: [ref] });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      layer_count: number;
+      mapboxRender?: { selfFetch?: unknown[] };
+    };
+    expect(sc.layer_count).toBe(0);
+    expect(sc.mapboxRender?.selfFetch).toEqual([
+      {
+        tool: 'ground_location',
+        params: expect.objectContaining({
+          geocodeTypes: 'neighborhood,locality,place'
+        })
+      }
+    ]);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('will also fetch and draw');
+  });
+
   it('passes through an optimization self-fetch ref with no owner and no prior server-side state (simulated restart)', async () => {
     const { buildSelfFetchRef } =
       await import('../../../src/utils/selfFetchRef.js');

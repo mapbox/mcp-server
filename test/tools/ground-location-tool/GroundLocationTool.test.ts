@@ -269,7 +269,7 @@ describe('GroundLocationTool', () => {
     expect(categoryCall?.[0]).toContain('limit=15');
   });
 
-  it('stores a mapboxRender payload with origin pin and POI markers', async () => {
+  it('attaches a self-fetch mapboxRender ref that carries the resolved strategy params (not server-fetched results)', async () => {
     const { tool } = setupMockHttp({
       'geocode/v6/reverse': geocodeResponse,
       'search/searchbox/v1/category': categoryResponse,
@@ -289,19 +289,46 @@ describe('GroundLocationTool', () => {
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
-    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
-
-    const { resolveMapPayloadRef } =
-      await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(
-      sc.mapboxRender!.ref!,
-      'account-test-ground-location'
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/ground_location\?data=/
     );
-    // First marker is the grounded origin; subsequent are numbered POIs.
-    expect(payload?.markers?.[0]?.style).toBe('pin');
-    expect(payload?.markers?.[0]?.popup).toBe('Mission District');
-    expect(payload?.markers?.slice(1).map((m) => m.style)).toEqual([
-      'numbered'
+
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('render_map_tool');
+    expect(text).toContain(sc.mapboxRender!.ref!);
+
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'ground_location',
+        params: expect.objectContaining({
+          longitude: -122.419,
+          latitude: 37.759,
+          geocodeTypes: 'neighborhood,locality,place',
+          poi: { query: 'coffee', limit: 10 }
+        })
+      }
     ]);
+  });
+
+  it('omits the poi field from the self-fetch ref when no query is given and strategy is not poi', async () => {
+    const { tool } = setupMockHttp({
+      'geocode/v6/reverse': geocodeResponse,
+      'isochrone/v1': isochroneResponse
+    });
+
+    const result = await tool.run({ longitude: -122.419, latitude: 37.759 });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch?.[0]?.params).not.toHaveProperty('poi');
   });
 });

@@ -538,6 +538,7 @@ ${initialDataScript}
         else if (sf.tool === 'search') selfFetchSearch(sf.params);
         else if (sf.tool === 'category_search') selfFetchCategorySearch(sf.params);
         else if (sf.tool === 'optimization') selfFetchOptimization(sf.params);
+        else if (sf.tool === 'ground_location') selfFetchGroundLocation(sf.params);
       });
     }
   }
@@ -1489,6 +1490,137 @@ ${initialDataScript}
           'Could not fetch optimized trip: ' + (err && err.message ? err.message : err)
         );
       });
+  }
+
+  // --- Self-fetch: ground location -----------------------------------------
+  // Mirrors src/tools/ground-location-tool/buildReverseGeocodeUrl.ts —
+  // kept in sync by the parity test in
+  // test/resources/ui-apps/groundLocationSelfFetchUrlParity.test.ts. The POI
+  // sub-fetch (if any) reuses buildCategorySearchApiUrl above rather than
+  // duplicating it. The sampling-derived strategy that decided geocodeTypes
+  // and whether a POI fetch is needed was already resolved server-side (the
+  // iframe can't invoke MCP sampling itself) and is carried in the ref.
+  function buildReverseGeocodeApiUrl(input, publicToken, apiEndpoint) {
+    var qp = new URLSearchParams();
+    qp.append('longitude', String(input.longitude));
+    qp.append('latitude', String(input.latitude));
+    qp.append('access_token', publicToken);
+    qp.append('limit', '1');
+    qp.append('types', input.types);
+    if (input.language) {
+      qp.append('language', input.language);
+    }
+    return apiEndpoint + 'search/geocode/v6/reverse?' + qp.toString();
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildReverseGeocodeApiUrl = buildReverseGeocodeApiUrl;
+
+  function isSafeGroundLocationParams(params) {
+    if (!params) return false;
+    if (typeof params.longitude !== 'number' || !isFinite(params.longitude)) return false;
+    if (typeof params.latitude !== 'number' || !isFinite(params.latitude)) return false;
+    if (typeof params.geocodeTypes !== 'string' || params.geocodeTypes.length === 0) return false;
+    return true;
+  }
+
+  // Mirrors the deleted server-side buildGroundLocationPayload (now
+  // client-only since the map preview self-fetches): a dark origin pin plus
+  // numbered orange POI markers. Isochrone contours aren't drawn here either
+  // — the original never rendered them, only a contour-minutes summary.
+  function buildGroundLocationMiniPayload(place, longitude, latitude, pois) {
+    var markers = [
+      {
+        coordinates: [longitude, latitude],
+        style: 'pin',
+        color: '#0f172a',
+        popup: place
+      }
+    ];
+    (pois || []).forEach(function(poi, i) {
+      var parts = [(i + 1) + '. ' + poi.name];
+      if (poi.address) parts.push(poi.address);
+      if (typeof poi.distance_meters === 'number') {
+        parts.push(Math.round(poi.distance_meters) + ' m');
+      }
+      markers.push({
+        coordinates: [poi.longitude, poi.latitude],
+        style: 'numbered',
+        label: String(i + 1),
+        color: '#f97316',
+        popup: parts.join(' — ')
+      });
+    });
+    return { summary: place, layers: [], markers: markers };
+  }
+
+  function selfFetchGroundLocation(params) {
+    if (!TOKEN || !isSafeGroundLocationParams(params)) {
+      showError('Could not fetch location context: missing token or invalid parameters.');
+      return;
+    }
+    var geocodeUrl = buildReverseGeocodeApiUrl(
+      {
+        longitude: params.longitude,
+        latitude: params.latitude,
+        types: params.geocodeTypes,
+        language: params.language
+      },
+      TOKEN,
+      API_ENDPOINT
+    );
+    var geocodePromise = fetch(geocodeUrl)
+      .then(function(res) { return res.ok ? res.json() : null; })
+      .catch(function() { return null; });
+
+    var poiPromise;
+    if (params.poi && typeof params.poi.query === 'string') {
+      var poiUrl = buildCategorySearchApiUrl(
+        {
+          category: params.poi.query,
+          proximity: { longitude: params.longitude, latitude: params.latitude },
+          limit: params.poi.limit,
+          language: params.language
+        },
+        TOKEN,
+        API_ENDPOINT
+      );
+      poiPromise = fetch(poiUrl)
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .catch(function() { return null; });
+    } else {
+      poiPromise = Promise.resolve(null);
+    }
+
+    Promise.all([geocodePromise, poiPromise]).then(function(results) {
+      var geocodeData = results[0];
+      var poiData = results[1];
+
+      var feature = geocodeData && Array.isArray(geocodeData.features)
+        ? geocodeData.features[0]
+        : null;
+      var place = (feature && feature.properties && feature.properties.name) ||
+        (params.latitude + ', ' + params.longitude);
+
+      var poiFeatures = (poiData && Array.isArray(poiData.features)) ? poiData.features : [];
+      var pois = poiFeatures.map(function(f) {
+        var props = f.properties || {};
+        var coords = (f.geometry && f.geometry.coordinates) || [params.longitude, params.latitude];
+        return {
+          name: props.name || 'Unknown',
+          address: props.full_address || props.place_formatted,
+          longitude: coords[0],
+          latitude: coords[1],
+          distance_meters: props.distance
+        };
+      });
+
+      var mini = buildGroundLocationMiniPayload(place, params.longitude, params.latitude, pois);
+      mergeAdditionalPayload(mini);
+    }).catch(function(err) {
+      showError(
+        'Could not fetch location context: ' + (err && err.message ? err.message : err)
+      );
+    });
   }
 
   function escapeText(s) {

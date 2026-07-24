@@ -13,7 +13,8 @@ const SELF_FETCH_TOOLS: readonly SelfFetchTool[] = [
   'map_matching',
   'search',
   'category_search',
-  'optimization'
+  'optimization',
+  'ground_location'
 ];
 
 /**
