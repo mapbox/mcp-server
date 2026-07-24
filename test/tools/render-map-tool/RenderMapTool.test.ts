@@ -61,16 +61,15 @@ describe('RenderMapTool', () => {
     expect(sc.rendered).toBe(true);
     expect(sc.layer_count).toBe(1);
     expect(sc.marker_count).toBe(2);
-    // The merged payload is stashed server-side under a ref for hosts that
-    // support resources/read (and to keep the response tiny for very large
-    // payloads).
-    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
-    const { resolveMapPayloadRef } =
-      await import('../../../src/utils/storeMapPayload.js');
-    const stored = resolveMapPayloadRef(
-      sc.mapboxRender!.ref!,
-      'account-test-render-map'
-    );
+    // Small merged payloads get a self-describing mapbox://inline/ ref
+    // rather than the ephemeral store — nothing server-side to lose on a
+    // restart, which matters for Claude Desktop specifically (it strips
+    // structuredContent and depends on resources/read against this exact
+    // ref). See inlinePayloadRef.ts.
+    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/inline\/payload\?data=/);
+    const { resolveInlinePayloadRef } =
+      await import('../../../src/utils/inlinePayloadRef.js');
+    const stored = resolveInlinePayloadRef(sc.mapboxRender!.ref!);
     expect(stored?.layers).toHaveLength(1);
     expect(stored?.markers).toHaveLength(2);
   });
@@ -300,5 +299,146 @@ describe('RenderMapTool', () => {
     };
     expect(sc.layer_count).toBe(2);
     expect(sc.summary).toBe('Iso A · Iso B');
+  });
+
+  it('tells the LLM to re-run upstream tools when all payload_refs are stale/unknown', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run(
+      { payload_refs: ['mapbox://temp/map-payload-does-not-exist'] },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token: tokenFor('account-test-render-map-stale') } } as any
+    );
+    expect(result.isError).toBe(true);
+    const text = (
+      result.content[0] as { type: 'text'; text: string }
+    ).text.toLowerCase();
+    expect(text).toContain('expired');
+    expect(text).toContain('re-run the tool');
+  });
+
+  it('renders with a note when some payload_refs resolve and others are stale', async () => {
+    const { storeMapPayload } =
+      await import('../../../src/utils/storeMapPayload.js');
+    const owner = 'account-test-render-map-partial';
+    const goodRef = storeMapPayload(
+      {
+        summary: 'Still fresh',
+        layers: [
+          {
+            id: 'route',
+            type: 'line',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-77, 38],
+                  [-76, 39]
+                ]
+              },
+              properties: {}
+            }
+          }
+        ]
+      },
+      owner
+    );
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const token = tokenFor(owner);
+    const result = await tool.run(
+      { payload_refs: [goodRef, 'mapbox://temp/map-payload-stale-one'] },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { layer_count: number };
+    expect(sc.layer_count).toBe(1);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('1 payload ref could not be resolved');
+    expect(text).toContain('Re-run the source tool');
+  });
+
+  it('renders a union_tool compute ref with no owner and no prior server-side state (simulated restart)', async () => {
+    const { buildComputeRef } =
+      await import('../../../src/utils/computeRef.js');
+    const ref = buildComputeRef('union', [
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [0, 0],
+              [2, 0],
+              [2, 2],
+              [0, 2],
+              [0, 0]
+            ]
+          ]
+        }
+      },
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [1, 1],
+              [3, 1],
+              [3, 3],
+              [1, 3],
+              [1, 1]
+            ]
+          ]
+        }
+      }
+    ]);
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    // Deliberately no authInfo/owner — a compute ref carries its own
+    // inputs, so unlike a mapbox://temp/ ref it never needs one to resolve.
+    const result = await tool.run({ payload_refs: [ref] });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { layer_count: number };
+    // 2 inputs × (fill + line) + result (fill + line) = 6 layers
+    expect(sc.layer_count).toBe(6);
+  });
+
+  it('passes through a directions self-fetch ref with no owner and no prior server-side state (simulated restart)', async () => {
+    const { buildSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const ref = buildSelfFetchRef('directions', {
+      coordinates: [
+        { longitude: -77, latitude: 38 },
+        { longitude: -76, latitude: 39 }
+      ],
+      routing_profile: 'mapbox/driving-traffic'
+    });
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    // Deliberately no authInfo/owner — a self-fetch ref carries its own
+    // params, so unlike a mapbox://temp/ ref it never needs one to resolve.
+    const result = await tool.run({ payload_refs: [ref] });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      layer_count: number;
+      mapboxRender?: { selfFetch?: unknown[] };
+    };
+    // No layers server-side — the iframe fetches and draws the route
+    // itself once it loads.
+    expect(sc.layer_count).toBe(0);
+    expect(sc.mapboxRender?.selfFetch).toEqual([
+      {
+        tool: 'directions',
+        params: expect.objectContaining({
+          routing_profile: 'mapbox/driving-traffic'
+        })
+      }
+    ]);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('will also fetch and draw');
   });
 });

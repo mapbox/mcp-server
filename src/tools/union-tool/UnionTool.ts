@@ -3,7 +3,6 @@
 
 import { union, polygon, featureCollection } from '@turf/turf';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { UnionInputSchema } from './UnionTool.input.schema.js';
@@ -12,9 +11,8 @@ import {
   type UnionOutput
 } from './UnionTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { buildPolygonOpsMapPayload } from './buildPolygonOpsMapPayload.js';
-import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildComputeRef } from '../../utils/computeRef.js';
 
 export class UnionTool extends BaseTool<
   typeof UnionInputSchema,
@@ -41,14 +39,7 @@ export class UnionTool extends BaseTool<
     super({ inputSchema: UnionInputSchema, outputSchema: UnionOutputSchema });
   }
 
-  async run(
-    rawInput: unknown,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    extra?: RequestHandlerExtra<any, any>
-  ): Promise<CallToolResult> {
-    const accessToken =
-      extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
-    const owner = accessToken ? getUserNameFromToken(accessToken) : undefined;
+  async run(rawInput: unknown): Promise<CallToolResult> {
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(
       trace.setSpan(context.active(), toolContext.span),
@@ -73,21 +64,23 @@ export class UnionTool extends BaseTool<
             `Result type: ${validated.type}\n` +
             `GeoJSON geometry:\n${JSON.stringify(validated.geometry, null, 2)}`;
 
-          const mapPayload = buildPolygonOpsMapPayload({
-            operation: 'union',
-            inputs: polys as Array<{ type: 'Feature'; geometry: unknown }>,
-            result: merged as { type: 'Feature'; geometry: unknown },
-            summary: `Union of ${input.polygons.length} polygons`
-          });
+          // Union is a pure function of its inputs — the ref carries the
+          // inputs themselves (already present in this call's own
+          // arguments) rather than a pointer to a server-side store, so
+          // rendering it later never depends on this process still being
+          // alive. See computeRef.ts.
+          const ref = buildComputeRef(
+            'union',
+            polys.map((p) => ({
+              type: 'Feature' as const,
+              geometry: p.geometry
+            }))
+          );
           const sc: Record<string, unknown> = {
-            ...(validated as unknown as Record<string, unknown>)
+            ...(validated as unknown as Record<string, unknown>),
+            mapboxRender: { ref }
           };
-          let textOut = text;
-          if (mapPayload) {
-            const ref = storeMapPayload(mapPayload, owner);
-            sc.mapboxRender = { ref };
-            textOut += renderHint(ref);
-          }
+          const textOut = text + renderHint(ref);
 
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();

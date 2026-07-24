@@ -208,14 +208,16 @@ describe('IntersectTool', () => {
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
-    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
-
-    const { resolveMapPayloadRef } =
-      await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(
-      sc.mapboxRender!.ref!,
-      'account-test-intersect'
+    // intersect_tool is a pure function of its own inputs, so the ref
+    // carries those inputs (no owner needed, no server-side store to
+    // expire).
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/compute\/intersect\?data=/
     );
+
+    const { resolveComputeRef } =
+      await import('../../../src/utils/computeRef.js');
+    const payload = resolveComputeRef(sc.mapboxRender!.ref!);
     expect(payload?.legend?.[1]?.label).toBe('intersect result');
   });
 });

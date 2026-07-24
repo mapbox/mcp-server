@@ -39,6 +39,13 @@ export class TemporaryDataResource extends BaseResource {
     const resource = temporaryResourceManager.get(uri);
 
     if (!resource) {
+      // TEMP DIAGNOSTIC (remove once the Claude Desktop rehydration/expiry
+      // bug is root-caused): confirms whether the entry is simply absent
+      // (never stored / evicted / expired / different process) as opposed
+      // to an owner mismatch below.
+      console.error(
+        `[mapbox-mcp-debug] resources/read miss: uri=${uri} not found in temporaryResourceManager`
+      );
       return notFound;
     }
 
@@ -61,6 +68,14 @@ export class TemporaryDataResource extends BaseResource {
       ? getUserNameFromToken(requesterToken)
       : undefined;
     if (!resource.owner || !requester || resource.owner !== requester) {
+      // TEMP DIAGNOSTIC (remove once root-caused): if this fires for a ref
+      // that was just created moments earlier, the two sides of the
+      // request are resolving different identities for the same session.
+      console.error(
+        `[mapbox-mcp-debug] resources/read owner mismatch: uri=${uri} ` +
+          `resource.owner=${resource.owner ?? '<undefined>'} requester=${requester ?? '<undefined>'} ` +
+          `hasRequestAuthInfoToken=${Boolean(extra?.authInfo?.token)}`
+      );
       return notFound;
     }
 

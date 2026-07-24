@@ -58,7 +58,10 @@ export class MapAppUIResource extends BaseResource {
       httpRequest: this.httpRequest
     });
 
-    const html = renderMapAppHtml({ publicToken: publicToken ?? '' });
+    const html = renderMapAppHtml({
+      publicToken: publicToken ?? '',
+      apiEndpoint: this.apiEndpoint()
+    });
 
     return {
       contents: [

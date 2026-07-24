@@ -10,7 +10,7 @@ import type { MapAppPayload } from './mapAppPayload.js';
 // path still works for hosts that support it) - matches the 50KB threshold
 // already used elsewhere (e.g. the directions/isochrone large-response
 // stash) for the same "don't bloat the response" reasoning.
-const MAX_INLINE_PAYLOAD_BYTES = 50 * 1024;
+export const MAX_INLINE_PAYLOAD_BYTES = 50 * 1024;
 
 /**
  * Schema for the `mapboxRender` field that data tools attach to their
@@ -56,6 +56,12 @@ export function storeMapPayload(
 ): string {
   const id = randomUUID();
   const uri = `${TEMP_URI_PREFIX}${id}`;
+  // TEMP DIAGNOSTIC (remove once the Claude Desktop rehydration/expiry bug
+  // is root-caused): compare this owner against whatever
+  // TemporaryDataResource.read() logs for the same uri.
+  console.error(
+    `[mapbox-mcp-debug] storeMapPayload: uri=${uri} owner=${owner ?? '<undefined>'}`
+  );
   // 30-minute TTL is the temporaryResourceManager default — same as the
   // directions/isochrone large-response stash, so the lifetime story is
   // consistent across uses.
@@ -138,6 +144,7 @@ export function mergeMapPayloads(payloads: MapAppPayload[]): MapAppPayload {
   const markers: NonNullable<MapAppPayload['markers']> = [];
   const legend: NonNullable<MapAppPayload['legend']> = [];
   const summaries: string[] = [];
+  const selfFetch: NonNullable<MapAppPayload['selfFetch']> = [];
 
   payloads.forEach((p, payloadIdx) => {
     if (p.summary) summaries.push(p.summary);
@@ -151,12 +158,14 @@ export function mergeMapPayloads(payloads: MapAppPayload[]): MapAppPayload {
     }
     if (Array.isArray(p.markers)) markers.push(...p.markers);
     if (Array.isArray(p.legend)) legend.push(...p.legend);
+    if (Array.isArray(p.selfFetch)) selfFetch.push(...p.selfFetch);
   });
 
   return {
     summary: summaries.length > 0 ? summaries.join(' · ') : undefined,
     layers,
     markers: markers.length > 0 ? markers : undefined,
-    legend: legend.length > 0 ? legend : undefined
+    legend: legend.length > 0 ? legend : undefined,
+    selfFetch: selfFetch.length > 0 ? selfFetch : undefined
   };
 }

@@ -16,8 +16,19 @@ import {
   resolveMapPayloadRef,
   mergeMapPayloads,
   storeMapPayload,
-  buildMapboxRenderField
+  buildMapboxRenderField,
+  MAX_INLINE_PAYLOAD_BYTES
 } from '../../utils/storeMapPayload.js';
+import { isComputeRef, resolveComputeRef } from '../../utils/computeRef.js';
+import {
+  isSelfFetchRef,
+  resolveSelfFetchRef
+} from '../../utils/selfFetchRef.js';
+import {
+  isInlinePayloadRef,
+  resolveInlinePayloadRef,
+  buildInlinePayloadRef
+} from '../../utils/inlinePayloadRef.js';
 import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 import type { HttpRequest } from '../../utils/types.js';
 
@@ -103,14 +114,28 @@ export class RenderMapTool extends BaseTool<
         try {
           const input = RenderMapInputSchema.parse(rawInput);
 
-          const payload = this.assemblePayload(input, owner);
+          const { payload, unresolvedRefs } = this.assemblePayload(
+            input,
+            owner
+          );
 
           if (!payload) {
+            // A ref that fails to resolve is usually a payload that expired
+            // (30-minute TTL) or was created in a different process/session
+            // — e.g. the conversation was rehydrated and the LLM reused a
+            // ref from before the gap. Tell it how to recover instead of
+            // leaving the map iframe with nothing to show and no next step.
+            const hadOnlyStaleRefs = unresolvedRefs.length > 0;
             return {
               content: [
                 {
                   type: 'text' as const,
-                  text: 'RenderMapTool: nothing to render. Pass either `payload_refs` or inline `layers`/`markers`.'
+                  text: hadOnlyStaleRefs
+                    ? `RenderMapTool: none of the provided payload_refs could be resolved — ` +
+                      `they've likely expired (temporary map data lasts ~30 minutes) or belong ` +
+                      `to a different session. Re-run the tool(s) that produced this data to get ` +
+                      `fresh refs, then call render_map_tool again.`
+                    : 'RenderMapTool: nothing to render. Pass either `payload_refs` or inline `layers`/`markers`.'
                 }
               ],
               isError: true
@@ -119,22 +144,52 @@ export class RenderMapTool extends BaseTool<
 
           const layerCount = payload.layers?.length ?? 0;
           const markerCount = payload.markers?.length ?? 0;
+          const selfFetchCount = payload.selfFetch?.length ?? 0;
+
+          const staleNote =
+            unresolvedRefs.length > 0
+              ? ` (Note: ${unresolvedRefs.length} payload ref${unresolvedRefs.length === 1 ? '' : 's'} ` +
+                `could not be resolved — likely expired — and ${unresolvedRefs.length === 1 ? 'was' : 'were'} ` +
+                `skipped. Re-run the source tool(s) if that data should be included.)`
+              : '';
+
+          // Self-fetched layers (e.g. a directions route) aren't counted
+          // above — the iframe fetches and draws them itself after this
+          // response, so there's nothing server-side to count yet.
+          const selfFetchNote =
+            selfFetchCount > 0
+              ? ` The map will also fetch and draw ${selfFetchCount} additional layer${selfFetchCount === 1 ? '' : 's'} directly from the Mapbox API once it loads.`
+              : '';
 
           const text =
             `Rendered map with ${layerCount} layer${layerCount === 1 ? '' : 's'}` +
             ` and ${markerCount} marker${markerCount === 1 ? '' : 's'}` +
             (payload.summary ? ` — ${payload.summary}` : '') +
-            '.';
+            '.' +
+            selfFetchNote +
+            staleNote;
 
-          // Stash the merged payload server-side. Claude Desktop strips
-          // structuredContent from MCP App iframe postMessages and
-          // replaces large content[] payloads with placeholder text, so
-          // the iframe must extract the ref from a tiny sentinel-tagged
-          // text item in content[]. Keep the total response tiny:
-          // no inline rawHtml (Claude Desktop already opens the iframe
-          // via meta.ui.resourceUri, so the rawHtml duplicate just bloats
-          // the response and trips the host's "too large" trim).
-          const mergedRef = storeMapPayload(payload, owner);
+          // Claude Desktop strips structuredContent from MCP App iframe
+          // postMessages and replaces large content[] payloads with
+          // placeholder text, so the iframe must extract the ref from a
+          // tiny sentinel-tagged text item in content[] and resolve it via
+          // resources/read. That means THIS ref — not just the input refs
+          // — has to survive a restart/rehydration for Claude Desktop to
+          // work reliably. When the merged payload is small (true for any
+          // combination of compute/self-fetch refs, and most inline
+          // payloads), encode it directly into a self-describing
+          // mapbox://inline/ ref instead of the ephemeral store — nothing
+          // server-side to lose. Only a payload backed by genuinely large
+          // upstream geometry (a real mapbox://temp/ resource) falls back
+          // to the store, keeping the existing TTL behavior for that case.
+          const payloadBytes = Buffer.byteLength(
+            JSON.stringify(payload),
+            'utf8'
+          );
+          const mergedRef =
+            payloadBytes <= MAX_INLINE_PAYLOAD_BYTES
+              ? buildInlinePayloadRef(payload)
+              : storeMapPayload(payload, owner);
           // Also inline the payload (when small) alongside the ref - hosts
           // like ChatGPT deliver structuredContent to the iframe intact but
           // have no resources/read equivalent, so the ref alone would be
@@ -188,17 +243,34 @@ export class RenderMapTool extends BaseTool<
   /**
    * Resolve `payload_refs` and merge with any inline layers/markers/legend.
    * Inline `summary` (when set) overrides any summary from the refs.
-   * Returns null if nothing renderable is provided.
+   * `payload` is null if nothing renderable is provided. `unresolvedRefs`
+   * lists any input refs that failed to resolve (expired/unknown/wrong
+   * owner) so the caller can tell the LLM data may be missing or stale,
+   * rather than silently dropping it.
    */
   private assemblePayload(
     input: RenderMapInput,
     owner: string | undefined
-  ): MapAppPayload | null {
+  ): { payload: MapAppPayload | null; unresolvedRefs: string[] } {
     const fromRefs: MapAppPayload[] = [];
+    const unresolvedRefs: string[] = [];
     if (Array.isArray(input.payload_refs)) {
       for (const ref of input.payload_refs) {
-        const resolved = resolveMapPayloadRef(ref, owner);
+        // Compute refs (union/intersect/difference), self-fetch refs
+        // (directions), and inline-payload refs (render_map_tool's own
+        // output, in case it's chained into another render_map_tool call)
+        // are all self-describing and carry no server-side state —
+        // resolving them never depends on `owner` or on anything having
+        // survived since the ref was minted.
+        const resolved = isComputeRef(ref)
+          ? resolveComputeRef(ref)
+          : isSelfFetchRef(ref)
+            ? resolveSelfFetchRef(ref)
+            : isInlinePayloadRef(ref)
+              ? resolveInlinePayloadRef(ref)
+              : resolveMapPayloadRef(ref, owner);
         if (resolved) fromRefs.push(resolved);
+        else unresolvedRefs.push(ref);
       }
     }
 
@@ -218,14 +290,14 @@ export class RenderMapTool extends BaseTool<
 
     const all: MapAppPayload[] = [...fromRefs];
     if (hasInlineContent || inline.summary || inline.legend) all.push(inline);
-    if (all.length === 0) return null;
+    if (all.length === 0) return { payload: null, unresolvedRefs };
 
     const merged = mergeMapPayloads(all);
     // Inline summary/camera/legend take precedence when provided.
     if (input.summary) merged.summary = input.summary;
     if (input.camera) merged.camera = inline.camera;
     if (input.legend) merged.legend = input.legend;
-    return merged;
+    return { payload: merged, unresolvedRefs };
   }
 }
 

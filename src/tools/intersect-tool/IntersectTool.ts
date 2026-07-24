@@ -3,7 +3,6 @@
 
 import { intersect, polygon, featureCollection } from '@turf/turf';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { IntersectInputSchema } from './IntersectTool.input.schema.js';
@@ -12,9 +11,8 @@ import {
   type IntersectOutput
 } from './IntersectTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { buildPolygonOpsMapPayload } from '../union-tool/buildPolygonOpsMapPayload.js';
-import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildComputeRef } from '../../utils/computeRef.js';
 
 export class IntersectTool extends BaseTool<
   typeof IntersectInputSchema,
@@ -44,14 +42,7 @@ export class IntersectTool extends BaseTool<
     });
   }
 
-  async run(
-    rawInput: unknown,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    extra?: RequestHandlerExtra<any, any>
-  ): Promise<CallToolResult> {
-    const accessToken =
-      extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
-    const owner = accessToken ? getUserNameFromToken(accessToken) : undefined;
+  async run(rawInput: unknown): Promise<CallToolResult> {
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(
       trace.setSpan(context.active(), toolContext.span),
@@ -76,29 +67,18 @@ export class IntersectTool extends BaseTool<
             ? `The polygons intersect.\nIntersection geometry:\n${JSON.stringify(validated.geometry, null, 2)}`
             : 'The polygons do not intersect.';
 
-          const mapPayload = buildPolygonOpsMapPayload({
-            operation: 'intersect',
-            inputs: [poly1, poly2] as Array<{
-              type: 'Feature';
-              geometry: unknown;
-            }>,
-            result: (result ?? null) as {
-              type: 'Feature';
-              geometry: unknown;
-            } | null,
-            summary: validated.intersects
-              ? 'Intersection of two polygons'
-              : 'Polygons do not intersect'
-          });
+          // Intersect is a pure function of its inputs — the ref carries
+          // the inputs themselves rather than a pointer to a server-side
+          // store. See computeRef.ts.
+          const ref = buildComputeRef('intersect', [
+            { type: 'Feature' as const, geometry: poly1.geometry },
+            { type: 'Feature' as const, geometry: poly2.geometry }
+          ]);
           const sc: Record<string, unknown> = {
-            ...(validated as unknown as Record<string, unknown>)
+            ...(validated as unknown as Record<string, unknown>),
+            mapboxRender: { ref }
           };
-          let textOut = text;
-          if (mapPayload) {
-            const ref = storeMapPayload(mapPayload, owner);
-            sc.mapboxRender = { ref };
-            textOut += renderHint(ref);
-          }
+          const textOut = text + renderHint(ref);
 
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
