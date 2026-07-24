@@ -1,22 +1,18 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { URLSearchParams } from 'node:url';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { MapMatchingInputSchema } from './MapMatchingTool.input.schema.js';
+import { buildMapMatchingRequestUrl } from './buildMapMatchingRequestUrl.js';
 import {
   MapMatchingOutputSchema,
   type MapMatchingOutput
 } from './MapMatchingTool.output.schema.js';
 import type { HttpRequest } from '../../utils/types.js';
-import {
-  decodePolylineWithFallback,
-  type MapAppPayload
-} from '../../utils/mapAppPayload.js';
-import { storeMapPayload, renderHint } from '../../utils/storeMapPayload.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
@@ -79,33 +75,11 @@ export class MapMatchingTool extends MapboxApiBasedTool<
       };
     }
 
-    // Build coordinate string: "lon1,lat1;lon2,lat2;..."
-    const coordsString = input.coordinates
-      .map((coord) => `${coord.longitude},${coord.latitude}`)
-      .join(';');
-
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    queryParams.append('access_token', accessToken);
-    queryParams.append('geometries', input.geometries);
-    queryParams.append('overview', input.overview);
-
-    // Add timestamps if provided (semicolon-separated)
-    if (input.timestamps) {
-      queryParams.append('timestamps', input.timestamps.join(';'));
-    }
-
-    // Add radiuses if provided (semicolon-separated)
-    if (input.radiuses) {
-      queryParams.append('radiuses', input.radiuses.join(';'));
-    }
-
-    // Add annotations if provided (comma-separated)
-    if (input.annotations && input.annotations.length > 0) {
-      queryParams.append('annotations', input.annotations.join(','));
-    }
-
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}matching/v5/mapbox/${input.profile}/${coordsString}?${queryParams.toString()}`;
+    const url = buildMapMatchingRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
     const response = await this.httpRequest(url);
 
@@ -165,19 +139,27 @@ export class MapMatchingTool extends MapboxApiBasedTool<
       };
     }
 
-    const mapPayload = buildMapMatchingPayload(validatedData, input);
+    // The map preview fetches its own matched route directly from the Map
+    // Matching API (client-side, using the iframe's public token) rather
+    // than depend on server-computed geometry stashed behind a ref — see
+    // selfFetchRef.ts. This ref carries only the call's own input params
+    // (already visible to the LLM). It always forces geometries=geojson
+    // and overview=full for the self-fetch itself, so the map preview
+    // never depends on what the caller's own request asked for.
+    const selfFetchRef = buildSelfFetchRef('map_matching', {
+      coordinates: input.coordinates,
+      profile: input.profile,
+      timestamps: input.timestamps,
+      radiuses: input.radiuses,
+      annotations: input.annotations
+    });
+
     const sc: Record<string, unknown> = {
-      ...(validatedData as unknown as Record<string, unknown>)
+      ...(validatedData as unknown as Record<string, unknown>),
+      mapboxRender: { ref: selfFetchRef }
     };
-    let textOut = JSON.stringify(validatedData, null, 2);
-    if (mapPayload) {
-      const ref = storeMapPayload(
-        mapPayload,
-        getUserNameFromToken(accessToken)
-      );
-      sc.mapboxRender = { ref };
-      textOut += renderHint(ref);
-    }
+    const textOut =
+      JSON.stringify(validatedData, null, 2) + renderHint(selfFetchRef);
 
     return {
       content: [{ type: 'text', text: textOut }],
@@ -185,75 +167,4 @@ export class MapMatchingTool extends MapboxApiBasedTool<
       isError: false
     };
   }
-}
-
-/**
- * Build a payload showing the raw GPS trace as a dashed orange line and
- * the matched route as a solid blue line, with a legend explaining both.
- */
-function buildMapMatchingPayload(
-  data: MapMatchingOutput,
-  input: z.infer<typeof MapMatchingInputSchema>
-): MapAppPayload | null {
-  const match = data.matchings?.[0];
-  if (!match) return null;
-
-  let matchedCoords: [number, number][] | null = null;
-  const g = match.geometry as unknown;
-  if (
-    g &&
-    typeof g === 'object' &&
-    (g as { type?: string }).type === 'LineString' &&
-    Array.isArray((g as { coordinates?: unknown }).coordinates)
-  ) {
-    matchedCoords = (g as { coordinates: [number, number][] }).coordinates;
-  } else if (typeof g === 'string' && g.length > 0) {
-    matchedCoords = decodePolylineWithFallback(g);
-  }
-  if (!matchedCoords || matchedCoords.length === 0) return null;
-
-  const rawCoords: [number, number][] = input.coordinates.map((c) => [
-    c.longitude,
-    c.latitude
-  ]);
-
-  const matched = data.tracepoints?.filter((t) => t != null).length ?? 0;
-  const total = data.tracepoints?.length ?? input.coordinates.length;
-
-  return {
-    summary: `Matched ${matched}/${total} GPS points (confidence ${(match.confidence * 100).toFixed(0)}%)`,
-    layers: [
-      {
-        id: 'raw-trace',
-        type: 'line',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: rawCoords },
-          properties: {}
-        },
-        paint: {
-          'line-color': '#f97316',
-          'line-width': 2,
-          'line-dasharray': [2, 2],
-          'line-opacity': 0.8
-        },
-        layout: { 'line-join': 'round', 'line-cap': 'round' }
-      },
-      {
-        id: 'matched-route',
-        type: 'line',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: matchedCoords },
-          properties: {}
-        },
-        paint: { 'line-color': '#3b82f6', 'line-width': 4 },
-        layout: { 'line-join': 'round', 'line-cap': 'round' }
-      }
-    ],
-    legend: [
-      { label: 'Raw trace', color: '#f97316' },
-      { label: 'Matched route', color: '#3b82f6' }
-    ]
-  };
 }

@@ -528,3 +528,146 @@ describe('mapAppHtml isochrone self-fetch', () => {
     expect(errorEl?.textContent).toContain('Could not fetch isochrone');
   });
 });
+
+describe('mapAppHtml map matching self-fetch', () => {
+  it('fetches and draws the raw + matched trace itself from a selfFetch descriptor', async () => {
+    const { sendToolResult, setFetchImpl, map, summaryEl, errorEl } =
+      loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    const addSourceSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+    map.addSource = addSourceSpy;
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        code: 'Ok',
+        matchings: [
+          {
+            confidence: 0.9,
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-122.4194, 37.7749],
+                [-122.4195, 37.775]
+              ]
+            }
+          }
+        ],
+        tracepoints: [
+          { location: [-122.4194, 37.7749] },
+          { location: [-122.4195, 37.775] }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/map_matching?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'map_matching',
+              params: {
+                coordinates: [
+                  { longitude: -122.4194, latitude: 37.7749 },
+                  { longitude: -122.4195, latitude: 37.775 }
+                ],
+                profile: 'driving'
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      'matching/v5/mapbox/driving/-122.4194,37.7749;-122.4195,37.775'
+    );
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('geometries=geojson');
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('overview=full');
+    expect(addSourceSpy).toHaveBeenCalledWith(
+      'selffetch-map-matching-raw',
+      expect.objectContaining({ type: 'geojson' })
+    );
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'selffetch-map-matching-matched' })
+    );
+    expect(summaryEl?.textContent).toBe(
+      'Matched 2/2 GPS points (confidence 90%)'
+    );
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('shows an error for NoMatch instead of a broken map', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ code: 'NoMatch' })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/map_matching?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'map_matching',
+              params: {
+                coordinates: [
+                  { longitude: -122.4194, latitude: 37.7749 },
+                  { longitude: -122.4195, latitude: 37.775 }
+                ],
+                profile: 'driving'
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(errorEl?.textContent).toContain('could not match the trace');
+  });
+
+  it('never fetches when the selfFetch params are unsafe (e.g. forged profile)', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 599,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/map_matching?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'map_matching',
+              params: {
+                coordinates: [
+                  { longitude: -122.4194, latitude: 37.7749 },
+                  { longitude: -122.4195, latitude: 37.775 }
+                ],
+                profile: 'driving/../../evil'
+              }
+            }
+          ]
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(errorEl?.textContent).toContain('Could not fetch map match');
+  });
+});

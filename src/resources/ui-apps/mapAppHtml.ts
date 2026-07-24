@@ -525,15 +525,16 @@ ${initialDataScript}
       );
     }
 
-    // Self-fetched layers (e.g. a directions route or isochrone contours):
-    // the ref only carried the tool's own input params, so fetch and draw
-    // them ourselves now that the map is up, rather than depend on
-    // server-computed geometry.
+    // Self-fetched layers (e.g. a directions route, isochrone contours, or
+    // a map-matched trace): the ref only carried the tool's own input
+    // params, so fetch and draw them ourselves now that the map is up,
+    // rather than depend on server-computed geometry.
     if (Array.isArray(payload.selfFetch)) {
       payload.selfFetch.forEach(function(sf) {
         if (!sf) return;
         if (sf.tool === 'directions') selfFetchDirections(sf.params);
         else if (sf.tool === 'isochrone') selfFetchIsochrone(sf.params);
+        else if (sf.tool === 'map_matching') selfFetchMapMatching(sf.params);
       });
     }
   }
@@ -933,6 +934,149 @@ ${initialDataScript}
       .catch(function(err) {
         showError(
           'Could not fetch isochrone: ' + (err && err.message ? err.message : err)
+        );
+      });
+  }
+
+  // --- Self-fetch: map matching ----------------------------------------
+  // Mirrors src/tools/map-matching-tool/buildMapMatchingRequestUrl.ts —
+  // kept in sync by the parity test in
+  // test/resources/ui-apps/mapMatchingSelfFetchUrlParity.test.ts. Always
+  // forces geometries=geojson and overview=full for the self-fetch itself,
+  // regardless of what the original tool call requested, so the map
+  // preview never depends on it.
+  var MAP_MATCHING_PROFILES = ['driving', 'driving-traffic', 'walking', 'cycling'];
+
+  function buildMapMatchingApiUrl(params, publicToken, apiEndpoint) {
+    var coordsString = params.coordinates
+      .map(function(c) { return c.longitude + ',' + c.latitude; })
+      .join(';');
+    var profile = params.profile || 'driving';
+
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    qp.append('geometries', 'geojson');
+    qp.append('overview', 'full');
+    if (params.timestamps) {
+      qp.append('timestamps', params.timestamps.join(';'));
+    }
+    if (params.radiuses) {
+      qp.append('radiuses', params.radiuses.join(';'));
+    }
+    if (params.annotations && params.annotations.length > 0) {
+      qp.append('annotations', params.annotations.join(','));
+    }
+
+    return apiEndpoint + 'matching/v5/mapbox/' + profile + '/' + coordsString +
+      '?' + qp.toString();
+  }
+  // Exposed so the parity test (Node vm sandbox) can call this in isolation.
+  window.__buildMapMatchingApiUrl = buildMapMatchingApiUrl;
+
+  // profile is spliced into the URL path unencoded, so it must be one of
+  // the known enum values rather than any string. Coordinates get
+  // interpolated directly too, so must be finite numbers.
+  function isSafeMapMatchingParams(params) {
+    if (!params || !Array.isArray(params.coordinates)) return false;
+    if (params.coordinates.length < 2) return false;
+    for (var i = 0; i < params.coordinates.length; i++) {
+      var c = params.coordinates[i];
+      if (!c || typeof c.longitude !== 'number' || !isFinite(c.longitude)) return false;
+      if (typeof c.latitude !== 'number' || !isFinite(c.latitude)) return false;
+    }
+    if (params.profile !== undefined && params.profile !== null) {
+      if (MAP_MATCHING_PROFILES.indexOf(params.profile) === -1) return false;
+    }
+    return true;
+  }
+
+  // Mirrors the deleted server-side buildMapMatchingPayload (now
+  // client-only since the map preview self-fetches): raw GPS trace as a
+  // dashed orange line, matched route as a solid blue line.
+  function buildMapMatchingMiniPayload(data, params) {
+    var match = data && data.matchings && data.matchings[0];
+    if (!match || !match.geometry || !Array.isArray(match.geometry.coordinates) ||
+        match.geometry.coordinates.length === 0) {
+      return null;
+    }
+
+    var rawCoords = params.coordinates.map(function(c) {
+      return [c.longitude, c.latitude];
+    });
+    var matchedCoords = match.geometry.coordinates;
+
+    var tracepoints = data.tracepoints || [];
+    var matched = tracepoints.filter(function(t) { return t != null; }).length;
+    var total = tracepoints.length || params.coordinates.length;
+    var confidencePct = Math.round((match.confidence || 0) * 100);
+
+    return {
+      summary: 'Matched ' + matched + '/' + total + ' GPS points (confidence ' + confidencePct + '%)',
+      layers: [
+        {
+          id: 'selffetch-map-matching-raw',
+          type: 'line',
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: rawCoords }, properties: {} },
+          paint: {
+            'line-color': '#f97316',
+            'line-width': 2,
+            'line-dasharray': [2, 2],
+            'line-opacity': 0.8
+          },
+          layout: { 'line-join': 'round', 'line-cap': 'round' }
+        },
+        {
+          id: 'selffetch-map-matching-matched',
+          type: 'line',
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: matchedCoords }, properties: {} },
+          paint: { 'line-color': '#3b82f6', 'line-width': 4 },
+          layout: { 'line-join': 'round', 'line-cap': 'round' }
+        }
+      ],
+      legend: [
+        { label: 'Raw trace', color: '#f97316' },
+        { label: 'Matched route', color: '#3b82f6' }
+      ]
+    };
+  }
+
+  function selfFetchMapMatching(params) {
+    if (!TOKEN || !isSafeMapMatchingParams(params)) {
+      showError('Could not fetch map match: missing token or invalid parameters.');
+      return;
+    }
+    var url = buildMapMatchingApiUrl(params, TOKEN, API_ENDPOINT);
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function() { return null; })
+            .then(function(body) {
+              var msg =
+                body && body.message
+                  ? body.message
+                  : 'Map Matching API error (' + res.status + ')';
+              throw new Error(msg);
+            });
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        if (data && data.code !== 'Ok') {
+          showError('Map Matching API could not match the trace (code: ' + data.code + ').');
+          return;
+        }
+        var mini = buildMapMatchingMiniPayload(data, params);
+        if (!mini) {
+          showError('Map Matching API returned no matched route.');
+          return;
+        }
+        mergeAdditionalPayload(mini);
+      })
+      .catch(function(err) {
+        showError(
+          'Could not fetch map match: ' + (err && err.message ? err.message : err)
         );
       });
   }

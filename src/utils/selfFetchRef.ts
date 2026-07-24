@@ -53,7 +53,13 @@ export function resolveSelfFetchRef(uri: string): MapAppPayload | null {
     return null;
   }
   if (!encoded) return null;
-  if (tool !== 'directions' && tool !== 'isochrone') return null;
+  if (
+    tool !== 'directions' &&
+    tool !== 'isochrone' &&
+    tool !== 'map_matching'
+  ) {
+    return null;
+  }
 
   let params: Record<string, unknown>;
   try {

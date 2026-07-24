@@ -296,7 +296,7 @@ describe('MapMatchingTool', () => {
     expect(callUrl).toContain('geometries=geojson');
   });
 
-  it('stores a mapboxRender payload with raw + matched line layers', async () => {
+  it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
     const fakeResp = {
       code: 'Ok',
       matchings: [
@@ -348,21 +348,26 @@ describe('MapMatchingTool', () => {
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
-    expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
-
-    const { resolveMapPayloadRef } =
-      await import('../../../src/utils/storeMapPayload.js');
-    const payload = resolveMapPayloadRef(
-      sc.mapboxRender!.ref!,
-      'account-test-map-matching'
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/map_matching\?data=/
     );
-    expect(payload?.layers?.map((l) => l.id)).toEqual([
-      'raw-trace',
-      'matched-route'
-    ]);
-    expect(payload?.legend?.map((e) => e.label)).toEqual([
-      'Raw trace',
-      'Matched route'
+
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'map_matching',
+        params: expect.objectContaining({
+          coordinates: [
+            { longitude: -122.4194, latitude: 37.7749 },
+            { longitude: -122.4195, latitude: 37.775 }
+          ],
+          profile: 'driving'
+        })
+      }
     ]);
   });
 });
