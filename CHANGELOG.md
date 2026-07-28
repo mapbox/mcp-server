@@ -34,6 +34,10 @@
 - **union_tool, intersect_tool, difference_tool: map previews are now recomputed from the original input polygons on every render** instead of being cached behind a server-side ref that could expire or vanish on a restart.
 - **render_map_tool: clearer recovery when a `payload_ref` can't be resolved.** Instead of silently dropping the data or returning a bare "nothing to render" error, the LLM is now told to re-run the upstream tool to get a fresh ref. The map preview itself now also shows the server's actual explanation (e.g. "expired") instead of a generic "malformed payload" message.
 
+### Testing
+
+- **New integration test: process-restart survival** (`test/integration/processRestart.test.ts`). Spawns the actual built server (`dist/esm/index.js`) as a real child process, gets a ref back over real stdio/MCP protocol, kills that process, spawns an independent one, and resolves the same ref against it — the only test in the suite that crosses a real process boundary, which is what the restart-survival fixes above actually need proven. Runs offline (`union_tool`/`render_map_tool` do no network I/O) in ~5s; skips itself with a clear message if `dist/esm/index.js` hasn't been built yet (CI already builds before testing).
+
 ## 0.12.7 - 2026-07-20
 
 ### Fixed
