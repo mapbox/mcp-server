@@ -41,7 +41,7 @@ This MCP server uses **stdio transport exclusively** for communication. Console 
 
 ### Security & Performance
 
-- **Sensitive Data Protection**: Input parameters logged by size only, not content
+- **Sensitive Data Protection**: Input parameters logged by size only, not content; access tokens are stripped from span attributes before export
 - **Minimal Overhead**: <1% CPU impact, ~10MB memory for trace buffers
 - **Configurable Sampling**: Support for production trace volume management
 - **Graceful Fallback**: No impact on functionality when tracing is disabled
@@ -137,13 +137,11 @@ The server supports **any OTLP-compatible observability backend**. Configuration
 ### Production Cloud Providers
 
 - **AWS X-Ray**: AWS-native distributed tracing
-
   - Endpoint: AWS Distro for OpenTelemetry Collector
   - Auth: IAM credentials
   - [Setup Guide](https://aws-otel.github.io/docs/getting-started/collector)
 
 - **Azure Monitor**: Azure Application Insights
-
   - Endpoint: `https://<region>.livediagnostics.monitor.azure.com`
   - Auth: Connection string or AAD token
   - [Setup Guide](https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable)
@@ -156,13 +154,11 @@ The server supports **any OTLP-compatible observability backend**. Configuration
 ### Production SaaS Observability Platforms
 
 - **Datadog**: Full-stack observability platform
-
   - Endpoint: `https://api.datadoghq.com/api/v2/traces` or local agent
   - Auth: API key
   - [Setup Guide](https://docs.datadoghq.com/tracing/trace_collection/opentelemetry/)
 
 - **New Relic**: Application performance monitoring
-
   - Endpoint: `https://otlp.nr-data.net:4318` (US) or `https://otlp.eu01.nr-data.net:4318` (EU)
   - Auth: License key
   - [Setup Guide](https://docs.newrelic.com/docs/more-integrations/open-source-telemetry-integrations/opentelemetry/opentelemetry-setup/)
@@ -352,6 +348,11 @@ getNodeAutoInstrumentations({
 ### Data Privacy
 
 - **Input sanitization**: Only input/output sizes are logged, not content
+- **Access tokens**: Mapbox APIs take the access token as a URL query parameter, and HTTP
+  auto-instrumentation records request URLs on client spans (`url.full`, `url.query`). Every
+  span passes through a redacting exporter that rewrites `access_token=<value>` to
+  `access_token=***` in all string attributes before anything is sent to your trace backend,
+  so tokens are not copied into your telemetry backend
 - **JWT validation**: Basic format validation only, no secret verification
 - **Error messages**: Error details are logged but sensitive data is protected
 

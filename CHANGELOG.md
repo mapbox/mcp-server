@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- **Tracing**: Access tokens are no longer included in exported spans. Mapbox APIs take the access token as a URL query parameter, and OpenTelemetry's HTTP/undici auto-instrumentation records the full request URL on client spans (`url.full`, `url.query`), so operators who configured `OTEL_EXPORTER_OTLP_ENDPOINT` had tokens copied verbatim into their telemetry backend. The trace exporter is now wrapped in a `RedactingSpanExporter` that rewrites `access_token=<value>` to `access_token=***` across all string span attributes before export.
+
 - **map_matching_tool**: When the Map Matching API can't match a trace (e.g. `code: "NoMatch"` for distant/unmatchable coordinates), the tool now returns a clear `isError` text result instead of crashing with `MCP error -32602: Output validation error` — the API omits `tracepoints`/`matchings` in this case, which previously violated the tool's output schema and was returned as `structuredContent` anyway, triggering the MCP SDK's output validation. The same schema-violating `structuredContent` could also be returned for a `code: "Ok"` response that otherwise failed schema validation (e.g. a `confidence` out of range); that fallback now also returns a graceful `isError` result instead of the raw invalid payload. `tracepoints` and `matchings` are also now `.optional()` in the output schema as a defensive measure. (AGI-1021)
 
 ## 0.12.7 - 2026-07-20
