@@ -11,46 +11,31 @@ import ipaddr from 'ipaddr.js';
  * Rejects:
  *  - non-http(s) schemes (e.g. file:, gopher:, data:, javascript:)
  *  - non-https URLs (markers should always be fetched over TLS)
- *  - URLs whose host is an IP literal in a loopback, private, link-local,
- *    unique-local, or otherwise non-routable range (CWE-918 SSRF), including
- *    IPv4 addresses embedded in an IPv6 literal via any of the standard
- *    encodings (IPv4-mapped, IPv4-compatible, 6to4, NAT64)
+ *  - URLs whose host is an IP literal outside the plain public "unicast"
+ *    range (CWE-918 SSRF) — see the deny-by-default note below
  *  - URLs whose host is a well-known local hostname
  *
  * Note: we do not perform DNS resolution here — the upstream service will
  * still resolve the hostname when fetching. This validation is a defense in
  * depth against the most common SSRF vectors that prompt-injected agents
- * tend to produce (IP literals and "localhost").
+ * tend to produce (IP literals and "localhost"). It cannot, by design,
+ * defend against DNS rebinding (an ordinary hostname resolving to an
+ * internal address at fetch time) — that has to be handled where the fetch
+ * actually happens.
  *
- * IPv6 addresses are allowed only when they fall in the plain global
- * "unicast" range as classified by ipaddr.js. Every IPv6 special-purpose
- * range — loopback, link-local, unique-local, multicast, reserved, and the
- * various IPv4-in-IPv6 transition/translation mechanisms (IPv4-mapped,
- * IPv4-compatible, 6to4, NAT64, SIIT, Teredo, AMT, ORCHID, etc.) — is
- * rejected outright, rather than trying to decode and check the IPv4
- * address some of these mechanisms embed. Legitimate marker image hosts
- * have no reason to be addressed through a transition mechanism, and
- * decoding each one correctly (some split the embedded address around
- * reserved bits, some XOR-obfuscate it) is error-prone and has repeatedly
- * missed cases; denying the whole category is simpler and strictly safer.
+ * Both IPv4 and IPv6 literals are allowed only when ipaddr.js classifies
+ * them as plain global "unicast" addresses; every other named range —
+ * loopback, private, link-local, unique-local, multicast, broadcast,
+ * carrier-grade NAT, reserved, and every IPv4-in-IPv6 transition/
+ * translation mechanism (IPv4-mapped, IPv4-compatible, 6to4, NAT64, SIIT,
+ * Teredo, AMT, ORCHID, etc.) — is rejected outright. This is a
+ * deliberate deny-by-default choice: legitimate marker image hosts have no
+ * reason to be addressed through any of these mechanisms, and enumerating
+ * which specific ranges or encodings are "dangerous enough to block" (the
+ * previous approach) has repeatedly missed cases as new ones were found.
+ * Denying everything except the one category that's actually normal is
+ * simpler and strictly safer.
  */
-
-function isBlockedIPv4(octets: number[]): boolean {
-  const [a, b] = octets;
-  // 0.0.0.0/8 — "this network" (unspecified + reserved); block conservatively
-  if (a === 0 || a === 10 || a === 127) return true;
-  // 169.254/16 (link-local, includes cloud metadata 169.254.169.254)
-  if (a === 169 && b === 254) return true;
-  // 172.16/12
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  // 192.168/16
-  if (a === 192 && b === 168) return true;
-  // 100.64/10 (CGNAT)
-  if (a === 100 && b >= 64 && b <= 127) return true;
-  // 224/4 multicast and 240/4 reserved
-  if (a >= 224) return true;
-  return false;
-}
 
 export function isSafeExternalUrl(rawUrl: string): boolean {
   let parsed: URL;
@@ -86,34 +71,25 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     return false;
   }
 
-  // IPv4 literal check (dotted quad)
-  const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (ipv4Match) {
-    const octets = ipv4Match.slice(1, 5).map((o) => Number(o));
-    if (octets.some((o) => o < 0 || o > 255)) {
-      return false;
-    }
-    return !isBlockedIPv4(octets);
+  // If the host isn't a parseable IP literal at all, it's an ordinary
+  // hostname — allowed here (subject to the local-hostname blocklist
+  // above); DNS rebinding is out of scope for this pre-fetch check, see
+  // the module doc comment.
+  if (!ipaddr.isValid(host)) {
+    return true;
+  }
+  const addr = ipaddr.parse(host);
+
+  // Deny by default for both IPv4 and IPv6: only plain global unicast
+  // addresses are allowed. Every other named range (private, loopback,
+  // link-local, multicast, broadcast, CGNAT, reserved, unique-local, and
+  // every IPv4-in-IPv6 transition/translation mechanism) is rejected,
+  // regardless of what it does or doesn't embed.
+  if (addr.range() !== 'unicast') {
+    return false;
   }
 
-  // IPv6 literal check (presence of ':' indicates IPv6 since IPv4 was handled)
-  if (host.includes(':')) {
-    let addr;
-    try {
-      addr = ipaddr.parse(host);
-    } catch {
-      return false;
-    }
-    if (addr.kind() !== 'ipv6') {
-      return false;
-    }
-    // Deny by default: only plain global unicast addresses are allowed.
-    // Every special-purpose range (loopback, link-local, unique-local,
-    // multicast, reserved, and every IPv4-in-IPv6 transition/translation
-    // mechanism) is rejected, regardless of what it does or doesn't embed.
-    if (addr.range() !== 'unicast') {
-      return false;
-    }
+  if (addr.kind() === 'ipv6') {
     // ipaddr.js does not classify the deprecated IPv4-compatible form
     // (::a.b.c.d, i.e. the leading 96 bits all zero) as a special range
     // when written in plain hex, which is exactly the form Node's URL
@@ -125,7 +101,6 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     if (bytes.slice(0, 12).every((b) => b === 0)) {
       return false;
     }
-    return true;
   }
 
   return true;

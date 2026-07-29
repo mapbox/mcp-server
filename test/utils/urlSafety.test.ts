@@ -61,6 +61,42 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://11.0.0.1/x.png')).toBe(true);
   });
 
+  it('rejects IPv4 ranges not covered by the previous hand-written blocklist', () => {
+    // 255.255.255.255 is broadcast, not multicast/reserved as previously
+    // classified — still denied under deny-by-default, but for a
+    // different (correct) reason.
+    expect(isSafeExternalUrl('https://255.255.255.255/x.png')).toBe(false);
+    // 240.0.0.1 is IANA "reserved for future use" (240/4), never explicitly
+    // named in the old octet-range checks (only caught because "a >= 224"
+    // over-blocked it alongside multicast).
+    expect(isSafeExternalUrl('https://240.0.0.1/x.png')).toBe(false);
+    // Documentation/TEST-NET ranges (RFC 5737) were never blocked by the
+    // old hand-written checks at all; deny-by-default catches them for
+    // free since ipaddr.js classifies them as 'reserved'.
+    expect(isSafeExternalUrl('https://192.0.2.1/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://198.51.100.1/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://203.0.113.1/x.png')).toBe(false);
+  });
+
+  it('rejects IPv4 addresses written in shorthand/non-decimal notations', () => {
+    // Node's URL parser canonicalizes these to dotted-quad before this
+    // function ever sees the hostname, so they're covered transitively —
+    // this just confirms the end-to-end behavior explicitly.
+    expect(isSafeExternalUrl('https://2130706433/x.png')).toBe(false); // 127.0.0.1 as a single decimal integer
+    expect(isSafeExternalUrl('https://0x7f000001/x.png')).toBe(false); // 127.0.0.1 in hex
+    expect(isSafeExternalUrl('https://127.1/x.png')).toBe(false); // short form of 127.0.0.1
+    expect(isSafeExternalUrl('https://0177.0.0.1/x.png')).toBe(false); // 127 in octal
+  });
+
+  it('rejects malformed IPv4-looking hosts rather than falling through to hostname handling', () => {
+    // Node's URL constructor itself rejects out-of-range octets, so these
+    // never reach isSafeExternalUrl with the malformed string intact —
+    // confirming there's no path where an invalid IP literal is silently
+    // treated as an allowed hostname.
+    expect(isSafeExternalUrl('https://999.1.1.1/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://1.2.3.999999999999/x.png')).toBe(false);
+  });
+
   it('allows ordinary public IPv6 unicast addresses', () => {
     expect(isSafeExternalUrl('https://[2607:f8b0:4004::1]/x.png')).toBe(true);
     expect(isSafeExternalUrl('https://[2001:4860:4860::8888]/x.png')).toBe(
