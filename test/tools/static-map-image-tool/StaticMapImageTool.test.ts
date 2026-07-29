@@ -399,6 +399,46 @@ describe('StaticMapImageTool', () => {
       );
     });
 
+    it('forwards the canonical re-serialization of a custom-marker URL, not the caller-supplied raw string', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      // A URL containing a backslash before an "@" is a classic
+      // parser-differential vector: the WHATWG URL parser (used by
+      // isSafeExternalUrl) normalises the backslash to a path separator
+      // for special schemes, so the validated host is example.com — but a
+      // more lenient downstream parser could read "8.8.8.8" as userinfo
+      // and connect to whatever follows the "@" instead. Forwarding the
+      // canonical serialization (rather than the caller's raw string)
+      // means any downstream parser sees the same unambiguous form that
+      // was actually validated, regardless of how it would have parsed
+      // the original raw string.
+      const rawUrl = 'https://example.com\\@169.254.169.254/marker.png';
+      const canonical = new URL(rawUrl).toString();
+      // The backslash is normalised to a path separator, so
+      // "169.254.169.254" ends up as harmless path text rather than the
+      // host — this is the property that actually matters, not the
+      // absence of the substring anywhere in the string.
+      expect(new URL(canonical).hostname).toBe('example.com');
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        overlays: [
+          {
+            type: 'custom-marker',
+            longitude: -74.006,
+            latitude: 40.7128,
+            url: rawUrl
+          }
+        ]
+      });
+
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain(`url-${encodeURIComponent(canonical)}(`);
+      expect(url).not.toContain(encodeURIComponent(rawUrl));
+    });
+
     it('adds path overlay to URL', async () => {
       const { httpRequest } = setupHttpRequest();
 

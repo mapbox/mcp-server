@@ -270,6 +270,12 @@ export const CustomMarkerOverlaySchema = z.object({
       message:
         'URL must be an https:// URL pointing to a public host (loopback, private, link-local, and unique-local addresses are not allowed)'
     })
+    // Re-serialize to the WHATWG URL parser's canonical form, so every
+    // downstream consumer of this value (the request forwarded to the
+    // Static Images API) parses exactly what isSafeExternalUrl validated,
+    // rather than re-parsing the caller's original raw string with a
+    // possibly different parser that could disagree on its structure.
+    .transform((url) => new URL(url).toString())
     .describe(
       'HTTPS URL of custom marker image (PNG or JPEG, max 1024px). Must point to a publicly reachable host; URLs targeting localhost, private, link-local, or unique-local addresses are rejected to prevent SSRF.'
     )
