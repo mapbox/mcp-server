@@ -11,37 +11,24 @@ import ipaddr from 'ipaddr.js';
  * Rejects:
  *  - non-http(s) schemes (e.g. file:, gopher:, data:, javascript:)
  *  - non-https URLs (markers should always be fetched over TLS)
- *  - URLs whose host is an IP literal outside the plain public "unicast"
- *    range (CWE-918 SSRF) — see the deny-by-default note below
- *  - URLs whose host is a well-known local hostname, under a reserved
- *    local/internal-use suffix (.internal, .local, .arpa), or dotless
- *    (single-label hostnames never resolve to a public host)
+ *  - IPv4/IPv6 literals outside ipaddr.js's plain "unicast" range —
+ *    deny-by-default, so loopback, private, link-local, multicast,
+ *    broadcast, CGNAT, reserved, and every IPv4-in-IPv6 transition/
+ *    translation mechanism (mapped, compatible, 6to4, NAT64, SIIT, Teredo,
+ *    AMT, ORCHID, etc.) are all rejected without needing to be named
+ *    individually (CWE-918 SSRF)
+ *  - well-known local hostnames, reserved local/internal-use suffixes
+ *    (.internal, .local, .arpa), and dotless single-label hostnames
  *
- * Note: we do not perform DNS resolution here — the upstream service will
- * still resolve the hostname when fetching. This validation is a defense in
- * depth against the most common SSRF vectors that prompt-injected agents
- * tend to produce (IP literals and "localhost"). It cannot, by design,
- * defend against DNS rebinding (an ordinary hostname resolving to an
- * internal address at fetch time) — that has to be handled where the fetch
- * actually happens. Two related gaps are out of scope for the same reason:
- * we don't restrict the port (the upstream fetcher is where that belongs),
- * and the local/internal-use suffix list can't be exhaustive (network-
- * specific suffixes like .corp, .lan, or .home resolve only on particular
- * private networks and aren't enumerable in general) — both are the same
- * class of problem as DNS rebinding, not gaps worth growing this list for.
- *
- * Both IPv4 and IPv6 literals are allowed only when ipaddr.js classifies
- * them as plain global "unicast" addresses; every other named range —
- * loopback, private, link-local, unique-local, multicast, broadcast,
- * carrier-grade NAT, reserved, and every IPv4-in-IPv6 transition/
- * translation mechanism (IPv4-mapped, IPv4-compatible, 6to4, NAT64, SIIT,
- * Teredo, AMT, ORCHID, etc.) — is rejected outright. This is a
- * deliberate deny-by-default choice: legitimate marker image hosts have no
- * reason to be addressed through any of these mechanisms, and enumerating
- * which specific ranges or encodings are "dangerous enough to block" (the
- * previous approach) has repeatedly missed cases as new ones were found.
- * Denying everything except the one category that's actually normal is
- * simpler and strictly safer.
+ * Out of scope, by design, for this pre-fetch string check — all three
+ * require validating the actual connection, not the URL string, so they
+ * belong where the fetch happens, not here:
+ *  - DNS rebinding (an ordinary hostname resolving to an internal address
+ *    at fetch time)
+ *  - port restriction
+ *  - network-specific hostname suffixes (.corp, .lan, .home, etc.) —
+ *    unlike .internal/.local/.arpa, these aren't globally reserved, so
+ *    they can't be enumerated in general
  */
 
 export function isSafeExternalUrl(rawUrl: string): boolean {
@@ -57,7 +44,10 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
   }
 
   // Strip optional surrounding brackets from IPv6 literals and a trailing
-  // root-label dot (e.g. "localhost." is equivalent to "localhost")
+  // root-label dot (e.g. "localhost." is equivalent to "localhost"). The
+  // dotless-hostname check further below relies on this running first —
+  // without it, "intranet." would still contain a dot and slip past that
+  // check.
   const host = parsed.hostname
     .replace(/^\[|\]$/g, '')
     .replace(/\.$/, '')
