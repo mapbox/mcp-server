@@ -76,4 +76,29 @@ describe('isSafeExternalUrl', () => {
       false
     );
   });
+
+  it('rejects IPv4-compatible IPv6 for blocked IPv4 ranges', () => {
+    // Node normalises ::169.254.169.254 to ::a9fe:a9fe (no dots, no ffff)
+    expect(isSafeExternalUrl('https://[::169.254.169.254]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[::127.0.0.1]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[::172.16.0.1]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[::a9fe:a9fe]/x.png')).toBe(false);
+  });
+
+  it('rejects 6to4-embedded blocked IPv4 ranges', () => {
+    expect(isSafeExternalUrl('https://[2002:a9fe:a9fe::]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[2002:7f00:1::]/x.png')).toBe(false);
+  });
+
+  it('rejects NAT64-embedded blocked IPv4 ranges', () => {
+    expect(isSafeExternalUrl('https://[64:ff9b::a9fe:a9fe]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[64:ff9b::7f00:1]/x.png')).toBe(false);
+  });
+
+  it('allows IPv4-compatible / 6to4 / NAT64 forms of public IPv4 addresses', () => {
+    // 8.8.8.8 -> 0808:0808
+    expect(isSafeExternalUrl('https://[::8.8.8.8]/x.png')).toBe(true);
+    expect(isSafeExternalUrl('https://[2002:808:808::]/x.png')).toBe(true);
+    expect(isSafeExternalUrl('https://[64:ff9b::808:808]/x.png')).toBe(true);
+  });
 });

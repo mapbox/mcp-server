@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- **urlSafety**: `isSafeExternalUrl()` (used to validate `static_map_image_tool` custom-marker overlay URLs) now uses `ipaddr.js` to parse IPv6 literals and correctly identify IPv4 addresses embedded via any standard encoding (IPv4-mapped, IPv4-compatible, 6to4, NAT64), instead of pattern-matching a subset of string forms. The previous regex-based check missed the bare IPv4-compatible form and the 6to4/NAT64 forms, letting blocked IPv4 ranges (loopback, private, link-local, etc.) through when expressed as one of those encodings.
 - **map_matching_tool**: When the Map Matching API can't match a trace (e.g. `code: "NoMatch"` for distant/unmatchable coordinates), the tool now returns a clear `isError` text result instead of crashing with `MCP error -32602: Output validation error` — the API omits `tracepoints`/`matchings` in this case, which previously violated the tool's output schema and was returned as `structuredContent` anyway, triggering the MCP SDK's output validation. The same schema-violating `structuredContent` could also be returned for a `code: "Ok"` response that otherwise failed schema validation (e.g. a `confidence` out of range); that fallback now also returns a graceful `isError` result instead of the raw invalid payload. `tracepoints` and `matchings` are also now `.optional()` in the output schema as a defensive measure. (AGI-1021)
 
 ## 0.12.7 - 2026-07-20
