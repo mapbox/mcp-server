@@ -39,6 +39,39 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://app.localhost./x.png')).toBe(false);
   });
 
+  it('rejects cloud-internal DNS zones (.internal)', () => {
+    // metadata.google.internal is the actual GCP metadata endpoint hostname
+    expect(isSafeExternalUrl('https://metadata.google.internal/x.png')).toBe(
+      false
+    );
+    expect(isSafeExternalUrl('https://some-service.internal/x.png')).toBe(
+      false
+    );
+  });
+
+  it('rejects mDNS (.local) and reverse-DNS/home zones (.arpa)', () => {
+    expect(isSafeExternalUrl('https://printer.local/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://router.home.arpa/x.png')).toBe(false);
+    expect(
+      isSafeExternalUrl('https://254.169.254.169.in-addr.arpa/x.png')
+    ).toBe(false);
+  });
+
+  it('rejects dotless single-label hostnames', () => {
+    expect(isSafeExternalUrl('https://intranet/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://metadata/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://ip6-loopback/x.png')).toBe(false);
+  });
+
+  it('allows ordinary multi-label public hostnames under similar-looking but distinct domains', () => {
+    // Sanity check that the suffix matching is exact-suffix, not substring
+    expect(isSafeExternalUrl('https://notinternal.com/x.png')).toBe(true);
+    expect(isSafeExternalUrl('https://locale.example.com/x.png')).toBe(true);
+    expect(isSafeExternalUrl('https://myinternal.example.com/x.png')).toBe(
+      true
+    );
+  });
+
   it('rejects IPv4 loopback / private / link-local / CGNAT / multicast', () => {
     expect(isSafeExternalUrl('https://127.0.0.1/x.png')).toBe(false);
     expect(isSafeExternalUrl('https://127.1.2.3/x.png')).toBe(false);

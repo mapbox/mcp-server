@@ -13,7 +13,9 @@ import ipaddr from 'ipaddr.js';
  *  - non-https URLs (markers should always be fetched over TLS)
  *  - URLs whose host is an IP literal outside the plain public "unicast"
  *    range (CWE-918 SSRF) — see the deny-by-default note below
- *  - URLs whose host is a well-known local hostname
+ *  - URLs whose host is a well-known local hostname, under a reserved
+ *    local/internal-use suffix (.internal, .local, .arpa), or dotless
+ *    (single-label hostnames never resolve to a public host)
  *
  * Note: we do not perform DNS resolution here — the upstream service will
  * still resolve the hostname when fetching. This validation is a defense in
@@ -67,16 +69,30 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     'ip6-loopback',
     'broadcasthost'
   ]);
-  if (blockedHostnames.has(host) || host.endsWith('.localhost')) {
+  // Suffixes reserved for local/internal use that no public marker image
+  // host is ever legitimately under: cloud-internal DNS zones (.internal,
+  // used by GCP/AWS service discovery — covers metadata.google.internal,
+  // the GCP metadata endpoint's actual hostname), mDNS (.local), and
+  // reverse-DNS / home-network zones reserved by RFC 6761/8375 (.arpa
+  // covers .in-addr.arpa, .ip6.arpa, and .home.arpa as suffixes of it).
+  const blockedSuffixes = ['.localhost', '.internal', '.local', '.arpa'];
+  if (
+    blockedHostnames.has(host) ||
+    blockedSuffixes.some((suffix) => host.endsWith(suffix))
+  ) {
     return false;
   }
 
   // If the host isn't a parseable IP literal at all, it's an ordinary
-  // hostname — allowed here (subject to the local-hostname blocklist
-  // above); DNS rebinding is out of scope for this pre-fetch check, see
-  // the module doc comment.
+  // hostname — allowed here (subject to the checks above), except that a
+  // public marker image host always has at least one dot; a dotless,
+  // single-label hostname only resolves via the fetcher's own network
+  // search-domain suffixing (e.g. "intranet", "metadata"), which is never
+  // the case for a legitimate external image URL. DNS rebinding on a
+  // multi-label hostname is out of scope for this pre-fetch check, see the
+  // module doc comment.
   if (!ipaddr.isValid(host)) {
-    return true;
+    return host.includes('.');
   }
   const addr = ipaddr.parse(host);
 
