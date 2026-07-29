@@ -46,7 +46,7 @@ export abstract class MapboxApiBasedTool<
    * @param token The token string to validate
    * @returns boolean indicating if the token has valid JWT format
    */
-  private isValidJwtFormat(token: string): boolean {
+  protected isValidJwtFormat(token: string): boolean {
     // JWT consists of three parts separated by dots: header.payload.signature
     const parts = token.split('.');
     if (parts.length !== 3) return false;

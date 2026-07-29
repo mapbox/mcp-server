@@ -1,5 +1,9 @@
 ## Unreleased
 
+### New Features
+
+- **`ground_location_tool` task-based streaming** (experimental): Convert `ground_location_tool` to use the MCP tasks extension (`server.experimental.tasks.registerToolTask`). The tool now returns a task handle immediately on `tools/call` instead of blocking until all API calls complete. Reverse geocoding and sampling classification run in parallel in the background; POI search and isochrone follow once the strategy is known. Task-capable clients get streaming updates; clients without task support get the same synchronous result as before via the SDK automatic polling path (`taskSupport: 'optional'`). The server is configured with `InMemoryTaskStore` to support task lifecycle management. See issue #197.
+
 ### Security
 
 - **directions_tool: fixed query parameter injection via the `exclude` parameter.** A `point(<lng> <lat>)` exclude entry was validated by splitting on spaces and reading only the first two tokens — any extra content after them (e.g. `point(0 0 &injected=evil)`) was never inspected or rejected. That value then reached the outbound Mapbox Directions API request through a hand-rolled encoder that escaped `,`/`(`/`)`/space but not `&`/`=`, concatenated directly onto the query string rather than through `URLSearchParams`. Together these let a caller-supplied `exclude` value add or override arbitrary query parameters on the authenticated Directions API request. Fixed by (1) requiring a `point(...)` entry's interior to be exactly two numbers and nothing else, and (2) building the `exclude` parameter through `URLSearchParams` like every other parameter, so it's always correctly percent-encoded regardless of content. Applied to both the server-side request builder and its hand-ported client-side twin in the map preview iframe.
