@@ -107,4 +107,33 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://[2002:808:808::]/x.png')).toBe(true);
     expect(isSafeExternalUrl('https://[64:ff9b::808:808]/x.png')).toBe(true);
   });
+
+  it('rejects NAT64 via the well-known alternate prefix (64:ff9b:1::/48)', () => {
+    expect(isSafeExternalUrl('https://[64:ff9b:1::a9fe:a9fe]/x.png')).toBe(
+      false
+    );
+  });
+
+  it('is case-insensitive for embedded-IPv4 detection', () => {
+    expect(isSafeExternalUrl('https://[::FFFF:169.254.169.254]/x.png')).toBe(
+      false
+    );
+    expect(isSafeExternalUrl('https://[::FFFF:A9FE:A9FE]/x.png')).toBe(false);
+  });
+
+  it('does not false-positive on public IPv6 addresses whose low bits resemble a blocked IPv4 address', () => {
+    // These are ordinary public unicast addresses; the low 32 bits happen to
+    // look like 169.254.169.254, but the leading bits are non-zero and this
+    // is not one of the recognized embedding shapes, so it must be allowed.
+    expect(isSafeExternalUrl('https://[2607:f8b0:4004::a9fe:a9fe]/x.png')).toBe(
+      true
+    );
+  });
+
+  it('does not block Teredo addresses (known gap: embedded IPv4 is XOR-obfuscated, not directly readable)', () => {
+    // 2001::ffff:ffff would XOR-decode to embedded IPv4 0.0.0.0; this just
+    // documents current behavior for an encoding this check does not
+    // attempt to decode.
+    expect(isSafeExternalUrl('https://[2001::ffff:ffff]/x.png')).toBe(true);
+  });
 });

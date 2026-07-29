@@ -21,6 +21,12 @@ import ipaddr from 'ipaddr.js';
  * still resolve the hostname when fetching. This validation is a defense in
  * depth against the most common SSRF vectors that prompt-injected agents
  * tend to produce (IP literals and "localhost").
+ *
+ * Known gap: Teredo addresses (2001::/32) obfuscate their embedded IPv4
+ * address by XORing it, so it can't be read directly from the address
+ * bytes the way the other embeddings can. Not handled here — Teredo also
+ * requires an active client-side tunneling service to route at all, which
+ * is not something server infrastructure typically runs.
  */
 
 function isBlockedIPv4(octets: number[]): boolean {
