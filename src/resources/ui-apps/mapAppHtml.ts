@@ -570,14 +570,6 @@ ${initialDataScript}
     return dateTime;
   }
 
-  function encodeExcludeClient(value) {
-    return value
-      .replace(/,/g, '%2C')
-      .replace(/\\(/g, '%28')
-      .replace(/\\)/g, '%29')
-      .replace(/ /g, '%20');
-  }
-
   function buildDirectionsApiUrl(params, publicToken, apiEndpoint) {
     var coords = params.coordinates
       .map(function(c) { return c.longitude + ',' + c.latitude; })
@@ -612,24 +604,22 @@ ${initialDataScript}
       qp.append('max_weight', String(params.max_weight));
     }
     qp.append('steps', 'true');
-
-    var queryString = qp.toString();
     if (params.exclude) {
-      queryString += '&exclude=' + encodeExcludeClient(params.exclude);
+      qp.append('exclude', params.exclude);
     }
 
-    return apiEndpoint + 'directions/v5/' + profile + '/' + encodedCoords + '?' + queryString;
+    return apiEndpoint + 'directions/v5/' + profile + '/' + encodedCoords + '?' + qp.toString();
   }
   // Exposed so the parity test (Node vm sandbox) can call this in isolation.
   window.__buildDirectionsApiUrl = buildDirectionsApiUrl;
 
   // params came from the ref (attacker-controlled if a sibling frame could
-  // forge postMessages) and get interpolated into the request URL, so
-  // validate the pieces our encoding does not neutralize. routing_profile
-  // is spliced into the URL path unencoded, and encodeExcludeClient only
-  // escapes ',', '(', ')' and spaces. Server-side input is zod-validated
-  // before it reaches buildDirectionsRequestUrl; this mirrors those
-  // guarantees for the client copy.
+  // forge postMessages) and get interpolated into the request URL.
+  // coordinates and exclude are both passed through URLSearchParams above,
+  // which percent-encodes them safely regardless of content — routing_profile
+  // is the one value spliced into the URL *path* unencoded, so its shape is
+  // restricted here. The exclude check below is defense-in-depth against a
+  // malformed ref, not a compensating control for an encoding gap.
   function isSafeDirectionsParams(params) {
     if (!params || !Array.isArray(params.coordinates)) return false;
     if (params.coordinates.length < 2) return false;

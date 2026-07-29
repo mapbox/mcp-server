@@ -136,13 +136,59 @@ describe('DirectionsTool', () => {
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
     const comma = '%2C';
-    const space = '%20';
+    const space = '+'; // URLSearchParams encodes a literal space as '+'
     const openPar = '%28';
     const closePar = '%29';
     expect(calledUrl).toContain(
       `exclude=toll${comma}point${openPar}-73.95${space}40.75${closePar}`
     );
     assertHeadersSent(mockHttpRequest, { expectedCalls: 1 });
+  });
+
+  it('rejects a point() exclude entry with a trailing third token instead of silently dropping it', async () => {
+    const { httpRequest } = setupHttpRequest();
+
+    const result = await new DirectionsTool({ httpRequest }).run({
+      coordinates: [
+        { longitude: -74.0, latitude: 40.7 },
+        { longitude: -73.9, latitude: 40.8 }
+      ],
+      exclude: 'point(0 0 &injected=evil)'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({
+      type: 'text'
+    });
+    expect((result.content[0] as { text: string }).text).toContain(
+      'Invalid point format in exclude parameter'
+    );
+  });
+
+  it('never lets exclude inject or duplicate other query parameters, even if a malformed value slipped past validation', async () => {
+    // Bypasses the schema directly to exercise the URL builder's own
+    // defense independent of the validator fix above.
+    const { buildDirectionsRequestUrl } =
+      await import('../../../src/tools/directions-tool/buildDirectionsRequestUrl.js');
+    const url = buildDirectionsRequestUrl({
+      input: {
+        coordinates: [
+          { longitude: -74.0, latitude: 40.7 },
+          { longitude: -73.9, latitude: 40.8 }
+        ],
+        routing_profile: 'mapbox/driving',
+        geometries: 'none',
+        alternatives: false,
+        exclude: 'point(0 0 &injected=evil)'
+      },
+      accessToken: 'pk.test-token',
+      apiEndpoint: 'https://api.mapbox.com/'
+    });
+
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('injected')).toBeNull();
+    expect(params.getAll('alternatives')).toEqual(['false']);
+    expect(params.get('exclude')).toBe('point(0 0 &injected=evil)');
   });
 
   it('handles fetch errors gracefully', async () => {

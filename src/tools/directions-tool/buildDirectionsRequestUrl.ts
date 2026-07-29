@@ -16,19 +16,11 @@ export interface DirectionsRequestInput {
   max_weight?: number;
 }
 
-function encodeExclude(value: string): string {
-  return value
-    .replace(/,/g, '%2C')
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29')
-    .replace(/ /g, '%20');
-}
-
 /**
  * Build the Mapbox Directions v5 request URL for a given input. Shared by
  * DirectionsTool.execute() (server-side) and hand-mirrored by the
- * self-fetching map preview iframe (directionsAppHtml.ts) — the parity test
- * in test/tools/directions-tool/directionsUrlParity.test.ts keeps the two
+ * self-fetching map preview iframe (mapAppHtml.ts) — the parity test in
+ * test/resources/ui-apps/directionsSelfFetchUrlParity.test.ts keeps the two
  * implementations in sync.
  */
 export function buildDirectionsRequestUrl(params: {
@@ -76,11 +68,9 @@ export function buildDirectionsRequestUrl(params: {
   }
 
   queryParams.append('steps', 'true');
-  let queryString = queryParams.toString();
-
   if (input.exclude) {
-    queryString += `&exclude=${encodeExclude(input.exclude)}`;
+    queryParams.append('exclude', input.exclude);
   }
 
-  return `${apiEndpoint}directions/v5/${input.routing_profile}/${encodedCoords}?${queryString}`;
+  return `${apiEndpoint}directions/v5/${input.routing_profile}/${encodedCoords}?${queryParams.toString()}`;
 }

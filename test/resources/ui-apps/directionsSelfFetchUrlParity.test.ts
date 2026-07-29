@@ -162,4 +162,38 @@ describe('Directions self-fetch URL builder parity (server vs. iframe)', () => {
 
     expect(clientUrl).toBe(serverUrl);
   });
+
+  it('encodes an exclude value containing "&"/"=" identically on both sides, without letting it inject a query parameter', () => {
+    const input = {
+      coordinates: [
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
+      ],
+      routing_profile: 'mapbox/driving',
+      geometries: 'none' as const,
+      alternatives: false,
+      exclude: 'point(0 0 &injected=evil)'
+    };
+
+    const serverUrl = buildDirectionsRequestUrl({
+      input,
+      accessToken: 'pk.test-token',
+      apiEndpoint: 'https://api.mapbox.com/',
+      geometriesOverride: 'geojson'
+    });
+
+    const buildClientUrl = loadClientBuildUrlFn();
+    const clientUrl = buildClientUrl(
+      input,
+      'pk.test-token',
+      'https://api.mapbox.com/'
+    );
+
+    expect(clientUrl).toBe(serverUrl);
+
+    const params = new URLSearchParams(serverUrl.split('?')[1]);
+    expect(params.get('injected')).toBeNull();
+    expect(params.getAll('alternatives')).toEqual(['false']);
+    expect(params.get('exclude')).toBe('point(0 0 &injected=evil)');
+  });
 });
