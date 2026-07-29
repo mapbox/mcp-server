@@ -22,11 +22,17 @@ import ipaddr from 'ipaddr.js';
  * depth against the most common SSRF vectors that prompt-injected agents
  * tend to produce (IP literals and "localhost").
  *
- * Known gap: Teredo addresses (2001::/32) obfuscate their embedded IPv4
- * address by XORing it, so it can't be read directly from the address
- * bytes the way the other embeddings can. Not handled here — Teredo also
- * requires an active client-side tunneling service to route at all, which
- * is not something server infrastructure typically runs.
+ * IPv6 addresses are allowed only when they fall in the plain global
+ * "unicast" range as classified by ipaddr.js. Every IPv6 special-purpose
+ * range — loopback, link-local, unique-local, multicast, reserved, and the
+ * various IPv4-in-IPv6 transition/translation mechanisms (IPv4-mapped,
+ * IPv4-compatible, 6to4, NAT64, SIIT, Teredo, AMT, ORCHID, etc.) — is
+ * rejected outright, rather than trying to decode and check the IPv4
+ * address some of these mechanisms embed. Legitimate marker image hosts
+ * have no reason to be addressed through a transition mechanism, and
+ * decoding each one correctly (some split the embedded address around
+ * reserved bits, some XOR-obfuscate it) is error-prone and has repeatedly
+ * missed cases; denying the whole category is simpler and strictly safer.
  */
 
 function isBlockedIPv4(octets: number[]): boolean {
@@ -58,8 +64,12 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     return false;
   }
 
-  // Strip optional surrounding brackets from IPv6 literals
-  const host = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  // Strip optional surrounding brackets from IPv6 literals and a trailing
+  // root-label dot (e.g. "localhost." is equivalent to "localhost")
+  const host = parsed.hostname
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '')
+    .toLowerCase();
 
   if (host.length === 0) {
     return false;
@@ -97,48 +107,24 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     if (addr.kind() !== 'ipv6') {
       return false;
     }
-    const range = addr.range();
-    if (
-      range === 'loopback' ||
-      range === 'unspecified' ||
-      range === 'linkLocal' ||
-      range === 'uniqueLocal' ||
-      range === 'multicast'
-    ) {
+    // Deny by default: only plain global unicast addresses are allowed.
+    // Every special-purpose range (loopback, link-local, unique-local,
+    // multicast, reserved, and every IPv4-in-IPv6 transition/translation
+    // mechanism) is rejected, regardless of what it does or doesn't embed.
+    if (addr.range() !== 'unicast') {
       return false;
     }
-
-    // Any IPv4 address embedded in an IPv6 literal must pass the same
-    // checks as a plain IPv4 literal. Rather than enumerate every named
-    // encoding (IPv4-mapped, IPv4-compatible, NAT64, SIIT, ...) — which is
-    // exactly the approach that missed some of them before — detect the
-    // embedding structurally from the address's raw bytes:
-    //  - 6to4 (2002::/16): embedded IPv4 is bytes 2-5.
-    //  - Any other form where the leading 64 bits are zero and bytes 8-11
-    //    are one of the three IETF-defined separators before an embedded
-    //    IPv4 address in the low 32 bits — all-zero (IPv4-compatible,
-    //    ::a.b.c.d), 0x0000ffff (IPv4-mapped, ::ffff:a.b.c.d), or
-    //    0xffff0000 (IPv4-translated / SIIT, ::ffff:0:a.b.c.d). This also
-    //    covers NAT64 (64:ff9b::/96), whose first 64 bits are non-zero but
-    //    which still carries the embedded address in the low 32 bits — so
-    //    it needs its own explicit check.
+    // ipaddr.js does not classify the deprecated IPv4-compatible form
+    // (::a.b.c.d, i.e. the leading 96 bits all zero) as a special range
+    // when written in plain hex, which is exactly the form Node's URL
+    // parser normalises a dotted-quad IPv4-compatible literal to — so it
+    // reaches here as ordinary 'unicast' and needs an explicit check.
+    // (::1 and :: are already excluded above via the loopback/unspecified
+    // ranges, so this only affects addresses with a genuine embedded IPv4.)
     const bytes = addr.toByteArray();
-    const separator = bytes.slice(8, 12).join(',');
-    let embeddedIPv4: number[] | null = null;
-    if (range === '6to4') {
-      embeddedIPv4 = bytes.slice(2, 6);
-    } else if (range === 'rfc6052') {
-      embeddedIPv4 = bytes.slice(12, 16);
-    } else if (
-      bytes.slice(0, 8).every((b) => b === 0) &&
-      ['0,0,0,0', '0,0,255,255', '255,255,0,0'].includes(separator)
-    ) {
-      embeddedIPv4 = bytes.slice(12, 16);
-    }
-    if (embeddedIPv4 && isBlockedIPv4(embeddedIPv4)) {
+    if (bytes.slice(0, 12).every((b) => b === 0)) {
       return false;
     }
-
     return true;
   }
 

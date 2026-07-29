@@ -33,6 +33,12 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://ip6-localhost/x.png')).toBe(false);
   });
 
+  it('rejects local hostnames written with a trailing root-label dot', () => {
+    expect(isSafeExternalUrl('https://localhost./x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://LOCALHOST./x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://app.localhost./x.png')).toBe(false);
+  });
+
   it('rejects IPv4 loopback / private / link-local / CGNAT / multicast', () => {
     expect(isSafeExternalUrl('https://127.0.0.1/x.png')).toBe(false);
     expect(isSafeExternalUrl('https://127.1.2.3/x.png')).toBe(false);
@@ -55,7 +61,14 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://11.0.0.1/x.png')).toBe(true);
   });
 
-  it('rejects IPv6 loopback / ULA / link-local / multicast', () => {
+  it('allows ordinary public IPv6 unicast addresses', () => {
+    expect(isSafeExternalUrl('https://[2607:f8b0:4004::1]/x.png')).toBe(true);
+    expect(isSafeExternalUrl('https://[2001:4860:4860::8888]/x.png')).toBe(
+      true
+    );
+  });
+
+  it('rejects IPv6 loopback / ULA / link-local / multicast / unspecified', () => {
     expect(isSafeExternalUrl('https://[::1]/x.png')).toBe(false);
     expect(isSafeExternalUrl('https://[::]/x.png')).toBe(false);
     expect(isSafeExternalUrl('https://[fc00::1]/x.png')).toBe(false);
@@ -64,76 +77,48 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://[ff02::1]/x.png')).toBe(false);
   });
 
-  it('rejects IPv4-mapped IPv6 literals', () => {
+  it('rejects IPv4-mapped IPv6 literals, regardless of the embedded IPv4 address', () => {
     expect(isSafeExternalUrl('https://[::ffff:127.0.0.1]/x.png')).toBe(false);
-  });
-
-  it('rejects IPv4-mapped IPv6 for private IPv4 ranges', () => {
     expect(isSafeExternalUrl('https://[::ffff:10.0.0.1]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[::ffff:192.168.1.1]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[::ffff:172.16.0.1]/x.png')).toBe(false);
     expect(isSafeExternalUrl('https://[::ffff:169.254.169.254]/x.png')).toBe(
       false
     );
+    // Even a mapped address embedding a public IPv4 is rejected — marker
+    // hosts have no legitimate reason to be addressed via this mechanism.
+    expect(isSafeExternalUrl('https://[::ffff:8.8.8.8]/x.png')).toBe(false);
   });
 
-  it('rejects IPv4-compatible IPv6 for blocked IPv4 ranges', () => {
-    // Node normalises ::169.254.169.254 to ::a9fe:a9fe (no dots, no ffff)
+  it('rejects every other IPv4-in-IPv6 transition/translation encoding', () => {
+    // IPv4-compatible (deprecated): Node normalises ::169.254.169.254 to
+    // ::a9fe:a9fe (no dots, no ffff) — still rejected, as any address in
+    // this range is.
     expect(isSafeExternalUrl('https://[::169.254.169.254]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[::127.0.0.1]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[::172.16.0.1]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[::a9fe:a9fe]/x.png')).toBe(false);
-  });
-
-  it('rejects 6to4-embedded blocked IPv4 ranges', () => {
-    expect(isSafeExternalUrl('https://[2002:a9fe:a9fe::]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[2002:7f00:1::]/x.png')).toBe(false);
-  });
-
-  it('rejects NAT64-embedded blocked IPv4 ranges', () => {
-    expect(isSafeExternalUrl('https://[64:ff9b::a9fe:a9fe]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[64:ff9b::7f00:1]/x.png')).toBe(false);
-  });
-
-  it('rejects IPv4-translated (SIIT) embedded blocked IPv4 ranges', () => {
-    expect(isSafeExternalUrl('https://[::ffff:0:7f00:1]/x.png')).toBe(false);
-    expect(isSafeExternalUrl('https://[::ffff:0:a9fe:a9fe]/x.png')).toBe(false);
-  });
-
-  it('allows IPv4-compatible / 6to4 / NAT64 / SIIT forms of public IPv4 addresses', () => {
-    expect(isSafeExternalUrl('https://[::ffff:0:808:808]/x.png')).toBe(true);
-    // 8.8.8.8 -> 0808:0808
-    expect(isSafeExternalUrl('https://[::8.8.8.8]/x.png')).toBe(true);
-    expect(isSafeExternalUrl('https://[2002:808:808::]/x.png')).toBe(true);
-    expect(isSafeExternalUrl('https://[64:ff9b::808:808]/x.png')).toBe(true);
-  });
-
-  it('rejects NAT64 via the well-known alternate prefix (64:ff9b:1::/48)', () => {
+    expect(isSafeExternalUrl('https://[::8.8.8.8]/x.png')).toBe(false);
+    // 6to4 (RFC 3056)
+    expect(isSafeExternalUrl('https://[2002:808:808::]/x.png')).toBe(false);
+    // NAT64, well-known prefix (RFC 6052) and local-use prefix (RFC 8215)
+    expect(isSafeExternalUrl('https://[64:ff9b::808:808]/x.png')).toBe(false);
     expect(isSafeExternalUrl('https://[64:ff9b:1::a9fe:a9fe]/x.png')).toBe(
       false
     );
+    // IPv4-translated / SIIT (RFC 6145)
+    expect(isSafeExternalUrl('https://[::ffff:0:808:808]/x.png')).toBe(false);
+    // Teredo (RFC 4380) — embedded IPv4 is XOR-obfuscated, but the whole
+    // range is denied regardless of what it decodes to.
+    expect(isSafeExternalUrl('https://[2001::ffff:ffff]/x.png')).toBe(false);
+    // A non-RFC-compliant NAT64 /48 encoding that places the IPv4 address
+    // at hextet boundaries instead of splitting it around the reserved
+    // byte — still denied, since the whole rfc6052 prefix range is denied
+    // regardless of how the remaining bits are laid out.
+    expect(
+      isSafeExternalUrl('https://[64:ff9b:1:a9fe:0:a9fe:808:808]/x.png')
+    ).toBe(false);
   });
 
-  it('is case-insensitive for embedded-IPv4 detection', () => {
+  it('is case-insensitive for IPv6 special-range detection', () => {
     expect(isSafeExternalUrl('https://[::FFFF:169.254.169.254]/x.png')).toBe(
       false
     );
-    expect(isSafeExternalUrl('https://[::FFFF:A9FE:A9FE]/x.png')).toBe(false);
-  });
-
-  it('does not false-positive on public IPv6 addresses whose low bits resemble a blocked IPv4 address', () => {
-    // These are ordinary public unicast addresses; the low 32 bits happen to
-    // look like 169.254.169.254, but the leading bits are non-zero and this
-    // is not one of the recognized embedding shapes, so it must be allowed.
-    expect(isSafeExternalUrl('https://[2607:f8b0:4004::a9fe:a9fe]/x.png')).toBe(
-      true
-    );
-  });
-
-  it('does not block Teredo addresses (known gap: embedded IPv4 is XOR-obfuscated, not directly readable)', () => {
-    // 2001::ffff:ffff would XOR-decode to embedded IPv4 0.0.0.0; this just
-    // documents current behavior for an encoding this check does not
-    // attempt to decode.
-    expect(isSafeExternalUrl('https://[2001::ffff:ffff]/x.png')).toBe(true);
+    expect(isSafeExternalUrl('https://[FE80::1]/x.png')).toBe(false);
   });
 });
