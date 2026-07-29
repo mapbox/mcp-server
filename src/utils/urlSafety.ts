@@ -102,20 +102,31 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
       return false;
     }
 
-    // Any IPv4 address embedded in an IPv6 literal — via IPv4-mapped
-    // (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d), 6to4 (2002::/16), or
-    // NAT64 (64:ff9b::/96, 64:ff9b:1::/48) — must pass the same checks as a
-    // plain IPv4 literal, since Node's URL parser normalises the dotted-quad
-    // form away and none of these encodings are otherwise distinguishable
-    // by pattern-matching the string form of the address.
+    // Any IPv4 address embedded in an IPv6 literal must pass the same
+    // checks as a plain IPv4 literal. Rather than enumerate every named
+    // encoding (IPv4-mapped, IPv4-compatible, NAT64, SIIT, ...) — which is
+    // exactly the approach that missed some of them before — detect the
+    // embedding structurally from the address's raw bytes:
+    //  - 6to4 (2002::/16): embedded IPv4 is bytes 2-5.
+    //  - Any other form where the leading 64 bits are zero and bytes 8-11
+    //    are one of the three IETF-defined separators before an embedded
+    //    IPv4 address in the low 32 bits — all-zero (IPv4-compatible,
+    //    ::a.b.c.d), 0x0000ffff (IPv4-mapped, ::ffff:a.b.c.d), or
+    //    0xffff0000 (IPv4-translated / SIIT, ::ffff:0:a.b.c.d). This also
+    //    covers NAT64 (64:ff9b::/96), whose first 64 bits are non-zero but
+    //    which still carries the embedded address in the low 32 bits — so
+    //    it needs its own explicit check.
     const bytes = addr.toByteArray();
+    const separator = bytes.slice(8, 12).join(',');
     let embeddedIPv4: number[] | null = null;
-    if (range === 'ipv4Mapped' || range === 'rfc6052') {
-      embeddedIPv4 = bytes.slice(12, 16);
-    } else if (range === '6to4') {
+    if (range === '6to4') {
       embeddedIPv4 = bytes.slice(2, 6);
-    } else if (bytes.slice(0, 12).every((b) => b === 0)) {
-      // Deprecated IPv4-compatible form: ::a.b.c.d
+    } else if (range === 'rfc6052') {
+      embeddedIPv4 = bytes.slice(12, 16);
+    } else if (
+      bytes.slice(0, 8).every((b) => b === 0) &&
+      ['0,0,0,0', '0,0,255,255', '255,255,0,0'].includes(separator)
+    ) {
       embeddedIPv4 = bytes.slice(12, 16);
     }
     if (embeddedIPv4 && isBlockedIPv4(embeddedIPv4)) {

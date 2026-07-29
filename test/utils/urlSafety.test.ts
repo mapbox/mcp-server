@@ -95,7 +95,13 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://[64:ff9b::7f00:1]/x.png')).toBe(false);
   });
 
-  it('allows IPv4-compatible / 6to4 / NAT64 forms of public IPv4 addresses', () => {
+  it('rejects IPv4-translated (SIIT) embedded blocked IPv4 ranges', () => {
+    expect(isSafeExternalUrl('https://[::ffff:0:7f00:1]/x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://[::ffff:0:a9fe:a9fe]/x.png')).toBe(false);
+  });
+
+  it('allows IPv4-compatible / 6to4 / NAT64 / SIIT forms of public IPv4 addresses', () => {
+    expect(isSafeExternalUrl('https://[::ffff:0:808:808]/x.png')).toBe(true);
     // 8.8.8.8 -> 0808:0808
     expect(isSafeExternalUrl('https://[::8.8.8.8]/x.png')).toBe(true);
     expect(isSafeExternalUrl('https://[2002:808:808::]/x.png')).toBe(true);
