@@ -5,14 +5,13 @@ import { describe, it, expect } from 'vitest';
 import { redactToken } from '../../src/utils/redactToken.js';
 
 describe('redactToken', () => {
-  const PUBLIC_TOKEN =
-    'pk.eyJ1IjoidmFsaXVuaWEiLCJhIjoiY21yb3FqdWtiMDJobjJ5c2c3NGVxeXphZCJ9.signaturevalue';
+  const PUBLIC_TOKEN = 'pk.eyJ1IjoiZXhhbXBsZS1hY2NvdW50In0.signaturevalue';
   const SECRET_TOKEN = 'sk.eyJ1IjoidGVzdHVzZXIifQ.signaturevalue';
   const TEMP_TOKEN = 'tk.eyJ1IjoidGVtcC11c2VyXzEifQ.signaturevalue';
 
   it('keeps the prefix and account name, dropping the signature', () => {
     expect(redactToken(`access_token=${PUBLIC_TOKEN}`)).toBe(
-      'access_token=pk.valiunia.redacted'
+      'access_token=pk.example-account.redacted'
     );
     expect(redactToken(`access_token=${SECRET_TOKEN}`)).toBe(
       'access_token=sk.testuser.redacted'
@@ -28,7 +27,7 @@ describe('redactToken', () => {
         `https://api.mapbox.com/directions/v5/mapbox/driving/0,0;1,1?access_token=${PUBLIC_TOKEN}&geometries=geojson`
       )
     ).toBe(
-      'https://api.mapbox.com/directions/v5/mapbox/driving/0,0;1,1?access_token=pk.valiunia.redacted&geometries=geojson'
+      'https://api.mapbox.com/directions/v5/mapbox/driving/0,0;1,1?access_token=pk.example-account.redacted&geometries=geojson'
     );
   });
 
@@ -38,7 +37,7 @@ describe('redactToken', () => {
         `first access_token=${PUBLIC_TOKEN} second access_token=${SECRET_TOKEN}`
       )
     ).toBe(
-      'first access_token=pk.valiunia.redacted second access_token=sk.testuser.redacted'
+      'first access_token=pk.example-account.redacted second access_token=sk.testuser.redacted'
     );
   });
 
