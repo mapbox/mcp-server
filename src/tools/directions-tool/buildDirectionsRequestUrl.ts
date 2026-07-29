@@ -16,14 +16,6 @@ export interface DirectionsRequestInput {
   max_weight?: number;
 }
 
-function encodeExclude(value: string): string {
-  return value
-    .replace(/,/g, '%2C')
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29')
-    .replace(/ /g, '%20');
-}
-
 /**
  * Build the Mapbox Directions v5 request URL for a given input. Shared by
  * DirectionsTool.execute() (server-side) and hand-mirrored by the
@@ -76,11 +68,9 @@ export function buildDirectionsRequestUrl(params: {
   }
 
   queryParams.append('steps', 'true');
-  let queryString = queryParams.toString();
-
   if (input.exclude) {
-    queryString += `&exclude=${encodeExclude(input.exclude)}`;
+    queryParams.append('exclude', input.exclude);
   }
 
-  return `${apiEndpoint}directions/v5/${input.routing_profile}/${encodedCoords}?${queryString}`;
+  return `${apiEndpoint}directions/v5/${input.routing_profile}/${encodedCoords}?${queryParams.toString()}`;
 }
