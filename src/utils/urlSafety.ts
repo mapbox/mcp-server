@@ -23,7 +23,12 @@ import ipaddr from 'ipaddr.js';
  * tend to produce (IP literals and "localhost"). It cannot, by design,
  * defend against DNS rebinding (an ordinary hostname resolving to an
  * internal address at fetch time) — that has to be handled where the fetch
- * actually happens.
+ * actually happens. Two related gaps are out of scope for the same reason:
+ * we don't restrict the port (the upstream fetcher is where that belongs),
+ * and the local/internal-use suffix list can't be exhaustive (network-
+ * specific suffixes like .corp, .lan, or .home resolve only on particular
+ * private networks and aren't enumerable in general) — both are the same
+ * class of problem as DNS rebinding, not gaps worth growing this list for.
  *
  * Both IPv4 and IPv6 literals are allowed only when ipaddr.js classifies
  * them as plain global "unicast" addresses; every other named range —

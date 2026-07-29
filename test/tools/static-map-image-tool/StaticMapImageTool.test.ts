@@ -439,6 +439,40 @@ describe('StaticMapImageTool', () => {
       expect(url).not.toContain(encodeURIComponent(rawUrl));
     });
 
+    it('escapes parentheses in a custom-marker URL so they cannot terminate the overlay segment early', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      // encodeURIComponent alone leaves ( ) ! ' * unescaped. A bare ")" in
+      // the URL path would otherwise sit right next to the overlay's own
+      // coordinate parentheses in the encoded overlay string
+      // (url-<value>(lon,lat)), which is exactly the ambiguity this PR is
+      // otherwise trying to eliminate, just one layer up in the Static
+      // Images API's own overlay syntax rather than in URL parsing.
+      const rawUrl = "https://example.com/a)(b'c!d*.png";
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        overlays: [
+          {
+            type: 'custom-marker',
+            longitude: -74.006,
+            latitude: 40.7128,
+            url: rawUrl
+          }
+        ]
+      });
+
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).not.toContain(')(b');
+      expect(url).toContain('%28');
+      expect(url).toContain('%29');
+      expect(url).toContain('%21');
+      expect(url).toContain('%27');
+      expect(url).toContain('%2A');
+    });
+
     it('adds path overlay to URL', async () => {
       const { httpRequest } = setupHttpRequest();
 
