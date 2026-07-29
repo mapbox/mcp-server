@@ -13,6 +13,7 @@ import { SpanKind } from '@opentelemetry/api';
 import { RedactingSpanExporter } from '../../src/utils/redactingSpanExporter.js';
 
 const SECRET = 'sk.eyJ1IjoidGVzdHVzZXIifQ.signaturevalue';
+const MASKED = 'sk.testuser.redacted';
 
 class CapturingExporter implements SpanExporter {
   readonly captured: ReadableSpan[] = [];
@@ -71,9 +72,9 @@ describe('RedactingSpanExporter', () => {
 
     const attributes = delegate.captured[0].attributes;
     expect(attributes['url.full']).toBe(
-      'https://api.mapbox.com/tokens/v2/testuser?access_token=***'
+      `https://api.mapbox.com/tokens/v2/testuser?access_token=${MASKED}`
     );
-    expect(attributes['url.query']).toBe('access_token=***');
+    expect(attributes['url.query']).toBe(`access_token=${MASKED}`);
     expect(
       Object.values(attributes).filter((value) =>
         String(value).includes(SECRET)
@@ -95,7 +96,7 @@ describe('RedactingSpanExporter', () => {
     );
 
     expect(delegate.captured[0].attributes['some.future.url.attribute']).toBe(
-      'https://api.mapbox.com/styles/v1/u?access_token=***&limit=5'
+      `https://api.mapbox.com/styles/v1/u?access_token=${MASKED}&limit=5`
     );
   });
 

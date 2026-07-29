@@ -86,8 +86,9 @@ function redactSpan(span: ReadableSpan): ReadableSpan {
 }
 
 /**
- * Wraps a SpanExporter and strips `access_token` values from span attributes
- * before they leave the process.
+ * Wraps a SpanExporter and strips access token signatures from span attributes
+ * before they leave the process, leaving behind the prefix and account name
+ * (`access_token=pk.some-account.redacted`).
  *
  * Auto-instrumentation of `fetch`/`undici` records the full request URL on client
  * spans (`url.full`, `url.query`), and Mapbox APIs take the access token as a
