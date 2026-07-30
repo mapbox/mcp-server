@@ -1,5 +1,10 @@
 ## Unreleased
 
+### New Features
+
+- **`directions_tool` — route selection elicitation.** When the Directions API returns two or more route alternatives, the tool now asks the user to pick one via `server.elicitInput(...)` (MCP elicitations), presenting each option's duration, distance, primary roads, traffic conditions, and incident count. Only the selected route is returned, and the choice is threaded through to the map preview's self-fetch so re-rendering shows the same route rather than defaulting back to the first one. If the client doesn't support elicitations, the user declines, or the call errors, the tool falls back to returning all route alternatives, matching prior behavior.
+- Corrected `docs/elicitations.md`, which had described a two-stage `directions_tool` elicitation flow (routing preferences before the API call, plus automatic client-capability detection) that was never implemented. The doc now accurately describes the single-stage route-selection elicitation and the actual fallback mechanism (a `try`/`catch` around each `elicitInput` call, with no capability pre-check).
+
 ## 0.13.0 - 2026-07-30
 
 ### Security

@@ -1310,6 +1310,174 @@ describe('DirectionsTool', () => {
       );
     });
   });
+
+  describe('Route selection elicitation', () => {
+    const twoCoords = [
+      { longitude: -74.006, latitude: 40.7128 },
+      { longitude: -71.0589, latitude: 42.3601 }
+    ];
+
+    function multiRouteResponse(count: number) {
+      return {
+        code: 'Ok',
+        routes: Array.from({ length: count }, (_, i) => ({
+          distance: 100000 + i * 1000,
+          duration: 3600 + i * 60,
+          legs: []
+        })),
+        waypoints: [
+          { location: [-74.006, 40.7128], name: '' },
+          { location: [-71.0589, 42.3601], name: '' }
+        ]
+      };
+    }
+
+    function createMockServer(elicitResponse?: {
+      action: 'accept' | 'decline';
+      content?: Record<string, unknown>;
+    }) {
+      return {
+        server: {
+          elicitInput: vi.fn().mockResolvedValue(
+            elicitResponse ?? {
+              action: 'accept',
+              content: { selectedIndex: '0' }
+            }
+          ),
+          sendLoggingMessage: vi.fn()
+        },
+        registerTool: vi.fn()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
+    }
+
+    it('triggers elicitation when 2+ routes are returned', async () => {
+      const { httpRequest } = setupHttpRequest({
+        json: async () => multiRouteResponse(3)
+      });
+      const tool = new DirectionsTool({ httpRequest });
+      const mockServer = createMockServer();
+      tool.installTo(mockServer);
+
+      await tool.run({ coordinates: twoCoords });
+
+      expect(mockServer.server.elicitInput).toHaveBeenCalledOnce();
+      const call = mockServer.server.elicitInput.mock.calls[0][0];
+      expect(call.mode).toBe('form');
+      expect(call.requestedSchema.properties.selectedIndex.enum).toEqual([
+        '0',
+        '1',
+        '2'
+      ]);
+    });
+
+    it('does not trigger elicitation when only one route is returned', async () => {
+      const { httpRequest } = setupHttpRequest({
+        json: async () => multiRouteResponse(1)
+      });
+      const tool = new DirectionsTool({ httpRequest });
+      const mockServer = createMockServer();
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ coordinates: twoCoords });
+
+      expect(mockServer.server.elicitInput).not.toHaveBeenCalled();
+      const sc = result.structuredContent as { routes?: unknown[] };
+      expect(sc.routes).toHaveLength(1);
+    });
+
+    it('filters to the selected route and threads selectedRouteIndex into the self-fetch ref', async () => {
+      const { httpRequest } = setupHttpRequest({
+        json: async () => multiRouteResponse(3)
+      });
+      const tool = new DirectionsTool({ httpRequest });
+      const mockServer = createMockServer({
+        action: 'accept',
+        content: { selectedIndex: '2' }
+      });
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ coordinates: twoCoords });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as {
+        routes?: Array<{ distance: number }>;
+        mapboxRender?: { ref?: string };
+      };
+      expect(sc.routes).toHaveLength(1);
+      expect(sc.routes?.[0].distance).toBe(102000); // routes[2]
+
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+      expect(payload?.selfFetch?.[0]).toMatchObject({
+        tool: 'directions',
+        params: expect.objectContaining({ selectedRouteIndex: 2 })
+      });
+    });
+
+    it('returns all routes and no selectedRouteIndex when the user declines', async () => {
+      const { httpRequest } = setupHttpRequest({
+        json: async () => multiRouteResponse(3)
+      });
+      const tool = new DirectionsTool({ httpRequest });
+      const mockServer = createMockServer({ action: 'decline' });
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ coordinates: twoCoords });
+
+      const sc = result.structuredContent as {
+        routes?: unknown[];
+        mapboxRender?: { ref?: string };
+      };
+      expect(sc.routes).toHaveLength(3);
+
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+      expect(payload?.selfFetch?.[0]?.params).not.toHaveProperty(
+        'selectedRouteIndex'
+      );
+    });
+
+    it('falls back to all routes when elicitation is unsupported or errors', async () => {
+      const { httpRequest } = setupHttpRequest({
+        json: async () => multiRouteResponse(3)
+      });
+      const tool = new DirectionsTool({ httpRequest });
+      const mockServer = {
+        server: {
+          elicitInput: vi
+            .fn()
+            .mockRejectedValue(new Error('Elicitation not supported')),
+          sendLoggingMessage: vi.fn()
+        },
+        registerTool: vi.fn()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ coordinates: twoCoords });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as { routes?: unknown[] };
+      expect(sc.routes).toHaveLength(3);
+    });
+
+    it('skips elicitation entirely when no server is installed', async () => {
+      const { httpRequest } = setupHttpRequest({
+        json: async () => multiRouteResponse(3)
+      });
+      const tool = new DirectionsTool({ httpRequest });
+      // Not installed to any server — tool.server is undefined.
+
+      const result = await tool.run({ coordinates: twoCoords });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as { routes?: unknown[] };
+      expect(sc.routes).toHaveLength(3);
+    });
+  });
 });
 
 describe('DirectionsTool — temporary resource ownership', () => {

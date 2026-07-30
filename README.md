@@ -52,6 +52,7 @@ For detailed setup instructions for different integrations, refer to the followi
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
 - **[Importing Tools Directly](./docs/importing-tools.md)** - Use Mapbox tools in your own applications without running the MCP server
+- **[Elicitations](./docs/elicitations.md)** - How `search_and_geocode_tool` and `directions_tool` ask the user to disambiguate results or pick a route, and how they fall back gracefully when the client doesn't support it
 
 ## Example Prompts
 
