@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Security
+
+- **directions_tool: fixed query parameter injection via the `exclude` parameter.** A `point(<lng> <lat>)` exclude entry was validated by splitting on spaces and reading only the first two tokens — any extra content after them (e.g. `point(0 0 &injected=evil)`) was never inspected or rejected. That value then reached the outbound Mapbox Directions API request through a hand-rolled encoder that escaped `,`/`(`/`)`/space but not `&`/`=`, concatenated directly onto the query string rather than through `URLSearchParams`. Together these let a caller-supplied `exclude` value add or override arbitrary query parameters on the authenticated Directions API request. Fixed by (1) requiring a `point(...)` entry's interior to be exactly two numbers and nothing else, and (2) building the `exclude` parameter through `URLSearchParams` like every other parameter, so it's always correctly percent-encoded regardless of content. Applied to both the server-side request builder and its hand-ported client-side twin in the map preview iframe.
+
 ### Fixed
 
 - **urlSafety**: `isSafeExternalUrl()` (used to validate `static_map_image_tool` custom-marker overlay URLs) now uses `ipaddr.js` to parse IPv6 literals and correctly identify IPv4 addresses embedded via any standard encoding (IPv4-mapped, IPv4-compatible, 6to4, NAT64, IPv4-translated/SIIT), instead of pattern-matching a subset of string forms. The previous regex-based check missed the bare IPv4-compatible form and the 6to4/NAT64/SIIT forms, letting blocked IPv4 ranges (loopback, private, link-local, etc.) through when expressed as one of those encodings. The embedded address is now detected from the parsed address's raw bytes rather than by enumerating each encoding's string shape.

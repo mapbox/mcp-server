@@ -70,11 +70,36 @@ describe('buildDirectionsRequestUrl', () => {
       apiEndpoint: 'https://api.mapbox.com/'
     });
 
-    expect(url).toContain('exclude=toll%2Cpoint%28-122.41%2037.785%29');
+    expect(url).toContain('exclude=toll%2Cpoint%28-122.41+37.785%29');
     expect(url).toContain('depart_at=2026-07-20T09%3A00');
     expect(url).toContain('max_height=4.5');
     expect(url).toContain('max_width=2.4');
     expect(url).toContain('max_weight=12.5');
     expect(url).toContain('alternatives=true');
+  });
+
+  it('percent-encodes exclude through URLSearchParams so it can never inject or duplicate another query parameter', () => {
+    const url = buildDirectionsRequestUrl({
+      input: {
+        coordinates: [
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.4, latitude: 37.79 }
+        ],
+        routing_profile: 'mapbox/driving',
+        geometries: 'none',
+        alternatives: false,
+        // Not a value the schema would allow through, but the URL builder
+        // is a separate line of defense: even a raw '&'/'=' must come back
+        // out through URLSearchParams unable to add or override a param.
+        exclude: 'point(0 0 &injected=evil)'
+      },
+      accessToken: 'pk.test-token',
+      apiEndpoint: 'https://api.mapbox.com/'
+    });
+
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('injected')).toBeNull();
+    expect(params.getAll('alternatives')).toEqual(['false']);
+    expect(params.get('exclude')).toBe('point(0 0 &injected=evil)');
   });
 });
