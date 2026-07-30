@@ -11,6 +11,8 @@ import {
   type UnionOutput
 } from './UnionTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildComputeRef } from '../../utils/computeRef.js';
 
 export class UnionTool extends BaseTool<
   typeof UnionInputSchema,
@@ -21,7 +23,10 @@ export class UnionTool extends BaseTool<
     'Merge two or more polygons into a single unified geometry. ' +
     'Useful for combining service areas, delivery zones, isochrones, or coverage regions. ' +
     'Returns a Polygon or MultiPolygon if the inputs do not overlap. ' +
-    'Works offline without API calls.';
+    'Works offline without API calls. ' +
+    'INPUT SHAPE: pass `polygons` as an array of polygons. Each polygon is an array of rings; each ring is an array of [lng, lat] pairs. ' +
+    'When chaining with isochrone_tool, extract `feature.geometry.coordinates` from each isochrone Feature — that is already a valid Polygon value. ' +
+    'Skip features whose `geometry.type === "MultiPolygon"` (pass each inner Polygon separately) or whose `geometry.type === "LineString"` (set isochrone_tool `polygons=true` to get Polygon output instead).';
 
   readonly annotations = {
     title: 'Union Polygons',
@@ -30,7 +35,6 @@ export class UnionTool extends BaseTool<
     idempotentHint: true,
     openWorldHint: false
   };
-
   constructor() {
     super({ inputSchema: UnionInputSchema, outputSchema: UnionOutputSchema });
   }
@@ -60,12 +64,30 @@ export class UnionTool extends BaseTool<
             `Result type: ${validated.type}\n` +
             `GeoJSON geometry:\n${JSON.stringify(validated.geometry, null, 2)}`;
 
+          // Union is a pure function of its inputs — the ref carries the
+          // inputs themselves (already present in this call's own
+          // arguments) rather than a pointer to a server-side store, so
+          // rendering it later never depends on this process still being
+          // alive. See computeRef.ts.
+          const ref = buildComputeRef(
+            'union',
+            polys.map((p) => ({
+              type: 'Feature' as const,
+              geometry: p.geometry
+            }))
+          );
+          const sc: Record<string, unknown> = {
+            ...(validated as unknown as Record<string, unknown>),
+            mapboxRender: { ref }
+          };
+          const textOut = text + renderHint(ref);
+
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
           return {
-            content: [{ type: 'text' as const, text }],
-            structuredContent: validated,
+            content: [{ type: 'text' as const, text: textOut }],
+            structuredContent: sc,
             isError: false
           };
         } catch (error) {

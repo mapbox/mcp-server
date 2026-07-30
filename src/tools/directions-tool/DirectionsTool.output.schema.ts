@@ -367,13 +367,20 @@ const CleanedWaypointSchema = z.object({
   metadata: WaypointMetadataSchema.nullable().optional()
 });
 
-// Main Directions API response schema
-export const DirectionsResponseSchema = z.object({
-  routes: z.array(RouteSchema).optional(), // Can be missing if no route found
-  waypoints: z.array(CleanedWaypointSchema).optional(), // Modified waypoints with renamed fields
-  code: z.string().optional(), // Removed by cleanResponseData for token efficiency
-  uuid: z.string().optional() // Removed by cleanResponseData for token efficiency
-});
+// Main Directions API response schema. `mapboxRender` is declared so hosts that
+// strictly validate tool results against the published JSON Schema don't
+// flag the response as malformed when the field is attached.
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
+export const DirectionsResponseSchema = z
+  .object({
+    routes: z.array(RouteSchema).optional(), // Can be missing if no route found
+    waypoints: z.array(CleanedWaypointSchema).optional(), // Modified waypoints with renamed fields
+    code: z.string().optional(), // Removed by cleanResponseData for token efficiency
+    uuid: z.string().optional(), // Removed by cleanResponseData for token efficiency
+    mapboxRender: MapAppRefSchema.optional()
+  })
+  .passthrough();
 
 export type DirectionsResponse = z.infer<typeof DirectionsResponseSchema>;
 export type Route = z.infer<typeof RouteSchema>;

@@ -24,9 +24,12 @@ export function setupHttpRequest(overrides?: Partial<Response>) {
   return { httpRequest: pipeline.execute.bind(pipeline), mockHttpRequest };
 }
 
-export function assertHeadersSent(mockFetch: Mock) {
-  expect(mockFetch).toHaveBeenCalledTimes(1);
-  const callArgs = mockFetch.mock.calls[0];
+export function assertHeadersSent(
+  mockFetch: Mock,
+  options?: { callIndex?: number; expectedCalls?: number }
+) {
+  expect(mockFetch).toHaveBeenCalledTimes(options?.expectedCalls ?? 1);
+  const callArgs = mockFetch.mock.calls[options?.callIndex ?? 0];
   const requestInit = callArgs[1];
   expect(requestInit?.headers).toMatchObject({
     'User-Agent': expect.any(String)

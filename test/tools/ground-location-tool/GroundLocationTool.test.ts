@@ -7,6 +7,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { GroundLocationTool } from '../../../src/tools/ground-location-tool/GroundLocationTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 const geocodeResponse = {
   features: [
@@ -266,5 +267,68 @@ describe('GroundLocationTool', () => {
       c[0].includes('category/restaurant')
     );
     expect(categoryCall?.[0]).toContain('limit=15');
+  });
+
+  it('attaches a self-fetch mapboxRender ref that carries the resolved strategy params (not server-fetched results)', async () => {
+    const { tool } = setupMockHttp({
+      'geocode/v6/reverse': geocodeResponse,
+      'search/searchbox/v1/category': categoryResponse,
+      'isochrone/v1': isochroneResponse
+    });
+
+    const token = tokenFor('account-test-ground-location');
+    const result = await tool.run(
+      {
+        longitude: -122.419,
+        latitude: 37.759,
+        query: 'coffee'
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/ground_location\?data=/
+    );
+
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('render_map_tool');
+    expect(text).toContain(sc.mapboxRender!.ref!);
+
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'ground_location',
+        params: expect.objectContaining({
+          longitude: -122.419,
+          latitude: 37.759,
+          geocodeTypes: 'neighborhood,locality,place',
+          poi: { query: 'coffee', limit: 10 }
+        })
+      }
+    ]);
+  });
+
+  it('omits the poi field from the self-fetch ref when no query is given and strategy is not poi', async () => {
+    const { tool } = setupMockHttp({
+      'geocode/v6/reverse': geocodeResponse,
+      'isochrone/v1': isochroneResponse
+    });
+
+    const result = await tool.run({ longitude: -122.419, latitude: 37.759 });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch?.[0]?.params).not.toHaveProperty('poi');
   });
 });
