@@ -1,6 +1,6 @@
 # Interactive Map Previews
 
-> **This document previously described MCP-UI support.** As of the `render_map_tool` release (v0.13.0), MCP-UI support (`@mcp-ui/server`) has been removed from this server entirely — it is no longer a dependency, and no tool emits an MCP-UI resource. Interactive map previews are now handled exclusively through **[`render_map_tool`](./render-map-tool.md)** via the MCP Apps protocol. This page is kept at its existing URL to avoid breaking old links; see [render-map-tool.md](./render-map-tool.md) for the current, comprehensive guide.
+> **MCP-UI support has been removed from this server.** Interactive map previews are now handled exclusively through **[`render_map_tool`](./render-map-tool.md)** via the MCP Apps protocol. This page is kept at its existing URL to avoid breaking old links; see [render-map-tool.md](./render-map-tool.md) for the current, comprehensive guide.
 
 ## What changed
 
