@@ -71,10 +71,6 @@ Each of the four prompts below exercises a different strategy in one tool call:
 - **Region** — _"What can I reach in a 15-minute walk from 37.7749, -122.4194?"_
 - **Routing** — _"Closest routable point to drop someone off at 34.0522, -118.2437"_
 
-<!-- TODO: link to grounding blog post once published — see "From answers to addresses: grounding an LLM for location" -->
-
-A detailed walkthrough of the design and the trade-offs against web search is in the works; this section will link to it once published.
-
 ### Location Discovery
 
 - "Find coffee shops within walking distance of the Empire State Building"
