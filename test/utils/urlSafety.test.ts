@@ -2,7 +2,10 @@
 // Licensed under the MIT License.
 
 import { describe, it, expect } from 'vitest';
-import { isSafeExternalUrl } from '../../src/utils/urlSafety.js';
+import {
+  isSafeExternalUrl,
+  parseSafeExternalUrl
+} from '../../src/utils/urlSafety.js';
 
 describe('isSafeExternalUrl', () => {
   it('accepts ordinary public https URLs', () => {
@@ -189,5 +192,37 @@ describe('isSafeExternalUrl', () => {
       false
     );
     expect(isSafeExternalUrl('https://[FE80::1]/x.png')).toBe(false);
+  });
+});
+
+describe('parseSafeExternalUrl', () => {
+  it('returns the parsed URL for a safe URL, so callers get the WHATWG-canonical form without re-parsing', () => {
+    const parsed = parseSafeExternalUrl('https://example.com/marker.png');
+    expect(parsed).toBeInstanceOf(URL);
+    expect(parsed?.toString()).toBe('https://example.com/marker.png');
+  });
+
+  it('returns the canonical serialization of a URL the WHATWG parser rewrites (backslash before @)', () => {
+    const parsed = parseSafeExternalUrl(
+      'https://example.com\\@169.254.169.254/x.png'
+    );
+    expect(parsed?.hostname).toBe('example.com');
+    expect(parsed?.toString()).toBe(
+      'https://example.com/@169.254.169.254/x.png'
+    );
+  });
+
+  it('returns the parsed URL for a safe non-IP-literal hostname (the multi-label hostname branch)', () => {
+    const parsed = parseSafeExternalUrl('https://images.example.org/a.png');
+    expect(parsed).toBeInstanceOf(URL);
+    expect(parsed?.hostname).toBe('images.example.org');
+  });
+
+  it('returns null for unsafe URLs', () => {
+    expect(parseSafeExternalUrl('http://example.com/x.png')).toBeNull();
+    expect(parseSafeExternalUrl('https://127.0.0.1/x.png')).toBeNull();
+    expect(parseSafeExternalUrl('https://[::1]/x.png')).toBeNull();
+    expect(parseSafeExternalUrl('https://intranet/x.png')).toBeNull();
+    expect(parseSafeExternalUrl('not a url')).toBeNull();
   });
 });

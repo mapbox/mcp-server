@@ -6,6 +6,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
+import { CustomMarkerOverlaySchema } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.input.schema.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 
@@ -224,6 +225,32 @@ describe('StaticMapImageTool', () => {
           ]
         })
       ).resolves.toMatchObject({ isError: true });
+    }
+  });
+
+  it('reports the SSRF validation message and canonical output from the custom-marker URL schema', () => {
+    const rejected = CustomMarkerOverlaySchema.safeParse({
+      type: 'custom-marker',
+      longitude: -74,
+      latitude: 40,
+      url: 'https://169.254.169.254/latest/meta-data/'
+    });
+    expect(rejected.success).toBe(false);
+    expect(JSON.stringify(rejected.error?.issues)).toContain(
+      'URL must be an https:// URL pointing to a public host'
+    );
+
+    const accepted = CustomMarkerOverlaySchema.safeParse({
+      type: 'custom-marker',
+      longitude: -74,
+      latitude: 40,
+      url: 'https://example.com\\@169.254.169.254/marker.png'
+    });
+    expect(accepted.success).toBe(true);
+    if (accepted.success) {
+      expect(accepted.data.url).toBe(
+        'https://example.com/@169.254.169.254/marker.png'
+      );
     }
   });
 
