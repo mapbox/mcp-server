@@ -5,6 +5,14 @@
 - **`directions_tool` — route selection elicitation.** When the Directions API returns two or more route alternatives, the tool now asks the user to pick one via `server.elicitInput(...)` (MCP elicitations), presenting each option's duration, distance, primary roads, traffic conditions, and incident count. Only the selected route is returned, and the choice is threaded through to the map preview's self-fetch so re-rendering shows the same route rather than defaulting back to the first one. If the client doesn't support elicitations, the user declines, or the call errors, the tool falls back to returning all route alternatives, matching prior behavior.
 - Corrected `docs/elicitations.md`, which had described a two-stage `directions_tool` elicitation flow (routing preferences before the API call, plus automatic client-capability detection) that was never implemented. The doc now accurately describes the single-stage route-selection elicitation and the actual fallback mechanism (a `try`/`catch` around each `elicitInput` call, with no capability pre-check).
 
+### Changed
+
+- **Removed dead MCP-UI code.** `--disable-mcp-ui` no longer appears in `--help` (it stopped doing anything once MCP-UI support was removed) but is still silently accepted so an existing launch config that passes it doesn't hard-fail on "Unknown option". Deleted the orphaned `StaticMapUIResource` (`ui://mapbox/static-map/index.html`) — it was registered but no tool had referenced it since `static_map_image_tool` stopped declaring an MCP Apps UI resource. No behavior change: MCP-UI support was already fully gone from the codebase; this just removes the code that referenced it.
+
+### Documentation
+
+- **README and `render_map_tool` docs refreshed.** The README's "Rich Map Previews" section and `docs/mcp-ui.md` described MCP-UI support (`@mcp-ui/server`, `ENABLE_MCP_UI`, `StaticMapUIResource` wired to `static_map_image_tool`) that was fully removed when `render_map_tool` shipped — `@mcp-ui/server` is no longer a dependency and nothing in `src/` reads `ENABLE_MCP_UI` anymore. `docs/mcp-ui.md` now explains what changed and points to the new **[`docs/render-map-tool.md`](./docs/render-map-tool.md)**, a comprehensive guide covering the full payload schema and, in particular, how to call `render_map_tool` standalone with your own GeoJSON — no other Mapbox tool required. Also added the ~12 tools missing from the README's tool inventory (`render_map_tool`, `ground_location_tool`, `place_details_tool`, `destination_tool`, `union_tool`/`intersect_tool`/`difference_tool`, `convex_tool`, `nearest_point_tool`/`nearest_point_on_line_tool`, `length_tool`) and replaced the entry for the removed `point_in_polygon_tool` with its actual replacement, `points_within_polygon_tool`.
+
 ## 0.13.0 - 2026-07-30
 
 ### Security

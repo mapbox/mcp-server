@@ -4,9 +4,9 @@
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
 
 /**
- * Render the generic Mapbox MCP App HTML — used by both the MCP Apps
- * resource (postMessage delivery) and any tool's inline MCP-UI rawHtml
- * block (initial-data baked in).
+ * Render the generic Mapbox MCP App HTML — served by the MCP Apps resource
+ * (`MapAppUIResource`) that `render_map_tool` targets exclusively via
+ * postMessage delivery.
  *
  * The iframe is a thin renderer over Mapbox GL JS. Tools produce a
  * `MapAppPayload` (see src/utils/mapAppPayload.ts) and the iframe
