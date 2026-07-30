@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { z } from 'zod';
-import { isSafeExternalUrl } from '../../utils/urlSafety.js';
+import { parseSafeExternalUrl } from '../../utils/urlSafety.js';
 
 // List of valid Maki icon names
 const MAKI_ICONS = [
@@ -266,16 +266,24 @@ export const CustomMarkerOverlaySchema = z.object({
   url: z
     .string()
     .url()
-    .refine(isSafeExternalUrl, {
-      message:
-        'URL must be an https:// URL pointing to a public host (loopback, private, link-local, and unique-local addresses are not allowed)'
+    // Validate and re-serialize to the WHATWG URL parser's canonical form
+    // in one pass, so every downstream consumer of this value (the request
+    // forwarded to the Static Images API) parses exactly what
+    // parseSafeExternalUrl validated, rather than re-parsing the caller's
+    // original raw string with a possibly different parser that could
+    // disagree on its structure.
+    .transform((url, ctx) => {
+      const parsed = parseSafeExternalUrl(url);
+      if (parsed === null) {
+        ctx.addIssue({
+          code: 'custom',
+          message:
+            'URL must be an https:// URL pointing to a public host (loopback, private, link-local, and unique-local addresses are not allowed)'
+        });
+        return z.NEVER;
+      }
+      return parsed.toString();
     })
-    // Re-serialize to the WHATWG URL parser's canonical form, so every
-    // downstream consumer of this value (the request forwarded to the
-    // Static Images API) parses exactly what isSafeExternalUrl validated,
-    // rather than re-parsing the caller's original raw string with a
-    // possibly different parser that could disagree on its structure.
-    .transform((url) => new URL(url).toString())
     .describe(
       'HTTPS URL of custom marker image (PNG or JPEG, max 1024px). Must point to a publicly reachable host; URLs targeting localhost, private, link-local, or unique-local addresses are rejected to prevent SSRF.'
     )

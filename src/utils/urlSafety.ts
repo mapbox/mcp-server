@@ -32,15 +32,24 @@ import ipaddr from 'ipaddr.js';
  */
 
 export function isSafeExternalUrl(rawUrl: string): boolean {
+  return parseSafeExternalUrl(rawUrl) !== null;
+}
+
+/**
+ * Same validation as isSafeExternalUrl, but returns the parsed URL on
+ * success (null otherwise) so callers that need the WHATWG-canonical form
+ * of the validated URL don't have to re-parse the raw string.
+ */
+export function parseSafeExternalUrl(rawUrl: string): URL | null {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
   } catch {
-    return false;
+    return null;
   }
 
   if (parsed.protocol !== 'https:') {
-    return false;
+    return null;
   }
 
   // Strip optional surrounding brackets from IPv6 literals and a trailing
@@ -54,7 +63,7 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     .toLowerCase();
 
   if (host.length === 0) {
-    return false;
+    return null;
   }
 
   // Block well-known local hostnames
@@ -75,7 +84,7 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     blockedHostnames.has(host) ||
     blockedSuffixes.some((suffix) => host.endsWith(suffix))
   ) {
-    return false;
+    return null;
   }
 
   // If the host isn't a parseable IP literal at all, it's an ordinary
@@ -87,7 +96,7 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
   // multi-label hostname is out of scope for this pre-fetch check, see the
   // module doc comment.
   if (!ipaddr.isValid(host)) {
-    return host.includes('.');
+    return host.includes('.') ? parsed : null;
   }
   const addr = ipaddr.parse(host);
 
@@ -97,7 +106,7 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
   // every IPv4-in-IPv6 transition/translation mechanism) is rejected,
   // regardless of what it does or doesn't embed.
   if (addr.range() !== 'unicast') {
-    return false;
+    return null;
   }
 
   if (addr.kind() === 'ipv6') {
@@ -110,9 +119,9 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     // ranges, so this only affects addresses with a genuine embedded IPv4.)
     const bytes = addr.toByteArray();
     if (bytes.slice(0, 12).every((b) => b === 0)) {
-      return false;
+      return null;
     }
   }
 
-  return true;
+  return parsed;
 }
