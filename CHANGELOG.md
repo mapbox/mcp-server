@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Security
+
+- **directions_tool: fixed query parameter injection via the `exclude` parameter.** A `point(<lng> <lat>)` exclude entry was validated by splitting on spaces and reading only the first two tokens — any extra content after them (e.g. `point(0 0 &injected=evil)`) was never inspected or rejected. That value then reached the outbound Mapbox Directions API request through a hand-rolled encoder that escaped `,`/`(`/`)`/space but not `&`/`=`, concatenated directly onto the query string rather than through `URLSearchParams`. Together these let a caller-supplied `exclude` value add or override arbitrary query parameters on the authenticated Directions API request. Fixed by (1) requiring a `point(...)` entry's interior to be exactly two numbers and nothing else, and (2) building the `exclude` parameter through `URLSearchParams` like every other parameter, so it's always correctly percent-encoded regardless of content. Applied to both the server-side request builder and its hand-ported client-side twin in the map preview iframe.
+
 ### Fixed
 
 - **Tracing**: Access tokens are no longer included in exported spans. Mapbox APIs take the access token as a URL query parameter, and OpenTelemetry's HTTP/undici auto-instrumentation records the full request URL on client spans (`url.full`, `url.query`), so operators who configured `OTEL_EXPORTER_OTLP_ENDPOINT` had tokens copied verbatim into their telemetry backend. The trace exporter is now wrapped in a `RedactingSpanExporter` that strips the token signature from all string span attributes before export. Redaction keeps the token prefix and account name — `pk.eyJ1...xyz.signature` becomes `pk.your-account.redacted` — so spans still distinguish public from secret tokens and show which account a request billed to, without carrying a usable credential. Values that do not parse as a Mapbox token fall back to `access_token=***`.
