@@ -11,6 +11,8 @@ import {
   type DifferenceOutput
 } from './DifferenceTool.output.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildComputeRef } from '../../utils/computeRef.js';
 
 export class DifferenceTool extends BaseTool<
   typeof DifferenceInputSchema,
@@ -21,7 +23,9 @@ export class DifferenceTool extends BaseTool<
     'Subtract one polygon from another, returning the area in polygon1 that is not covered by polygon2. ' +
     'Useful for computing exclusion zones, finding uncovered service areas, or "what is in zone A but not zone B?". ' +
     'Returns null geometry if polygon2 fully covers polygon1. ' +
-    'Works offline without API calls.';
+    'Works offline without API calls. ' +
+    'INPUT SHAPE: `polygon1` and `polygon2` are each an array of rings; each ring is an array of [lng, lat] pairs. ' +
+    'When chaining with isochrone_tool, extract `feature.geometry.coordinates` from each isochrone Feature (with `polygons=true`).';
 
   readonly annotations = {
     title: 'Difference of Polygons',
@@ -63,12 +67,25 @@ export class DifferenceTool extends BaseTool<
             ? `Difference computed (area in polygon1 not covered by polygon2).\nGeometry:\n${JSON.stringify(validated.geometry, null, 2)}`
             : 'No difference: polygon2 fully covers polygon1.';
 
+          // Difference is a pure function of its inputs — the ref carries
+          // the inputs themselves rather than a pointer to a server-side
+          // store. See computeRef.ts.
+          const ref = buildComputeRef('difference', [
+            { type: 'Feature' as const, geometry: poly1.geometry },
+            { type: 'Feature' as const, geometry: poly2.geometry }
+          ]);
+          const sc: Record<string, unknown> = {
+            ...(validated as unknown as Record<string, unknown>),
+            mapboxRender: { ref }
+          };
+          const textOut = text + renderHint(ref);
+
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
           return {
-            content: [{ type: 'text' as const, text }],
-            structuredContent: validated,
+            content: [{ type: 'text' as const, text: textOut }],
+            structuredContent: sc,
             isError: false
           };
         } catch (error) {

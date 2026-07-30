@@ -10,6 +10,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { MapMatchingTool } from '../../../src/tools/map-matching-tool/MapMatchingTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 const sampleMapMatchingResponse = {
   code: 'Ok',
@@ -228,6 +229,55 @@ describe('MapMatchingTool', () => {
     expect(callUrl).toContain('/matching/v5/mapbox/cycling/');
   });
 
+  it('returns a graceful error when the API cannot match the trace', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => ({ code: 'NoMatch' })
+    });
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4783, latitude: 37.8199 }
+      ],
+      profile: 'walking'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('NoMatch')
+    });
+  });
+
+  it('returns a graceful error when the API responds Ok but with a schema-invalid payload', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => ({
+        code: 'Ok',
+        // confidence must be between 0 and 1 - this violates MapMatchingOutputSchema
+        matchings: [{ confidence: 5, distance: 100, duration: 10 }],
+        tracepoints: []
+      })
+    });
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      profile: 'driving'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining("didn't match the expected format")
+    });
+  });
+
   it('uses geojson geometries by default', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => sampleMapMatchingResponse
@@ -244,5 +294,80 @@ describe('MapMatchingTool', () => {
 
     const callUrl = mockHttpRequest.mock.calls[0][0] as string;
     expect(callUrl).toContain('geometries=geojson');
+  });
+
+  it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
+    const fakeResp = {
+      code: 'Ok',
+      matchings: [
+        {
+          confidence: 0.9,
+          distance: 200,
+          duration: 60,
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-122.4194, 37.7749],
+              [-122.4195, 37.775]
+            ]
+          }
+        }
+      ],
+      tracepoints: [
+        {
+          name: '',
+          location: [-122.4194, 37.7749],
+          matchings_index: 0,
+          alternatives_count: 0
+        },
+        {
+          name: '',
+          location: [-122.4195, 37.775],
+          matchings_index: 0,
+          alternatives_count: 0
+        }
+      ]
+    };
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      json: async () => fakeResp
+    });
+
+    const token = tokenFor('account-test-map-matching');
+    const result = await new MapMatchingTool({ httpRequest }).run(
+      {
+        coordinates: [
+          { longitude: -122.4194, latitude: 37.7749 },
+          { longitude: -122.4195, latitude: 37.775 }
+        ],
+        profile: 'driving'
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/map_matching\?data=/
+    );
+
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'map_matching',
+        params: expect.objectContaining({
+          coordinates: [
+            { longitude: -122.4194, latitude: 37.7749 },
+            { longitude: -122.4195, latitude: 37.775 }
+          ],
+          profile: 'driving'
+        })
+      }
+    ]);
   });
 });

@@ -1,16 +1,18 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { URLSearchParams } from 'node:url';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { MapMatchingInputSchema } from './MapMatchingTool.input.schema.js';
+import { buildMapMatchingRequestUrl } from './buildMapMatchingRequestUrl.js';
 import {
   MapMatchingOutputSchema,
   type MapMatchingOutput
 } from './MapMatchingTool.output.schema.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
@@ -32,7 +34,6 @@ export class MapMatchingTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: MapMatchingInputSchema,
@@ -74,33 +75,11 @@ export class MapMatchingTool extends MapboxApiBasedTool<
       };
     }
 
-    // Build coordinate string: "lon1,lat1;lon2,lat2;..."
-    const coordsString = input.coordinates
-      .map((coord) => `${coord.longitude},${coord.latitude}`)
-      .join(';');
-
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    queryParams.append('access_token', accessToken);
-    queryParams.append('geometries', input.geometries);
-    queryParams.append('overview', input.overview);
-
-    // Add timestamps if provided (semicolon-separated)
-    if (input.timestamps) {
-      queryParams.append('timestamps', input.timestamps.join(';'));
-    }
-
-    // Add radiuses if provided (semicolon-separated)
-    if (input.radiuses) {
-      queryParams.append('radiuses', input.radiuses.join(';'));
-    }
-
-    // Add annotations if provided (comma-separated)
-    if (input.annotations && input.annotations.length > 0) {
-      queryParams.append('annotations', input.annotations.join(','));
-    }
-
-    const url = `${MapboxApiBasedTool.mapboxApiEndpoint}matching/v5/mapbox/${input.profile}/${coordsString}?${queryParams.toString()}`;
+    const url = buildMapMatchingRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
     const response = await this.httpRequest(url);
 
@@ -119,29 +98,73 @@ export class MapMatchingTool extends MapboxApiBasedTool<
 
     const data = (await response.json()) as MapMatchingOutput;
 
+    // The Map Matching API returns 200 with a non-"Ok" code (e.g. "NoMatch",
+    // "NoSegment") when it can't match the trace, and omits tracepoints/matchings
+    // in that case. Surface this as a tool error rather than structured content
+    // so the MCP SDK's output schema validation is skipped for this response.
+    if (data.code !== 'Ok') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Map Matching API could not match the trace (code: ${data.code}). Try adjusting the coordinates or radiuses.`
+          }
+        ],
+        isError: true
+      };
+    }
+
     // Validate the response against our output schema
+    let validatedData: MapMatchingOutput;
     try {
-      const validatedData = MapMatchingOutputSchema.parse(data);
+      validatedData = MapMatchingOutputSchema.parse(data);
+    } catch (validationError) {
+      // The API responded with code: 'Ok' but the payload still doesn't match
+      // our output schema. Never return schema-violating structuredContent -
+      // the MCP SDK rejects it with the same -32602 this fix is meant to avoid.
+      const message =
+        validationError instanceof Error
+          ? validationError.message
+          : String(validationError);
+      this.log('warning', `Schema validation warning: ${message}`);
 
       return {
         content: [
-          { type: 'text', text: JSON.stringify(validatedData, null, 2) }
+          {
+            type: 'text',
+            text: `Map Matching API returned a response that didn't match the expected format: ${message}`
+          }
         ],
-        structuredContent: validatedData,
-        isError: false
-      };
-    } catch (validationError) {
-      // If validation fails, return the raw result anyway with a warning
-      this.log(
-        'warning',
-        `Schema validation warning: ${validationError instanceof Error ? validationError.message : String(validationError)}`
-      );
-
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data,
-        isError: false
+        isError: true
       };
     }
+
+    // The map preview fetches its own matched route directly from the Map
+    // Matching API (client-side, using the iframe's public token) rather
+    // than depend on server-computed geometry stashed behind a ref — see
+    // selfFetchRef.ts. This ref carries only the call's own input params
+    // (already visible to the LLM). It always forces geometries=geojson
+    // and overview=full for the self-fetch itself, so the map preview
+    // never depends on what the caller's own request asked for.
+    const selfFetchRef = buildSelfFetchRef('map_matching', {
+      coordinates: input.coordinates,
+      profile: input.profile,
+      timestamps: input.timestamps,
+      radiuses: input.radiuses,
+      annotations: input.annotations
+    });
+
+    const sc: Record<string, unknown> = {
+      ...(validatedData as unknown as Record<string, unknown>),
+      mapboxRender: { ref: selfFetchRef }
+    };
+    const textOut =
+      JSON.stringify(validatedData, null, 2) + renderHint(selfFetchRef);
+
+    return {
+      content: [{ type: 'text', text: textOut }],
+      structuredContent: sc,
+      isError: false
+    };
   }
 }

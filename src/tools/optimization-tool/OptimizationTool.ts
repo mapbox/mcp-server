@@ -14,6 +14,9 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolExecutionContext } from '../../utils/tracing.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { buildOptimizationRequestUrl } from './buildOptimizationRequestUrl.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 /**
  * OptimizationTool - Find optimal route through multiple coordinates (V1 API)
@@ -38,7 +41,6 @@ export class OptimizationTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: OptimizationInputSchema,
@@ -53,42 +55,11 @@ export class OptimizationTool extends MapboxApiBasedTool<
     toolContext: ToolExecutionContext
   ): Promise<CallToolResult> {
     try {
-      // Format coordinates for URL: "lon,lat;lon,lat;..."
-      const coordinatesStr = input.coordinates
-        .map((coord) => `${coord.longitude},${coord.latitude}`)
-        .join(';');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        access_token: accessToken
+      const url = buildOptimizationRequestUrl({
+        input,
+        accessToken,
+        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
       });
-
-      if (input.source) {
-        params.set('source', input.source);
-      }
-      if (input.destination) {
-        params.set('destination', input.destination);
-      }
-      params.set('roundtrip', String(input.roundtrip));
-
-      if (input.geometries) {
-        params.set('geometries', input.geometries);
-      }
-      if (input.overview) {
-        params.set('overview', input.overview);
-      }
-      if (input.steps !== undefined) {
-        params.set('steps', String(input.steps));
-      }
-      if (input.annotations && input.annotations.length > 0) {
-        params.set('annotations', input.annotations.join(','));
-      }
-      if (input.language) {
-        params.set('language', input.language);
-      }
-
-      // Build URL: GET /optimized-trips/v1/{profile}/{coordinates}
-      const url = `${MapboxApiBasedTool.mapboxApiEndpoint}optimized-trips/v1/${input.profile}/${coordinatesStr}?${params.toString()}`;
 
       toolContext.span.setAttribute(
         'optimization.coordinates_count',
@@ -165,9 +136,34 @@ export class OptimizationTool extends MapboxApiBasedTool<
         validatedResult.waypoints.length
       );
 
+      // The map preview fetches its own optimized trip directly from the
+      // Optimization API (client-side, using the iframe's public token)
+      // rather than depend on server-computed geometry stashed behind a
+      // ref — see selfFetchRef.ts. Always forces geometries=geojson and
+      // overview=full for the self-fetch itself (regardless of what the
+      // original call requested — overview defaults to 'simplified' and
+      // could even be 'false', which would otherwise leave the map preview
+      // with no geometry to draw).
+      const ref = buildSelfFetchRef('optimization', {
+        coordinates: input.coordinates,
+        profile: input.profile,
+        source: input.source,
+        destination: input.destination,
+        roundtrip: input.roundtrip,
+        steps: input.steps,
+        annotations: input.annotations,
+        language: input.language
+      });
+
+      const sc: Record<string, unknown> = {
+        ...(validatedResult as unknown as Record<string, unknown>),
+        mapboxRender: { ref }
+      };
+      const textOut = text + renderHint(ref);
+
       return {
-        content: [{ type: 'text' as const, text }],
-        structuredContent: validatedResult,
+        content: [{ type: 'text' as const, text: textOut }],
+        structuredContent: sc,
         isError: false
       };
     } catch (error) {

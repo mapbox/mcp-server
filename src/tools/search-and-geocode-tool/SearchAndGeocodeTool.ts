@@ -14,6 +14,9 @@ import type {
   MapboxFeature
 } from '../../schemas/geojson.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { buildSearchAndGeocodeRequestUrl } from './buildSearchAndGeocodeRequestUrl.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -31,7 +34,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: SearchAndGeocodeInputSchema,
@@ -105,79 +107,13 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     input: z.infer<typeof SearchAndGeocodeInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Starting search with input: ${JSON.stringify(input)}`
-    );
+    const url = buildSearchAndGeocodeRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/forward`
-    );
-
-    // Required parameters
-    url.searchParams.append('q', input.q);
-    url.searchParams.append('access_token', accessToken);
-
-    // Optional parameters
-    if (input.language) {
-      url.searchParams.append('language', input.language);
-    }
-
-    // Hard code limit to 10
-    url.searchParams.append('limit', '10');
-
-    // Add proximity if provided (API defaults to IP-based location when omitted)
-    if (input.proximity) {
-      url.searchParams.append(
-        'proximity',
-        `${input.proximity.longitude},${input.proximity.latitude}`
-      );
-    }
-
-    if (input.bbox) {
-      url.searchParams.append(
-        'bbox',
-        `${input.bbox.minLongitude},${input.bbox.minLatitude},${input.bbox.maxLongitude},${input.bbox.maxLatitude}`
-      );
-    }
-
-    if (input.country && input.country.length > 0) {
-      url.searchParams.append('country', input.country.join(','));
-    }
-
-    if (input.types && input.types.length > 0) {
-      url.searchParams.append('types', input.types.join(','));
-    }
-
-    if (input.poi_category && input.poi_category.length > 0) {
-      url.searchParams.append('poi_category', input.poi_category.join(','));
-    }
-
-    if (input.auto_complete !== undefined) {
-      url.searchParams.append('auto_complete', input.auto_complete.toString());
-    }
-
-    if (input.eta_type) {
-      url.searchParams.append('eta_type', input.eta_type);
-    }
-
-    if (input.navigation_profile) {
-      url.searchParams.append('navigation_profile', input.navigation_profile);
-    }
-
-    if (input.origin) {
-      url.searchParams.append(
-        'origin',
-        `${input.origin.longitude},${input.origin.latitude}`
-      );
-    }
-
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Fetching from URL: ${url.toString().replace(accessToken, '[REDACTED]')}`
-    );
-
-    const response = await this.httpRequest(url.toString());
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
       const errorMessage = await this.getErrorMessage(response);
@@ -210,11 +146,6 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       // Graceful fallback to raw data
       data = rawData as SearchBoxResponse;
     }
-
-    this.log(
-      'info',
-      `SearchAndGeocodeTool: Successfully completed search, found ${data.features?.length || 0} results`
-    );
 
     // Check if we have multiple results that might be ambiguous
     if (
@@ -270,18 +201,23 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
             features: [selectedFeature]
           };
 
-          return {
-            content: [
-              {
-                type: 'text',
-                text: this.formatGeoJsonToText(
-                  singleResult as MapboxFeatureCollection
-                )
-              }
-            ],
-            structuredContent: singleResult,
-            isError: false
-          };
+          return this.withMapPayload(
+            {
+              content: [
+                {
+                  type: 'text',
+                  text: this.formatGeoJsonToText(
+                    singleResult as MapboxFeatureCollection
+                  )
+                }
+              ],
+              structuredContent: singleResult,
+              isError: false
+            },
+            singleResult,
+            input,
+            selectedFeature?.properties?.mapbox_id
+          );
         } else if (result.action === 'decline') {
           // User declined to select - return all results as before
           this.log(
@@ -289,25 +225,81 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
             'SearchAndGeocodeTool: User declined to select a specific result'
           );
         }
-      } catch (elicitError) {
-        // If elicitation fails, fall back to returning all results
-        this.log(
-          'warning',
-          `SearchAndGeocodeTool: Elicitation failed: ${elicitError instanceof Error ? elicitError.message : 'Unknown error'}`
-        );
+      } catch {
+        // Elicitation isn't supported by every MCP client (Claude Desktop
+        // doesn't, for example). Falling back to "return all results" is the
+        // expected behavior — silent, since Claude Desktop's UI flags tool
+        // calls that emit notifications/message at any level as visually
+        // failed even when the JSON-RPC response is isError: false.
       }
     }
 
     // Default behavior: return all results
-    return {
-      content: [
-        {
-          type: 'text',
-          text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
-        }
-      ],
-      structuredContent: data,
-      isError: false
+    return this.withMapPayload(
+      {
+        content: [
+          {
+            type: 'text',
+            text: this.formatGeoJsonToText(data as MapboxFeatureCollection)
+          }
+        ],
+        structuredContent: data,
+        isError: false
+      },
+      data,
+      input
+    );
+  }
+
+  /**
+   * Attach a self-fetch `mapboxRender` ref to structuredContent so the map
+   * preview fetches its own results directly from the Search API
+   * client-side (see selfFetchRef.ts) rather than depend on server-side
+   * geometry storage. `selectedMapboxId` is set when elicitation resolved
+   * to a single specific result — the client re-fetches the same query and
+   * filters down to that result's `mapbox_id` (falling back to showing all
+   * fresh results if ranking shifted enough that it's no longer present).
+   */
+  private withMapPayload(
+    base: CallToolResult,
+    data: unknown,
+    input: z.infer<typeof SearchAndGeocodeInputSchema>,
+    selectedMapboxId?: string
+  ): CallToolResult {
+    const fc = data as
+      | { features?: Array<{ geometry?: { type?: string } }> }
+      | null
+      | undefined;
+    const hasPoints =
+      Array.isArray(fc?.features) &&
+      fc.features.some((f) => f.geometry?.type === 'Point');
+    if (!hasPoints && !input.proximity) return base;
+
+    const ref = buildSelfFetchRef('search', {
+      q: input.q,
+      language: input.language,
+      proximity: input.proximity,
+      bbox: input.bbox,
+      country: input.country,
+      types: input.types,
+      poi_category: input.poi_category,
+      auto_complete: input.auto_complete,
+      eta_type: input.eta_type,
+      navigation_profile: input.navigation_profile,
+      origin: input.origin,
+      selectedMapboxId
+    });
+    const sc = {
+      ...((base.structuredContent ?? {}) as Record<string, unknown>),
+      mapboxRender: { ref }
     };
+    // Append the render hint to the first text content so the LLM sees the
+    // exact ref string and doesn't hallucinate a URI.
+    const content = (base.content ?? []).map((c, i) =>
+      i === 0 && c.type === 'text'
+        ? { ...c, text: (c.text as string) + renderHint(ref) }
+        : c
+    );
+    return { ...base, content, structuredContent: sc };
   }
 }

@@ -7,11 +7,14 @@ import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { IsochroneInputSchema } from './IsochroneTool.input.schema.js';
+import { buildIsochroneRequestUrl } from './buildIsochroneRequestUrl.js';
 import {
   IsochroneResponseSchema,
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
@@ -31,7 +34,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: IsochroneInputSchema,
@@ -59,7 +61,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
       } else if (props.metric === 'distance') {
         description += ' meters distance';
       } else {
-        // Fallback - try to infer from contour value
         description += props.contour <= 60 ? ' minutes' : ' meters';
       }
 
@@ -84,10 +85,6 @@ export class IsochroneTool extends MapboxApiBasedTool<
     input: z.infer<typeof IsochroneInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}isochrone/v1/${input.profile}/${input.coordinates.longitude}%2C${input.coordinates.latitude}`
-    );
-    url.searchParams.append('access_token', accessToken);
     if (
       (!input.contours_minutes || input.contours_minutes.length === 0) &&
       (!input.contours_meters || input.contours_meters.length === 0)
@@ -102,39 +99,12 @@ export class IsochroneTool extends MapboxApiBasedTool<
         isError: true
       };
     }
-    if (input.contours_minutes && input.contours_minutes.length > 0) {
-      url.searchParams.append(
-        'contours_minutes',
-        input.contours_minutes.join(',')
-      );
-    }
-    if (input.contours_meters && input.contours_meters.length > 0) {
-      url.searchParams.append(
-        'contours_meters',
-        input.contours_meters?.join(',')
-      );
-    }
-    if (input.contours_colors && input.contours_colors.length > 0) {
-      url.searchParams.append(
-        'contours_colors',
-        input.contours_colors.join(',')
-      );
-    }
-    if (input.polygons) {
-      url.searchParams.append('polygons', String(input.polygons));
-    }
-    if (input.denoise) {
-      url.searchParams.append('denoise', String(input.denoise));
-    }
-    if (input.generalize) {
-      url.searchParams.append('generalize', String(input.generalize));
-    }
-    if (input.exclude && input.exclude.length > 0) {
-      url.searchParams.append('exclude', input.exclude.join(','));
-    }
-    if (input.depart_at) {
-      url.searchParams.append('depart_at', input.depart_at);
-    }
+
+    const url = buildIsochroneRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
     const response = await this.httpRequest(url);
 
@@ -153,10 +123,29 @@ export class IsochroneTool extends MapboxApiBasedTool<
 
     const data = await response.json();
 
-    // Check response size and conditionally create temporary resource
-    const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
+    const RESPONSE_SIZE_THRESHOLD = 50 * 1024;
     const responseText = JSON.stringify(data, null, 2);
     const responseSize = responseText.length;
+
+    // The map preview fetches its own contours directly from the Isochrone
+    // API (client-side, using the iframe's public token) rather than
+    // depend on server-computed geometry stashed behind a ref — see
+    // selfFetchRef.ts. This ref carries only the call's own input params
+    // (already visible to the LLM), so unlike a mapbox://temp/ ref there's
+    // nothing server-side that a restart or a rehydrated conversation
+    // could invalidate.
+    const selfFetchRef = buildSelfFetchRef('isochrone', {
+      profile: input.profile,
+      coordinates: input.coordinates,
+      contours_minutes: input.contours_minutes,
+      contours_meters: input.contours_meters,
+      contours_colors: input.contours_colors,
+      polygons: input.polygons,
+      denoise: input.denoise,
+      generalize: input.generalize,
+      exclude: input.exclude,
+      depart_at: input.depart_at
+    });
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
       const resourceId = randomBytes(16).toString('hex');
@@ -174,37 +163,43 @@ export class IsochroneTool extends MapboxApiBasedTool<
         (data as { features?: unknown[] }).features?.length ?? 0;
       const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full GeoJSON if needed.`;
 
+      const summaryStructured: Record<string, unknown> = {
+        mapboxRender: { ref: selfFetchRef }
+      };
+      const largeText = summaryText + renderHint(selfFetchRef);
       return {
-        content: [{ type: 'text', text: summaryText }],
+        content: [{ type: 'text', text: largeText }],
+        structuredContent: summaryStructured,
         isError: false
       };
     }
 
-    // Validate the response against our schema
     const parsedData = IsochroneResponseSchema.safeParse(data);
+    const validated = parsedData.success
+      ? parsedData.data
+      : (data as IsochroneResponse);
 
-    if (parsedData.success) {
-      // Valid response - use formatted output
-      const formattedText = this.formatIsochroneResponse(parsedData.data);
-      return {
-        content: [{ type: 'text', text: formattedText }],
-        structuredContent: parsedData.data as unknown as Record<
-          string,
-          unknown
-        >,
-        isError: false
-      };
-    } else {
-      // Invalid response - fall back to JSON string for backward compatibility
+    if (!parsedData.success) {
       this.log(
         'warning',
         `IsochroneTool: Response validation failed: ${parsedData.error.message}`
       );
-      return {
-        content: [{ type: 'text', text: responseText }],
-        structuredContent: data as Record<string, unknown>,
-        isError: false
-      };
     }
+
+    const text = parsedData.success
+      ? this.formatIsochroneResponse(parsedData.data)
+      : responseText;
+
+    const sc: Record<string, unknown> = {
+      ...(validated as unknown as Record<string, unknown>),
+      mapboxRender: { ref: selfFetchRef }
+    };
+    const smallText = text + renderHint(selfFetchRef);
+
+    return {
+      content: [{ type: 'text', text: smallText }],
+      structuredContent: sc,
+      isError: false
+    };
   }
 }

@@ -3,13 +3,18 @@
 
 import { z } from 'zod';
 
-export const UnionOutputSchema = z.object({
-  geometry: z
-    .record(z.string(), z.unknown())
-    .describe(
-      'GeoJSON geometry of the merged polygon (Polygon or MultiPolygon)'
-    ),
-  type: z.string().describe('Geometry type: Polygon or MultiPolygon')
-});
+import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
+
+export const UnionOutputSchema = z
+  .object({
+    geometry: z
+      .record(z.string(), z.unknown())
+      .describe(
+        'GeoJSON geometry of the merged polygon (Polygon or MultiPolygon)'
+      ),
+    type: z.string().describe('Geometry type: Polygon or MultiPolygon'),
+    mapboxRender: MapAppRefSchema.optional()
+  })
+  .passthrough();
 
 export type UnionOutput = z.infer<typeof UnionOutputSchema>;

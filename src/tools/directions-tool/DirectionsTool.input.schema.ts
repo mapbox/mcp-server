@@ -143,8 +143,12 @@ export const DirectionsInputSchema = z.object({
     .default('none')
     .describe(
       'The format of the returned geometry. Options: \n' +
-        '- none (default): no geometry object is returned at all, use this if you do not need all of the intermediate coordinates.\n' +
-        '- geojson: as GeoJSON LineString (might be very long as there could be a lot of points)'
+        '- none (default): no geometry object is returned in the response. The map preview UI ' +
+        'still renders the route on its own; use this whenever you do not need the raw ' +
+        'coordinates yourself.\n' +
+        '- geojson: as GeoJSON LineString (might be very long as there could be a lot of ' +
+        'points). Only needed when you (the caller) require the coordinates directly — not ' +
+        'required for the map preview to work.'
     ),
   max_height: z
     .number()
@@ -217,17 +221,25 @@ export const DirectionsInputSchema = z.object({
         // Check if it's a point exclusion
         if (item.startsWith('point(') && item.endsWith(')')) {
           const coordStr = item.substring(6, item.length - 1).trim();
-          const [lngStr, latStr] = coordStr.split(' ');
+          // Require exactly two space-separated numbers and nothing else.
+          // Destructuring `coordStr.split(' ')` previously read only the
+          // first two tokens and silently dropped anything past them, so a
+          // third token (e.g. an "&param=value" fragment) was never
+          // inspected and rode along unvalidated into the exclude value.
+          const pointMatch = /^(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)$/.exec(
+            coordStr
+          );
 
-          // Validate both parts exist
-          if (!lngStr || !latStr) {
+          if (!pointMatch) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
-              message: `Invalid point format in exclude parameter: '${item}'. Format should be point(<lng> <lat>)`,
+              message: `Invalid point format in exclude parameter: '${item}'. Format should be point(<lng> <lat>) with exactly one number for longitude and one for latitude`,
               path: []
             });
             continue;
           }
+
+          const [, lngStr, latStr] = pointMatch;
 
           // Parse and validate longitude
           const lng = Number(lngStr);
