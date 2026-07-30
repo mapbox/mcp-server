@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import * as vm from 'node:vm';
 import { buildDirectionsRequestUrl } from '../../../src/tools/directions-tool/buildDirectionsRequestUrl.js';
-import { renderDirectionsAppHtml } from '../../../src/resources/ui-apps/directionsAppHtml.js';
+import { renderMapAppHtml } from '../../../src/resources/ui-apps/mapAppHtml.js';
 
 type ClientBuildUrlFn = (
   params: unknown,
@@ -16,10 +16,14 @@ type ClientBuildUrlFn = (
  * Extracts and runs the iframe's inline <script> in a sandboxed VM context,
  * then returns its exposed test hook `window.__buildDirectionsApiUrl` — the
  * hand-ported client-side twin of buildDirectionsRequestUrl. This is the
- * parity check that keeps the two implementations from drifting apart.
+ * parity check that keeps the two implementations from drifting apart. See
+ * the equivalent check that existed for the old per-tool directions iframe,
+ * test/tools/directions-tool/directionsUrlParity.test.ts (removed when that
+ * iframe was folded into the generic render_map_tool app in PR #199) — this
+ * is its spiritual successor, adapted to the generic iframe + self-fetch ref.
  */
 function loadClientBuildUrlFn(): ClientBuildUrlFn {
-  const html = renderDirectionsAppHtml({
+  const html = renderMapAppHtml({
     publicToken: 'pk.parity-test-token',
     apiEndpoint: 'https://api.mapbox.com/'
   });
@@ -45,7 +49,7 @@ function loadClientBuildUrlFn(): ClientBuildUrlFn {
     },
     document: {
       getElementById: () => fakeElement,
-      addEventListener: () => {}
+      createElement: () => fakeElement
     },
     URLSearchParams,
     console,
@@ -64,7 +68,7 @@ function loadClientBuildUrlFn(): ClientBuildUrlFn {
   return win.__buildDirectionsApiUrl;
 }
 
-describe('Directions URL builder parity (server vs. iframe self-fetch)', () => {
+describe('Directions self-fetch URL builder parity (server vs. iframe)', () => {
   it('produces the same query string for a full set of parameters', () => {
     const input = {
       coordinates: [

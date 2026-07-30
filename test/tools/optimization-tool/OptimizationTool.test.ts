@@ -8,6 +8,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 import { OptimizationTool } from '../../../src/tools/optimization-tool/OptimizationTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 // Sample V1 API response
 const sampleV1Response = {
@@ -270,5 +271,56 @@ describe('OptimizationTool V1 API', () => {
     expect(text).toContain('minutes');
     expect(text).toContain('km');
     expect(text).toContain('0 → 1 → 2');
+  });
+
+  it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      status: 200,
+      json: async () => sampleV1Response
+    });
+
+    const tool = new OptimizationTool({ httpRequest });
+    const token = tokenFor('account-test-optimization');
+    const result = await tool.run(
+      {
+        coordinates: [
+          { longitude: -122.4194, latitude: 37.7749 },
+          { longitude: -122.4195, latitude: 37.775 },
+          { longitude: -122.4197, latitude: 37.7751 }
+        ]
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/optimization\?data=/
+    );
+
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('render_map_tool');
+    expect(text).toContain(sc.mapboxRender!.ref!);
+
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'optimization',
+        params: expect.objectContaining({
+          coordinates: [
+            { longitude: -122.4194, latitude: 37.7749 },
+            { longitude: -122.4195, latitude: 37.775 },
+            { longitude: -122.4197, latitude: 37.7751 }
+          ]
+        })
+      }
+    ]);
   });
 });

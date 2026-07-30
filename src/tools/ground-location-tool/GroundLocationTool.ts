@@ -10,6 +10,10 @@ import {
   GroundLocationOutputSchema,
   type GroundLocationOutput
 } from './GroundLocationTool.output.schema.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
+import { buildReverseGeocodeUrl } from './buildReverseGeocodeUrl.js';
+import { buildCategorySearchRequestUrl } from '../category-search-tool/buildCategorySearchRequestUrl.js';
 
 type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
 
@@ -79,7 +83,6 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: GroundLocationInputSchema,
@@ -152,17 +155,13 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     types: string,
     language?: string
   ): Promise<{ place: string; full_address?: string }> {
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/geocode/v6/reverse`
-    );
-    url.searchParams.append('longitude', longitude.toString());
-    url.searchParams.append('latitude', latitude.toString());
-    url.searchParams.append('access_token', accessToken);
-    url.searchParams.append('limit', '1');
-    url.searchParams.append('types', types);
-    if (language) url.searchParams.append('language', language);
+    const url = buildReverseGeocodeUrl({
+      input: { longitude, latitude, types, language },
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
-    const response = await this.httpRequest(url.toString());
+    const response = await this.httpRequest(url);
     if (!response.ok) return { place: `${latitude}, ${longitude}` };
 
     const data = (await response.json()) as GeocodingResponse;
@@ -184,15 +183,18 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     accessToken: string,
     language?: string
   ): Promise<GroundLocationOutput['nearby_pois']> {
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/category/${encodeURIComponent(query)}`
-    );
-    url.searchParams.append('access_token', accessToken);
-    url.searchParams.append('proximity', `${longitude},${latitude}`);
-    url.searchParams.append('limit', limit.toString());
-    if (language) url.searchParams.append('language', language);
+    const url = buildCategorySearchRequestUrl({
+      input: {
+        category: query,
+        proximity: { longitude, latitude },
+        limit,
+        language
+      },
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
-    const response = await this.httpRequest(url.toString());
+    const response = await this.httpRequest(url);
     if (!response.ok) return [];
 
     const data = (await response.json()) as CategorySearchResponse;
@@ -377,9 +379,40 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     const validated = GroundLocationOutputSchema.safeParse(result);
     const output = validated.success ? validated.data : result;
 
+    const sc: Record<string, unknown> = {
+      ...(output as unknown as Record<string, unknown>)
+    };
+    let textOut = this.formatOutput(output, strategy);
+
+    // The map preview fetches its own results directly from the Geocoding
+    // and Search Box APIs (client-side, using the iframe's public token)
+    // rather than depend on server-computed geometry stashed behind a ref
+    // — see selfFetchRef.ts. The sampling-derived strategy can't be
+    // recomputed client-side (sampling is an LLM round-trip through the
+    // host, which the iframe can't invoke), so the params it resolved to
+    // (geocodeTypes, and the POI query/limit if a POI fetch is needed) are
+    // baked into the ref instead. Isochrone contours aren't fetched here —
+    // buildGroundLocationPayload never rendered them either, since the
+    // tool only surfaces a contour-minutes summary, not the polygons.
+    const poiNeeded = Boolean(query) || strategy === 'poi';
+    const ref = buildSelfFetchRef('ground_location', {
+      longitude,
+      latitude,
+      geocodeTypes,
+      language,
+      poi: poiNeeded
+        ? {
+            query: query ?? 'place',
+            limit: strategy === 'poi' ? Math.max(limit, 15) : limit
+          }
+        : undefined
+    });
+    sc.mapboxRender = { ref };
+    textOut += renderHint(ref);
+
     return {
-      content: [{ type: 'text', text: this.formatOutput(output, strategy) }],
-      structuredContent: output as unknown as Record<string, unknown>,
+      content: [{ type: 'text', text: textOut }],
+      structuredContent: sc,
       isError: false
     };
   }
