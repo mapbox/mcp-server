@@ -5,10 +5,12 @@
 const TOKEN_PREFIXES = new Set(['pk', 'sk', 'tk']);
 
 /**
- * Character allowlist for an account name lifted out of a token payload, matching the
- * username validation in StyleComparisonTool. This bounds what a token payload can put
- * into a span attribute or log line; it is not a statement of Mapbox's account naming
- * rules. A name outside it is not partially disclosed — it falls back to `***`.
+ * Character allowlist for an account name lifted out of a token payload. This
+ * bounds what a token payload can put into a span attribute or log line — the
+ * value comes from decoding untrusted JWT payload data, so the allowlist is a
+ * safety gate against log/span injection and oversized values, not a
+ * statement of Mapbox's actual account naming rules. A name outside it is not
+ * partially disclosed — it falls back to `***`.
  */
 const ACCOUNT_NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
