@@ -6,7 +6,6 @@ import { CategoryListResource } from './category-list/CategoryListResource.js';
 import { TemporaryDataResource } from './temporary/TemporaryDataResource.js';
 import { ComputeResource } from './compute/ComputeResource.js';
 import { InlinePayloadResource } from './inline-payload/InlinePayloadResource.js';
-import { StaticMapUIResource } from './ui-apps/StaticMapUIResource.js';
 import { MapAppUIResource } from './ui-apps/MapAppUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
@@ -18,7 +17,6 @@ export const ALL_RESOURCES = [
   new TemporaryDataResource(),
   new ComputeResource(),
   new InlinePayloadResource(),
-  new StaticMapUIResource(),
   // Single shared map renderer, targeted exclusively by render_map_tool.
   new MapAppUIResource({ httpRequest }),
   new VersionResource()
