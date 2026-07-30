@@ -19,8 +19,8 @@ export interface DirectionsRequestInput {
 /**
  * Build the Mapbox Directions v5 request URL for a given input. Shared by
  * DirectionsTool.execute() (server-side) and hand-mirrored by the
- * self-fetching map preview iframe (directionsAppHtml.ts) — the parity test
- * in test/tools/directions-tool/directionsUrlParity.test.ts keeps the two
+ * self-fetching map preview iframe (mapAppHtml.ts) — the parity test in
+ * test/resources/ui-apps/directionsSelfFetchUrlParity.test.ts keeps the two
  * implementations in sync.
  */
 export function buildDirectionsRequestUrl(params: {
