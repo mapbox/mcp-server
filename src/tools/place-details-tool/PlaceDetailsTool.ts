@@ -204,9 +204,16 @@ export class PlaceDetailsTool extends MapboxApiBasedTool<
 
     url.searchParams.append('access_token', accessToken);
 
-    if (input.attribute_sets && input.attribute_sets.length > 0) {
-      url.searchParams.append('attribute_sets', input.attribute_sets.join(','));
-    }
+    // "basic" (name, feature_type, address, coordinates) is what the
+    // Details API calls its default attribute set, and this tool's output
+    // schema requires `properties.name`/`properties.feature_type` — so it
+    // must always be requested, even if the caller's attribute_sets omits
+    // it, or the API response fails output validation.
+    const attributeSets = new Set(['basic', ...(input.attribute_sets ?? [])]);
+    url.searchParams.append(
+      'attribute_sets',
+      Array.from(attributeSets).join(',')
+    );
 
     if (input.language) {
       url.searchParams.append('language', input.language);

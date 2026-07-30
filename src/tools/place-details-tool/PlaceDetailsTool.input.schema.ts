@@ -16,7 +16,7 @@ export const PlaceDetailsInputSchema = z.object({
     .array(z.enum(['basic', 'photos', 'visit', 'venue']))
     .optional()
     .describe(
-      'Which attribute sets to include in the response. Options: "basic" (address/coordinates, always included), "photos" (place photo URLs), "visit" (opening hours, rating, price level, popularity), "venue" (phone number, website URL, social media links). When not specified, only basic attributes are returned.'
+      'Which attribute sets to include in the response. Options: "basic" (name/address/coordinates — always requested from the API regardless of whether you list it here, since it\'s required for a valid response), "photos" (place photo URLs), "visit" (opening hours, rating, price level, popularity), "venue" (phone number, website URL, social media links). When not specified, only basic attributes are returned.'
     ),
   language: z
     .string()
