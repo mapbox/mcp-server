@@ -636,6 +636,11 @@ ${initialDataScript}
       if (typeof params.exclude !== 'string') return false;
       if (!/^[A-Za-z0-9_,.() -]+$/.test(params.exclude)) return false;
     }
+    if (params.selectedRouteIndex !== undefined && params.selectedRouteIndex !== null) {
+      if (typeof params.selectedRouteIndex !== 'number') return false;
+      if (!isFinite(params.selectedRouteIndex) || params.selectedRouteIndex < 0) return false;
+      if (Math.floor(params.selectedRouteIndex) !== params.selectedRouteIndex) return false;
+    }
     return true;
   }
 
@@ -757,7 +762,16 @@ ${initialDataScript}
         return res.json();
       })
       .then(function(data) {
-        var route = data && data.routes && data.routes[0];
+        var routes = (data && data.routes) || [];
+        // If elicitation resolved to a specific route server-side, draw that
+        // same one out of the freshly re-fetched alternatives — falling back
+        // to the first route if the index is out of range (e.g. the API
+        // returned fewer alternatives this time around), same fallback
+        // philosophy as selectedMapboxId in the search self-fetch.
+        var route =
+          (typeof params.selectedRouteIndex === 'number' &&
+            routes[params.selectedRouteIndex]) ||
+          routes[0];
         var coords = route ? pickRouteGeometryClient(route) : null;
         if (!coords) {
           showError('Directions API returned no route.');

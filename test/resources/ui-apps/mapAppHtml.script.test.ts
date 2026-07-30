@@ -421,6 +421,156 @@ describe('mapAppHtml directions self-fetch', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(errorEl?.textContent).toContain('Could not fetch route');
   });
+
+  it('draws the route at selectedRouteIndex, not just the first one, when multiple routes come back', async () => {
+    const { sendToolResult, setFetchImpl, map, summaryEl } =
+      loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        routes: [
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-77, 38],
+                [-76, 39]
+              ]
+            },
+            distance: 10000,
+            duration: 600
+          },
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-77, 38],
+                [-76.5, 38.2],
+                [-76, 39]
+              ]
+            },
+            distance: 20000,
+            duration: 1200
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/directions?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'directions',
+              params: {
+                coordinates: [
+                  { longitude: -77, latitude: 38 },
+                  { longitude: -76, latitude: 39 }
+                ],
+                selectedRouteIndex: 1
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    // Summary is derived from whichever route got drawn — routes[1]'s
+    // distance/duration (20000m / 1609.34 ≈ 12.4mi), not routes[0]'s.
+    expect(summaryEl?.textContent).toContain('12.4 mi');
+    expect(summaryEl?.textContent).toContain('20 min');
+  });
+
+  it('falls back to the first route when selectedRouteIndex is out of range', async () => {
+    const { sendToolResult, setFetchImpl, summaryEl } = loadScriptSandbox();
+
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        routes: [
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-77, 38],
+                [-76, 39]
+              ]
+            },
+            distance: 10000,
+            duration: 600
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/directions?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'directions',
+              params: {
+                coordinates: [
+                  { longitude: -77, latitude: 38 },
+                  { longitude: -76, latitude: 39 }
+                ],
+                // The fresh re-fetch only returned 1 route this time.
+                selectedRouteIndex: 3
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(summaryEl?.textContent).toContain('6.2 mi');
+  });
+
+  it('never fetches when selectedRouteIndex is not a valid non-negative integer', async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: false,
+      status: 599,
+      json: async () => ({})
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/directions?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'directions',
+              params: {
+                coordinates: [
+                  { longitude: -77, latitude: 38 },
+                  { longitude: -76, latitude: 39 }
+                ],
+                selectedRouteIndex: -1
+              }
+            }
+          ]
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(errorEl?.textContent).toContain('Could not fetch route');
+  });
 });
 
 describe('mapAppHtml isochrone self-fetch', () => {
