@@ -1,6 +1,8 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import ipaddr from 'ipaddr.js';
+
 /**
  * Validates that a URL is safe for server-side fetching by an upstream service
  * (in particular, the Mapbox Static Images API which fetches custom marker
@@ -9,32 +11,59 @@
  * Rejects:
  *  - non-http(s) schemes (e.g. file:, gopher:, data:, javascript:)
  *  - non-https URLs (markers should always be fetched over TLS)
- *  - URLs whose host is an IP literal in a loopback, private, link-local,
- *    unique-local, or otherwise non-routable range (CWE-918 SSRF)
- *  - URLs whose host is a well-known local hostname
+ *  - IPv4/IPv6 literals outside ipaddr.js's plain "unicast" range —
+ *    deny-by-default, so loopback, private, link-local, multicast,
+ *    broadcast, CGNAT, reserved, and every IPv4-in-IPv6 transition/
+ *    translation mechanism (mapped, compatible, 6to4, NAT64, SIIT, Teredo,
+ *    AMT, ORCHID, etc.) are all rejected without needing to be named
+ *    individually (CWE-918 SSRF)
+ *  - well-known local hostnames, reserved local/internal-use suffixes
+ *    (.internal, .local, .arpa), and dotless single-label hostnames
  *
- * Note: we do not perform DNS resolution here — the upstream service will
- * still resolve the hostname when fetching. This validation is a defense in
- * depth against the most common SSRF vectors that prompt-injected agents
- * tend to produce (IP literals and "localhost").
+ * Out of scope, by design, for this pre-fetch string check — all three
+ * require validating the actual connection, not the URL string, so they
+ * belong where the fetch happens, not here:
+ *  - DNS rebinding (an ordinary hostname resolving to an internal address
+ *    at fetch time)
+ *  - port restriction
+ *  - network-specific hostname suffixes (.corp, .lan, .home, etc.) —
+ *    unlike .internal/.local/.arpa, these aren't globally reserved, so
+ *    they can't be enumerated in general
  */
+
 export function isSafeExternalUrl(rawUrl: string): boolean {
+  return parseSafeExternalUrl(rawUrl) !== null;
+}
+
+/**
+ * Same validation as isSafeExternalUrl, but returns the parsed URL on
+ * success (null otherwise) so callers that need the WHATWG-canonical form
+ * of the validated URL don't have to re-parse the raw string.
+ */
+export function parseSafeExternalUrl(rawUrl: string): URL | null {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
   } catch {
-    return false;
+    return null;
   }
 
   if (parsed.protocol !== 'https:') {
-    return false;
+    return null;
   }
 
-  // Strip optional surrounding brackets from IPv6 literals
-  const host = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  // Strip optional surrounding brackets from IPv6 literals and a trailing
+  // root-label dot (e.g. "localhost." is equivalent to "localhost"). The
+  // dotless-hostname check further below relies on this running first —
+  // without it, "intranet." would still contain a dot and slip past that
+  // check.
+  const host = parsed.hostname
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '')
+    .toLowerCase();
 
   if (host.length === 0) {
-    return false;
+    return null;
   }
 
   // Block well-known local hostnames
@@ -44,52 +73,55 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
     'ip6-loopback',
     'broadcasthost'
   ]);
-  if (blockedHostnames.has(host) || host.endsWith('.localhost')) {
-    return false;
+  // Suffixes reserved for local/internal use that no public marker image
+  // host is ever legitimately under: cloud-internal DNS zones (.internal,
+  // used by GCP/AWS service discovery — covers metadata.google.internal,
+  // the GCP metadata endpoint's actual hostname), mDNS (.local), and
+  // reverse-DNS / home-network zones reserved by RFC 6761/8375 (.arpa
+  // covers .in-addr.arpa, .ip6.arpa, and .home.arpa as suffixes of it).
+  const blockedSuffixes = ['.localhost', '.internal', '.local', '.arpa'];
+  if (
+    blockedHostnames.has(host) ||
+    blockedSuffixes.some((suffix) => host.endsWith(suffix))
+  ) {
+    return null;
   }
 
-  // IPv4 literal check (dotted quad)
-  const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (ipv4Match) {
-    const octets = ipv4Match.slice(1, 5).map((o) => Number(o));
-    if (octets.some((o) => o < 0 || o > 255)) {
-      return false;
+  // If the host isn't a parseable IP literal at all, it's an ordinary
+  // hostname — allowed here (subject to the checks above), except that a
+  // public marker image host always has at least one dot; a dotless,
+  // single-label hostname only resolves via the fetcher's own network
+  // search-domain suffixing (e.g. "intranet", "metadata"), which is never
+  // the case for a legitimate external image URL. DNS rebinding on a
+  // multi-label hostname is out of scope for this pre-fetch check, see the
+  // module doc comment.
+  if (!ipaddr.isValid(host)) {
+    return host.includes('.') ? parsed : null;
+  }
+  const addr = ipaddr.parse(host);
+
+  // Deny by default for both IPv4 and IPv6: only plain global unicast
+  // addresses are allowed. Every other named range (private, loopback,
+  // link-local, multicast, broadcast, CGNAT, reserved, unique-local, and
+  // every IPv4-in-IPv6 transition/translation mechanism) is rejected,
+  // regardless of what it does or doesn't embed.
+  if (addr.range() !== 'unicast') {
+    return null;
+  }
+
+  if (addr.kind() === 'ipv6') {
+    // ipaddr.js does not classify the deprecated IPv4-compatible form
+    // (::a.b.c.d, i.e. the leading 96 bits all zero) as a special range
+    // when written in plain hex, which is exactly the form Node's URL
+    // parser normalises a dotted-quad IPv4-compatible literal to — so it
+    // reaches here as ordinary 'unicast' and needs an explicit check.
+    // (::1 and :: are already excluded above via the loopback/unspecified
+    // ranges, so this only affects addresses with a genuine embedded IPv4.)
+    const bytes = addr.toByteArray();
+    if (bytes.slice(0, 12).every((b) => b === 0)) {
+      return null;
     }
-    const [a, b] = octets;
-    // 0.0.0.0/8, 10/8, 127/8
-    // 0.0.0.0/8 — "this network" (unspecified + reserved); block conservatively
-    if (a === 0 || a === 10 || a === 127) return false;
-    // 169.254/16 (link-local, includes cloud metadata 169.254.169.254)
-    if (a === 169 && b === 254) return false;
-    // 172.16/12
-    if (a === 172 && b >= 16 && b <= 31) return false;
-    // 192.168/16
-    if (a === 192 && b === 168) return false;
-    // 100.64/10 (CGNAT)
-    if (a === 100 && b >= 64 && b <= 127) return false;
-    // 224/4 multicast and 240/4 reserved
-    if (a >= 224) return false;
-    return true;
   }
 
-  // IPv6 literal check (presence of ':' indicates IPv6 since IPv4 was handled)
-  if (host.includes(':')) {
-    // ::1 loopback, :: unspecified
-    if (host === '::1' || host === '::') return false;
-    // fc00::/7 unique local (fc.. or fd..)
-    if (/^f[cd][0-9a-f]{2}:/.test(host)) return false;
-    // fe80::/10 link-local
-    if (/^fe[89ab][0-9a-f]:/.test(host)) return false;
-    // ff00::/8 multicast
-    if (/^ff[0-9a-f]{2}:/.test(host)) return false;
-    // IPv4-mapped / IPv4-compatible IPv6: ::ffff:a.b.c.d or ::a.b.c.d
-    // (Node's URL parser normalises ::ffff:127.0.0.1 to ::ffff:7f00:1, so
-    // detect the embedded IPv4 either as a dotted-quad or as the
-    // ::ffff:xxxx:xxxx hex form.)
-    if (/\d+\.\d+\.\d+\.\d+/.test(host)) return false;
-    if (/^::ffff:[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(host)) return false;
-    return true;
-  }
-
-  return true;
+  return parsed;
 }
