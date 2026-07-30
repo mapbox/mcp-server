@@ -10,6 +10,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { CategorySearchTool } from '../../../src/tools/category-search-tool/CategorySearchTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('CategorySearchTool', () => {
   afterEach(() => {
@@ -437,5 +438,59 @@ describe('CategorySearchTool', () => {
     const tool = new CategorySearchTool({ httpRequest });
     expect(tool.outputSchema).toBeDefined();
     expect(tool.outputSchema).toBeTruthy();
+  });
+
+  it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
+    const fakeResp = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            mapbox_id: 'id-1',
+            name: 'Cafe Reveille',
+            feature_type: 'poi',
+            context: { country: { name: 'United States' } },
+            coordinates: { longitude: -122.41, latitude: 37.78 }
+          },
+          geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+        }
+      ],
+      attribution: '© Mapbox'
+    };
+    const { httpRequest } = setupHttpRequest({
+      ok: true,
+      json: async () => fakeResp
+    });
+    const token = tokenFor('account-test-category-search');
+    const result = await new CategorySearchTool({ httpRequest }).run(
+      {
+        category: 'cafe',
+        proximity: { longitude: -122.42, latitude: 37.78 }
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token } } as any
+    );
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/category_search\?data=/
+    );
+
+    // The ref is self-describing (no server-side store, no owner needed)
+    // — resolving it doesn't depend on this test's `token`/account at all.
+    const { resolveSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+    expect(payload?.selfFetch).toEqual([
+      {
+        tool: 'category_search',
+        params: expect.objectContaining({
+          category: 'cafe',
+          proximity: { longitude: -122.42, latitude: 37.78 }
+        })
+      }
+    ]);
   });
 });

@@ -46,6 +46,12 @@ export {
 // Export types
 export type { HttpRequest, TracedRequestInit } from './types.js';
 
+// Export tracing helpers for consumers running their own OpenTelemetry setup.
+// Wrap your span exporter in RedactingSpanExporter to keep Mapbox access tokens,
+// which travel as a URL query parameter, out of exported span attributes.
+export { RedactingSpanExporter } from './redactingSpanExporter.js';
+export { redactToken } from './redactToken.js';
+
 // Export version utilities
 export { getVersionInfo } from './versionUtils.js';
 export type { VersionInfo } from './versionUtils.js';

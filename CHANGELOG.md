@@ -1,5 +1,93 @@
 ## Unreleased
 
+### New Features
+
+- **`directions_tool` — route selection elicitation.** When the Directions API returns two or more route alternatives, the tool now asks the user to pick one via `server.elicitInput(...)` (MCP elicitations), presenting each option's duration, distance, primary roads, traffic conditions, and incident count. Only the selected route is returned, and the choice is threaded through to the map preview's self-fetch so re-rendering shows the same route rather than defaulting back to the first one. If the client doesn't support elicitations, the user declines, or the call errors, the tool falls back to returning all route alternatives, matching prior behavior.
+- Corrected `docs/elicitations.md`, which had described a two-stage `directions_tool` elicitation flow (routing preferences before the API call, plus automatic client-capability detection) that was never implemented. The doc now accurately describes the single-stage route-selection elicitation and the actual fallback mechanism (a `try`/`catch` around each `elicitInput` call, with no capability pre-check).
+
+### Fixed
+
+- **`place_details_tool`: fixed output validation failure when `attribute_sets` omitted `"basic"`.** The tool's output schema requires `properties.name` and `properties.feature_type`, both of which are only populated by the Details API's `basic` attribute set — so a call like `attribute_sets: ["visit"]` was accepted at the input stage but then failed with an opaque `Output validation error` once the API's response came back without those fields. `"basic"` is now always merged into the outgoing `attribute_sets` request regardless of what the caller passes, matching what the tool's own description already claimed ("always included").
+
+### Changed
+
+- **Removed dead MCP-UI code.** `--disable-mcp-ui` no longer appears in `--help` (it stopped doing anything once MCP-UI support was removed) but is still silently accepted so an existing launch config that passes it doesn't hard-fail on "Unknown option". Deleted the orphaned `StaticMapUIResource` (`ui://mapbox/static-map/index.html`) — it was registered but no tool had referenced it since `static_map_image_tool` stopped declaring an MCP Apps UI resource. No behavior change: MCP-UI support was already fully gone from the codebase; this just removes the code that referenced it.
+
+### Documentation
+
+- **README and `render_map_tool` docs refreshed.** The README's "Rich Map Previews" section and `docs/mcp-ui.md` described MCP-UI support (`@mcp-ui/server`, `ENABLE_MCP_UI`, `StaticMapUIResource` wired to `static_map_image_tool`) that was fully removed when `render_map_tool` shipped — `@mcp-ui/server` is no longer a dependency and nothing in `src/` reads `ENABLE_MCP_UI` anymore. `docs/mcp-ui.md` now explains what changed and points to the new **[`docs/render-map-tool.md`](./docs/render-map-tool.md)**, a comprehensive guide covering the full payload schema and, in particular, how to call `render_map_tool` standalone with your own GeoJSON — no other Mapbox tool required. Also added the ~12 tools missing from the README's tool inventory (`render_map_tool`, `ground_location_tool`, `place_details_tool`, `destination_tool`, `union_tool`/`intersect_tool`/`difference_tool`, `convex_tool`, `nearest_point_tool`/`nearest_point_on_line_tool`, `length_tool`) and replaced the entry for the removed `point_in_polygon_tool` with its actual replacement, `points_within_polygon_tool`.
+
+## 0.13.0 - 2026-07-30
+
+### Security
+
+- **directions_tool: fixed query parameter injection via the `exclude` parameter.** A `point(<lng> <lat>)` exclude entry was validated by splitting on spaces and reading only the first two tokens — any extra content after them (e.g. `point(0 0 &injected=evil)`) was never inspected or rejected. That value then reached the outbound Mapbox Directions API request through a hand-rolled encoder that escaped `,`/`(`/`)`/space but not `&`/`=`, concatenated directly onto the query string rather than through `URLSearchParams`. Together these let a caller-supplied `exclude` value add or override arbitrary query parameters on the authenticated Directions API request. Fixed by (1) requiring a `point(...)` entry's interior to be exactly two numbers and nothing else, and (2) building the `exclude` parameter through `URLSearchParams` like every other parameter, so it's always correctly percent-encoded regardless of content. Applied to both the server-side request builder and its hand-ported client-side twin in the map preview iframe.
+
+### New Features
+
+- **`render_map_tool` — single visualization primitive** for Mapbox MCP. Takes
+  a `MapAppPayload` and displays a live Mapbox GL JS map. All other geo
+  tools (directions, isochrone, optimization, search, map-matching,
+  ground-location, polygon-ops) return a ready-to-render `_mapApp` payload
+  on their `structuredContent`; the LLM passes it to `render_map_tool` to
+  show a map. This is the only tool that declares `_meta.ui.resourceUri`,
+  so MCP App hosts (which only fully render the iframe for the last tool
+  in a chained sequence) always render successfully — the visualization
+  step is terminal by design.
+- **`MapAppPayload` schema** (`src/utils/mapAppPayload.ts`) — the wire
+  format between data tools and `render_map_tool`. Thin pass-through over
+  Mapbox Style spec `paint`/`layout` objects so any layer/marker/legend
+  combination expressible in GL JS is expressible in the payload.
+- **Per-tool payload builders** — `buildPolygonOpsMapPayload` (still used
+  server-side; see below for the tools that moved their payload building
+  to the iframe instead). Each is a pure function over its tool's
+  response: ~20-80 lines, no HTML, no iframe wiring.
+- **Shared `renderMapAppHtml`** (`src/resources/ui-apps/mapAppHtml.ts`) —
+  one iframe template that consumes any `MapAppPayload`. Used by both the
+  MCP Apps resource (`MapAppUIResource`) and any client that wants to
+  bake initial data in.
+- **Polyline decoding moves tool-side** via `decodePolyline` /
+  `decodePolylineWithFallback` so the iframe only ever receives GeoJSON.
+
+### Fixed
+
+- **Tracing**: Access tokens are no longer included in exported spans. Mapbox APIs take the access token as a URL query parameter, and OpenTelemetry's HTTP/undici auto-instrumentation records the full request URL on client spans (`url.full`, `url.query`), so operators who configured `OTEL_EXPORTER_OTLP_ENDPOINT` had tokens copied verbatim into their telemetry backend. The trace exporter is now wrapped in a `RedactingSpanExporter` that strips the token signature from all string span attributes before export. Redaction keeps the token prefix and account name — `pk.eyJ1...xyz.signature` becomes `pk.your-account.redacted` — so spans still distinguish public from secret tokens and show which account a request billed to, without carrying a usable credential. Values that do not parse as a Mapbox token fall back to `access_token=***`.
+
+- **urlSafety**: `isSafeExternalUrl()` (used to validate `static_map_image_tool` custom-marker overlay URLs) now uses `ipaddr.js` to parse IPv6 literals and correctly identify IPv4 addresses embedded via any standard encoding (IPv4-mapped, IPv4-compatible, 6to4, NAT64, IPv4-translated/SIIT), instead of pattern-matching a subset of string forms. The previous regex-based check missed the bare IPv4-compatible form and the 6to4/NAT64/SIIT forms, letting blocked IPv4 ranges (loopback, private, link-local, etc.) through when expressed as one of those encodings. The embedded address is now detected from the parsed address's raw bytes rather than by enumerating each encoding's string shape.
+- **map_matching_tool**: When the Map Matching API can't match a trace (e.g. `code: "NoMatch"` for distant/unmatchable coordinates), the tool now returns a clear `isError` text result instead of crashing with `MCP error -32602: Output validation error` — the API omits `tracepoints`/`matchings` in this case, which previously violated the tool's output schema and was returned as `structuredContent` anyway, triggering the MCP SDK's output validation. The same schema-violating `structuredContent` could also be returned for a `code: "Ok"` response that otherwise failed schema validation (e.g. a `confidence` out of range); that fallback now also returns a graceful `isError` result instead of the raw invalid payload. `tracepoints` and `matchings` are also now `.optional()` in the output schema as a defensive measure. (AGI-1021)
+- **render_map_tool: map previews no longer break after a server restart or when reopening an old conversation.** Rendering previously depended entirely on in-memory server state (a 30-minute-TTL `Map`) that doesn't survive a process restart — including `render_map_tool`'s own merged-output ref, the one every MCP App host actually re-fetches when a map card is redisplayed. That ref is now self-describing (the whole small payload is encoded directly into the ref) instead of pointing at that ephemeral store, whenever the payload is small enough to inline.
+- **directions_tool, isochrone_tool, map_matching_tool, optimization_tool (v1), search_and_geocode_tool, category_search_tool, ground_location_tool: map previews now fetch their own data directly from the relevant Mapbox API**, client-side in the iframe, using the same public token already used for map tiles, instead of depending on geometry computed and cached server-side. This also means these previews always reflect fresh data on every render (e.g. current traffic for directions) and no longer depend on the caller's own request options (e.g. `geometries`/`overview` choices) to have geometry to draw. For `ground_location_tool`, the sampling-derived grounding strategy (which decides the geocode types and whether a POI lookup is needed) is resolved once server-side and threaded through the ref, since the iframe can't invoke MCP sampling itself.
+- **union_tool, intersect_tool, difference_tool: map previews are now recomputed from the original input polygons on every render** instead of being cached behind a server-side ref that could expire or vanish on a restart.
+- **render_map_tool: clearer recovery when a `payload_ref` can't be resolved.** Instead of silently dropping the data or returning a bare "nothing to render" error, the LLM is now told to re-run the upstream tool to get a fresh ref. The map preview itself now also shows the server's actual explanation (e.g. "expired") instead of a generic "malformed payload" message.
+
+### Testing
+
+- **New integration test: process-restart survival** (`test/integration/processRestart.test.ts`). Spawns the actual built server (`dist/esm/index.js`) as a real child process, gets a ref back over real stdio/MCP protocol, kills that process, spawns an independent one, and resolves the same ref against it — the only test in the suite that crosses a real process boundary, which is what the restart-survival fixes above actually need proven. Runs offline (`union_tool`/`render_map_tool` do no network I/O) in ~5s; skips itself with a clear message if `dist/esm/index.js` hasn't been built yet (CI already builds before testing).
+
+## 0.12.7 - 2026-07-20
+
+### Fixed
+
+- **directions_tool**: The map preview UI (both the MCP Apps resource and the legacy MCP-UI inline UI) now fetches its own route directly from the Directions API using the tool call's input parameters, instead of depending on the tool response carrying `geometries="geojson"`. Previously, the map showed an error whenever the default `geometries="none"` was used because no route data was returned to draw. The map now works regardless of the `geometries` value, so text/data responses can stay compact by default without ever breaking the preview.
+- **directions_tool map preview**: Replaced the one-shot render latch with per-call render cycles, so a host that reuses the same iframe across sequential `directions_tool` calls gets the new route instead of the first one forever, and hardened the iframe's postMessage handling — messages are only accepted from the embedding host (sender pinning), and untrusted input that gets interpolated into the Directions request URL (`coordinates`, `routing_profile`, `exclude`) is validated before the self-fetch runs, mirroring the server-side zod guarantees.
+
+### Documentation
+
+- **CONTRIBUTING**: Clarify that unsolicited PRs adding third-party directory/discovery listings (e.g. README badges, `beacon.json`-style manifests) are out of scope and will be closed without review (#225).
+
+## 0.12.6 - 2026-07-13
+
+### Fixed
+
+- **Public token resolution**: `resolveMapboxPublicToken` now also resolves a public token for `tk.*` (OAuth-issued temporary) bearers, not just `sk.*` bearers. Previously, granting the `tokens:read` scope to an OAuth client had no effect because the Tokens API lookup was skipped for `tk.*` tokens, causing GL JS preview tools (e.g. Directions) to fail with "No Mapbox public token available" even when `tokens:read` was granted.
+- **Public token cache is now per-user**: the resolved public token cache was previously a single global slot shared by every request. It's now keyed by the token's account, so concurrent requests from different accounts can no longer receive each other's cached public token.
+
+## 0.12.5 - 2026-06-15
+
+### Changed
+
+- **Docker**: Remove `libgnutls30` from the runtime image via `dpkg --remove --force-depends`. The package is only depended on by `apt`, which is not needed at runtime. `libgnutls30` is not called by Node.js (which uses OpenSSL for TLS) and was present solely as a transitive system dependency of the Debian slim base.
+
 ## 0.12.3 - 2026-06-11
 
 ### Changed

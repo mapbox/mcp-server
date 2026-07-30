@@ -17,11 +17,14 @@ const OPTIONS = [
   '--help, -h           Show this help message',
   '--version, -v        Show the server version',
   '--enable-tools       Enable only the comma-separated tools',
-  '--disable-tools      Disable the comma-separated tools',
-  '--disable-mcp-ui     Disable MCP-UI resources'
+  '--disable-tools      Disable the comma-separated tools'
 ];
 
 const OPTIONS_WITH_VALUES = new Set(['--enable-tools', '--disable-tools']);
+// --disable-mcp-ui is no longer a real option (MCP-UI support was removed
+// entirely — see docs/mcp-ui.md) but stays recognized-and-ignored here, not
+// in OPTIONS, so an existing launch config that still passes it keeps
+// starting instead of hard-failing on "Unknown option".
 const KNOWN_FLAGS = new Set([
   '--help',
   '-h',

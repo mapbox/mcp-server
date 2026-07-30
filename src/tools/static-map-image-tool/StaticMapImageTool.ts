@@ -16,6 +16,22 @@ import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 // result limit. base64 adds ~33% overhead, so 700KB raw ≈ 933KB encoded.
 const IMAGE_INLINE_THRESHOLD = 700 * 1024; // 700KB
 
+// encodeURIComponent leaves (, ), !, ', and * unescaped (they're valid in a
+// URI component per RFC 3986's "unreserved" carve-out from the older
+// escape() behaviour). Every overlay value below is embedded inside a
+// path segment delimited by literal parentheses (e.g. `url-<value>(lon,lat)`,
+// `geojson(<value>)`), so a raw `)` in the value can terminate that segment
+// early from the Static Images API's own overlay-syntax parser's point of
+// view, even though this value already passed URL/JSON validation on our
+// side. Escape those characters explicitly so both parsers agree on where
+// the value actually ends.
+function encodeOverlayComponent(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[()!'*]/g,
+    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
 > {
@@ -55,7 +71,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       }
 
       case 'custom-marker': {
-        const encodedUrl = encodeURIComponent(overlay.url);
+        const encodedUrl = encodeOverlayComponent(overlay.url);
         return `url-${encodedUrl}(${overlay.longitude},${overlay.latitude})`;
       }
 
@@ -77,12 +93,12 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
         }
 
         // URL encode the polyline to handle special characters
-        return `${path}(${encodeURIComponent(overlay.encodedPolyline)})`;
+        return `${path}(${encodeOverlayComponent(overlay.encodedPolyline)})`;
       }
 
       case 'geojson': {
         const geojsonString = JSON.stringify(overlay.data);
-        return `geojson(${encodeURIComponent(geojsonString)})`;
+        return `geojson(${encodeOverlayComponent(geojsonString)})`;
       }
     }
   }
@@ -124,7 +140,6 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
-    // content[0] MUST be the URL text — MCP Apps UI finds it via content.find(c => c.type === 'text')
     // Use public URL (without credentials) to avoid leaking the access token
     const content: CallToolResult['content'] = [
       { type: 'text', text: publicUrl }

@@ -11,6 +11,9 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
+import { buildCategorySearchRequestUrl } from './buildCategorySearchRequestUrl.js';
+import { renderHint } from '../../utils/storeMapPayload.js';
+import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -28,7 +31,6 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     idempotentHint: true,
     openWorldHint: true
   };
-
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: CategorySearchInputSchema,
@@ -102,56 +104,13 @@ export class CategorySearchTool extends MapboxApiBasedTool<
     input: z.infer<typeof CategorySearchInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    // Build URL with required parameters
-    const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/searchbox/v1/category/${encodeURIComponent(input.category)}`
-    );
+    const url = buildCategorySearchRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    });
 
-    // Add access token
-    url.searchParams.append('access_token', accessToken);
-
-    // Add optional parameters
-    if (input.language) {
-      url.searchParams.append('language', input.language);
-    }
-
-    if (input.limit !== undefined) {
-      url.searchParams.append('limit', input.limit.toString());
-    }
-
-    // Add proximity if provided (API defaults to IP-based location when omitted)
-    if (input.proximity) {
-      url.searchParams.append(
-        'proximity',
-        `${input.proximity.longitude},${input.proximity.latitude}`
-      );
-    }
-
-    if (input.bbox) {
-      const { minLongitude, minLatitude, maxLongitude, maxLatitude } =
-        input.bbox;
-      url.searchParams.append(
-        'bbox',
-        `${minLongitude},${minLatitude},${maxLongitude},${maxLatitude}`
-      );
-    }
-
-    if (input.country && input.country.length > 0) {
-      url.searchParams.append('country', input.country.join(','));
-    }
-
-    if (
-      input.poi_category_exclusions &&
-      input.poi_category_exclusions.length > 0
-    ) {
-      url.searchParams.append(
-        'poi_category_exclusions',
-        input.poi_category_exclusions.join(',')
-      );
-    }
-
-    // Make the request
-    const response = await this.httpRequest(url.toString());
+    const response = await this.httpRequest(url);
 
     if (!response.ok) {
       const errorMessage = await this.getErrorMessage(response);
@@ -181,18 +140,47 @@ export class CategorySearchTool extends MapboxApiBasedTool<
       data = rawData as MapboxFeatureCollection;
     }
 
-    if (input.format === 'json_string') {
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
-    } else {
-      return {
-        content: [{ type: 'text', text: this.formatGeoJsonToText(data) }],
-        structuredContent: data as unknown as Record<string, unknown>,
-        isError: false
-      };
+    const baseText =
+      input.format === 'json_string'
+        ? JSON.stringify(data, null, 2)
+        : this.formatGeoJsonToText(data);
+
+    // The map preview fetches its own results directly from the Search Box
+    // API (client-side, using the iframe's public token) rather than
+    // depend on server-computed geometry stashed behind a ref — see
+    // selfFetchRef.ts. Only attach a ref when there's something to show
+    // (a point result, or at least a proximity center to draw).
+    const hasPoints = Array.isArray(data.features)
+      ? data.features.some((f) => f.geometry?.type === 'Point')
+      : false;
+
+    const sc: Record<string, unknown> = {
+      ...(data as unknown as Record<string, unknown>)
+    };
+    let textOut = baseText;
+    if (hasPoints || input.proximity) {
+      const ref = buildSelfFetchRef('category_search', {
+        category: input.category,
+        language: input.language,
+        limit: input.limit,
+        proximity: input.proximity,
+        bbox: input.bbox,
+        country: input.country,
+        poi_category_exclusions: input.poi_category_exclusions
+      });
+      sc.mapboxRender = { ref };
+      // Don't append the human-readable hint when the user requested JSON
+      // output — it would break round-trip parsing. Callers that pass
+      // json_string usually already know about render_map_tool.
+      if (input.format !== 'json_string') {
+        textOut += renderHint(ref);
+      }
     }
+
+    return {
+      content: [{ type: 'text', text: textOut }],
+      structuredContent: sc,
+      isError: false
+    };
   }
 }

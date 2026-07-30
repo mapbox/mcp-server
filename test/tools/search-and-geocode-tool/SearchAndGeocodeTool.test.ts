@@ -9,6 +9,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { SearchAndGeocodeTool } from '../../../src/tools/search-and-geocode-tool/SearchAndGeocodeTool.js';
+import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('SearchAndGeocodeTool', () => {
   afterEach(() => {
@@ -516,6 +517,48 @@ describe('SearchAndGeocodeTool', () => {
       expect(features[0].properties.name).toBe('Springfield #2');
     });
 
+    it('carries the selected mapbox_id in the self-fetch ref so the map preview shows just that result', async () => {
+      const mockResponse = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Springfield #1', mapbox_id: 'id-1' },
+            geometry: { type: 'Point', coordinates: [-73, 42] }
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Springfield #2', mapbox_id: 'id-2' },
+            geometry: { type: 'Point', coordinates: [-74, 43] }
+          }
+        ]
+      };
+      const { httpRequest } = setupHttpRequest({
+        json: async () => mockResponse
+      });
+
+      const tool = new SearchAndGeocodeTool({ httpRequest });
+      const mockServer = createMockServer({
+        action: 'accept',
+        content: { selectedIndex: '1' }
+      });
+      tool.installTo(mockServer);
+
+      const result = await tool.run({ q: 'Springfield' });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as {
+        mapboxRender?: { ref?: string };
+      };
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+      expect(payload?.selfFetch?.[0]).toMatchObject({
+        tool: 'search',
+        params: expect.objectContaining({ selectedMapboxId: 'id-2' })
+      });
+    });
+
     it('returns all results when user declines elicitation', async () => {
       const mockResponse = createMultipleResultsResponse(4);
       const { httpRequest } = setupHttpRequest({
@@ -614,6 +657,76 @@ describe('SearchAndGeocodeTool', () => {
       ).toEqual([
         'Springfield - Springfield, Illinois, United States',
         'Springfield - 123 Main St, Springfield, MA 01103'
+      ]);
+    });
+  });
+
+  describe('map render payload', () => {
+    it("attaches a self-fetch mapboxRender ref that carries the call's own params (not server-computed geometry)", async () => {
+      const fakeResp = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {
+              name: 'Blue Bottle',
+              full_address: '66 Mint St',
+              feature_type: 'poi',
+              context: {}
+            },
+            geometry: { type: 'Point', coordinates: [-122.39, 37.78] }
+          },
+          {
+            type: 'Feature',
+            properties: {
+              name: 'Sightglass',
+              full_address: '270 7th St',
+              feature_type: 'poi',
+              context: {}
+            },
+            geometry: { type: 'Point', coordinates: [-122.41, 37.77] }
+          }
+        ]
+      };
+      const { httpRequest } = setupHttpRequest({
+        ok: true,
+        json: async () => fakeResp
+      });
+      const token = tokenFor('account-test-search-and-geocode');
+      const result = await new SearchAndGeocodeTool({ httpRequest }).run(
+        {
+          q: 'coffee',
+          proximity: { longitude: -122.4194, latitude: 37.7749 }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { authInfo: { token } } as any
+      );
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as {
+        mapboxRender?: { ref?: string };
+      };
+      expect(sc.mapboxRender?.ref).toMatch(
+        /^mapbox:\/\/selffetch\/search\?data=/
+      );
+
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('render_map_tool');
+      expect(text).toContain(sc.mapboxRender!.ref!);
+
+      // The ref is self-describing (no server-side store, no owner needed)
+      // — resolving it doesn't depend on this test's `token`/account at all.
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+      expect(payload?.selfFetch).toEqual([
+        {
+          tool: 'search',
+          params: expect.objectContaining({
+            q: 'coffee',
+            proximity: { longitude: -122.4194, latitude: 37.7749 }
+          })
+        }
       ]);
     });
   });

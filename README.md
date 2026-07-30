@@ -15,6 +15,7 @@ The Mapbox MCP Server transforms any AI agent or application into a geospatially
 - **Route optimization** to find the optimal visiting order for multiple stops (traveling salesman problem)
 - **Map matching** to snap GPS traces to the road network for clean route visualization
 - **Isochrone generation** to visualize areas reachable within specific time or distance constraints
+- **Live, interactive map rendering** (`render_map_tool`) to display routes, search results, and your own custom GeoJSON on a real Mapbox GL JS map directly inside the chat
 - **Static map images** to create visual representations of locations, routes, and geographic data
 - **Offline geospatial calculations** for distance, area, bearing, buffers, and spatial analysis without requiring API calls
 
@@ -52,6 +53,8 @@ For detailed setup instructions for different integrations, refer to the followi
 - [Cursor AI IDE Setup](./docs/cursor-setup.md) - Setting up a development environment in Cursor AI IDE
 - [Smolagents Integration](./docs/using-mcp-with-smolagents/README.md) - Example showing how to connect Smolagents AI agents to Mapbox's tools
 - **[Importing Tools Directly](./docs/importing-tools.md)** - Use Mapbox tools in your own applications without running the MCP server
+- **[`render_map_tool` Guide](./docs/render-map-tool.md)** - The map visualization primitive: full payload schema and how to render your own data standalone, without any other Mapbox tool
+- **[Elicitations](./docs/elicitations.md)** - How `search_and_geocode_tool` and `directions_tool` ask the user to disambiguate results or pick a route, and how they fall back gracefully when the client doesn't support it
 
 ## Example Prompts
 
@@ -87,9 +90,11 @@ A detailed walkthrough of the design and the trade-offs against web search is in
 
 ### Visualization & Maps
 
+- "Using the Mapbox map render tool, show me directions from the Golden Gate Bridge to Union Square in San Francisco" — renders a live, interactive route on a real Mapbox map
 - "Create a map image showing the route from Golden Gate Bridge to Fisherman's Wharf with markers at both locations"
 - "Show me a satellite view of Manhattan with key landmarks marked"
 - "Generate a map highlighting all Starbucks locations within a mile of downtown Seattle"
+- "Show a fill polygon over these coordinates: [...], with a marker labeled 'Warehouse' at [...]" — renders your own GeoJSON directly via `render_map_tool`, no other Mapbox tool needed
 
 ### Analysis & Planning
 
@@ -148,24 +153,18 @@ Access the complete list of available category IDs for use with the category sea
 - **Clients with native MCP resource support**: Use the `resources/read` MCP protocol method
 - **Clients without resource support**: Use the `resource_reader_tool` with the resource URI
 
-## Rich Map Previews (MCP Apps)
+## Rich Map Previews (`render_map_tool`)
 
-The `static_map_image_tool` provides an interactive map preview panel in compatible clients, in addition to the base64 image that all clients receive.
-
-This server implements the **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`), which renders a self-contained HTML app panel directly inside the chat. Supported clients show an interactive map with a Fullscreen toggle:
+Every geospatial tool in this server (directions, isochrone, search, and more) can display its result as a live, interactive Mapbox GL JS map via **`render_map_tool`** — the server's single visualization primitive. It renders through the **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`) as a self-contained HTML panel directly inside the chat, with a Fullscreen toggle, in supported clients:
 
 - **Claude Desktop** ✅
 - **VS Code with GitHub Copilot** ✅
 - **Claude Code** ✅
 - **[Goose](https://github.com/block/goose)** ✅
 
-All clients receive the base64-encoded map image regardless of protocol support — interactive previews are a progressive enhancement on top of the standard image response.
+**You don't need any of this server's other tools to use it.** `render_map_tool` also accepts hand-composed GeoJSON directly — your own polygons, markers, and routes — with no dependency on `directions_tool`, `isochrone_tool`, or any other Mapbox API call. See **[the full `render_map_tool` guide](./docs/render-map-tool.md)** for the payload schema and a complete standalone example.
 
-### Legacy: MCP-UI
-
-This server also retains support for **MCP-UI** (`@mcp-ui/server`), an earlier open specification for embedded iframe previews. MCP Apps is the recommended protocol; MCP-UI support is kept for backwards compatibility.
-
-MCP-UI is enabled by default. To disable it, pass `--disable-mcp-ui` as a command-line flag or set `ENABLE_MCP_UI=false`. See the [MCP-UI documentation](./docs/mcp-ui.md) for details.
+If you need a guaranteed static image in clients without MCP Apps support, use `static_map_image_tool` instead — it returns a base64-encoded PNG/JPEG that every client can display.
 
 #### CLIENT_NEEDS_RESOURCE_FALLBACK
 
@@ -225,17 +224,30 @@ Calculate the distance between two geographic coordinates using the Haversine fo
 
 **Example Usage**: "What's the distance between San Francisco (37.7749°N, 122.4194°W) and New York (40.7128°N, 74.0060°W)?"
 
-#### Point in Polygon Tool
+#### Points Within Polygon Tool
 
-Test whether a point is inside a polygon or multipolygon.
+Test one or more points against a polygon or multipolygon, returning only those inside. Handles a single point or a batch in one call.
 
 **Features**:
 
 - Works with complex polygons including holes
 - Supports multipolygons
-- Useful for geofencing and service area checks
+- Batch-tests any number of points in one call
+- Useful for geofencing, delivery zone validation, and customer segmentation
 
-**Example Usage**: "Is this delivery address inside our service area?"
+**Example Usage**: "Which of these delivery addresses are inside our service area?"
+
+#### Destination Tool
+
+Calculate a destination point given a starting point, bearing, and distance using geodesic (great-circle) offset.
+
+**Features**:
+
+- Straight-line offset, not a routed path
+- Useful for "find a point 5km north of X" or constructing search offsets
+- No API calls required
+
+**Example Usage**: "What's the point 10km northeast of the Space Needle?"
 
 #### Bearing Tool
 
@@ -322,6 +334,61 @@ Reduce the number of vertices in a line or polygon using the Douglas-Peucker alg
 
 **Example Usage**: "Simplify this complex boundary to reduce the number of points"
 
+#### Length Tool
+
+Measure the total length of a line defined by a series of coordinates.
+
+**Features**:
+
+- Supports kilometers, miles, meters, and feet
+- Useful for measuring a drawn route, path, or boundary without a routing API call
+
+**Example Usage**: "How long is this hiking trail?"
+
+#### Convex Tool
+
+Compute the convex hull of a set of points — the smallest convex polygon containing all of them.
+
+**Features**:
+
+- Useful for bounding-area analysis or estimating coverage area
+- Works offline without API calls
+
+**Example Usage**: "What's the smallest polygon that contains all of these store locations?"
+
+#### Nearest Point Tool
+
+Find the nearest point in a collection to a given target point.
+
+**Features**:
+
+- More efficient than calling `distance_tool` for each candidate and sorting
+- Useful for finding the closest store, stop, or landmark to a location
+
+**Example Usage**: "Which of these stores is closest to my current location?"
+
+#### Nearest Point on Line Tool
+
+Snap a point to the nearest position on a line or route, returning that point and the distance to it.
+
+**Features**:
+
+- Useful for "which point on this route is closest to my location?" or map-matching without an API call
+
+**Example Usage**: "Where on this hiking trail am I closest to right now?"
+
+#### Union, Intersect, and Difference Tools
+
+Combine or compare two or more polygons — `union_tool` merges them into one geometry, `intersect_tool` finds the area they share, and `difference_tool` subtracts one from another.
+
+**Features**:
+
+- Useful for combining service areas, finding coverage overlap, or computing exclusion zones (e.g. "what's covered by zone A but not zone B?")
+- Works entirely offline — no API calls required
+- Each returns a `render_map_tool` reference so the result can be visualized directly
+
+**Example Usage**: "Combine these two delivery zones into one coverage area" / "Where do these two isochrones overlap?" / "What part of this service area isn't covered by our 15-minute isochrone?"
+
 ### Mapbox API Tools
 
 #### Category List Tool (Deprecated)
@@ -369,6 +436,25 @@ Performs reverse geocoding using the [Mapbox geocoding V6 API](https://docs.mapb
 - Results filtering by type (address, poi, neighborhood, etc.)
 - Support for multiple languages
 - Rich location context information
+
+#### Ground location tool
+
+Answers "what's near this coordinate" questions in a single call — place name, nearby points of interest, and travel-time reachability — sourced from live Mapbox data with citations. Use this instead of chaining `reverse_geocode_tool` with a web search.
+
+**Features**:
+
+- Classifies the query (routing, neighborhood context, POI search, or region/reachability) and fetches only the relevant data
+- Nearby POI search by category, when requested
+- Travel-time reachability summary (isochrone-based)
+- Returns a `render_map_tool` reference with the grounded location and nearby POIs plotted
+
+**Example Usage**: "What neighborhood is this coordinate in, and are there any coffee shops nearby?"
+
+#### Place details tool
+
+Retrieves detailed information about a specific place using its Mapbox ID — photos, opening hours, ratings, phone numbers, and website URLs. Use after `search_and_geocode_tool`, `category_search_tool`, or `reverse_geocode_tool` to get more detail on a specific result.
+
+**Example Usage**: "Tell me more about that first coffee shop result — hours, phone number, and website"
 
 #### Directions tool
 

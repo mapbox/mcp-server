@@ -1,61 +1,38 @@
 # Elicitations
 
-Some tools in this server use the MCP [elicitations](https://modelcontextprotocol.io/docs/concepts/elicitation) feature to ask the user for input during tool execution. This enables a more interactive experience — for example, letting the user choose between multiple routes or disambiguate between search results — rather than having the AI model make that choice unilaterally.
+Some tools in this server use the MCP [elicitations](https://modelcontextprotocol.io/docs/concepts/elicitation) feature to ask the user for input during tool execution — for example, letting the user pick between multiple search results or route options, rather than having the model choose unilaterally.
 
-## Client Support
+## How it works
 
-Elicitations require the MCP client to support the feature. The server detects this automatically at connection time by checking `clientCapabilities.elicitation`.
+Each tool that uses elicitations calls `server.elicitInput(...)` directly and wraps the call in a `try`/`catch`. There is no capability pre-check or connection-time gating — every tool that can use elicitation is registered unconditionally, and the `catch` block is what makes an individual call fall back gracefully when the connected client doesn't support elicitation or the call otherwise fails. Support is therefore determined entirely by how the specific client you're using implements the MCP elicitation spec; check your client's own documentation for its current support status rather than relying on any list here, since that can change independently of this server.
 
-**Clients with known elicitation support:**
+If the user **declines** an elicitation prompt (as opposed to the client not supporting elicitation at all), the tool also falls back gracefully — see [Fallback Behavior](#fallback-behavior).
 
-- Claude Desktop
-- Claude Code
-
-**Clients without elicitation support** receive the standard tool responses with no interactive prompts (see [Fallback Behavior](#fallback-behavior) below).
-
-## Tools That Use Elicitations
-
-### `directions_tool`
-
-The directions tool uses a two-stage elicitation pattern.
-
-**Stage 1 — Routing preferences (before the API call)**
-
-When the request is a simple A→B route with no exclusions already specified, the tool asks the user to choose routing preferences before making the API call:
-
-- Fastest route (tolls permitted)
-- Avoid tolls
-- Avoid highways
-- Avoid ferries
-
-This ensures the API call is made with the right parameters from the start, rather than requiring a second call if the user's preferences aren't met.
-
-> Stage 1 only triggers for two-waypoint routes with no `exclude` parameter already set.
-
-**Stage 2 — Route selection (after the API call)**
-
-When the API returns two or more route alternatives, the tool presents each option with its duration, distance, primary roads, traffic conditions, and any incidents, and asks the user to pick one. Only the selected route is returned.
-
-> Stage 2 only triggers when two or more routes are returned.
-
-**Fallback behavior:** If elicitations are unavailable or the user declines, Stage 1 uses the default routing parameters and Stage 2 returns all available routes for the AI model to evaluate.
-
----
+## Tools that use elicitations
 
 ### `search_and_geocode_tool`
 
 When a search returns between 2 and 10 results, the tool asks the user to select the correct location before returning it. Each option is labeled with the place name and formatted address.
 
-**Fallback behavior:** If elicitations are unavailable or the user declines, all results are returned for the AI model to evaluate.
+If the user selects one, the tool also threads that choice into `render_map_tool`'s self-fetch ref (`selectedMapboxId`) so the map preview shows just that result — see [render-map-tool.md](./render-map-tool.md).
 
-## Fallback Behavior
+### `directions_tool`
 
-When a client does not support elicitations, or when the user declines an elicitation prompt, the tools fall back gracefully:
+When the Directions API returns two or more route alternatives, the tool asks the user to pick one before returning a result. Each option is labeled with duration, distance, primary roads, a rough traffic-conditions indicator, and any incident count.
 
-| Tool                      | Without elicitations            |
-| ------------------------- | ------------------------------- |
-| `directions_tool` Stage 1 | Uses default routing parameters |
-| `directions_tool` Stage 2 | Returns all route alternatives  |
-| `search_and_geocode_tool` | Returns all matching results    |
+If the user selects one, the tool returns only that route, and threads the selected route's position in the original alternatives array (`selectedRouteIndex`) into the self-fetch ref, so the map preview draws the same route rather than whichever the API happens to return first on the client's independent re-fetch.
 
-Elicitation failures (e.g., network or protocol errors) are caught and logged at `warning` level — the tool always completes with a usable result.
+> Route identity isn't stable across separate API calls the way a search result's `mapbox_id` is — there's no unique ID to key off. `selectedRouteIndex` is a best-effort position-based match: if the map preview's own re-fetch (which can return different alternatives, e.g. under `driving-traffic` as live conditions shift) doesn't have that many routes anymore, it falls back to the first one rather than erroring.
+
+## Fallback behavior
+
+| Tool                      | Client doesn't support elicitation, or the call errors | User declines the prompt       |
+| ------------------------- | ------------------------------------------------------ | ------------------------------ |
+| `search_and_geocode_tool` | Returns all matching results                           | Returns all matching results   |
+| `directions_tool`         | Returns all route alternatives                         | Returns all route alternatives |
+
+Either way, the tool always completes with a usable, non-error result — elicitation is a UX enhancement layered on top of the normal response, not a requirement for the tool to function. Elicitation failures are logged at `warning` level (or silently swallowed where a client's own UI treats any logged notification during a tool call as a visible failure) rather than surfaced as tool errors.
+
+---
+
+For questions or issues, please [open an issue](https://github.com/mapbox/mcp-server/issues) on GitHub.

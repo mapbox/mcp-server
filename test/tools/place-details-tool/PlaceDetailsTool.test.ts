@@ -123,7 +123,9 @@ describe('PlaceDetailsTool', () => {
       'search/details/v1/retrieve/dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB'
     );
     expect(calledUrl).toContain('access_token=');
-    expect(calledUrl).not.toContain('attribute_sets');
+    // "basic" is always requested, even when the caller doesn't specify
+    // attribute_sets at all — see "always includes basic..." tests below.
+    expect(calledUrl).toContain('attribute_sets=basic');
     expect(calledUrl).not.toContain('language');
     expect(calledUrl).not.toContain('worldview');
   });
@@ -144,6 +146,35 @@ describe('PlaceDetailsTool', () => {
     expect(calledUrl).toContain('attribute_sets=basic%2Cvisit%2Cvenue');
     expect(calledUrl).toContain('language=fr');
     expect(calledUrl).toContain('worldview=us');
+  });
+
+  it('always includes "basic" in the API request even when attribute_sets omits it', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      json: async () => sampleResponse
+    });
+
+    await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
+      attribute_sets: ['visit']
+    });
+
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
+    expect(calledUrl).toContain('attribute_sets=basic%2Cvisit');
+  });
+
+  it('does not duplicate "basic" when the caller already includes it', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      json: async () => sampleResponse
+    });
+
+    await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
+      attribute_sets: ['visit', 'basic']
+    });
+
+    const calledUrl = mockHttpRequest.mock.calls[0][0];
+    expect(calledUrl).toContain('attribute_sets=basic%2Cvisit');
+    expect(calledUrl).not.toContain('basic%2Cvisit%2Cbasic');
   });
 
   it('URL-encodes the mapbox_id in the path', async () => {

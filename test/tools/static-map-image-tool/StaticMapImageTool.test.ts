@@ -6,6 +6,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
+import { CustomMarkerOverlaySchema } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.input.schema.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 
@@ -31,112 +32,76 @@ describe('StaticMapImageTool', () => {
   });
 
   it('returns URL as text content', async () => {
-    // Disable MCP-UI for this test to focus on URL only
-    const originalEnv = process.env.ENABLE_MCP_UI;
-    process.env.ENABLE_MCP_UI = 'false';
+    const { httpRequest } = setupHttpRequest();
 
-    try {
-      const { httpRequest } = setupHttpRequest();
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 10,
+      size: { width: 800, height: 600 },
+      style: 'mapbox/satellite-v9'
+    });
 
-      const result = await new StaticMapImageTool({ httpRequest }).run({
-        center: { longitude: -74.006, latitude: 40.7128 },
-        zoom: 10,
-        size: { width: 800, height: 600 },
-        style: 'mapbox/satellite-v9'
-      });
-
-      expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(2); // URL text + image
-      expect(result.content[0].type).toBe('text');
-      const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain(
-        'api.mapbox.com/styles/v1/mapbox/satellite-v9/static/'
-      );
-      expect(textContent.text).toContain('-74.006,40.7128,10');
-      expect(textContent.text).toContain('800x600');
-      expect(textContent.text).not.toContain('access_token=');
-    } finally {
-      // Restore environment variable
-      if (originalEnv !== undefined) {
-        process.env.ENABLE_MCP_UI = originalEnv;
-      } else {
-        delete process.env.ENABLE_MCP_UI;
-      }
-    }
+    expect(result.isError).toBe(false);
+    expect(result.content).toHaveLength(2); // URL text + image
+    expect(result.content[0].type).toBe('text');
+    const textContent = result.content[0] as { type: 'text'; text: string };
+    expect(textContent.text).toContain(
+      'api.mapbox.com/styles/v1/mapbox/satellite-v9/static/'
+    );
+    expect(textContent.text).toContain('-74.006,40.7128,10');
+    expect(textContent.text).toContain('800x600');
+    expect(textContent.text).not.toContain('access_token=');
   });
 
   it('returns URL containing map details', async () => {
-    // Disable MCP-UI for this test to focus on URL only
-    const originalEnv = process.env.ENABLE_MCP_UI;
-    process.env.ENABLE_MCP_UI = 'false';
+    const { httpRequest } = setupHttpRequest();
 
-    try {
-      const { httpRequest } = setupHttpRequest();
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 600, height: 400 },
+      style: 'mapbox/streets-v12'
+    });
 
-      const result = await new StaticMapImageTool({ httpRequest }).run({
-        center: { longitude: -74.006, latitude: 40.7128 },
-        zoom: 12,
-        size: { width: 600, height: 400 },
-        style: 'mapbox/streets-v12'
-      });
+    expect(result.isError).toBe(false);
+    expect(result.content[0].type).toBe('text');
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].type).toBe('text');
-
-      const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain('mapbox/streets-v12/static/');
-      expect(textContent.text).toContain('-74.006,40.7128,12');
-      expect(textContent.text).toContain('600x400');
-    } finally {
-      if (originalEnv !== undefined) {
-        process.env.ENABLE_MCP_UI = originalEnv;
-      } else {
-        delete process.env.ENABLE_MCP_UI;
-      }
-    }
+    const textContent = result.content[0] as { type: 'text'; text: string };
+    expect(textContent.text).toContain('mapbox/streets-v12/static/');
+    expect(textContent.text).toContain('-74.006,40.7128,12');
+    expect(textContent.text).toContain('600x400');
   });
 
   it('URL includes overlay markers when overlays present', async () => {
-    const originalEnv = process.env.ENABLE_MCP_UI;
-    process.env.ENABLE_MCP_UI = 'false';
+    const { httpRequest } = setupHttpRequest();
 
-    try {
-      const { httpRequest } = setupHttpRequest();
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 600, height: 400 },
+      style: 'mapbox/streets-v12',
+      overlays: [
+        {
+          type: 'marker',
+          longitude: -74.006,
+          latitude: 40.7128,
+          size: 'large',
+          color: 'ff0000'
+        },
+        {
+          type: 'marker',
+          longitude: -74.01,
+          latitude: 40.71,
+          size: 'small',
+          color: '00ff00'
+        }
+      ]
+    });
 
-      const result = await new StaticMapImageTool({ httpRequest }).run({
-        center: { longitude: -74.006, latitude: 40.7128 },
-        zoom: 12,
-        size: { width: 600, height: 400 },
-        style: 'mapbox/streets-v12',
-        overlays: [
-          {
-            type: 'marker',
-            longitude: -74.006,
-            latitude: 40.7128,
-            size: 'large',
-            color: 'ff0000'
-          },
-          {
-            type: 'marker',
-            longitude: -74.01,
-            latitude: 40.71,
-            size: 'small',
-            color: '00ff00'
-          }
-        ]
-      });
-
-      expect(result.isError).toBe(false);
-      const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain('pin-l+ff0000(-74.006,40.7128)');
-      expect(textContent.text).toContain('pin-s+00ff00(-74.01,40.71)');
-    } finally {
-      if (originalEnv !== undefined) {
-        process.env.ENABLE_MCP_UI = originalEnv;
-      } else {
-        delete process.env.ENABLE_MCP_UI;
-      }
-    }
+    expect(result.isError).toBe(false);
+    const textContent = result.content[0] as { type: 'text'; text: string };
+    expect(textContent.text).toContain('pin-l+ff0000(-74.006,40.7128)');
+    expect(textContent.text).toContain('pin-s+00ff00(-74.01,40.71)');
   });
 
   it('constructs correct Mapbox Static API URL', async () => {
@@ -224,6 +189,32 @@ describe('StaticMapImageTool', () => {
           ]
         })
       ).resolves.toMatchObject({ isError: true });
+    }
+  });
+
+  it('reports the SSRF validation message and canonical output from the custom-marker URL schema', () => {
+    const rejected = CustomMarkerOverlaySchema.safeParse({
+      type: 'custom-marker',
+      longitude: -74,
+      latitude: 40,
+      url: 'https://169.254.169.254/latest/meta-data/'
+    });
+    expect(rejected.success).toBe(false);
+    expect(JSON.stringify(rejected.error?.issues)).toContain(
+      'URL must be an https:// URL pointing to a public host'
+    );
+
+    const accepted = CustomMarkerOverlaySchema.safeParse({
+      type: 'custom-marker',
+      longitude: -74,
+      latitude: 40,
+      url: 'https://example.com\\@169.254.169.254/marker.png'
+    });
+    expect(accepted.success).toBe(true);
+    if (accepted.success) {
+      expect(accepted.data.url).toBe(
+        'https://example.com/@169.254.169.254/marker.png'
+      );
     }
   });
 
@@ -397,6 +388,80 @@ describe('StaticMapImageTool', () => {
       expect(url).toContain(
         `url-${encodeURIComponent('https://example.com/marker.png')}(-74.006,40.7128)/`
       );
+    });
+
+    it('forwards the canonical re-serialization of a custom-marker URL, not the caller-supplied raw string', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      // A URL containing a backslash before an "@" is a classic
+      // parser-differential vector: the WHATWG URL parser (used by
+      // isSafeExternalUrl) normalises the backslash to a path separator
+      // for special schemes, so the validated host is example.com — but a
+      // more lenient downstream parser could read "8.8.8.8" as userinfo
+      // and connect to whatever follows the "@" instead. Forwarding the
+      // canonical serialization (rather than the caller's raw string)
+      // means any downstream parser sees the same unambiguous form that
+      // was actually validated, regardless of how it would have parsed
+      // the original raw string.
+      const rawUrl = 'https://example.com\\@169.254.169.254/marker.png';
+      const canonical = new URL(rawUrl).toString();
+      // The backslash is normalised to a path separator, so
+      // "169.254.169.254" ends up as harmless path text rather than the
+      // host — this is the property that actually matters, not the
+      // absence of the substring anywhere in the string.
+      expect(new URL(canonical).hostname).toBe('example.com');
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        overlays: [
+          {
+            type: 'custom-marker',
+            longitude: -74.006,
+            latitude: 40.7128,
+            url: rawUrl
+          }
+        ]
+      });
+
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).toContain(`url-${encodeURIComponent(canonical)}(`);
+      expect(url).not.toContain(encodeURIComponent(rawUrl));
+    });
+
+    it('escapes parentheses in a custom-marker URL so they cannot terminate the overlay segment early', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      // encodeURIComponent alone leaves ( ) ! ' * unescaped. A bare ")" in
+      // the URL path would otherwise sit right next to the overlay's own
+      // coordinate parentheses in the encoded overlay string
+      // (url-<value>(lon,lat)), which is exactly the ambiguity this PR is
+      // otherwise trying to eliminate, just one layer up in the Static
+      // Images API's own overlay syntax rather than in URL parsing.
+      const rawUrl = "https://example.com/a)(b'c!d*.png";
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        overlays: [
+          {
+            type: 'custom-marker',
+            longitude: -74.006,
+            latitude: 40.7128,
+            url: rawUrl
+          }
+        ]
+      });
+
+      const url = (result.content[0] as { type: 'text'; text: string }).text;
+      expect(url).not.toContain(')(b');
+      expect(url).toContain('%28');
+      expect(url).toContain('%29');
+      expect(url).toContain('%21');
+      expect(url).toContain('%27');
+      expect(url).toContain('%2A');
     });
 
     it('adds path overlay to URL', async () => {
@@ -719,6 +784,24 @@ describe('StaticMapImageTool', () => {
       expect(calledUrl).toContain('pin-s-restaurant+0000ff(-74.006,40.7128)');
       expect(calledUrl).toContain('pin-l-hospital+ff0000(-74.01,40.71)');
       expect(calledUrl).toContain('pin-s-bicycle+00ff00(-74.005,40.715)');
+    });
+  });
+
+  describe('content shape', () => {
+    it('returns exactly URL text + base64 image, nothing else', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 600, height: 400 },
+        style: 'mapbox/streets-v12'
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content).toHaveLength(2);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[1].type).toBe('image');
     });
   });
 
