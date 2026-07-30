@@ -4,6 +4,7 @@
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
+import { redactToken } from '../../utils/redactToken.js';
 import { SearchAndGeocodeInputSchema } from './SearchAndGeocodeTool.input.schema.js';
 import {
   SearchBoxResponseSchema,
@@ -112,6 +113,11 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
       accessToken,
       apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
     });
+
+    this.log(
+      'info',
+      `SearchAndGeocodeTool: Fetching from URL: ${redactToken(url)}`
+    );
 
     const response = await this.httpRequest(url);
 
