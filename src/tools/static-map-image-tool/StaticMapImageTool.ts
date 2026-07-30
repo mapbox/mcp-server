@@ -124,7 +124,6 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
-    // content[0] MUST be the URL text — MCP Apps UI finds it via content.find(c => c.type === 'text')
     // Use public URL (without credentials) to avoid leaking the access token
     const content: CallToolResult['content'] = [
       { type: 'text', text: publicUrl }

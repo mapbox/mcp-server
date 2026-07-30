@@ -31,112 +31,76 @@ describe('StaticMapImageTool', () => {
   });
 
   it('returns URL as text content', async () => {
-    // Disable MCP-UI for this test to focus on URL only
-    const originalEnv = process.env.ENABLE_MCP_UI;
-    process.env.ENABLE_MCP_UI = 'false';
+    const { httpRequest } = setupHttpRequest();
 
-    try {
-      const { httpRequest } = setupHttpRequest();
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 10,
+      size: { width: 800, height: 600 },
+      style: 'mapbox/satellite-v9'
+    });
 
-      const result = await new StaticMapImageTool({ httpRequest }).run({
-        center: { longitude: -74.006, latitude: 40.7128 },
-        zoom: 10,
-        size: { width: 800, height: 600 },
-        style: 'mapbox/satellite-v9'
-      });
-
-      expect(result.isError).toBe(false);
-      expect(result.content).toHaveLength(2); // URL text + image
-      expect(result.content[0].type).toBe('text');
-      const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain(
-        'api.mapbox.com/styles/v1/mapbox/satellite-v9/static/'
-      );
-      expect(textContent.text).toContain('-74.006,40.7128,10');
-      expect(textContent.text).toContain('800x600');
-      expect(textContent.text).not.toContain('access_token=');
-    } finally {
-      // Restore environment variable
-      if (originalEnv !== undefined) {
-        process.env.ENABLE_MCP_UI = originalEnv;
-      } else {
-        delete process.env.ENABLE_MCP_UI;
-      }
-    }
+    expect(result.isError).toBe(false);
+    expect(result.content).toHaveLength(2); // URL text + image
+    expect(result.content[0].type).toBe('text');
+    const textContent = result.content[0] as { type: 'text'; text: string };
+    expect(textContent.text).toContain(
+      'api.mapbox.com/styles/v1/mapbox/satellite-v9/static/'
+    );
+    expect(textContent.text).toContain('-74.006,40.7128,10');
+    expect(textContent.text).toContain('800x600');
+    expect(textContent.text).not.toContain('access_token=');
   });
 
   it('returns URL containing map details', async () => {
-    // Disable MCP-UI for this test to focus on URL only
-    const originalEnv = process.env.ENABLE_MCP_UI;
-    process.env.ENABLE_MCP_UI = 'false';
+    const { httpRequest } = setupHttpRequest();
 
-    try {
-      const { httpRequest } = setupHttpRequest();
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 600, height: 400 },
+      style: 'mapbox/streets-v12'
+    });
 
-      const result = await new StaticMapImageTool({ httpRequest }).run({
-        center: { longitude: -74.006, latitude: 40.7128 },
-        zoom: 12,
-        size: { width: 600, height: 400 },
-        style: 'mapbox/streets-v12'
-      });
+    expect(result.isError).toBe(false);
+    expect(result.content[0].type).toBe('text');
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].type).toBe('text');
-
-      const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain('mapbox/streets-v12/static/');
-      expect(textContent.text).toContain('-74.006,40.7128,12');
-      expect(textContent.text).toContain('600x400');
-    } finally {
-      if (originalEnv !== undefined) {
-        process.env.ENABLE_MCP_UI = originalEnv;
-      } else {
-        delete process.env.ENABLE_MCP_UI;
-      }
-    }
+    const textContent = result.content[0] as { type: 'text'; text: string };
+    expect(textContent.text).toContain('mapbox/streets-v12/static/');
+    expect(textContent.text).toContain('-74.006,40.7128,12');
+    expect(textContent.text).toContain('600x400');
   });
 
   it('URL includes overlay markers when overlays present', async () => {
-    const originalEnv = process.env.ENABLE_MCP_UI;
-    process.env.ENABLE_MCP_UI = 'false';
+    const { httpRequest } = setupHttpRequest();
 
-    try {
-      const { httpRequest } = setupHttpRequest();
+    const result = await new StaticMapImageTool({ httpRequest }).run({
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 600, height: 400 },
+      style: 'mapbox/streets-v12',
+      overlays: [
+        {
+          type: 'marker',
+          longitude: -74.006,
+          latitude: 40.7128,
+          size: 'large',
+          color: 'ff0000'
+        },
+        {
+          type: 'marker',
+          longitude: -74.01,
+          latitude: 40.71,
+          size: 'small',
+          color: '00ff00'
+        }
+      ]
+    });
 
-      const result = await new StaticMapImageTool({ httpRequest }).run({
-        center: { longitude: -74.006, latitude: 40.7128 },
-        zoom: 12,
-        size: { width: 600, height: 400 },
-        style: 'mapbox/streets-v12',
-        overlays: [
-          {
-            type: 'marker',
-            longitude: -74.006,
-            latitude: 40.7128,
-            size: 'large',
-            color: 'ff0000'
-          },
-          {
-            type: 'marker',
-            longitude: -74.01,
-            latitude: 40.71,
-            size: 'small',
-            color: '00ff00'
-          }
-        ]
-      });
-
-      expect(result.isError).toBe(false);
-      const textContent = result.content[0] as { type: 'text'; text: string };
-      expect(textContent.text).toContain('pin-l+ff0000(-74.006,40.7128)');
-      expect(textContent.text).toContain('pin-s+00ff00(-74.01,40.71)');
-    } finally {
-      if (originalEnv !== undefined) {
-        process.env.ENABLE_MCP_UI = originalEnv;
-      } else {
-        delete process.env.ENABLE_MCP_UI;
-      }
-    }
+    expect(result.isError).toBe(false);
+    const textContent = result.content[0] as { type: 'text'; text: string };
+    expect(textContent.text).toContain('pin-l+ff0000(-74.006,40.7128)');
+    expect(textContent.text).toContain('pin-s+00ff00(-74.01,40.71)');
   });
 
   it('constructs correct Mapbox Static API URL', async () => {
@@ -723,7 +687,7 @@ describe('StaticMapImageTool', () => {
   });
 
   describe('content shape', () => {
-    it('returns URL text + base64 image (no MCP-UI fallback)', async () => {
+    it('returns exactly URL text + base64 image, nothing else', async () => {
       const { httpRequest } = setupHttpRequest();
 
       const result = await new StaticMapImageTool({ httpRequest }).run({
