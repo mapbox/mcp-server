@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Documentation
+
+- **README and `render_map_tool` docs refreshed.** The README's "Rich Map Previews" section and `docs/mcp-ui.md` described MCP-UI support (`@mcp-ui/server`, `ENABLE_MCP_UI`, `StaticMapUIResource` wired to `static_map_image_tool`) that was fully removed when `render_map_tool` shipped — `@mcp-ui/server` is no longer a dependency and nothing in `src/` reads `ENABLE_MCP_UI` anymore. `docs/mcp-ui.md` now explains what changed and points to the new **[`docs/render-map-tool.md`](./docs/render-map-tool.md)**, a comprehensive guide covering the full payload schema and, in particular, how to call `render_map_tool` standalone with your own GeoJSON — no other Mapbox tool required. Also added the ~12 tools missing from the README's tool inventory (`render_map_tool`, `ground_location_tool`, `place_details_tool`, `destination_tool`, `union_tool`/`intersect_tool`/`difference_tool`, `convex_tool`, `nearest_point_tool`/`nearest_point_on_line_tool`, `length_tool`) and replaced the entry for the removed `point_in_polygon_tool` with its actual replacement, `points_within_polygon_tool`.
+
 ## 0.13.0 - 2026-07-30
 
 ### Security
