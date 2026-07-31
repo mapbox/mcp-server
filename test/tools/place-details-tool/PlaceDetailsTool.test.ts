@@ -11,85 +11,54 @@ import {
 } from '../../utils/httpPipelineUtils.js';
 import { PlaceDetailsTool } from '../../../src/tools/place-details-tool/PlaceDetailsTool.js';
 
+// Shaped after a live response from places/v1/details/retrieve.
 const sampleResponse = {
-  type: 'Feature',
-  geometry: {
-    type: 'Point',
-    coordinates: [-122.4194, 37.7749]
+  mapbox_id: 'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY',
+  name: 'Golden Gate Park',
+  full_address: 'Golden Gate Park, San Francisco, CA 94117, United States',
+  brand: null,
+  primary_category: 'park',
+  categories: ['park', 'recreation_area'],
+  permanently_closed: false,
+  status: 'active',
+  created_at: '2026-07-02T02:56:22.965',
+  updated_at: '2026-07-15T01:45:22.019',
+  score: { closed: 0, popularity: 0.85, reality: 0.9 },
+  coordinates: {
+    latitude: 37.7749,
+    longitude: -122.4194,
+    source: 'poi',
+    routable_points: [
+      { name: 'driving', latitude: 37.7748, longitude: -122.4193 }
+    ]
   },
-  properties: {
-    name: 'Golden Gate Park',
-    mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
-    feature_type: 'poi',
-    full_address: 'Golden Gate Park, San Francisco, CA 94117',
-    place_formatted: 'San Francisco, CA 94117',
-    poi_category: ['park', 'recreation area'],
-    poi_category_ids: ['park', 'recreation_area'],
-    context: {
-      place: { name: 'San Francisco' },
-      region: { name: 'California' },
-      country: { name: 'United States', country_code: 'US' }
-    },
-    coordinates: {
-      longitude: -122.4194,
-      latitude: 37.7749
-    },
-    maki: 'park'
-  }
+  address: {
+    city: 'San Francisco',
+    region: 'California',
+    country: 'United States',
+    country_code: 'US'
+  },
+  attributes: {}
 };
 
 const sampleResponseWithVenue = {
   ...sampleResponse,
-  properties: {
-    ...sampleResponse.properties,
-    metadata: {
-      phone: '+1-415-831-2700',
-      website: 'https://sfrecpark.org/parks/golden-gate-park/',
-      rating: 4.8,
-      review_count: 12500,
-      popularity: 0.92
-    }
-  }
+  phone: '+1-415-831-2700',
+  website: 'https://sfrecpark.org/parks/golden-gate-park/'
 };
 
-const sampleResponseWithWeekdayText = {
+const sampleResponseWithOpeningHours = {
   ...sampleResponse,
-  properties: {
-    ...sampleResponse.properties,
-    metadata: {
-      open_hours: {
-        weekday_text: [
-          'Monday: 9:00 AM – 9:00 PM',
-          'Tuesday: 9:00 AM – 9:00 PM',
-          'Wednesday: 9:00 AM – 9:00 PM',
-          'Thursday: 9:00 AM – 9:00 PM',
-          'Friday: 9:00 AM – 10:00 PM',
-          'Saturday: 10:00 AM – 10:00 PM',
-          'Sunday: Closed'
-        ]
-      }
-    }
-  }
+  opening_hours:
+    'Mo 09:00-21:00; Tu 09:00-21:00; We 09:00-21:00; Th 09:00-21:00; Fr 09:00-22:00; Sa 10:00-22:00'
 };
 
-const sampleResponseWithPeriods = {
+const sampleResponseWithPhotos = {
   ...sampleResponse,
-  properties: {
-    ...sampleResponse.properties,
-    metadata: {
-      open_hours: {
-        periods: [
-          { open: { day: 1, time: '0900' }, close: { day: 1, time: '2100' } },
-          { open: { day: 2, time: '0900' }, close: { day: 2, time: '2100' } },
-          { open: { day: 3, time: '0900' }, close: { day: 3, time: '2100' } },
-          { open: { day: 4, time: '0900' }, close: { day: 4, time: '2100' } },
-          { open: { day: 5, time: '0900' }, close: { day: 5, time: '2200' } },
-          { open: { day: 6, time: '1000' }, close: { day: 6, time: '2200' } }
-          // Sunday (0) absent — should appear as Closed
-        ]
-      }
-    }
-  }
+  photos: [
+    { url: 'https://example.com/photo1.jpg', width: 800, height: 600 },
+    { url: 'https://example.com/photo2.jpg', width: 400, height: 300 }
+  ]
 };
 
 describe('PlaceDetailsTool', () => {
@@ -103,78 +72,34 @@ describe('PlaceDetailsTool', () => {
     });
 
     await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB'
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
     });
 
     assertHeadersSent(mockHttpRequest);
   });
 
-  it('constructs correct URL with required parameters', async () => {
+  it('constructs the correct URL against the Places API', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => sampleResponse
     });
 
     await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB'
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
     });
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).toContain(
-      'search/details/v1/retrieve/dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB'
+      'places/v1/details/retrieve/dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
     );
     expect(calledUrl).toContain('access_token=');
-    // "basic" is always requested, even when the caller doesn't specify
-    // attribute_sets at all — see "always includes basic..." tests below.
-    expect(calledUrl).toContain('attribute_sets=basic');
+    // The Places API's Details endpoint has no attribute_sets, language, or
+    // worldview parameters (unlike the older Details API this tool used
+    // previously) — it always returns the same shape.
+    expect(calledUrl).not.toContain('attribute_sets');
     expect(calledUrl).not.toContain('language');
     expect(calledUrl).not.toContain('worldview');
-  });
-
-  it('includes optional parameters in URL when provided', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest({
-      json: async () => sampleResponse
-    });
-
-    await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
-      attribute_sets: ['basic', 'visit', 'venue'],
-      language: 'fr',
-      worldview: 'us'
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('attribute_sets=basic%2Cvisit%2Cvenue');
-    expect(calledUrl).toContain('language=fr');
-    expect(calledUrl).toContain('worldview=us');
-  });
-
-  it('always includes "basic" in the API request even when attribute_sets omits it', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest({
-      json: async () => sampleResponse
-    });
-
-    await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
-      attribute_sets: ['visit']
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('attribute_sets=basic%2Cvisit');
-  });
-
-  it('does not duplicate "basic" when the caller already includes it', async () => {
-    const { httpRequest, mockHttpRequest } = setupHttpRequest({
-      json: async () => sampleResponse
-    });
-
-    await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
-      attribute_sets: ['visit', 'basic']
-    });
-
-    const calledUrl = mockHttpRequest.mock.calls[0][0];
-    expect(calledUrl).toContain('attribute_sets=basic%2Cvisit');
-    expect(calledUrl).not.toContain('basic%2Cvisit%2Cbasic');
   });
 
   it('URL-encodes the mapbox_id in the path', async () => {
@@ -182,7 +107,7 @@ describe('PlaceDetailsTool', () => {
       json: async () => sampleResponse
     });
 
-    const mapboxId = 'dXJuOm1ieHBsYzpB/special+id';
+    const mapboxId = 'dXJuOm1ieHBvaTpB/special+id';
     await new PlaceDetailsTool({ httpRequest }).run({ mapbox_id: mapboxId });
 
     const calledUrl = mockHttpRequest.mock.calls[0][0];
@@ -195,28 +120,30 @@ describe('PlaceDetailsTool', () => {
     });
 
     const result = await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB'
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
     });
 
     expect(result.isError).toBe(false);
     const text = (result.content[0] as { type: 'text'; text: string }).text;
     expect(text).toContain('Name: Golden Gate Park');
     expect(text).toContain(
-      'Address: Golden Gate Park, San Francisco, CA 94117'
+      'Address: Golden Gate Park, San Francisco, CA 94117, United States'
     );
     expect(text).toContain('Coordinates: 37.7749, -122.4194');
-    expect(text).toContain('Type: poi');
-    expect(text).toContain('Category: park, recreation area');
+    expect(text).toContain('Type: park');
+    expect(text).toContain('Category: park, recreation_area');
+    expect(text).toContain('Popularity: 85%');
   });
 
-  it('includes venue metadata in formatted text when present', async () => {
+  it('includes phone and website in formatted text when present', async () => {
     const { httpRequest } = setupHttpRequest({
       json: async () => sampleResponseWithVenue
     });
 
     const result = await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
-      attribute_sets: ['basic', 'venue', 'visit']
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
     });
 
     expect(result.isError).toBe(false);
@@ -225,9 +152,55 @@ describe('PlaceDetailsTool', () => {
     expect(text).toContain(
       'Website: https://sfrecpark.org/parks/golden-gate-park/'
     );
-    expect(text).toContain('Rating: 4.8');
-    expect(text).toContain('Reviews: 12500');
-    expect(text).toContain('Popularity: 92%');
+  });
+
+  it('notes permanently closed places in formatted text', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => ({ ...sampleResponse, permanently_closed: true })
+    });
+
+    const result = await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
+    });
+
+    expect(result.isError).toBe(false);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Status: Permanently closed');
+  });
+
+  it('formats the opening_hours string into readable lines', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => sampleResponseWithOpeningHours
+    });
+
+    const result = await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
+    });
+
+    expect(result.isError).toBe(false);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Hours:');
+    expect(text).toContain('Mo 09:00-21:00');
+    expect(text).toContain('Sa 10:00-22:00');
+  });
+
+  it('lists photo URLs when present', async () => {
+    const { httpRequest } = setupHttpRequest({
+      json: async () => sampleResponseWithPhotos
+    });
+
+    const result = await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
+    });
+
+    expect(result.isError).toBe(false);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Photos:');
+    expect(text).toContain('https://example.com/photo1.jpg');
+    expect(text).toContain('https://example.com/photo2.jpg');
   });
 
   it('returns structured content', async () => {
@@ -236,13 +209,14 @@ describe('PlaceDetailsTool', () => {
     });
 
     const result = await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB'
+      mapbox_id:
+        'dXJuOm1ieHBvaTpmMzRhMDkxOC1kZTRjLTQyNDktODkwNi00ODMxNmUxODMzMzY'
     });
 
     expect(result.isError).toBe(false);
     expect(result.structuredContent).toBeDefined();
-    expect((result.structuredContent as typeof sampleResponse).type).toBe(
-      'Feature'
+    expect((result.structuredContent as typeof sampleResponse).name).toBe(
+      'Golden Gate Park'
     );
   });
 
@@ -264,12 +238,13 @@ describe('PlaceDetailsTool', () => {
     ).toContain('Place not found');
   });
 
-  it('handles 400 error from invalid mapbox_id', async () => {
+  it('handles 422 error from invalid mapbox_id format', async () => {
     const { httpRequest } = setupHttpRequest({
       ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      text: async () => JSON.stringify({ message: 'Invalid mapbox_id format' })
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      text: async () =>
+        JSON.stringify({ message: 'Invalid mapbox_id format: invalid' })
     });
 
     const result = await new PlaceDetailsTool({ httpRequest }).run({
@@ -290,44 +265,6 @@ describe('PlaceDetailsTool', () => {
     const result = await new PlaceDetailsTool({ httpRequest }).run({});
 
     expect(result.isError).toBe(true);
-  });
-
-  it('formats hours using weekday_text when available', async () => {
-    const { httpRequest } = setupHttpRequest({
-      json: async () => sampleResponseWithWeekdayText
-    });
-
-    const result = await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
-      attribute_sets: ['visit']
-    });
-
-    expect(result.isError).toBe(false);
-    const text = (result.content[0] as { type: 'text'; text: string }).text;
-    expect(text).toContain('Hours:');
-    expect(text).toContain('Monday: 9:00 AM – 9:00 PM');
-    expect(text).toContain('Sunday: Closed');
-  });
-
-  it('formats hours from periods when weekday_text is absent', async () => {
-    const { httpRequest } = setupHttpRequest({
-      json: async () => sampleResponseWithPeriods
-    });
-
-    const result = await new PlaceDetailsTool({ httpRequest }).run({
-      mapbox_id: 'dXJuOm1ieHBsYzpBYUFBQUFBQUFBQUFBQUFB',
-      attribute_sets: ['visit']
-    });
-
-    expect(result.isError).toBe(false);
-    const text = (result.content[0] as { type: 'text'; text: string }).text;
-    expect(text).toContain('Hours:');
-    expect(text).toContain('Monday: 9 AM – 9 PM');
-    expect(text).toContain('Friday: 9 AM – 10 PM');
-    expect(text).toContain('Saturday: 10 AM – 10 PM');
-    expect(text).toContain('Sunday: Closed');
-    // Raw JSON should not appear
-    expect(text).not.toContain('"day"');
   });
 
   it('has output schema defined', () => {

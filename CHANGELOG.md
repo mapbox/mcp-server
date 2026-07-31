@@ -1,5 +1,14 @@
 ## Unreleased
 
+### Breaking Changes
+
+- **`place_details_tool` now calls the Mapbox Places API instead of the older Details API.** The tool previously called `search/details/v1/retrieve` (`docs.mapbox.com/api/search/details/`); it now calls `places/v1/details/retrieve` (`docs.mapbox.com/api/search/places/`), a separate, newer product built around a larger POI dataset. This is not a compatible upgrade:
+  - **Input**: `attribute_sets`, `language`, and `worldview` are removed from the input schema. The Places API's Details endpoint takes only a `mapbox_id` and has no equivalent parameters.
+  - **Output**: the response is no longer a GeoJSON `Feature`. It's a flat object (`name`, `full_address`, `phone`, `website`, `categories`, `opening_hours` as a plain OSM-format string, `coordinates: { latitude, longitude }`, `score: { popularity, reality, closed }`, `address`, `attributes`, `photos`, `building`) — see `PlaceDetailsTool.output.schema.ts`. Callers reading `properties.*` or `geometry.coordinates` from the old shape need to update to the new field names.
+  - **Lost fields**: the old API's `rating`/`review_count`/`price` (user rating and review count) have no equivalent in the new API. `score.popularity`/`score.reality` are data-quality/confidence signals, not user ratings, and are preserved in the formatted text output as "Popularity: N%".
+  - The Places API is **Public Preview**: its default quota is 1,000 records/month per account and 100 records/sec, and its response contract may change without notice. The output schema is deliberately permissive (`.passthrough()` throughout, most fields optional) to avoid the class of output-validation failure fixed in 0.14.0 if the API adds or omits fields.
+  - We are not supporting both APIs going forward, since the server isn't at 1.0 yet.
+
 ## 0.14.0 - 2026-07-30
 
 ### New Features
