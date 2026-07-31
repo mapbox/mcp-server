@@ -4,6 +4,8 @@
 
 - **Tool calls are now bound to the MCP server that received them.** `BaseTool` tracked its target server in a single mutable instance field set by `installTo()`, and the callback it registered read that field at call time rather than capturing the server it was registered on. Because the pre-configured instances exported from `@mapbox/mcp-server/tools` are module-level singletons, an application that installed one instance into more than one `McpServer` would have the later `installTo()` silently redirect the earlier server's callbacks: logging, sampling (`ground_location_tool`), and elicitations (`search_and_geocode_tool`, `directions_tool`) would all be sent to whichever server was installed last. Each invocation now resolves the server that registered its callback, via `AsyncLocalStorage`, so concurrent calls arriving through different servers stay on their own. Single-server applications — including the server shipped by this package — behave exactly as before. Calling `run()` directly, outside a registered callback, still falls back to the most recently installed server.
 
+  `BaseResource` carried the same pattern and got the same treatment. Its only reader was `log()`, so the practical effect there was misdirected log messages rather than misdirected client interaction, but the resource instances exported from `@mapbox/mcp-server/resources` are module-level singletons for the same reason and the shared field was the same hazard.
+
 ## 0.14.0 - 2026-07-30
 
 ### New Features
