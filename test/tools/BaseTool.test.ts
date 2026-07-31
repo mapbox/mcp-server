@@ -139,4 +139,95 @@ describe('BaseTool', () => {
       );
     });
   });
+
+  describe('server binding', () => {
+    // Records the server observed at entry and again after an await, so a
+    // binding that only holds until the first suspension point is caught.
+    class ObservingTool extends BaseTool<typeof TestInputSchema> {
+      name = 'observing_tool';
+      description = 'Reports which server its invocation is bound to';
+      annotations = { title: 'Observing Tool', readOnlyHint: true };
+
+      async run(): Promise<CallToolResult> {
+        const before = this.activeServer;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const after = this.activeServer;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                before: (before as any)?.id ?? null,
+                after: (after as any)?.id ?? null
+              })
+            }
+          ],
+          isError: false
+        };
+      }
+    }
+
+    // Minimal McpServer stand-in that captures the callback installTo
+    // registers, and carries an id so a call can be traced to its server.
+    function createFakeServer(id: string) {
+      let registered: (args: any, extra: any) => Promise<CallToolResult>;
+      const server = {
+        id,
+        server: {},
+        registerTool: (_name: string, _config: any, cb: any) => {
+          registered = cb;
+          return {};
+        }
+      };
+      return {
+        server: server as any,
+        invoke: () => registered({}, {})
+      };
+    }
+
+    function observed(result: CallToolResult) {
+      return JSON.parse((result.content[0] as { text: string }).text);
+    }
+
+    function installedInTwoServers() {
+      const tool = new ObservingTool({ inputSchema: TestInputSchema });
+      const a = createFakeServer('a');
+      const b = createFakeServer('b');
+      tool.installTo(a.server);
+      tool.installTo(b.server);
+      return { tool, a, b };
+    }
+
+    it('routes each invocation to the server that registered its callback', async () => {
+      const { a, b } = installedInTwoServers();
+
+      // Installing into b must not redirect the callback registered on a.
+      expect(observed(await a.invoke()).before).toBe('a');
+      expect(observed(await b.invoke()).before).toBe('b');
+    });
+
+    it('keeps concurrent invocations on separate servers from cross-binding', async () => {
+      const { a, b } = installedInTwoServers();
+
+      const [fromA, fromB] = await Promise.all([a.invoke(), b.invoke()]);
+
+      expect(observed(fromA)).toEqual({ before: 'a', after: 'a' });
+      expect(observed(fromB)).toEqual({ before: 'b', after: 'b' });
+    });
+
+    it('falls back to the installed server when run() is called directly', async () => {
+      const tool = new ObservingTool({ inputSchema: TestInputSchema });
+      const a = createFakeServer('a');
+      tool.installTo(a.server);
+
+      // A direct run() has no registered callback to take a binding from.
+      expect(observed(await tool.run()).before).toBe('a');
+    });
+
+    it('reports no server when the tool was never installed', async () => {
+      const tool = new ObservingTool({ inputSchema: TestInputSchema });
+
+      expect(observed(await tool.run()).before).toBeNull();
+    });
+  });
 });

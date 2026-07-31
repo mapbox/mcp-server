@@ -100,9 +100,9 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     longitude: number,
     latitude: number
   ): Promise<GroundingStrategy> {
-    const samplingCapability =
-      this.server?.server.getClientCapabilities()?.sampling;
-    if (!samplingCapability || !this.server) {
+    const server = this.activeServer;
+    const samplingCapability = server?.server.getClientCapabilities()?.sampling;
+    if (!samplingCapability || !server) {
       return 'neighborhood';
     }
 
@@ -116,7 +116,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
       `- "region" — user wants area/boundary context like travel-time zones or coverage areas`;
 
     try {
-      const result = await this.server.server.createMessage({
+      const result = await server.server.createMessage({
         messages: [{ role: 'user', content: { type: 'text', text: prompt } }],
         maxTokens: 10
       });

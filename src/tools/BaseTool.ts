@@ -10,6 +10,7 @@ import type {
   CallToolResult
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ZodTypeAny } from 'zod';
 import type { z } from 'zod';
 
@@ -33,7 +34,29 @@ export abstract class BaseTool<
       };
     };
   };
+  /**
+   * The most recently installed server. Used as a fallback when `run()` is
+   * called directly rather than through a callback registered by `installTo()`.
+   * A single instance installed into several servers only retains the last one,
+   * so code handling a tool call should read `activeServer` instead.
+   */
   protected server: McpServer | null = null;
+
+  /**
+   * The server whose registered callback is handling the current tool call.
+   * Scoped per invocation, so concurrent calls arriving through different
+   * servers each observe their own.
+   */
+  private readonly invocationServer = new AsyncLocalStorage<McpServer>();
+
+  /**
+   * The server a tool call should communicate with — the one that registered
+   * the callback handling it, falling back to the last installed server when
+   * `run()` is invoked outside a registered callback.
+   */
+  protected get activeServer(): McpServer | null {
+    return this.invocationServer.getStore() ?? this.server;
+  }
 
   constructor(params: {
     inputSchema: InputSchema;
@@ -91,7 +114,8 @@ export abstract class BaseTool<
       this.name,
       config,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (args: any, extra: any) => this.run(args, extra)
+      (args: any, extra: any) =>
+        this.invocationServer.run(server, () => this.run(args, extra))
     );
   }
 
@@ -111,8 +135,9 @@ export abstract class BaseTool<
     level: 'debug' | 'info' | 'warning' | 'error',
     data: unknown
   ): void {
-    if (this.server?.server) {
-      void this.server.server.sendLoggingMessage({ level, data });
+    const server = this.activeServer;
+    if (server?.server) {
+      void server.server.sendLoggingMessage({ level, data });
     }
   }
 
