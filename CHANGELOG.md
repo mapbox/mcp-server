@@ -6,6 +6,10 @@
 
   `BaseResource` carried the same pattern and got the same treatment. Its only reader was `log()`, so the practical effect there was misdirected log messages rather than misdirected client interaction, but the resource instances exported from `@mapbox/mcp-server/resources` are module-level singletons for the same reason and the shared field was the same hazard.
 
+  Two registration paths bypass those wrappers and needed the same binding. `resource_reader_tool` (the fallback for clients without the native MCP resource API) looks a resource up in the registry and calls its `read()` directly, so the read never passed through the resource's own registered handler; it now inherits the server servicing the tool call. MCP Apps UI resources (`ui://…`) are registered through `registerAppResource` rather than `installTo()`, so their reads previously resolved no server at all and their `log()` calls were silent no-ops; that registration now binds the read too. Both are handled by a single process-wide async-context store shared by tools and resources, replacing the two per-instance stores.
+
+  One visible consequence of sharing that store: a tool or resource that was never installed into any server now resolves the calling request's server when it is invoked from inside another component's request handler, instead of resolving nothing. Reads and logs that used to silently go nowhere will now reach a client.
+
 ## 0.14.0 - 2026-07-30
 
 ### New Features

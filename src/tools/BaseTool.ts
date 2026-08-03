@@ -10,7 +10,7 @@ import type {
   CallToolResult
 } from '@modelcontextprotocol/sdk/types.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import { AsyncLocalStorage } from 'node:async_hooks';
+import { getActiveServer, runWithServer } from '../utils/serverScope.js';
 import type { ZodTypeAny } from 'zod';
 import type { z } from 'zod';
 
@@ -37,25 +37,17 @@ export abstract class BaseTool<
   /**
    * The most recently installed server. Used as a fallback when `run()` is
    * called directly rather than through a callback registered by `installTo()`.
-   * A single instance installed into several servers only retains the last one,
-   * so code handling a tool call should read `activeServer` instead.
+   * A single instance installed into several servers only retains the last one.
    */
   protected server: McpServer | null = null;
 
   /**
-   * The server whose registered callback is handling the current tool call.
-   * Scoped per invocation, so concurrent calls arriving through different
-   * servers each observe their own.
-   */
-  private readonly invocationServer = new AsyncLocalStorage<McpServer>();
-
-  /**
-   * The server a tool call should communicate with — the one that registered
-   * the callback handling it, falling back to the last installed server when
-   * `run()` is invoked outside a registered callback.
+   * The server a tool call should communicate with — the one whose request is
+   * being serviced, falling back to the last installed server when `run()` is
+   * invoked outside any registered callback.
    */
   protected get activeServer(): McpServer | null {
-    return this.invocationServer.getStore() ?? this.server;
+    return getActiveServer() ?? this.server;
   }
 
   constructor(params: {
@@ -115,7 +107,7 @@ export abstract class BaseTool<
       config,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (args: any, extra: any) =>
-        this.invocationServer.run(server, () => this.run(args, extra))
+        runWithServer(server, () => this.run(args, extra))
     );
   }
 
