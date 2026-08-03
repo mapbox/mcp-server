@@ -154,8 +154,9 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     }
 
     // Check if we have multiple results that might be ambiguous
+    const server = this.activeServer;
     if (
-      this.server &&
+      server &&
       data.features &&
       data.features.length >= 2 &&
       data.features.length <= 10
@@ -174,7 +175,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
         });
 
         // Create a JSON Schema with enum for the selection
-        const result = await this.server.server.elicitInput({
+        const result = await server.server.elicitInput({
           mode: 'form',
           message: `Found ${data.features.length} results for "${input.q}". Please select the correct location:`,
           requestedSchema: {

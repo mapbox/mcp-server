@@ -104,7 +104,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
   private async elicitRouteSelection(
     routes: Route[]
   ): Promise<number | undefined> {
-    if (!this.server || routes.length < 2) return undefined;
+    const server = this.activeServer;
+    if (!server || routes.length < 2) return undefined;
 
     try {
       const options = routes.map((route, index) => ({
@@ -112,7 +113,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
         label: this.describeRoute(route)
       }));
 
-      const result = await this.server.server.elicitInput({
+      const result = await server.server.elicitInput({
         mode: 'form',
         message: `Found ${routes.length} routes. Choose your preferred route:`,
         requestedSchema: {
