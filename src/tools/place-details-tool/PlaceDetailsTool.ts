@@ -12,7 +12,13 @@ import {
   type PlaceDetailsOutput
 } from './PlaceDetailsTool.output.schema.js';
 
-// API Documentation: https://docs.mapbox.com/api/search/details/
+// API Documentation: https://docs.mapbox.com/api/search/places/
+//
+// This calls the Places API's Details/Retrieve endpoint, not the older,
+// separate Details API (docs.mapbox.com/api/search/details/) this tool used
+// previously. The Places API is Public Preview: its default quota is 1,000
+// records/month per account and 100 records/sec, and its response contract
+// may change without notice.
 
 export class PlaceDetailsTool extends MapboxApiBasedTool<
   typeof PlaceDetailsInputSchema,
@@ -20,7 +26,7 @@ export class PlaceDetailsTool extends MapboxApiBasedTool<
 > {
   name = 'place_details_tool';
   description =
-    'Retrieve detailed information about a specific place using its Mapbox ID. Use after search_and_geocode_tool, category_search_tool, or reverse_geocode_tool to get additional details such as photos, opening hours, ratings, phone numbers, and website URLs. Requires the mapbox_id field from a previous search result.';
+    'Retrieve detailed information about a specific place using its Mapbox ID. Use after search_and_geocode_tool, category_search_tool, or reverse_geocode_tool to get additional details such as photos, opening hours, phone numbers, and website URLs. Requires the mapbox_id field from a previous search result.';
   annotations = {
     title: 'Place Details Tool',
     readOnlyHint: true,
@@ -37,155 +43,71 @@ export class PlaceDetailsTool extends MapboxApiBasedTool<
     });
   }
 
-  private formatOpenHours(openHours: Record<string, unknown>): string {
-    const DAY_NAMES = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday'
-    ];
+  /** `opening_hours` is an OSM opening_hours string, e.g. "Mo 09:00-23:45; Tu 09:00-23:45; ...". */
+  private formatOpeningHours(openingHours: string): string {
+    const parts = openingHours
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return '';
 
-    // Use weekday_text if the API provides it — already formatted per day
-    if (Array.isArray(openHours['weekday_text'])) {
-      const lines = (openHours['weekday_text'] as string[])
-        .map((line) => `  ${line}`)
-        .join('\n');
-      return `Hours:\n${lines}`;
-    }
-
-    // Fall back to parsing periods array
-    if (!Array.isArray(openHours['periods'])) return '';
-
-    type Period = {
-      open: { day: number; time: string };
-      close?: { day: number; time: string };
-    };
-
-    const formatTime = (hhmm: string): string => {
-      const h = parseInt(hhmm.slice(0, 2), 10);
-      const m = hhmm.slice(2);
-      const period = h < 12 ? 'AM' : 'PM';
-      const hour = h % 12 || 12;
-      return m === '00' ? `${hour} ${period}` : `${hour}:${m} ${period}`;
-    };
-
-    // Group periods by open day
-    const byDay = new Map<number, string[]>();
-    for (const period of openHours['periods'] as Period[]) {
-      const day = period.open.day;
-      const open = formatTime(period.open.time);
-      const close = period.close ? formatTime(period.close.time) : 'midnight';
-      const range = `${open} – ${close}`;
-      const existing = byDay.get(day);
-      if (existing) {
-        existing.push(range);
-      } else {
-        byDay.set(day, [range]);
-      }
-    }
-
-    const dayLines = DAY_NAMES.map((name, i) => {
-      const ranges = byDay.get(i);
-      return `  ${name}: ${ranges ? ranges.join(', ') : 'Closed'}`;
-    });
-
-    return `Hours:\n${dayLines.join('\n')}`;
+    const lines = parts.map((part) => `  ${part}`).join('\n');
+    return `Hours:\n${lines}`;
   }
 
   private formatDetailsToText(data: PlaceDetailsOutput): string {
-    const props = data.properties;
     const lines: string[] = [];
 
-    // Name
-    lines.push(`Name: ${props.name}`);
+    lines.push(`Name: ${data.name}`);
 
-    // Address
-    if (props.full_address) {
-      lines.push(`Address: ${props.full_address}`);
-    } else if (props.place_formatted) {
-      lines.push(`Address: ${props.place_formatted}`);
-    } else if (props.address) {
-      lines.push(`Address: ${props.address}`);
+    if (data.full_address) {
+      lines.push(`Address: ${data.full_address}`);
     }
 
-    // Coordinates from geometry
-    if (data.geometry?.coordinates) {
-      const [lng, lat] = data.geometry.coordinates;
-      lines.push(`Coordinates: ${lat}, ${lng}`);
+    if (data.coordinates) {
+      lines.push(
+        `Coordinates: ${data.coordinates.latitude}, ${data.coordinates.longitude}`
+      );
     }
 
-    // Feature type and categories
-    if (props.feature_type) {
-      lines.push(`Type: ${props.feature_type}`);
+    if (data.primary_category) {
+      lines.push(`Type: ${data.primary_category}`);
     }
-    if (props.poi_category && props.poi_category.length > 0) {
-      lines.push(`Category: ${props.poi_category.join(', ')}`);
-    }
-
-    // Brand
-    if (props.brand && props.brand.length > 0) {
-      lines.push(`Brand: ${props.brand.join(', ')}`);
+    if (data.categories && data.categories.length > 0) {
+      lines.push(`Category: ${data.categories.join(', ')}`);
     }
 
-    // Venue attributes (phone, website, social media)
-    const metadata = props.metadata as Record<string, unknown> | undefined;
-    if (metadata) {
-      if (metadata['phone']) {
-        lines.push(`Phone: ${metadata['phone']}`);
-      }
-      if (metadata['website']) {
-        lines.push(`Website: ${metadata['website']}`);
-      }
-      if (
-        metadata['social_media'] &&
-        typeof metadata['social_media'] === 'object'
-      ) {
-        const social = metadata['social_media'] as Record<string, string>;
-        const socialLinks = Object.entries(social)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(', ');
-        if (socialLinks) lines.push(`Social: ${socialLinks}`);
-      }
+    if (data.brand) {
+      lines.push(`Brand: ${data.brand}`);
+    }
 
-      // Visit attributes (hours, rating, price)
-      if (metadata['price']) {
-        lines.push(`Price: ${metadata['price']}`);
-      }
-      if (metadata['rating'] !== undefined) {
-        lines.push(`Rating: ${metadata['rating']}`);
-      }
-      if (metadata['review_count'] !== undefined) {
-        lines.push(`Reviews: ${metadata['review_count']}`);
-      }
-      if (metadata['popularity'] !== undefined) {
-        lines.push(
-          `Popularity: ${Math.round((metadata['popularity'] as number) * 100)}%`
-        );
-      }
-      if (
-        metadata['open_hours'] &&
-        typeof metadata['open_hours'] === 'object'
-      ) {
-        const formatted = this.formatOpenHours(
-          metadata['open_hours'] as Record<string, unknown>
-        );
-        if (formatted) lines.push(formatted);
-      }
+    if (data.phone) {
+      lines.push(`Phone: ${data.phone}`);
+    }
+    if (data.website) {
+      lines.push(`Website: ${data.website}`);
+    }
 
-      // Photos
-      if (Array.isArray(metadata['primary_photo'])) {
-        const photos = metadata['primary_photo'] as Array<
-          Record<string, string>
-        >;
-        const photoUrls = photos
-          .map((p) => p['url'] || p['thumb_url'])
-          .filter(Boolean);
-        if (photoUrls.length > 0) {
-          lines.push(`Photos: ${photoUrls.join(', ')}`);
-        }
+    if (
+      data.score?.popularity !== undefined &&
+      data.score?.popularity !== null
+    ) {
+      lines.push(`Popularity: ${Math.round(data.score.popularity * 100)}%`);
+    }
+
+    if (data.permanently_closed) {
+      lines.push('Status: Permanently closed');
+    }
+
+    if (data.opening_hours) {
+      const formatted = this.formatOpeningHours(data.opening_hours);
+      if (formatted) lines.push(formatted);
+    }
+
+    if (data.photos && data.photos.length > 0) {
+      const urls = data.photos.map((photo) => photo.url).filter(Boolean);
+      if (urls.length > 0) {
+        lines.push(`Photos: ${urls.join(', ')}`);
       }
     }
 
@@ -199,29 +121,10 @@ export class PlaceDetailsTool extends MapboxApiBasedTool<
     _context: ToolExecutionContext
   ): Promise<CallToolResult> {
     const url = new URL(
-      `${MapboxApiBasedTool.mapboxApiEndpoint}search/details/v1/retrieve/${encodeURIComponent(input.mapbox_id)}`
+      `${MapboxApiBasedTool.mapboxApiEndpoint}places/v1/details/retrieve/${encodeURIComponent(input.mapbox_id)}`
     );
 
     url.searchParams.append('access_token', accessToken);
-
-    // "basic" (name, feature_type, address, coordinates) is what the
-    // Details API calls its default attribute set, and this tool's output
-    // schema requires `properties.name`/`properties.feature_type` — so it
-    // must always be requested, even if the caller's attribute_sets omits
-    // it, or the API response fails output validation.
-    const attributeSets = new Set(['basic', ...(input.attribute_sets ?? [])]);
-    url.searchParams.append(
-      'attribute_sets',
-      Array.from(attributeSets).join(',')
-    );
-
-    if (input.language) {
-      url.searchParams.append('language', input.language);
-    }
-
-    if (input.worldview) {
-      url.searchParams.append('worldview', input.worldview);
-    }
 
     const response = await this.httpRequest(url.toString());
 
