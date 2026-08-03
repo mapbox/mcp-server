@@ -38,7 +38,9 @@ export class TemporaryResourceManager {
     private defaultTTL: number = 30 * 60 * 1000, // 30 minutes
     private maxBytes: number = 50 * 1024 * 1024 // 50MB
   ) {
-    // Run cleanup every 5 minutes
+    // Run cleanup every 5 minutes. Constructed at module load, so the interval
+    // captures no active server (see serverScope.ts) — constructing a manager
+    // inside a request handler would pin that request's server for good.
     this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
   }
 

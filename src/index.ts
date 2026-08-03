@@ -12,10 +12,6 @@ import { SpanStatusCode } from '@opentelemetry/api';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
-  registerAppResource,
-  RESOURCE_MIME_TYPE
-} from '@modelcontextprotocol/ext-apps/server';
-import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
   CompleteRequestSchema
@@ -27,6 +23,7 @@ import {
   getResourceFallbackTools
 } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
+import { registerUiResources } from './resources/registerUiResources.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
@@ -136,23 +133,7 @@ enabledCoreTools.forEach((tool) => {
 const uiResources = allResources.filter((r) => r.uri.startsWith('ui://'));
 const regularResources = allResources.filter((r) => !r.uri.startsWith('ui://'));
 
-// Register MCP Apps UI resources using registerAppResource
-// IMPORTANT: Use RESOURCE_MIME_TYPE which is "text/html;profile=mcp-app"
-// This tells clients (like Claude Desktop) that this is an MCP App
-uiResources.forEach((resource) => {
-  registerAppResource(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    server as any,
-    resource.name,
-    resource.uri,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { mimeType: RESOURCE_MIME_TYPE, description: resource.description } as any,
-    async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await resource.read(resource.uri, {} as any);
-    }
-  );
-});
+registerUiResources(server, uiResources);
 
 // Register regular resources using standard registration
 regularResources.forEach((resource) => {

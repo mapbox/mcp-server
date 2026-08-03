@@ -1,7 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { AsyncLocalStorage } from 'node:async_hooks';
+import { getActiveServer, runWithServer } from '../utils/serverScope.js';
 import {
   type McpServer,
   ResourceTemplate
@@ -25,25 +25,17 @@ export abstract class BaseResource {
   /**
    * The most recently installed server. Used as a fallback when `read()` is
    * called directly rather than through a handler registered by `installTo()`.
-   * A single instance installed into several servers only retains the last one,
-   * so code handling a read should use `activeServer` instead.
+   * A single instance installed into several servers only retains the last one.
    */
   protected server: McpServer | null = null;
 
   /**
-   * The server whose registered handler is serving the current read. Scoped per
-   * invocation, so concurrent reads arriving through different servers each
-   * observe their own.
-   */
-  private readonly invocationServer = new AsyncLocalStorage<McpServer>();
-
-  /**
-   * The server a read should communicate with — the one that registered the
-   * handler serving it, falling back to the last installed server when `read()`
-   * is invoked outside a registered handler.
+   * The server a read should communicate with — the one whose request is being
+   * serviced, falling back to the last installed server when `read()` is
+   * invoked outside any registered handler.
    */
   protected get activeServer(): McpServer | null {
-    return this.invocationServer.getStore() ?? this.server;
+    return getActiveServer() ?? this.server;
   }
 
   /**
@@ -70,10 +62,7 @@ export abstract class BaseResource {
           uri: URL,
           _variables: Record<string, string | string[]>,
           extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-        ) =>
-          this.invocationServer.run(server, () =>
-            this.read(uri.toString(), extra)
-          )
+        ) => runWithServer(server, () => this.read(uri.toString(), extra))
       );
     } else {
       server.registerResource(
@@ -83,10 +72,7 @@ export abstract class BaseResource {
         (
           uri: URL,
           extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-        ) =>
-          this.invocationServer.run(server, () =>
-            this.read(uri.toString(), extra)
-          )
+        ) => runWithServer(server, () => this.read(uri.toString(), extra))
       );
     }
   }

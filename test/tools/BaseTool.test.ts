@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { BaseTool } from '../../src/tools/BaseTool.js';
 import { z } from 'zod';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { createFakeServer } from '../helpers/fakeMcpServer.js';
 
 // Create a concrete test implementation of BaseTool
 class TestTool extends BaseTool<
@@ -167,24 +168,6 @@ describe('BaseTool', () => {
       }
     }
 
-    // Minimal McpServer stand-in that captures the callback installTo
-    // registers, and carries an id so a call can be traced to its server.
-    function createFakeServer(id: string) {
-      let registered: (args: any, extra: any) => Promise<CallToolResult>;
-      const server = {
-        id,
-        server: {},
-        registerTool: (_name: string, _config: any, cb: any) => {
-          registered = cb;
-          return {};
-        }
-      };
-      return {
-        server: server as any,
-        invoke: () => registered({}, {})
-      };
-    }
-
     function observed(result: CallToolResult) {
       return JSON.parse((result.content[0] as { text: string }).text);
     }
@@ -202,14 +185,17 @@ describe('BaseTool', () => {
       const { a, b } = installedInTwoServers();
 
       // Installing into b must not redirect the callback registered on a.
-      expect(observed(await a.invoke()).before).toBe('a');
-      expect(observed(await b.invoke()).before).toBe('b');
+      expect(observed(await a.invokeTool()).before).toBe('a');
+      expect(observed(await b.invokeTool()).before).toBe('b');
     });
 
     it('keeps concurrent invocations on separate servers from cross-binding', async () => {
       const { a, b } = installedInTwoServers();
 
-      const [fromA, fromB] = await Promise.all([a.invoke(), b.invoke()]);
+      const [fromA, fromB] = await Promise.all([
+        a.invokeTool(),
+        b.invokeTool()
+      ]);
 
       expect(observed(fromA)).toEqual({ before: 'a', after: 'a' });
       expect(observed(fromB)).toEqual({ before: 'b', after: 'b' });
@@ -228,6 +214,38 @@ describe('BaseTool', () => {
       const tool = new ObservingTool({ inputSchema: TestInputSchema });
 
       expect(observed(await tool.run()).before).toBeNull();
+    });
+
+    it('binds a nested run() to the server handling the outer call', async () => {
+      // Delegates to another instance, the way ResourceReaderTool delegates to
+      // a resource from the registry.
+      class OuterTool extends BaseTool<typeof TestInputSchema> {
+        name = 'outer_tool';
+        description = 'Delegates to another tool';
+        annotations = { title: 'Outer Tool', readOnlyHint: true };
+
+        constructor(private readonly inner: ObservingTool) {
+          super({ inputSchema: TestInputSchema });
+        }
+
+        async run(): Promise<CallToolResult> {
+          return this.inner.run();
+        }
+      }
+
+      const inner = new ObservingTool({ inputSchema: TestInputSchema });
+      const outer = new OuterTool(inner);
+      const a = createFakeServer('a');
+      const b = createFakeServer('b');
+
+      // The inner tool knows only about b; the call arrives through a.
+      inner.installTo(b.server);
+      outer.installTo(a.server);
+
+      expect(observed(await a.invokeTool())).toEqual({
+        before: 'a',
+        after: 'a'
+      });
     });
   });
 });
