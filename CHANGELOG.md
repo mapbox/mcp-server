@@ -6,6 +6,10 @@
 
   `BaseResource` carried the same pattern and got the same treatment. Its only reader was `log()`, so the practical effect there was misdirected log messages rather than misdirected client interaction, but the resource instances exported from `@mapbox/mcp-server/resources` are module-level singletons for the same reason and the shared field was the same hazard.
 
+### Dependencies
+
+- Bumped `@modelcontextprotocol/sdk` to `1.30.0`. Not adopting the `2026-07-28` spec revision this release covers (stateless request/response model, elicitation replaced by Multi Round-Trip Requests, Sampling deprecated) — that's a separate migration tracked in #245, since `directions_tool`/`search_and_geocode_tool`'s elicitation-based selection and `ground_location_tool`'s sampling-based strategy detection all depend on the mechanisms being replaced. Regenerated `patches/@modelcontextprotocol+sdk+1.30.0.patch` (previously pinned to `1.29.0`) — same patch content, applies cleanly to the new version, verified live against the built server.
+
 ## 0.14.0 - 2026-07-30
 
 ### New Features
