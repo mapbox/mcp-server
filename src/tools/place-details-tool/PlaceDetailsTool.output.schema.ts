@@ -15,6 +15,12 @@ import { z } from 'zod';
  * fields without notice, so this schema is deliberately permissive rather
  * than risk an output-validation failure like the one fixed for the
  * previous Details API (see CHANGELOG).
+ *
+ * `feature_type`, `bbox`, `context`, and `metadata` are never populated by
+ * the Places API itself — they're only present when `mapbox_id` resolved via
+ * the legacy Details API fallback (boundaries/neighborhoods/cities/regions,
+ * which the Places API rejects). See `PlaceDetailsTool.ts`'s
+ * `normalizeLegacyFeature`.
  */
 export const PlaceDetailsOutputSchema = z
   .object({
@@ -24,6 +30,11 @@ export const PlaceDetailsOutputSchema = z
     brand: z.string().nullable().optional(),
     primary_category: z.string().optional(),
     categories: z.array(z.string()).optional(),
+    // Legacy Details API fallback only (see doc comment above).
+    feature_type: z.string().optional(),
+    bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+    context: z.object({}).passthrough().optional(),
+    metadata: z.object({}).passthrough().optional(),
     // OSM opening_hours syntax, e.g. "Mo 09:00-23:45; Tu 09:00-23:45; ...".
     opening_hours: z.string().optional(),
     permanently_closed: z.boolean().nullable().optional(),
@@ -84,3 +95,52 @@ export const PlaceDetailsOutputSchema = z
  * Type inference for PlaceDetailsOutput
  */
 export type PlaceDetailsOutput = z.infer<typeof PlaceDetailsOutputSchema>;
+
+/**
+ * Raw GeoJSON `Feature` returned by the legacy Details API
+ * (`search/details/v1/retrieve`). Only used for the fallback path — see
+ * `PlaceDetailsTool.ts`'s `normalizeLegacyFeature`, which maps this into
+ * `PlaceDetailsOutput`.
+ */
+export const LegacyPlaceDetailsFeatureSchema = z
+  .object({
+    type: z.literal('Feature'),
+    geometry: z
+      .object({
+        type: z.literal('Point'),
+        coordinates: z.tuple([z.number(), z.number()])
+      })
+      .passthrough(),
+    properties: z
+      .object({
+        name: z.string(),
+        mapbox_id: z.string(),
+        feature_type: z.string(),
+        address: z.string().optional(),
+        full_address: z.string().optional(),
+        place_formatted: z.string().optional(),
+        context: z.object({}).passthrough().optional(),
+        coordinates: z
+          .object({
+            longitude: z.number(),
+            latitude: z.number()
+          })
+          .passthrough()
+          .optional(),
+        bbox: z
+          .tuple([z.number(), z.number(), z.number(), z.number()])
+          .optional(),
+        poi_category: z.array(z.string()).optional(),
+        brand: z.array(z.string()).optional(),
+        metadata: z.object({}).passthrough().optional()
+      })
+      .passthrough()
+  })
+  .passthrough();
+
+/**
+ * Type inference for LegacyPlaceDetailsFeature
+ */
+export type LegacyPlaceDetailsFeature = z.infer<
+  typeof LegacyPlaceDetailsFeatureSchema
+>;

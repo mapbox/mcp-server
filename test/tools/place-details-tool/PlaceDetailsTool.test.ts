@@ -61,6 +61,29 @@ const sampleResponseWithPhotos = {
   ]
 };
 
+const boundaryMapboxId = 'dXJuOm1ieHBsYzpIa2pvN0E';
+
+// Shaped after a live response from search/details/v1/retrieve for a city
+// (a mapbox_id the Places API rejects — see the fallback tests below).
+const legacyBoundaryFeature = {
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [-87.632362, 41.881953] },
+  properties: {
+    name: 'Chicago',
+    mapbox_id: boundaryMapboxId,
+    feature_type: 'place',
+    full_address: 'Chicago, Illinois, United States',
+    place_formatted: 'Illinois, United States',
+    bbox: [-87.940377, 41.624491, -87.49696, 42.034847],
+    context: {
+      country: { id: 'dXJuOm1ieHBsYzpJdXc', name: 'United States' },
+      region: { id: 'dXJuOm1ieHBsYzpST3c', name: 'Illinois' }
+    },
+    coordinates: { latitude: 41.881953, longitude: -87.632362 },
+    metadata: {}
+  }
+};
+
 describe('PlaceDetailsTool', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -238,14 +261,101 @@ describe('PlaceDetailsTool', () => {
     ).toContain('Place not found');
   });
 
-  it('handles 422 error from invalid mapbox_id format', async () => {
-    const { httpRequest } = setupHttpRequest({
-      ok: false,
-      status: 422,
-      statusText: 'Unprocessable Entity',
-      text: async () =>
-        JSON.stringify({ message: 'Invalid mapbox_id format: invalid' })
+  it('falls back to the legacy Details API when the Places API rejects a boundary mapbox_id', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    mockHttpRequest.mockReset();
+    mockHttpRequest
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        text: async () =>
+          JSON.stringify({
+            message: `Invalid mapbox_id format: ${boundaryMapboxId}`
+          })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => legacyBoundaryFeature
+      });
+
+    const result = await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id: boundaryMapboxId
     });
+
+    expect(result.isError).toBe(false);
+    expect(mockHttpRequest).toHaveBeenCalledTimes(2);
+    expect(mockHttpRequest.mock.calls[0][0]).toContain(
+      'places/v1/details/retrieve/'
+    );
+    expect(mockHttpRequest.mock.calls[1][0]).toContain(
+      'search/details/v1/retrieve/'
+    );
+
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Name: Chicago');
+    expect(text).toContain('Type: place');
+    expect(text).toContain('Coordinates: 41.881953, -87.632362');
+
+    const data = result.structuredContent as Record<string, unknown>;
+    expect(data.mapbox_id).toBe(boundaryMapboxId);
+    expect(data.full_address).toBe('Chicago, Illinois, United States');
+    expect(data.bbox).toEqual([-87.940377, 41.624491, -87.49696, 42.034847]);
+  });
+
+  it('forwards attribute_sets/language/worldview to the legacy fallback request', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    mockHttpRequest.mockReset();
+    mockHttpRequest
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        text: async () =>
+          JSON.stringify({ message: 'Invalid mapbox_id format' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => legacyBoundaryFeature
+      });
+
+    await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id: boundaryMapboxId,
+      attribute_sets: ['venue'],
+      language: 'fr',
+      worldview: 'jp'
+    });
+
+    const fallbackUrl = mockHttpRequest.mock.calls[1][0];
+    expect(fallbackUrl).toContain('attribute_sets=basic%2Cvenue');
+    expect(fallbackUrl).toContain('language=fr');
+    expect(fallbackUrl).toContain('worldview=jp');
+  });
+
+  it('returns an error when both the Places API and the legacy fallback fail', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    mockHttpRequest.mockReset();
+    mockHttpRequest
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        text: async () =>
+          JSON.stringify({ message: 'Invalid mapbox_id format' })
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: async () =>
+          JSON.stringify({
+            message: 'Could not complete Location Details retrieve'
+          })
+      });
 
     const result = await new PlaceDetailsTool({ httpRequest }).run({
       mapbox_id: 'invalid'
@@ -254,7 +364,23 @@ describe('PlaceDetailsTool', () => {
     expect(result.isError).toBe(true);
     expect(
       (result.content[0] as { type: 'text'; text: string }).text
-    ).toContain('Invalid mapbox_id format');
+    ).toContain('Could not complete Location Details retrieve');
+  });
+
+  it('does not fall back to the legacy API for non-422 errors', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: async () => JSON.stringify({ message: 'Place not found' })
+    });
+
+    const result = await new PlaceDetailsTool({ httpRequest }).run({
+      mapbox_id: 'nonexistent-id'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockHttpRequest).toHaveBeenCalledTimes(1);
   });
 
   it('requires mapbox_id input', async () => {
