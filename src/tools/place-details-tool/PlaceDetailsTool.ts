@@ -26,7 +26,7 @@ export class PlaceDetailsTool extends MapboxApiBasedTool<
 > {
   name = 'place_details_tool';
   description =
-    'Retrieve detailed information about a specific place using its Mapbox ID. Use after search_and_geocode_tool, category_search_tool, or reverse_geocode_tool to get additional details such as photos, opening hours, phone numbers, and website URLs. Requires the mapbox_id field from a previous search result.';
+    'Retrieve detailed information about a specific point of interest (POI) using its Mapbox ID. Use after search_and_geocode_tool, category_search_tool, or reverse_geocode_tool to get additional details such as photos, opening hours, phone numbers, and website URLs. Requires the mapbox_id field from a previous search result. Only accepts POI IDs (businesses, addresses, buildings) — mapbox_ids for neighborhoods, cities, or other administrative boundaries are rejected by this endpoint. This API is in Public Preview with a default quota of 1,000 requests/month; contact Mapbox if you need a higher volume.';
   annotations = {
     title: 'Place Details Tool',
     readOnlyHint: true,
