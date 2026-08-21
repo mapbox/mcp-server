@@ -184,7 +184,7 @@ ${initialDataScript}
     mapboxgl.accessToken = TOKEN;
     map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/standard',
       center: [0, 20],
       zoom: 1.5
     });
