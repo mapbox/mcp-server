@@ -172,6 +172,23 @@ ${initialDataScript}
   );
 
   // --- Map setup ------------------------------------------------------------
+  var initialDataRead = false;
+  var initialData = null;
+
+  // Parses the #initial-data script tag once and caches the result — read
+  // before map construction (to seed the constructor's config option, so
+  // a baseMapConfig takes effect before first paint instead of flashing
+  // default colors) and again by consumeInitialData() after load.
+  function readInitialData() {
+    if (initialDataRead) return initialData;
+    initialDataRead = true;
+    var el = document.getElementById('initial-data');
+    if (el && el.textContent) {
+      try { initialData = JSON.parse(el.textContent); } catch (_) { /* ignore */ }
+    }
+    return initialData;
+  }
+
   function initMap() {
     if (!TOKEN) {
       showError('No Mapbox public token available. Set MAPBOX_PUBLIC_TOKEN or grant tokens:read to the OAuth client.');
@@ -182,12 +199,17 @@ ${initialDataScript}
       return;
     }
     mapboxgl.accessToken = TOKEN;
-    map = new mapboxgl.Map({
+    var data = readInitialData();
+    var mapOptions = {
       container: 'map',
       style: 'mapbox://styles/mapbox/standard',
       center: [0, 20],
       zoom: 1.5
-    });
+    };
+    if (data && data.baseMapConfig) {
+      mapOptions.config = { basemap: data.baseMapConfig };
+    }
+    map = new mapboxgl.Map(mapOptions);
     map.addControl(new mapboxgl.NavigationControl(), 'top-left');
     map.on('load', function() {
       mapLoaded = true;
@@ -202,12 +224,8 @@ ${initialDataScript}
   initMap();
 
   function consumeInitialData() {
-    var el = document.getElementById('initial-data');
-    if (!el || !el.textContent) return;
-    try {
-      var data = JSON.parse(el.textContent);
-      if (data && Array.isArray(data.layers)) render(data);
-    } catch (_) { /* ignore */ }
+    var data = readInitialData();
+    if (data && Array.isArray(data.layers)) render(data);
   }
 
   // --- Tool result extraction ----------------------------------------------
@@ -401,6 +419,7 @@ ${initialDataScript}
     };
     if (layer.paint) def.paint = layer.paint;
     if (layer.layout) def.layout = layer.layout;
+    if (layer.slot) def.slot = layer.slot;
     map.addLayer(def);
     trackedLayerIds.push(layer.id);
 
@@ -466,9 +485,18 @@ ${initialDataScript}
     if (bounds) fitToBounds(bounds);
   }
 
+  function applyBaseMapConfig(baseMapConfig) {
+    if (!baseMapConfig || typeof baseMapConfig !== 'object') return;
+    if (typeof map.setConfigProperty !== 'function') return;
+    Object.keys(baseMapConfig).forEach(function(key) {
+      try { map.setConfigProperty('basemap', key, baseMapConfig[key]); } catch (_) { /* not a Standard-based style */ }
+    });
+  }
+
   function render(payload) {
     if (!map) return;
     teardown();
+    applyBaseMapConfig(payload.baseMapConfig);
 
     var bbox = bboxAccumulator();
     var layers = Array.isArray(payload.layers) ? payload.layers : [];

@@ -62,6 +62,11 @@ export class RenderMapTool extends BaseTool<
     'result + a route) onto one map. ' +
     'Inline `layers`/`markers`/`legend` fields are also supported for ' +
     'hand-composed payloads from raw GeoJSON. ' +
+    'To restyle the base map itself (e.g. "make the water red", switch to night ' +
+    'lighting, hide POI labels) pass `baseMapConfig`. Every call is a fresh ' +
+    'render — it does not accumulate state — so to restyle an already-drawn ' +
+    'map without losing its content, re-pass the same `payload_refs`/`layers` ' +
+    'alongside `baseMapConfig` rather than sending `baseMapConfig` alone. ' +
     'Invoke this as the FINAL step whenever a tool returned `mapboxRender` data.';
 
   readonly annotations = {
@@ -161,11 +166,16 @@ export class RenderMapTool extends BaseTool<
               ? ` The map will also fetch and draw ${selfFetchCount} additional layer${selfFetchCount === 1 ? '' : 's'} directly from the Mapbox API once it loads.`
               : '';
 
+          const baseMapConfigNote = payload.baseMapConfig
+            ? ' Updated the base map style.'
+            : '';
+
           const text =
             `Rendered map with ${layerCount} layer${layerCount === 1 ? '' : 's'}` +
             ` and ${markerCount} marker${markerCount === 1 ? '' : 's'}` +
             (payload.summary ? ` — ${payload.summary}` : '') +
             '.' +
+            baseMapConfigNote +
             selfFetchNote +
             staleNote;
 
@@ -282,21 +292,31 @@ export class RenderMapTool extends BaseTool<
       markers: input.markers as MapAppPayload['markers'],
       legend: input.legend,
       camera: input.camera as MapAppPayload['camera'],
-      summary: input.summary
+      summary: input.summary,
+      baseMapConfig: input.baseMapConfig
     };
     const hasInlineContent =
       (inline.layers && inline.layers.length > 0) ||
       (inline.markers && inline.markers.length > 0);
 
     const all: MapAppPayload[] = [...fromRefs];
-    if (hasInlineContent || inline.summary || inline.legend) all.push(inline);
+    // baseMapConfig-only calls (e.g. "now turn the water red" with no new
+    // data) are renderable on their own — treated like summary/legend.
+    if (
+      hasInlineContent ||
+      inline.summary ||
+      inline.legend ||
+      inline.baseMapConfig
+    )
+      all.push(inline);
     if (all.length === 0) return { payload: null, unresolvedRefs };
 
     const merged = mergeMapPayloads(all);
-    // Inline summary/camera/legend take precedence when provided.
+    // Inline summary/camera/legend/baseMapConfig take precedence when provided.
     if (input.summary) merged.summary = input.summary;
     if (input.camera) merged.camera = inline.camera;
     if (input.legend) merged.legend = input.legend;
+    if (input.baseMapConfig) merged.baseMapConfig = input.baseMapConfig;
     return { payload: merged, unresolvedRefs };
   }
 }

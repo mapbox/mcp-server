@@ -15,7 +15,7 @@ import { buildInlinePayloadRef } from '../../../src/utils/inlinePayloadRef.js';
  * bridge doesn't support at all), while a ref-only result (Claude
  * Desktop, which strips structuredContent) still falls back to it.
  */
-function loadScriptSandbox() {
+function loadScriptSandbox(options?: { initialData?: unknown }) {
   const html = renderMapAppHtml({ publicToken: 'pk.test-token' });
   const scriptMatch = html.match(
     /<script>\n\(function\(\) \{[\s\S]*?\}\)\(\);\n<\/script>/
@@ -42,11 +42,23 @@ function loadScriptSandbox() {
   // keeps the reference, so returning the same object per id lets tests
   // inspect state (e.g. errorEl.textContent) after the fact.
   const elementsById: Record<string, ReturnType<typeof fakeElement>> = {};
+  // Seeded before the script runs so initMap()'s synchronous
+  // readInitialData() call (used to pass baseMapConfig into the Map
+  // constructor's `config` option) sees it, mirroring the real
+  // #initial-data script tag renderMapAppHtml embeds when `initialData`
+  // is passed to it server-side.
+  if (options?.initialData !== undefined) {
+    elementsById['initial-data'] = {
+      ...fakeElement(),
+      textContent: JSON.stringify(options.initialData)
+    };
+  }
   function getElementById(id: string) {
     if (!elementsById[id]) elementsById[id] = fakeElement();
     return elementsById[id];
   }
 
+  const mapConstructorCalls: Array<Record<string, unknown>> = [];
   const fakeMapInstance = {
     addControl: () => {},
     on: (event: string, cb: () => void) => {
@@ -91,7 +103,8 @@ function loadScriptSandbox() {
     },
     mapboxgl: {
       accessToken: '',
-      Map: function Map() {
+      Map: function Map(mapOptions: Record<string, unknown>) {
+        mapConstructorCalls.push(mapOptions);
         return fakeMapInstance;
       },
       NavigationControl: function NavigationControl() {},
@@ -147,6 +160,7 @@ function loadScriptSandbox() {
     },
     postMessageCalls,
     map: fakeMapInstance,
+    mapConstructorCalls,
     errorEl: elementsById.error,
     summaryEl: elementsById.summary
   };
@@ -313,6 +327,144 @@ describe('mapAppHtml inline-payload-first tool-result handling', () => {
     await Promise.resolve();
 
     expect(errorEl?.textContent).toBe('Map payload was empty or malformed.');
+  });
+});
+
+describe('mapAppHtml baseMapConfig and slot', () => {
+  it('seeds baseMapConfig into the Map constructor config option, from initial data', () => {
+    const { mapConstructorCalls } = loadScriptSandbox({
+      initialData: {
+        layers: [],
+        baseMapConfig: { colorWater: '#ff0000' }
+      }
+    });
+
+    expect(mapConstructorCalls).toHaveLength(1);
+    expect(mapConstructorCalls[0].config).toEqual({
+      basemap: { colorWater: '#ff0000' }
+    });
+  });
+
+  it('omits the config option from the Map constructor when there is no initial baseMapConfig', () => {
+    const { mapConstructorCalls } = loadScriptSandbox();
+
+    expect(mapConstructorCalls).toHaveLength(1);
+    expect(mapConstructorCalls[0].config).toBeUndefined();
+  });
+
+  it('applies each baseMapConfig key via map.setConfigProperty on render', () => {
+    const { sendToolResult, map } = loadScriptSandbox();
+    const setConfigPropertySpy = vi.fn();
+    (map as { setConfigProperty?: unknown }).setConfigProperty =
+      setConfigPropertySpy;
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://temp/map-payload-abc',
+          layers: [],
+          baseMapConfig: { colorWater: '#ff0000', lightPreset: 'night' }
+        }
+      }
+    });
+
+    expect(setConfigPropertySpy).toHaveBeenCalledWith(
+      'basemap',
+      'colorWater',
+      '#ff0000'
+    );
+    expect(setConfigPropertySpy).toHaveBeenCalledWith(
+      'basemap',
+      'lightPreset',
+      'night'
+    );
+  });
+
+  it('does not throw when the map has no setConfigProperty (e.g. a non-Standard base style)', () => {
+    const { sendToolResult, map } = loadScriptSandbox();
+    delete (map as { setConfigProperty?: unknown }).setConfigProperty;
+
+    expect(() =>
+      sendToolResult({
+        structuredContent: {
+          mapboxRender: {
+            ref: 'mapbox://temp/map-payload-abc',
+            layers: [],
+            baseMapConfig: { colorWater: '#ff0000' }
+          }
+        }
+      })
+    ).not.toThrow();
+  });
+
+  it('passes a layer slot through to map.addLayer', () => {
+    const { sendToolResult, map } = loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://temp/map-payload-abc',
+          layers: [
+            {
+              id: 'route',
+              type: 'line',
+              slot: 'top',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    [-77, 38],
+                    [-76, 39]
+                  ]
+                },
+                properties: {}
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'route', slot: 'top' })
+    );
+  });
+
+  it('omits slot from the addLayer call when not provided (default behavior unchanged)', () => {
+    const { sendToolResult, map } = loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://temp/map-payload-abc',
+          layers: [
+            {
+              id: 'route',
+              type: 'line',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    [-77, 38],
+                    [-76, 39]
+                  ]
+                },
+                properties: {}
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    const callArg = addLayerSpy.mock.calls[0][0] as { slot?: unknown };
+    expect(callArg.slot).toBeUndefined();
   });
 });
 
