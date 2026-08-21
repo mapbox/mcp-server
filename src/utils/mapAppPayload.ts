@@ -43,6 +43,52 @@ export interface MapAppLayer {
   paint?: Record<string, unknown>;
   /** Mapbox Style spec layout object, passed through to addLayer. */
   layout?: Record<string, unknown>;
+  /**
+   * Where to place this layer relative to the Standard base style's own
+   * layers ('bottom' | 'middle' | 'top'). Omit to keep the current
+   * behavior: the layer renders above everything, including labels.
+   */
+  slot?: 'bottom' | 'middle' | 'top';
+}
+
+/**
+ * Standard base-style config properties (`map.setConfigProperty('basemap',
+ * key, value)`), for restyling the base map itself rather than adding new
+ * layers on top of it. Only the currently-documented properties are typed;
+ * `.passthrough()` on the Zod schema below lets a Standard property Mapbox
+ * ships later flow through without a schema change here. Has no effect if
+ * the underlying base style isn't Standard.
+ */
+export interface MapAppBaseMapConfig {
+  theme?: 'default' | 'faded' | 'monochrome' | 'custom';
+  lightPreset?: 'day' | 'dawn' | 'dusk' | 'night';
+  colorWater?: string;
+  colorLand?: string;
+  colorGreenspace?: string;
+  colorMotorways?: string;
+  colorTrunks?: string;
+  colorRoads?: string;
+  colorBuildings?: string;
+  colorAdminBoundaries?: string;
+  colorCommercial?: string;
+  colorEducation?: string;
+  colorMedical?: string;
+  colorIndustrial?: string;
+  colorPlaceLabels?: string;
+  colorRoadLabels?: string;
+  colorPointOfInterestLabels?: string;
+  showPointOfInterestLabels?: boolean;
+  showTransitLabels?: boolean;
+  showPlaceLabels?: boolean;
+  showRoadLabels?: boolean;
+  showAdminBoundaries?: boolean;
+  showIndoor?: boolean;
+  showIndoorLabels?: boolean;
+  showLandmarkIconLabels?: boolean;
+  show3dObjects?: boolean;
+  show3dTrees?: boolean;
+  show3dFacades?: boolean;
+  densityPointOfInterestLabels?: number;
 }
 
 export interface MapAppMarker {
@@ -122,6 +168,8 @@ export interface MapAppPayload {
   defer?: MapAppDeferredLayer;
   /** Layers the iframe fetches and builds itself, post-initial-render. */
   selfFetch?: MapAppSelfFetch[];
+  /** Restyles the Standard base map itself (colors, theme, lightPreset, label visibility). */
+  baseMapConfig?: MapAppBaseMapConfig;
 }
 
 // Zod mirror of MapAppPayload, kept loose on paint/layout/geometry internals
@@ -150,8 +198,43 @@ const MapAppLayerSchema = z.object({
   type: z.enum(['fill', 'line', 'circle', 'symbol']),
   data: z.union([FeatureSchema, FeatureCollectionSchema]),
   paint: z.record(z.string(), z.unknown()).optional(),
-  layout: z.record(z.string(), z.unknown()).optional()
+  layout: z.record(z.string(), z.unknown()).optional(),
+  slot: z.enum(['bottom', 'middle', 'top']).optional()
 });
+
+const MapAppBaseMapConfigSchema = z
+  .object({
+    theme: z.enum(['default', 'faded', 'monochrome', 'custom']).optional(),
+    lightPreset: z.enum(['day', 'dawn', 'dusk', 'night']).optional(),
+    colorWater: z.string().optional(),
+    colorLand: z.string().optional(),
+    colorGreenspace: z.string().optional(),
+    colorMotorways: z.string().optional(),
+    colorTrunks: z.string().optional(),
+    colorRoads: z.string().optional(),
+    colorBuildings: z.string().optional(),
+    colorAdminBoundaries: z.string().optional(),
+    colorCommercial: z.string().optional(),
+    colorEducation: z.string().optional(),
+    colorMedical: z.string().optional(),
+    colorIndustrial: z.string().optional(),
+    colorPlaceLabels: z.string().optional(),
+    colorRoadLabels: z.string().optional(),
+    colorPointOfInterestLabels: z.string().optional(),
+    showPointOfInterestLabels: z.boolean().optional(),
+    showTransitLabels: z.boolean().optional(),
+    showPlaceLabels: z.boolean().optional(),
+    showRoadLabels: z.boolean().optional(),
+    showAdminBoundaries: z.boolean().optional(),
+    showIndoor: z.boolean().optional(),
+    showIndoorLabels: z.boolean().optional(),
+    showLandmarkIconLabels: z.boolean().optional(),
+    show3dObjects: z.boolean().optional(),
+    show3dTrees: z.boolean().optional(),
+    show3dFacades: z.boolean().optional(),
+    densityPointOfInterestLabels: z.number().optional()
+  })
+  .passthrough();
 
 const MapAppMarkerSchema = z.object({
   coordinates: z.tuple([z.number(), z.number()]),
@@ -197,7 +280,8 @@ export const MapAppPayloadSchema = z.object({
   markers: z.array(MapAppMarkerSchema).optional(),
   legend: z.array(MapAppLegendEntrySchema).optional(),
   camera: MapAppCameraSchema.optional(),
-  selfFetch: z.array(MapAppSelfFetchSchema).optional()
+  selfFetch: z.array(MapAppSelfFetchSchema).optional(),
+  baseMapConfig: MapAppBaseMapConfigSchema.optional()
 });
 
 /**

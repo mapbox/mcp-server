@@ -618,4 +618,49 @@ describe('RenderMapTool', () => {
     const text = (result.content[0] as { type: 'text'; text: string }).text;
     expect(text).toContain('will also fetch and draw');
   });
+
+  it('accepts a baseMapConfig-only call with no layers/markers/refs', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      baseMapConfig: { colorWater: '#ff0000' }
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      layer_count: number;
+      mapboxRender?: { baseMapConfig?: Record<string, unknown> };
+    };
+    expect(sc.layer_count).toBe(0);
+    expect(sc.mapboxRender?.baseMapConfig).toEqual({ colorWater: '#ff0000' });
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Updated the base map style');
+  });
+
+  it('still errors with nothing to render when baseMapConfig and everything else are absent', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({});
+
+    expect(result.isError).toBe(true);
+  });
+
+  it('carries baseMapConfig through when merged with a payload_ref', async () => {
+    const { buildSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const ref = buildSelfFetchRef('isochrone', {
+      coordinates: [-122.4194, 37.7749],
+      contours_minutes: [10]
+    });
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      payload_refs: [ref],
+      baseMapConfig: { lightPreset: 'night' }
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      mapboxRender?: { baseMapConfig?: Record<string, unknown> };
+    };
+    expect(sc.mapboxRender?.baseMapConfig).toEqual({ lightPreset: 'night' });
+  });
 });
