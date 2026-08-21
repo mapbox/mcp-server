@@ -33,6 +33,12 @@ const layerSchema = z.object({
     .optional()
     .describe(
       'Mapbox Style Spec layout object (e.g. { "line-join": "round", "line-cap": "round" })'
+    ),
+  slot: z
+    .enum(['bottom', 'middle', 'top'])
+    .optional()
+    .describe(
+      'Placement relative to the base map\'s own layers. "bottom": below all basemap layers. "middle": above land/water but below roads, buildings, and labels — the usual choice for data-viz layers (isochrones, choropleths). "top": above all basemap layers except labels — the usual choice for routes and highlighted features. Omit to render above everything, including labels (prior default behavior).'
     )
 });
 
@@ -78,6 +84,49 @@ const cameraSchema = z.object({
     )
 });
 
+const baseMapConfigSchema = z
+  .object({
+    theme: z
+      .enum(['default', 'faded', 'monochrome', 'custom'])
+      .optional()
+      .describe('Overall color treatment of the base map.'),
+    lightPreset: z
+      .enum(['day', 'dawn', 'dusk', 'night'])
+      .optional()
+      .describe('Lighting/shadow preset.'),
+    colorWater: z.string().optional().describe('CSS color override for water.'),
+    colorLand: z.string().optional().describe('CSS color override for land.'),
+    colorGreenspace: z.string().optional(),
+    colorMotorways: z.string().optional(),
+    colorTrunks: z.string().optional(),
+    colorRoads: z.string().optional(),
+    colorBuildings: z.string().optional(),
+    colorAdminBoundaries: z.string().optional(),
+    colorCommercial: z.string().optional(),
+    colorEducation: z.string().optional(),
+    colorMedical: z.string().optional(),
+    colorIndustrial: z.string().optional(),
+    colorPlaceLabels: z.string().optional(),
+    colorRoadLabels: z.string().optional(),
+    colorPointOfInterestLabels: z.string().optional(),
+    showPointOfInterestLabels: z.boolean().optional(),
+    showTransitLabels: z.boolean().optional(),
+    showPlaceLabels: z.boolean().optional(),
+    showRoadLabels: z.boolean().optional(),
+    showAdminBoundaries: z.boolean().optional(),
+    showIndoor: z.boolean().optional(),
+    showIndoorLabels: z.boolean().optional(),
+    showLandmarkIconLabels: z.boolean().optional(),
+    show3dObjects: z.boolean().optional(),
+    show3dTrees: z.boolean().optional(),
+    show3dFacades: z.boolean().optional(),
+    densityPointOfInterestLabels: z.number().optional()
+  })
+  .passthrough()
+  .describe(
+    'Restyles the Standard base map itself via Mapbox\'s config-property system (map.setConfigProperty) — e.g. { "colorWater": "#ff0000" } to turn the water red, or { "lightPreset": "night" } for night lighting. Only the currently-documented Standard properties are typed above; unrecognized keys still pass through in case Mapbox ships new ones. Has no effect if the base style isn\'t Standard.'
+  );
+
 export const RenderMapInputSchema = z.object({
   /**
    * Preferred way to pass data from another Mapbox tool. Every geo tool
@@ -118,7 +167,8 @@ export const RenderMapInputSchema = z.object({
     .optional()
     .describe(
       'Initial camera position. If omitted, the map auto-fits to the union of all data.'
-    )
+    ),
+  baseMapConfig: baseMapConfigSchema.optional()
 });
 
 export type RenderMapInput = z.infer<typeof RenderMapInputSchema>;

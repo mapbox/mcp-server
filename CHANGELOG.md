@@ -1,5 +1,9 @@
 ## Unreleased
 
+### New Features
+
+- **`render_map_tool`: restyle the base map itself via `baseMapConfig`, and place custom layers with `slot`.** Previously `MapAppPayload`/`RenderMapInputSchema` only supported adding new GeoJSON layers on top of a fixed base map. `baseMapConfig` exposes Mapbox Standard's config-property system (`map.setConfigProperty('basemap', ...)`) — e.g. `{ "colorWater": "#ff0000" }` turns the water red, or `{ "lightPreset": "night" }` switches to night lighting — covering colors, `theme`, `lightPreset`, and label/3D-object visibility toggles. Applied at map-construction time (via the `config` option, when present in the initial payload) to avoid a flash of default colors, and via `setConfigProperty` on later re-renders. `layers[].slot` (`"bottom" | "middle" | "top"`) places a custom layer relative to Standard's own layers instead of always rendering above everything, including labels (still the default when `slot` is omitted). Both verified live in a real browser against the Mapbox API. See `docs/render-map-tool.md` for the full property list and an example. Filed as #249 after a user asked whether `render_map_tool` could turn the water red on the fly.
+
 ### Breaking Changes
 
 - **`place_details_tool` now calls the Mapbox Places API instead of the older Details API.** The tool previously called `search/details/v1/retrieve` (`docs.mapbox.com/api/search/details/`); it now calls `places/v1/details/retrieve` (`docs.mapbox.com/api/search/places/`), a separate, newer product built around a larger POI dataset. This is not a compatible upgrade:

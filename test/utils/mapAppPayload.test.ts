@@ -4,7 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   decodePolyline,
-  decodePolylineWithFallback
+  decodePolylineWithFallback,
+  MapAppPayloadSchema
 } from '../../src/utils/mapAppPayload.js';
 
 describe('decodePolyline', () => {
@@ -33,5 +34,66 @@ describe('decodePolyline', () => {
     expect(out).not.toBeNull();
     expect(out!.length).toBe(3);
     expect(out![0][0]).toBeCloseTo(-120.2, 4);
+  });
+});
+
+describe('MapAppPayloadSchema baseMapConfig/slot', () => {
+  const baseLayer = {
+    id: 'route',
+    type: 'line' as const,
+    data: {
+      type: 'Feature' as const,
+      geometry: { type: 'LineString' as const, coordinates: [] }
+    }
+  };
+
+  it('accepts a documented baseMapConfig key', () => {
+    const parsed = MapAppPayloadSchema.parse({
+      layers: [],
+      baseMapConfig: { colorWater: '#ff0000', lightPreset: 'night' }
+    });
+    expect(parsed.baseMapConfig).toEqual({
+      colorWater: '#ff0000',
+      lightPreset: 'night'
+    });
+  });
+
+  it('passes through an undocumented baseMapConfig key rather than stripping it', () => {
+    const parsed = MapAppPayloadSchema.parse({
+      layers: [],
+      baseMapConfig: { someFutureStandardProperty: 'value' }
+    });
+    expect(parsed.baseMapConfig).toEqual({
+      someFutureStandardProperty: 'value'
+    });
+  });
+
+  it('rejects an invalid enum value for a typed baseMapConfig key', () => {
+    expect(() =>
+      MapAppPayloadSchema.parse({
+        layers: [],
+        baseMapConfig: { lightPreset: 'midnight' }
+      })
+    ).toThrow();
+  });
+
+  it('accepts a layer with a valid slot', () => {
+    const parsed = MapAppPayloadSchema.parse({
+      layers: [{ ...baseLayer, slot: 'middle' }]
+    });
+    expect(parsed.layers[0].slot).toBe('middle');
+  });
+
+  it('rejects a layer with an invalid slot', () => {
+    expect(() =>
+      MapAppPayloadSchema.parse({
+        layers: [{ ...baseLayer, slot: 'sideways' }]
+      })
+    ).toThrow();
+  });
+
+  it('omits slot when not provided (default behavior unchanged)', () => {
+    const parsed = MapAppPayloadSchema.parse({ layers: [baseLayer] });
+    expect(parsed.layers[0].slot).toBeUndefined();
   });
 });
