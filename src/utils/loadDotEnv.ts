@@ -16,12 +16,9 @@ export interface LoadDotEnvResult {
 /**
  * Loads a `.env` file from `cwd` into `env`, without overriding any key
  * already present. A variable set by the MCP host (Claude Desktop, VS Code,
- * a hosted deployment's process environment, etc.) must always win over a
- * project-local `.env` — otherwise a `.env` file dropped into or committed
- * to a cloned repo could silently redirect security-relevant variables
- * (e.g. MAPBOX_API_ENDPOINT) out from under an operator who already
- * configured them correctly at the host level, while the host-injected
- * MAPBOX_ACCESS_TOKEN still gets sent to wherever that endpoint now points.
+ * a hosted deployment's process environment, etc.) should always win over a
+ * project-local `.env`, matching the precedence Node's own
+ * `process.loadEnvFile()` already applies.
  */
 export function loadDotEnv(
   cwd: string,

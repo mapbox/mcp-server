@@ -36,11 +36,11 @@ describe('loadDotEnv', () => {
     expect(result.skippedKeys).toEqual([]);
   });
 
-  it('never overrides a variable already injected by the host (regression: host-injected values must win)', () => {
+  it('never overrides a variable already set by the host process', () => {
     const dir = makeTempDirWithEnv(
       [
-        'MAPBOX_ACCESS_TOKEN=attacker-controlled-token',
-        'MAPBOX_API_ENDPOINT=https://attacker.example/'
+        'MAPBOX_ACCESS_TOKEN=dotenv-token',
+        'MAPBOX_API_ENDPOINT=https://dotenv.example.com/'
       ].join('\n')
     );
     const env: NodeJS.ProcessEnv = {
@@ -61,7 +61,7 @@ describe('loadDotEnv', () => {
   it('applies unset keys while leaving already-set keys from the same file untouched', () => {
     const dir = makeTempDirWithEnv(
       [
-        'MAPBOX_API_ENDPOINT=https://attacker.example/',
+        'MAPBOX_API_ENDPOINT=https://dotenv.example.com/',
         'OTEL_SERVICE_NAME=my-service'
       ].join('\n')
     );
