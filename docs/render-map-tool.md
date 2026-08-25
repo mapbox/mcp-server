@@ -20,6 +20,8 @@
 1. **Chain-position limitation**: several MCP App hosts (Claude Desktop among them) only fully render the interactive panel for the _last_ tool call in a sequence. Funneling every visualization through one terminal tool means the map always renders, regardless of how many other tools ran first.
 2. **Token efficiency**: geometry (a route polyline, a set of isochrone contours, a polygon boundary) can be tens of thousands of coordinate pairs. Passing it through the model as tool-call arguments is slow and expensive. The other Mapbox tools in this server avoid that by stashing their result behind a short reference string (`payload_refs`) instead of inlining the geometry — but this is an optimization, not a requirement. You're always free to pass geometry inline instead.
 
+**Base map style**: the underlying base map is always [Mapbox Standard](https://docs.mapbox.com/map-styles/standard/guides/). Beyond drawing your own layers/markers on top of it, you can restyle Standard itself (colors, lighting, label visibility) via `baseMapConfig` — see the [Payload reference](#payload-reference) below.
+
 ## Two ways to use it
 
 | Mode           | When to use it                                                                                     | What you pass                                                                                       |
@@ -121,24 +123,26 @@ An LLM using this server is instructed (via each tool's own output) to call `ren
 
 All fields are optional; provide whichever combination fits what you're drawing.
 
-| Field          | Type       | Description                                                                                  |
-| -------------- | ---------- | -------------------------------------------------------------------------------------------- |
-| `payload_refs` | `string[]` | Reference strings from other tools' `mapboxRender.ref`. Merges with any inline fields below. |
-| `summary`      | `string`   | Short header chip shown top-left on the map (e.g. `"Route: 12.4 mi, 23 min"`).               |
-| `layers`       | array      | Inline GL JS layers — see below.                                                             |
-| `markers`      | array      | Inline point markers — see below.                                                            |
-| `legend`       | array      | Inline legend rows — see below.                                                              |
-| `camera`       | object     | Initial camera position. If omitted, the map auto-fits to everything drawn.                  |
+| Field           | Type       | Description                                                                                    |
+| --------------- | ---------- | ---------------------------------------------------------------------------------------------- |
+| `payload_refs`  | `string[]` | Reference strings from other tools' `mapboxRender.ref`. Merges with any inline fields below.   |
+| `summary`       | `string`   | Short header chip shown top-left on the map (e.g. `"Route: 12.4 mi, 23 min"`).                 |
+| `layers`        | array      | Inline GL JS layers — see below.                                                               |
+| `markers`       | array      | Inline point markers — see below.                                                              |
+| `legend`        | array      | Inline legend rows — see below.                                                                |
+| `camera`        | object     | Initial camera position. If omitted, the map auto-fits to everything drawn.                    |
+| `baseMapConfig` | object     | Restyles the Standard base map itself (colors, theme, lighting, label visibility) — see below. |
 
 **`layers[]`** — one entry per Mapbox GL JS source+layer pair:
 
-| Field    | Type                                       | Description                                                                                                                                                                       |
-| -------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`     | `string`                                   | Unique id within the payload (used as both source id and layer id).                                                                                                               |
-| `type`   | `"fill" \| "line" \| "circle" \| "symbol"` | Mapbox GL layer type.                                                                                                                                                             |
-| `data`   | GeoJSON `Feature` or `FeatureCollection`   | Geometry must be `Point`, `LineString`, `Polygon`, or `MultiPolygon`. Coordinates are `[longitude, latitude]`.                                                                    |
-| `paint`  | object                                     | [Mapbox Style Spec](https://docs.mapbox.com/style-spec/reference/layers/) paint object, passed through to `addLayer` as-is (e.g. `{ "line-color": "#3b82f6", "line-width": 5 }`). |
-| `layout` | object                                     | Style Spec layout object (e.g. `{ "line-join": "round", "line-cap": "round" }`).                                                                                                  |
+| Field    | Type                                       | Description                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`     | `string`                                   | Unique id within the payload (used as both source id and layer id).                                                                                                                                                                                                                                                                                                                                              |
+| `type`   | `"fill" \| "line" \| "circle" \| "symbol"` | Mapbox GL layer type.                                                                                                                                                                                                                                                                                                                                                                                            |
+| `data`   | GeoJSON `Feature` or `FeatureCollection`   | Geometry must be `Point`, `LineString`, `Polygon`, or `MultiPolygon`. Coordinates are `[longitude, latitude]`.                                                                                                                                                                                                                                                                                                   |
+| `paint`  | object                                     | [Mapbox Style Spec](https://docs.mapbox.com/style-spec/reference/layers/) paint object, passed through to `addLayer` as-is (e.g. `{ "line-color": "#3b82f6", "line-width": 5 }`).                                                                                                                                                                                                                                |
+| `layout` | object                                     | Style Spec layout object (e.g. `{ "line-join": "round", "line-cap": "round" }`).                                                                                                                                                                                                                                                                                                                                 |
+| `slot`   | `"bottom" \| "middle" \| "top"`            | Placement relative to the base map's own layers. `"bottom"`: below all basemap layers. `"middle"`: above land/water but below roads, buildings, and labels — the usual choice for data-viz layers (isochrones, choropleths). `"top"`: above all basemap layers except labels — the usual choice for routes and highlighted features. Omit to render above everything, including labels (prior default behavior). |
 
 **`markers[]`** — one entry per point marker:
 
@@ -165,6 +169,22 @@ All fields are optional; provide whichever combination fits what you're drawing.
 | `center` | `[number, number]`                     | `[longitude, latitude]`.                                                                                |
 | `zoom`   | `number`                               | Zoom level.                                                                                             |
 | `bounds` | `[[number, number], [number, number]]` | `[[minLng, minLat], [maxLng, maxLat]]`. Takes precedence over `center`/`zoom` and over auto-fit if set. |
+
+**`baseMapConfig`** — restyles the [Mapbox Standard](https://docs.mapbox.com/map-styles/standard/guides/) base map itself via its [config-property system](https://docs.mapbox.com/map-styles/standard/api/) (`map.setConfigProperty('basemap', ...)`), rather than adding a new layer on top of it. For example, `{ "colorWater": "#ff0000" }` turns the water red:
+
+![A San Francisco map with the water rendered bright red via baseMapConfig's colorWater property, with a route line and marker drawn on top](./images/render-map-tool-base-map-config.png)
+
+| Field                                                                                                                                                                                                                                                                              | Type                                               | Description                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| `theme`                                                                                                                                                                                                                                                                            | `"default" \| "faded" \| "monochrome" \| "custom"` | Overall color treatment.                           |
+| `lightPreset`                                                                                                                                                                                                                                                                      | `"day" \| "dawn" \| "dusk" \| "night"`             | Lighting/shadow preset.                            |
+| `colorWater`, `colorLand`, `colorGreenspace`, `colorMotorways`, `colorTrunks`, `colorRoads`, `colorBuildings`, `colorAdminBoundaries`, `colorCommercial`, `colorEducation`, `colorMedical`, `colorIndustrial`, `colorPlaceLabels`, `colorRoadLabels`, `colorPointOfInterestLabels` | `string`                                           | CSS color override for the named base-map feature. |
+| `showPointOfInterestLabels`, `showTransitLabels`, `showPlaceLabels`, `showRoadLabels`, `showAdminBoundaries`, `showIndoor`, `showIndoorLabels`, `showLandmarkIconLabels`, `show3dObjects`, `show3dTrees`, `show3dFacades`                                                          | `boolean`                                          | Toggles visibility of the named base-map feature.  |
+| `densityPointOfInterestLabels`                                                                                                                                                                                                                                                     | `number`                                           | POI label density.                                 |
+
+Only the properties above are typed in the schema, but unrecognized keys still pass through — useful if Mapbox ships a new Standard config property before this list is updated.
+
+**Important**: like every other field, `baseMapConfig` participates in `render_map_tool`'s "fresh render" model — a call doesn't accumulate on top of a previous one. If you want to restyle a map that already has data on it, re-pass the same `payload_refs`/`layers` alongside `baseMapConfig` in the same call, rather than sending `baseMapConfig` alone (a `baseMapConfig`-only call is valid, but renders a blank map in the new style with no data on it).
 
 The payload format is intentionally a thin pass-through to the Mapbox Style Spec rather than its own DSL — anything expressible as a GL JS `paint`/`layout` object is expressible here, so you're not limited to a fixed set of pre-baked styles.
 
