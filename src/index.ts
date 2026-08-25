@@ -261,6 +261,22 @@ async function main() {
     }
   }
 
+  // Registered before connect() so it's already in place the moment the
+  // client's initialize handshake completes. getClientCapabilities() and
+  // getClientVersion() are only populated once the server has processed the
+  // client's `initialize` request -- reading them synchronously right after
+  // `server.connect()` races that request and reliably sees them as unset,
+  // since connect() only waits for the transport to start, not for the
+  // handshake to finish.
+  server.server.oninitialized = () => {
+    onClientInitialized().catch((error) => {
+      server.server.sendLoggingMessage({
+        level: 'warning',
+        data: `Error handling client initialization: ${error instanceof Error ? error.message : String(error)}`
+      });
+    });
+  };
+
   // Start receiving messages on stdin and sending messages on stdout
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -317,8 +333,19 @@ async function main() {
     level: 'debug',
     data: JSON.stringify(relevantEnvVars, null, 2)
   });
+}
 
-  // After connection, dynamically register capability-dependent tools
+// Runs once per session, after the client's initialize handshake completes
+// (see the `oninitialized` registration in main() for why that timing
+// matters). Reports which client connected and registers any tools gated on
+// capabilities the client declared during that handshake.
+async function onClientInitialized() {
+  const clientInfo = server.server.getClientVersion();
+  server.server.sendLoggingMessage({
+    level: 'info',
+    data: `Client identified as: ${clientInfo?.name ?? 'unknown'} v${clientInfo?.version ?? 'unknown'}`
+  });
+
   const clientCapabilities = server.server.getClientCapabilities();
 
   // Debug: Log what capabilities we detected
