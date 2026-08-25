@@ -35,7 +35,8 @@ import {
   initializeTracing,
   shutdownTracing,
   isTracingInitialized,
-  getTracer
+  getTracer,
+  setClientInfo
 } from './utils/tracing.js';
 
 // Load .env from current working directory (where npm run is executed)
@@ -345,6 +346,9 @@ async function onClientInitialized() {
     level: 'info',
     data: `Client identified as: ${clientInfo?.name ?? 'unknown'} v${clientInfo?.version ?? 'unknown'}`
   });
+  // Recorded so every subsequent tool-execution span carries it too --
+  // see setClientInfo's doc comment in tracing.ts.
+  setClientInfo(clientInfo);
 
   const clientCapabilities = server.server.getClientCapabilities();
 
