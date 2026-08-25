@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Security
+
+- **`.env` loading no longer overrides variables already set in the process environment.** The startup loader applied every key from a project-local `.env` (found via `process.cwd()`) directly onto `process.env`, replacing anything already there. A `.env` file added to (or modified within) the working directory — e.g. by a repo contributor, or anything else with write access to that directory — could therefore override `MAPBOX_API_ENDPOINT` after the MCP host (Claude Desktop, VS Code, a hosted deployment, etc.) had already configured it correctly, while the host-injected `MAPBOX_ACCESS_TOKEN` remained valid and kept getting sent as `access_token` to whatever host the overridden endpoint now pointed at — exfiltrating the token to an attacker-controlled server with no error surfaced to the operator. `.env` loading (`src/utils/loadDotEnv.ts`) now skips any key that already exists in `process.env`, matching the intent of Node's own `process.loadEnvFile()`; skipped keys are reported in the server's startup log message and tracing span so this is never silent.
+
 ### Breaking Changes
 
 - **`place_details_tool` now calls the Mapbox Places API instead of the older Details API.** The tool previously called `search/details/v1/retrieve` (`docs.mapbox.com/api/search/details/`); it now calls `places/v1/details/retrieve` (`docs.mapbox.com/api/search/places/`), a separate, newer product built around a larger POI dataset. This is not a compatible upgrade:
