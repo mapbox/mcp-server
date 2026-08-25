@@ -168,7 +168,13 @@ export const RenderMapInputSchema = z.object({
     .describe(
       'Initial camera position. If omitted, the map auto-fits to the union of all data.'
     ),
-  baseMapConfig: baseMapConfigSchema.optional()
+  baseMapConfig: baseMapConfigSchema.optional(),
+  baseStyle: z
+    .enum(['standard', 'standard-satellite'])
+    .optional()
+    .describe(
+      'Which Mapbox-owned base style to load; defaults to "standard". "standard-satellite" is the same Standard style family rendered over global satellite imagery instead of a vector basemap — same config-property system and bottom/middle/top slots apply, but it has no theme and no flat-color overrides like colorWater/colorBuildings (there\'s no vector surface to recolor). See https://docs.mapbox.com/map-styles/reference/standard-satellite/ for its supported baseMapConfig properties.'
+    )
 });
 
 export type RenderMapInput = z.infer<typeof RenderMapInputSchema>;

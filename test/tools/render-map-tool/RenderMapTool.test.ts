@@ -663,4 +663,42 @@ describe('RenderMapTool', () => {
     };
     expect(sc.mapboxRender?.baseMapConfig).toEqual({ lightPreset: 'night' });
   });
+
+  it('accepts a baseStyle-only call with no layers/markers/refs', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      baseStyle: 'standard-satellite'
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      layer_count: number;
+      mapboxRender?: { baseStyle?: string };
+    };
+    expect(sc.layer_count).toBe(0);
+    expect(sc.mapboxRender?.baseStyle).toBe('standard-satellite');
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('Updated the base map style');
+  });
+
+  it('carries baseStyle through when merged with a payload_ref', async () => {
+    const { buildSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const ref = buildSelfFetchRef('isochrone', {
+      coordinates: [-122.4194, 37.7749],
+      contours_minutes: [10]
+    });
+
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      payload_refs: [ref],
+      baseStyle: 'standard-satellite'
+    });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      mapboxRender?: { baseStyle?: string };
+    };
+    expect(sc.mapboxRender?.baseStyle).toBe('standard-satellite');
+  });
 });
