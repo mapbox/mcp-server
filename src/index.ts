@@ -1,13 +1,10 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-// Load environment variables from .env file if present
-// Use Node.js built-in util.parseEnv() and manually apply to override existing vars
-import { parseEnv } from 'node:util';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+// Load environment variables from .env file if present, without overriding
+// anything the MCP host already injected into process.env (see loadDotEnv).
 import { SpanStatusCode } from '@opentelemetry/api';
+import { loadDotEnv } from './utils/loadDotEnv.js';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -40,27 +37,22 @@ import {
 } from './utils/tracing.js';
 
 // Load .env from current working directory (where npm run is executed)
-// This happens before tracing is initialized, but we'll add a span when tracing is ready
-const envPath = join(process.cwd(), '.env');
-let envLoadError: Error | null = null;
-let envLoadedCount = 0;
-
-if (existsSync(envPath)) {
-  try {
-    // Read and parse .env file using Node.js built-in parseEnv
-    const envFile = readFileSync(envPath, 'utf-8');
-    const parsed = parseEnv(envFile);
-
-    // Apply parsed values to process.env (with override)
-    // Note: process.loadEnvFile() doesn't override, so we use parseEnv + manual assignment
-    for (const [key, value] of Object.entries(parsed)) {
-      process.env[key] = value;
-      envLoadedCount++;
-    }
-  } catch (error) {
-    envLoadError = error instanceof Error ? error : new Error(String(error));
-  }
-}
+// This happens before tracing is initialized, but we'll add a span when tracing is ready.
+// MAPBOX_ACCESS_TOKEN/MAPBOX_API_ENDPOINT are excluded even when unset: a
+// project-local .env redirecting MAPBOX_API_ENDPOINT would otherwise still
+// cause the real host-injected access token to be sent to that endpoint,
+// even in the common case where the host never set MAPBOX_API_ENDPOINT
+// itself and relies on the built-in api.mapbox.com default.
+const DOTENV_PROTECTED_KEYS = new Set([
+  'MAPBOX_ACCESS_TOKEN',
+  'MAPBOX_API_ENDPOINT'
+]);
+const envResult = loadDotEnv(process.cwd(), process.env, DOTENV_PROTECTED_KEYS);
+const envPath = envResult.path;
+const envLoadError = envResult.error;
+const envLoadedCount = envResult.appliedCount;
+const envSkippedKeys = envResult.skippedKeys;
+const envBlockedKeys = envResult.blockedKeys;
 
 const versionInfo = getVersionInfo();
 const cliMetadataResult = handleCliMetadataArgs(
@@ -230,8 +222,10 @@ async function main() {
         const span = tracer.startSpan('config.load_env', {
           attributes: {
             'config.file.path': envPath,
-            'config.file.exists': existsSync(envPath),
+            'config.file.exists': envResult.exists,
             'config.vars.loaded': envLoadedCount,
+            'config.vars.skipped': envSkippedKeys.length,
+            'config.vars.blocked': envBlockedKeys.length,
             'operation.type': 'config_load'
           }
         });
@@ -244,7 +238,11 @@ async function main() {
           });
           span.setAttribute('error.type', envLoadError.name);
           span.setAttribute('error.message', envLoadError.message);
-        } else if (envLoadedCount > 0) {
+        } else if (
+          envLoadedCount > 0 ||
+          envSkippedKeys.length > 0 ||
+          envBlockedKeys.length > 0
+        ) {
           span.setStatus({ code: SpanStatusCode.OK });
           span.setAttribute('config.load.success', true);
         } else {
@@ -314,10 +312,35 @@ async function main() {
       level: 'warning',
       data: `Warning loading .env file: ${envLoadError.message}`
     });
-  } else if (envLoadedCount > 0) {
+  } else if (
+    envLoadedCount > 0 ||
+    envSkippedKeys.length > 0 ||
+    envBlockedKeys.length > 0
+  ) {
+    const parts: string[] = [];
+    if (envLoadedCount > 0) {
+      parts.push(
+        `loaded ${envLoadedCount} environment variable(s) from ${envPath}`
+      );
+    }
+    if (envSkippedKeys.length > 0) {
+      // These keys were already set (e.g. injected by the MCP host) and were
+      // intentionally left unchanged — a .env file never overrides an
+      // already-set variable. Surfaced so this is never silent.
+      parts.push(
+        `left ${envSkippedKeys.length} already-set variable(s) from ${envPath} unchanged: ${envSkippedKeys.join(', ')}`
+      );
+    }
+    if (envBlockedKeys.length > 0) {
+      // Security-sensitive keys a .env file may never set, even when unset
+      // in the process environment -- see DOTENV_PROTECTED_KEYS above.
+      parts.push(
+        `ignored ${envBlockedKeys.length} security-sensitive variable(s) from ${envPath} (not settable via .env): ${envBlockedKeys.join(', ')}`
+      );
+    }
     server.server.sendLoggingMessage({
       level: 'info',
-      data: `Loaded ${envLoadedCount} environment variables from ${envPath}`
+      data: parts.join('; ')
     });
   }
 
