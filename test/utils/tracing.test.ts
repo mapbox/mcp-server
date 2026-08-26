@@ -12,7 +12,8 @@ import {
   markSpanSuccess,
   markSpanError,
   validateJwtForTracing,
-  getObjectSize
+  getObjectSize,
+  setClientInfo
 } from '../../src/utils/tracing.js';
 
 // Mock the OpenTelemetry modules to avoid actual tracing in tests
@@ -58,6 +59,7 @@ vi.mock('@opentelemetry/api', () => ({
 describe('tracing utilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setClientInfo(undefined);
   });
 
   afterEach(async () => {
@@ -155,6 +157,33 @@ describe('tracing utilities', () => {
           'session.id': 'session-123',
           'user.id': 'user-456',
           'account.id': 'account-789'
+        }
+      });
+    });
+
+    it('should include the connected client name/version once set via setClientInfo', () => {
+      const tracer = getTracer();
+      const mockSpan = {
+        setAttributes: vi.fn(),
+        setStatus: vi.fn(),
+        recordException: vi.fn(),
+        end: vi.fn()
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(tracer.startSpan).mockReturnValue(mockSpan as any);
+
+      setClientInfo({ name: 'claude-ai', version: '1.0.0' });
+      createToolSpan('test_tool', 1024);
+
+      expect(tracer.startSpan).toHaveBeenCalledWith('tool.test_tool', {
+        kind: expect.any(Number),
+        attributes: {
+          'tool.name': 'test_tool',
+          'tool.input.size': 1024,
+          'operation.type': 'tool_execution',
+          'mcp.client.name': 'claude-ai',
+          'mcp.client.version': '1.0.0'
         }
       });
     });
