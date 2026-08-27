@@ -29,10 +29,16 @@ export class DirectionsTool extends MapboxApiBasedTool<
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
     'Returns a `mapboxRender.ref` in structuredContent regardless of the geometries value - pass ' +
-    'it to render_map_tool to display the route on a live Mapbox GL JS map. ' +
+    'it to render_map_tool to display the route on a live Mapbox GL JS map (this always works, ' +
+    'for any trip length, independent of what you pass for geometries/overview below). ' +
     'Use geometries="none" (default) for compact text/data responses (distance, duration, ' +
-    'turn-by-turn instructions). Use geometries="geojson" only when you need the raw route ' +
-    'coordinates in the response yourself - the map preview works either way.';
+    'turn-by-turn instructions, congestion). Use geometries="geojson" whenever YOU need the ' +
+    'route coordinates yourself, e.g. to draw the route in your own app - this always returns ' +
+    'coordinates directly in this response, for a 2-mile trip and a 400-mile one alike, because ' +
+    'it defaults to a simplified-but-fully-drawable geometry (see the `overview` parameter). ' +
+    'Only if you explicitly request overview="full" (maximum-precision geometry) can a very ' +
+    "long trip still exceed this response's size limit; in that rare case the full geometry is " +
+    'stored as a `mapbox://temp/...` resource instead, readable via the MCP resources API.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
