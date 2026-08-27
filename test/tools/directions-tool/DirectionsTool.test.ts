@@ -79,7 +79,10 @@ describe('DirectionsTool', () => {
     expect(calledUrl).toContain('geometries=geojson');
     expect(calledUrl).toContain('alternatives=true');
     expect(calledUrl).toContain('annotations=distance%2Cspeed');
-    expect(calledUrl).toContain('overview=full');
+    // Defaults to simplified for geometries=geojson -- see the
+    // "always returns coordinates directly, regardless of trip length"
+    // tests below for why.
+    expect(calledUrl).toContain('overview=simplified');
     expect(calledUrl).toContain('exclude=ferry');
     assertHeadersSent(mockHttpRequest);
   });
@@ -1308,6 +1311,141 @@ describe('DirectionsTool', () => {
       expect(sc?.mapboxRender?.ref).toMatch(
         /^mapbox:\/\/selffetch\/directions\?data=/
       );
+    });
+
+    describe('geometries="geojson" returns coordinates directly for both short and long trips', () => {
+      // A realistic *cleaned* shape for a long trip fetched with the new
+      // default overview=simplified: still just a few dozen coordinate
+      // pairs (confirmed live against the real Directions API for a real
+      // London->Edinburgh route: 46 points, ~4.7KB total), unlike overview
+      // =full's tens of thousands. cleanResponseData is identity-mocked in
+      // this file's beforeEach, so this fixture stands in for its own
+      // output directly.
+      function longRouteResponse() {
+        const geometry = {
+          type: 'LineString',
+          coordinates: Array.from({ length: 46 }, (_, i) => [
+            -0.1278 + i * 0.065,
+            51.5074 + i * 0.0967
+          ])
+        };
+        return {
+          code: 'Ok',
+          routes: [
+            {
+              distance: 671000,
+              duration: 26400,
+              geometry,
+              leg_summaries: ['A1, M1, A68'],
+              intersecting_admins: ['GBR'],
+              notifications_summary: [],
+              incidents_summary: [
+                {
+                  type: 'construction',
+                  impact: 'major',
+                  affected_road_names: ['A1']
+                }
+              ],
+              num_legs: 1,
+              average_speed_kph: 91
+              // No congestion_information -- overview=simplified can't
+              // request the congestion annotation (see
+              // buildDirectionsRequestUrl.ts).
+            }
+          ],
+          waypoints: [
+            { location: [-0.1278, 51.5074], name: '' },
+            { location: [-3.1883, 55.9533], name: '' }
+          ]
+        };
+      }
+
+      function shortRouteResponse() {
+        return {
+          code: 'Ok',
+          routes: [
+            {
+              distance: 1500,
+              duration: 180,
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-74.0, 40.7],
+                  [-74.005, 40.705],
+                  [-74.01, 40.71]
+                ]
+              },
+              leg_summaries: ['Main St'],
+              num_legs: 1,
+              average_speed_kph: 30
+            }
+          ],
+          waypoints: [
+            { location: [-74.0, 40.7], name: '' },
+            { location: [-74.01, 40.71], name: '' }
+          ]
+        };
+      }
+
+      it('returns geometry directly, with no mapbox://temp/ fallback, for a long trip', async () => {
+        const httpRequestFn = mockHttpRequestForGeometry(longRouteResponse());
+        const result = await new DirectionsTool({
+          httpRequest: httpRequestFn
+        }).run({
+          coordinates: [
+            { longitude: -0.1278, latitude: 51.5074 },
+            { longitude: -3.1883, latitude: 55.9533 }
+          ],
+          geometries: 'geojson'
+        });
+
+        expect(result.isError).toBe(false);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).not.toContain('mapbox://temp/');
+        expect(text).not.toContain('exceeds context limit');
+        expect(Buffer.byteLength(text, 'utf8')).toBeLessThan(50 * 1024);
+
+        const sc = result.structuredContent as {
+          routes?: Array<{ geometry?: { coordinates?: unknown[] } }>;
+        };
+        expect(sc.routes?.[0]?.geometry?.coordinates?.length).toBe(46);
+      });
+
+      it('returns geometry directly, in the same response shape, for a short trip', async () => {
+        const httpRequestFn = mockHttpRequestForGeometry(shortRouteResponse());
+        const result = await new DirectionsTool({
+          httpRequest: httpRequestFn
+        }).run({
+          coordinates: [
+            { longitude: -74.0, latitude: 40.7 },
+            { longitude: -74.01, latitude: 40.71 }
+          ],
+          geometries: 'geojson'
+        });
+
+        expect(result.isError).toBe(false);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).not.toContain('mapbox://temp/');
+
+        const sc = result.structuredContent as {
+          routes?: Array<{ geometry?: { coordinates?: unknown[] } }>;
+        };
+        expect(sc.routes?.[0]?.geometry?.coordinates?.length).toBe(3);
+      });
+
+      it('requests overview=simplified by default for the long trip (the actual fix)', async () => {
+        const httpRequestFn = mockHttpRequestForGeometry(longRouteResponse());
+        await new DirectionsTool({ httpRequest: httpRequestFn }).run({
+          coordinates: [
+            { longitude: -0.1278, latitude: 51.5074 },
+            { longitude: -3.1883, latitude: 55.9533 }
+          ],
+          geometries: 'geojson'
+        });
+
+        const calledUrl = httpRequestFn.mock.calls[0][0] as string;
+        expect(calledUrl).toContain('overview=simplified');
+      });
     });
   });
 

@@ -213,6 +213,11 @@ export function cleanResponseData(
       moderate: 0,
       low: 0
     };
+    // The API only returns a congestion annotation at all when overview=full
+    // was requested (see buildDirectionsRequestUrl.ts) — tracked here so we
+    // can omit congestion_information entirely rather than reporting a
+    // misleading all-zero breakdown when it was never requested.
+    let sawCongestionAnnotation = false;
 
     if (route.legs) {
       route.legs.forEach((leg) => {
@@ -229,6 +234,7 @@ export function cleanResponseData(
         }
 
         if (leg.annotation?.congestion && leg.annotation?.distance) {
+          sawCongestionAnnotation = true;
           // iterate every congestion string in leg.annotation.congestion
           // each string is one of `severe, heavy, moderate, low, unknown`
           // keep track of total distance by type of congestion
@@ -320,13 +326,18 @@ export function cleanResponseData(
 
     cleanedRoute.num_legs = route.legs?.length || 0;
 
-    // Add congestion distance information to route
-    cleanedRoute.congestion_information = {
-      length_low: Math.round(congestionTypeToDistance.low),
-      length_moderate: Math.round(congestionTypeToDistance.moderate),
-      length_heavy: Math.round(congestionTypeToDistance.heavy),
-      length_severe: Math.round(congestionTypeToDistance.severe)
-    };
+    // Add congestion distance information to route, but only when the API
+    // actually returned a congestion annotation -- omitted (rather than
+    // reported as all-zero) when it wasn't requested/available, so this
+    // can't be misread as "confirmed no traffic anywhere".
+    if (sawCongestionAnnotation) {
+      cleanedRoute.congestion_information = {
+        length_low: Math.round(congestionTypeToDistance.low),
+        length_moderate: Math.round(congestionTypeToDistance.moderate),
+        length_heavy: Math.round(congestionTypeToDistance.heavy),
+        length_severe: Math.round(congestionTypeToDistance.severe)
+      };
+    }
 
     // Calculate and add average speed in km/h
     if (sumDistanceMeters > 0 && totalDistanceWeightedSpeed > 0) {
