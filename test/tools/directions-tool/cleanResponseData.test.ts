@@ -304,6 +304,33 @@ describe('cleanResponseData', () => {
     // Note: 'unknown' congestion type is skipped
   });
 
+  it('omits congestion_information (rather than reporting all-zero) when no congestion annotation was requested', () => {
+    // Mirrors the real shape of a response fetched with overview=simplified
+    // -- distance/speed annotations are present, congestion is not (see
+    // buildDirectionsRequestUrl.ts).
+    const mockData = {
+      routes: [
+        {
+          legs: [
+            {
+              annotation: {
+                speed: [10, 20, 30],
+                distance: [100, 200, 300]
+              },
+              summary: 'Leg with no congestion annotation'
+            }
+          ]
+        }
+      ]
+    };
+
+    const result = cleanResponseData(mockInput, mockData);
+
+    expect(result.routes[0].congestion_information).toBeUndefined();
+    // Speed/distance-derived data is unaffected by the absence of congestion.
+    expect(result.routes[0].average_speed_kph).toBe(84);
+  });
+
   it('should calculate average speed correctly', () => {
     const mockData = {
       routes: [
