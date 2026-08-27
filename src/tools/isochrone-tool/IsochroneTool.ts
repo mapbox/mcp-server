@@ -1,7 +1,6 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -12,10 +11,9 @@ import {
   IsochroneResponseSchema,
   type IsochroneResponse
 } from './IsochroneTool.output.schema.js';
-import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { buildInlineResponseRef } from '../../utils/inlineResponseRef.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -148,20 +146,17 @@ export class IsochroneTool extends MapboxApiBasedTool<
     });
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
-      const resourceId = randomBytes(16).toString('hex');
-      const resourceUri = `mapbox://temp/isochrone-${resourceId}`;
-
-      temporaryResourceManager.create({
-        id: resourceId,
-        uri: resourceUri,
-        data,
-        metadata: { toolName: this.name, size: responseSize },
-        owner: getUserNameFromToken(accessToken)
-      });
+      // Self-describing ref carrying the full response, rather than a
+      // mapbox://temp/... ref backed by process-local storage: the hosted
+      // deployment runs multiple stateless tasks with no session
+      // stickiness, so a ref only readable on the one task that handled
+      // this call would fail whenever the follow-up resources/read landed
+      // on a different task. See inlineResponseRef.ts.
+      const resourceUri = buildInlineResponseRef('isochrone', data);
 
       const contourCount =
         (data as { features?: unknown[] }).features?.length ?? 0;
-      const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full GeoJSON if needed.`;
+      const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON is available now (already computed, nothing to wait for) via the MCP resources API.\nResource URI: ${resourceUri}`;
 
       const summaryStructured: Record<string, unknown> = {
         mapboxRender: { ref: selfFetchRef }

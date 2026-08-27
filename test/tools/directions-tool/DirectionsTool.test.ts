@@ -10,7 +10,6 @@ import {
 } from '../../utils/httpPipelineUtils.js';
 import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
 import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
-import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 import { tokenFor } from '../../utils/tokenTestUtils.js';
 
 describe('DirectionsTool', () => {
@@ -1292,16 +1291,36 @@ describe('DirectionsTool', () => {
 
       expect(result.isError).toBe(false);
 
-      // Confirm we actually exercised the large-response summary path...
+      // Confirm we actually exercised the large-response summary path,
+      // and that the fallback is a self-describing inline-response ref
+      // (not a mapbox://temp/... ref backed by process-local storage,
+      // which would only be readable on the one hosted task that handled
+      // this call).
       const textBlock = result.content.find(
         (c) => (c as { type?: string }).type === 'text'
       ) as { text?: string } | undefined;
       expect(textBlock?.text).toContain('exceeds context limit');
-      expect(textBlock?.text).toMatch(/mapbox:\/\/temp\//);
+      expect(textBlock?.text).not.toContain('mapbox://temp/');
+      expect(textBlock?.text).not.toContain('TTL');
+      expect(textBlock?.text).toMatch(
+        /mapbox:\/\/inline-response\/directions\?data=/
+      );
+
+      // The large-response ref carries the full route data directly, so
+      // it's readable with zero prior server-side state.
+      const uri = textBlock!.text!.match(
+        /mapbox:\/\/inline-response\/directions\?data=\S+/
+      )![0];
+      const { resolveInlineResponseRef } =
+        await import('../../../src/utils/inlineResponseRef.js');
+      const resolved = resolveInlineResponseRef<{
+        routes?: Array<{ geometry?: { coordinates?: unknown[] } }>;
+      }>(uri);
+      expect(resolved?.routes?.[0]?.geometry?.coordinates).toHaveLength(4000);
 
       // ...and that a self-fetch mapboxRender ref is still attached
-      // alongside it (distinct from the large-response mapbox://temp/
-      // resource above, which holds the full JSON, not the map ref).
+      // alongside it (distinct from the large-response inline-response
+      // ref above, which holds the full JSON, not the map ref).
       const sc = result.structuredContent as
         | { mapboxRender?: { ref?: string } }
         | undefined;
@@ -1480,14 +1499,13 @@ describe('DirectionsTool', () => {
   });
 });
 
-describe('DirectionsTool — temporary resource ownership', () => {
+describe('DirectionsTool — large-response ref survives a process boundary', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    temporaryResourceManager.clear();
   });
 
-  it('stores the temp resource with owner = the calling account (real token round-trip)', async () => {
-    // A geojson response large enough (>50KB) to be stored as a temp resource.
+  it('is readable with zero prior server-side state, unlike the account-scoped temp store it replaced', async () => {
+    // A geojson response large enough (>50KB) to trigger the fallback.
     const bigGeometry = {
       type: 'LineString',
       coordinates: Array.from({ length: 4000 }, (_, i) => [
@@ -1517,16 +1535,21 @@ describe('DirectionsTool — temporary resource ownership', () => {
       { authInfo: { token } } as any
     );
 
-    // The transcript should point to a temp resource...
     const text = (result.content ?? [])
       .map((c) => (c as { text?: string }).text ?? '')
       .join('\n');
-    const uri = text.match(/mapbox:\/\/temp\/[^\s`]+/)?.[0];
+    const uri = text.match(/mapbox:\/\/inline-response\/\S+/)?.[0];
     expect(uri).toBeTruthy();
 
-    // ...and that resource must be owned by the account from the token, not
-    // undefined — proving the tool wires `owner` from the real accessToken.
-    const stored = temporaryResourceManager.get(uri as string);
-    expect(stored?.owner).toBe('account-zhuwenlong');
+    // No temporaryResourceManager, no owner, no store involved at all —
+    // resolving the ref is a pure function of the URI string, so it works
+    // identically regardless of which process (hosted task) reads it,
+    // or which account's token happened to make the original call.
+    const { resolveInlineResponseRef } =
+      await import('../../../src/utils/inlineResponseRef.js');
+    const resolved = resolveInlineResponseRef<{
+      routes?: Array<{ distance?: number }>;
+    }>(uri as string);
+    expect(resolved?.routes?.[0]?.distance).toBe(1);
   });
 });

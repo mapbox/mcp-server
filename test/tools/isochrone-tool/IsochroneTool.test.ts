@@ -211,4 +211,60 @@ describe('IsochroneTool', () => {
       }
     ]);
   });
+
+  it('falls back to a self-describing inline-response ref (not mapbox://temp/) when the response is large', async () => {
+    // A response large enough (>50KB) to trigger the fallback.
+    const bigContour = {
+      type: 'Feature',
+      properties: { contour: 10 },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          Array.from({ length: 4000 }, (_, i) => [i * 0.001, i * 0.001])
+        ]
+      }
+    };
+    const largeResponse = {
+      type: 'FeatureCollection',
+      features: [bigContour]
+    };
+    const { httpRequest } = setupHttpRequest({
+      json: async () => largeResponse
+    });
+
+    const result = await new IsochroneTool({ httpRequest }).run({
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_minutes: [10],
+      generalize: 1000
+    });
+
+    expect(result.isError).toBe(false);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('exceeds context limit');
+    expect(text).not.toContain('mapbox://temp/');
+    expect(text).not.toContain('TTL');
+    expect(text).toMatch(/mapbox:\/\/inline-response\/isochrone\?data=/);
+
+    // No temporaryResourceManager, no owner, no store involved at all —
+    // resolving the ref is a pure function of the URI string.
+    const uri = text.match(
+      /mapbox:\/\/inline-response\/isochrone\?data=\S+/
+    )?.[0];
+    expect(uri).toBeTruthy();
+    const { resolveInlineResponseRef } =
+      await import('../../../src/utils/inlineResponseRef.js');
+    const resolved = resolveInlineResponseRef<{
+      features?: Array<{ geometry?: { coordinates?: unknown[][] } }>;
+    }>(uri as string);
+    expect(resolved?.features?.[0]?.geometry?.coordinates?.[0]).toHaveLength(
+      4000
+    );
+
+    // A self-fetch mapboxRender ref is still attached alongside it.
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/isochrone\?data=/
+    );
+  });
 });
