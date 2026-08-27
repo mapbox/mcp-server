@@ -1,36 +1,23 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomUUID, randomBytes } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
-import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { buildInlineImageRef } from '../../utils/inlineImageRef.js';
+import {
+  buildStaticMapRequestUrl,
+  getStaticMapMimeType
+} from './buildStaticMapRequestUrl.js';
 
-// Images larger than this threshold are stored as temporary resources instead
-// of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
-// result limit. base64 adds ~33% overhead, so 700KB raw ≈ 933KB encoded.
+// Images larger than this threshold fall back to a self-describing
+// mapbox://inline-image/ ref instead of being inlined as base64, to avoid
+// exceeding Claude Desktop's 1MB tool result limit. base64 adds ~33%
+// overhead, so 700KB raw ≈ 933KB encoded.
 const IMAGE_INLINE_THRESHOLD = 700 * 1024; // 700KB
-
-// encodeURIComponent leaves (, ), !, ', and * unescaped (they're valid in a
-// URI component per RFC 3986's "unreserved" carve-out from the older
-// escape() behaviour). Every overlay value below is embedded inside a
-// path segment delimited by literal parentheses (e.g. `url-<value>(lon,lat)`,
-// `geojson(<value>)`), so a raw `)` in the value can terminate that segment
-// early from the Static Images API's own overlay-syntax parser's point of
-// view, even though this value already passed URL/JSON validation on our
-// side. Escape those characters explicitly so both parsers agree on where
-// the value actually ends.
-function encodeOverlayComponent(value: string): string {
-  return encodeURIComponent(value).replace(
-    /[()!'*]/g,
-    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()
-  );
-}
 
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
@@ -53,79 +40,11 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     });
   }
 
-  private encodeOverlay(overlay: z.infer<typeof OverlaySchema>): string {
-    switch (overlay.type) {
-      case 'marker': {
-        const size = overlay.size === 'large' ? 'pin-l' : 'pin-s';
-        let marker = size;
-
-        if (overlay.label) {
-          marker += `-${overlay.label}`;
-        }
-
-        if (overlay.color) {
-          marker += `+${overlay.color}`;
-        }
-
-        return `${marker}(${overlay.longitude},${overlay.latitude})`;
-      }
-
-      case 'custom-marker': {
-        const encodedUrl = encodeOverlayComponent(overlay.url);
-        return `url-${encodedUrl}(${overlay.longitude},${overlay.latitude})`;
-      }
-
-      case 'path': {
-        let path = `path-${overlay.strokeWidth}`;
-
-        if (overlay.strokeColor) {
-          path += `+${overlay.strokeColor}`;
-          if (overlay.strokeOpacity !== undefined) {
-            path += `-${overlay.strokeOpacity}`;
-          }
-        }
-
-        if (overlay.fillColor) {
-          path += `+${overlay.fillColor}`;
-          if (overlay.fillOpacity !== undefined) {
-            path += `-${overlay.fillOpacity}`;
-          }
-        }
-
-        // URL encode the polyline to handle special characters
-        return `${path}(${encodeOverlayComponent(overlay.encodedPolyline)})`;
-      }
-
-      case 'geojson': {
-        const geojsonString = JSON.stringify(overlay.data);
-        return `geojson(${encodeOverlayComponent(geojsonString)})`;
-      }
-    }
-  }
-
   protected async execute(
     input: z.infer<typeof StaticMapImageInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    const { longitude: lng, latitude: lat } = input.center;
-    const { width, height } = input.size;
-
-    // Build overlay string
-    let overlayString = '';
-    if (input.overlays && input.overlays.length > 0) {
-      const encodedOverlays = input.overlays.map((overlay) => {
-        return this.encodeOverlay(overlay);
-      });
-      overlayString = encodedOverlays.join(',') + '/';
-    }
-
-    const density = input.highDensity ? '@2x' : '';
-    const encodedStyle = input.style
-      .split('/')
-      .map(encodeURIComponent)
-      .join('/');
-    const publicUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
-    const url = `${publicUrl}?access_token=${accessToken}`;
+    const { publicUrl, url } = buildStaticMapRequestUrl(input, accessToken);
 
     // Fetch image
     const response = await this.httpRequest(url);
@@ -137,8 +56,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       };
     }
     const buffer = await response.arrayBuffer();
-    const isRasterStyle = input.style.includes('satellite');
-    const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
+    const mimeType = getStaticMapMimeType(input.style);
 
     // Use public URL (without credentials) to avoid leaking the access token
     const content: CallToolResult['content'] = [
@@ -146,21 +64,14 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     ];
 
     if (buffer.byteLength > IMAGE_INLINE_THRESHOLD) {
-      // Image is too large to inline safely — store as temporary resource
-      const resourceId = randomBytes(16).toString('hex');
-      const resourceUri = `mapbox://temp/static-map-${resourceId}`;
-      const base64Data = Buffer.from(buffer).toString('base64');
-      temporaryResourceManager.create({
-        id: resourceId,
-        uri: resourceUri,
-        data: base64Data,
-        metadata: { toolName: this.name, size: buffer.byteLength },
-        mimeType,
-        owner: getUserNameFromToken(accessToken)
-      });
+      // Image is too large to inline safely. Ref encodes the request params,
+      // not the image bytes — see inlineImageRef.ts for why (a raw-bytes ref
+      // for an image this size would itself exceed the MCP SDK's own
+      // resource-URI length cap).
+      const resourceUri = buildInlineImageRef('static-map', input);
       content.push({
         type: 'text',
-        text: `⚠️ Image (${Math.round(buffer.byteLength / 1024)}KB) stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes`
+        text: `⚠️ Image (${Math.round(buffer.byteLength / 1024)}KB) exceeds the inline size limit.\n\nFetch it via the MCP resources API — this re-renders the same deterministic image on demand, so it works from any server instance and there is nothing to wait for.\nResource URI: ${resourceUri}`
       });
     } else {
       // Image is small enough to inline as base64
