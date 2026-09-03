@@ -96,4 +96,26 @@ describe('MapAppPayloadSchema baseMapConfig/slot', () => {
     const parsed = MapAppPayloadSchema.parse({ layers: [baseLayer] });
     expect(parsed.layers[0].slot).toBeUndefined();
   });
+
+  it('accepts baseStyle "standard-satellite"', () => {
+    const parsed = MapAppPayloadSchema.parse({
+      layers: [],
+      baseStyle: 'standard-satellite'
+    });
+    expect(parsed.baseStyle).toBe('standard-satellite');
+  });
+
+  it('rejects an invalid baseStyle value', () => {
+    expect(() =>
+      MapAppPayloadSchema.parse({
+        layers: [],
+        baseStyle: 'satellite-streets'
+      })
+    ).toThrow();
+  });
+
+  it('omits baseStyle when not provided (default behavior unchanged)', () => {
+    const parsed = MapAppPayloadSchema.parse({ layers: [baseLayer] });
+    expect(parsed.baseStyle).toBeUndefined();
+  });
 });

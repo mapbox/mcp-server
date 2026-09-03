@@ -20,7 +20,7 @@
 1. **Chain-position limitation**: several MCP App hosts (Claude Desktop among them) only fully render the interactive panel for the _last_ tool call in a sequence. Funneling every visualization through one terminal tool means the map always renders, regardless of how many other tools ran first.
 2. **Token efficiency**: geometry (a route polyline, a set of isochrone contours, a polygon boundary) can be tens of thousands of coordinate pairs. Passing it through the model as tool-call arguments is slow and expensive. The other Mapbox tools in this server avoid that by stashing their result behind a short reference string (`payload_refs`) instead of inlining the geometry — but this is an optimization, not a requirement. You're always free to pass geometry inline instead.
 
-**Base map style**: the underlying base map is always [Mapbox Standard](https://docs.mapbox.com/map-styles/standard/guides/). Beyond drawing your own layers/markers on top of it, you can restyle Standard itself (colors, lighting, label visibility) via `baseMapConfig` — see the [Payload reference](#payload-reference) below.
+**Base map style**: the underlying base map defaults to [Mapbox Standard](https://docs.mapbox.com/map-styles/standard/guides/); pass `baseStyle: "standard-satellite"` to switch to [Mapbox Standard Satellite](https://docs.mapbox.com/map-styles/reference/standard-satellite/) instead (satellite imagery with the same dynamic labels/roads on top). Beyond drawing your own layers/markers on top of either, you can restyle the base map itself (colors, lighting, label visibility) via `baseMapConfig` — see the [Payload reference](#payload-reference) below.
 
 ## Two ways to use it
 
@@ -123,15 +123,16 @@ An LLM using this server is instructed (via each tool's own output) to call `ren
 
 All fields are optional; provide whichever combination fits what you're drawing.
 
-| Field           | Type       | Description                                                                                    |
-| --------------- | ---------- | ---------------------------------------------------------------------------------------------- |
-| `payload_refs`  | `string[]` | Reference strings from other tools' `mapboxRender.ref`. Merges with any inline fields below.   |
-| `summary`       | `string`   | Short header chip shown top-left on the map (e.g. `"Route: 12.4 mi, 23 min"`).                 |
-| `layers`        | array      | Inline GL JS layers — see below.                                                               |
-| `markers`       | array      | Inline point markers — see below.                                                              |
-| `legend`        | array      | Inline legend rows — see below.                                                                |
-| `camera`        | object     | Initial camera position. If omitted, the map auto-fits to everything drawn.                    |
-| `baseMapConfig` | object     | Restyles the Standard base map itself (colors, theme, lighting, label visibility) — see below. |
+| Field           | Type                                 | Description                                                                                    |
+| --------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `payload_refs`  | `string[]`                           | Reference strings from other tools' `mapboxRender.ref`. Merges with any inline fields below.   |
+| `summary`       | `string`                             | Short header chip shown top-left on the map (e.g. `"Route: 12.4 mi, 23 min"`).                 |
+| `layers`        | array                                | Inline GL JS layers — see below.                                                               |
+| `markers`       | array                                | Inline point markers — see below.                                                              |
+| `legend`        | array                                | Inline legend rows — see below.                                                                |
+| `camera`        | object                               | Initial camera position. If omitted, the map auto-fits to everything drawn.                    |
+| `baseMapConfig` | object                               | Restyles the Standard base map itself (colors, theme, lighting, label visibility) — see below. |
+| `baseStyle`     | `"standard" \| "standard-satellite"` | Which Mapbox-owned base style to load; defaults to `"standard"` — see below.                   |
 
 **`layers[]`** — one entry per Mapbox GL JS source+layer pair:
 
@@ -185,6 +186,14 @@ All fields are optional; provide whichever combination fits what you're drawing.
 Only the properties above are typed in the schema, but unrecognized keys still pass through — useful if Mapbox ships a new Standard config property before this list is updated.
 
 **Important**: like every other field, `baseMapConfig` participates in `render_map_tool`'s "fresh render" model — a call doesn't accumulate on top of a previous one. If you want to restyle a map that already has data on it, re-pass the same `payload_refs`/`layers` alongside `baseMapConfig` in the same call, rather than sending `baseMapConfig` alone (a `baseMapConfig`-only call is valid, but renders a blank map in the new style with no data on it).
+
+**`baseStyle`** — which Mapbox-owned base style to load. Defaults to `"standard"`; set to `"standard-satellite"` to load [Mapbox Standard Satellite](https://docs.mapbox.com/map-styles/reference/standard-satellite/) instead — the same Standard style family rendered over global satellite imagery, with the same dynamic POI/road/place labels and the same `bottom`/`middle`/`top` slots for custom layers:
+
+![A satellite view of San Francisco via baseStyle: "standard-satellite", with a yellow route line drawn on top and Standard's dynamic place/POI labels rendering over the imagery](./images/render-map-tool-standard-satellite.png)
+
+`baseMapConfig` still works under `standard-satellite`, but it supports a smaller set of properties than `standard` does — no `theme` and no flat-color overrides like `colorWater`/`colorBuildings`, since there's no vector land/water surface to recolor under the imagery. See the [Standard Satellite reference](https://docs.mapbox.com/map-styles/reference/standard-satellite/) for its exact supported property list.
+
+Like `baseMapConfig`, `baseStyle` participates in the "fresh render" model described above — re-pass `payload_refs`/`layers` alongside it if you want to restyle a map that already has data on it.
 
 The payload format is intentionally a thin pass-through to the Mapbox Style Spec rather than its own DSL — anything expressible as a GL JS `paint`/`layout` object is expressible here, so you're not limited to a fixed set of pre-baked styles.
 

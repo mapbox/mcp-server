@@ -91,6 +91,17 @@ export interface MapAppBaseMapConfig {
   densityPointOfInterestLabels?: number;
 }
 
+/**
+ * Which Mapbox-owned base style to load. Both are part of the Standard
+ * family (same config-property system and `bottom`/`middle`/`top` slots,
+ * per https://docs.mapbox.com/map-styles/reference/), so `baseMapConfig`
+ * and `slot` work under either — `standard-satellite` just doesn't support
+ * every Standard property (no `theme`, no flat-color overrides like
+ * `colorWater`/`colorBuildings`, since imagery replaces those surfaces).
+ * Defaults to `standard` when omitted.
+ */
+export type MapAppBaseStyle = 'standard' | 'standard-satellite';
+
 export interface MapAppMarker {
   coordinates: [number, number];
   /**
@@ -170,6 +181,8 @@ export interface MapAppPayload {
   selfFetch?: MapAppSelfFetch[];
   /** Restyles the Standard base map itself (colors, theme, lightPreset, label visibility). */
   baseMapConfig?: MapAppBaseMapConfig;
+  /** Which Mapbox-owned base style to load; defaults to `standard`. */
+  baseStyle?: MapAppBaseStyle;
 }
 
 // Zod mirror of MapAppPayload, kept loose on paint/layout/geometry internals
@@ -281,7 +294,8 @@ export const MapAppPayloadSchema = z.object({
   legend: z.array(MapAppLegendEntrySchema).optional(),
   camera: MapAppCameraSchema.optional(),
   selfFetch: z.array(MapAppSelfFetchSchema).optional(),
-  baseMapConfig: MapAppBaseMapConfigSchema.optional()
+  baseMapConfig: MapAppBaseMapConfigSchema.optional(),
+  baseStyle: z.enum(['standard', 'standard-satellite']).optional()
 });
 
 /**

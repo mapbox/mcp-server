@@ -200,9 +200,14 @@ ${initialDataScript}
     }
     mapboxgl.accessToken = TOKEN;
     var data = readInitialData();
+    // Allowlisted rather than interpolated directly, so an unrecognized
+    // value can never reach the style URL -- falls back to 'standard'.
+    var baseStyleId = (data && data.baseStyle === 'standard-satellite')
+      ? 'standard-satellite'
+      : 'standard';
     var mapOptions = {
       container: 'map',
-      style: 'mapbox://styles/mapbox/standard',
+      style: 'mapbox://styles/mapbox/' + baseStyleId,
       center: [0, 20],
       zoom: 1.5
     };

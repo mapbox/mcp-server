@@ -397,6 +397,43 @@ describe('mapAppHtml baseMapConfig and slot', () => {
     ).not.toThrow();
   });
 
+  it('defaults to the standard style when no baseStyle is provided', () => {
+    const { mapConstructorCalls } = loadScriptSandbox();
+
+    expect(mapConstructorCalls).toHaveLength(1);
+    expect(mapConstructorCalls[0].style).toBe(
+      'mapbox://styles/mapbox/standard'
+    );
+  });
+
+  it('loads the standard-satellite style when baseStyle is set in initial data', () => {
+    const { mapConstructorCalls } = loadScriptSandbox({
+      initialData: {
+        layers: [],
+        baseStyle: 'standard-satellite'
+      }
+    });
+
+    expect(mapConstructorCalls).toHaveLength(1);
+    expect(mapConstructorCalls[0].style).toBe(
+      'mapbox://styles/mapbox/standard-satellite'
+    );
+  });
+
+  it('falls back to standard for an unrecognized baseStyle value rather than interpolating it', () => {
+    const { mapConstructorCalls } = loadScriptSandbox({
+      initialData: {
+        layers: [],
+        baseStyle: 'not-a-real-style; </script>'
+      }
+    });
+
+    expect(mapConstructorCalls).toHaveLength(1);
+    expect(mapConstructorCalls[0].style).toBe(
+      'mapbox://styles/mapbox/standard'
+    );
+  });
+
   it('passes a layer slot through to map.addLayer', () => {
     const { sendToolResult, map } = loadScriptSandbox();
     const addLayerSpy = vi.fn();
