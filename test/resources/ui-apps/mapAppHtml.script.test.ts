@@ -59,10 +59,20 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
   }
 
   const mapConstructorCalls: Array<Record<string, unknown>> = [];
+  const setStyleCalls: string[] = [];
   const fakeMapInstance = {
     addControl: () => {},
     on: (event: string, cb: () => void) => {
       if (event === 'load') cb();
+    },
+    // Mirrors GL JS's setStyle(...) followed by a 'style.load' event once
+    // the new style is ready -- fired synchronously here since the test
+    // sandbox doesn't need to simulate the real network round-trip.
+    once: (event: string, cb: () => void) => {
+      if (event === 'style.load') cb();
+    },
+    setStyle: (styleUrl: string) => {
+      setStyleCalls.push(styleUrl);
     },
     addSource: () => {},
     addLayer: () => {},
@@ -161,6 +171,7 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
     postMessageCalls,
     map: fakeMapInstance,
     mapConstructorCalls,
+    setStyleCalls,
     errorEl: elementsById.error,
     summaryEl: elementsById.summary
   };
@@ -432,6 +443,42 @@ describe('mapAppHtml baseMapConfig and slot', () => {
     expect(mapConstructorCalls[0].style).toBe(
       'mapbox://styles/mapbox/standard'
     );
+  });
+
+  it('switches base style via map.setStyle when baseStyle arrives in a render (not initial data) -- the real-world path, since MapAppUIResource never seeds initial data server-side', () => {
+    const { sendToolResult, setStyleCalls } = loadScriptSandbox();
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://temp/map-payload-abc',
+          layers: [],
+          baseStyle: 'standard-satellite'
+        }
+      }
+    });
+
+    expect(setStyleCalls).toEqual([
+      'mapbox://styles/mapbox/standard-satellite'
+    ]);
+  });
+
+  it('does not call setStyle when a render repeats the style the map is already on', () => {
+    const { sendToolResult, setStyleCalls } = loadScriptSandbox({
+      initialData: { layers: [], baseStyle: 'standard-satellite' }
+    });
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://temp/map-payload-abc',
+          layers: [],
+          baseStyle: 'standard-satellite'
+        }
+      }
+    });
+
+    expect(setStyleCalls).toEqual([]);
   });
 
   it('passes a layer slot through to map.addLayer', () => {
