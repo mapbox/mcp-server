@@ -108,6 +108,10 @@ ${initialDataScript}
   var map = null;
   var mapLoaded = false;
   var pendingPayload = null;
+  // Tracks which base style the map is currently constructed with, so a
+  // later render() can detect a baseStyle change and switch via setStyle()
+  // -- the style is otherwise only ever set once, at construction time.
+  var currentBaseStyleId = 'standard';
   var currentDisplayMode = 'inline';
 
   // Tracks what we've added so re-renders can tear down cleanly.
@@ -205,6 +209,7 @@ ${initialDataScript}
     var baseStyleId = (data && data.baseStyle === 'standard-satellite')
       ? 'standard-satellite'
       : 'standard';
+    currentBaseStyleId = baseStyleId;
     var mapOptions = {
       container: 'map',
       style: 'mapbox://styles/mapbox/' + baseStyleId,
@@ -500,6 +505,25 @@ ${initialDataScript}
 
   function render(payload) {
     if (!map) return;
+    // baseStyle is only otherwise applied at map-construction time (see
+    // initMap()) -- MapAppUIResource never seeds initial-data server-side,
+    // so every real render_map_tool call arrives here instead. Without this
+    // check, a later call passing baseStyle: "standard-satellite" would be
+    // silently ignored and the map would stay on whatever style it was
+    // constructed with (always "standard" in practice).
+    var desiredBaseStyleId = payload.baseStyle === 'standard-satellite'
+      ? 'standard-satellite'
+      : (payload.baseStyle === 'standard' ? 'standard' : null);
+    if (desiredBaseStyleId && desiredBaseStyleId !== currentBaseStyleId) {
+      currentBaseStyleId = desiredBaseStyleId;
+      map.setStyle('mapbox://styles/mapbox/' + desiredBaseStyleId);
+      map.once('style.load', function() { renderBody(payload); });
+      return;
+    }
+    renderBody(payload);
+  }
+
+  function renderBody(payload) {
     teardown();
     applyBaseMapConfig(payload.baseMapConfig);
 
