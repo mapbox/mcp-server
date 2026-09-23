@@ -85,12 +85,38 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     cursor: pointer;
   }
+  #side-panel {
+    position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 10;
+    width: 280px; max-width: calc(100% - 24px);
+    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
+    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #side-panel .panel-head {
+    padding: 10px 12px; font-size: 13px; font-weight: 600;
+    border-bottom: 1px solid rgba(255,255,255,0.12); flex: 0 0 auto;
+  }
+  #side-panel .panel-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
+  #side-panel .panel-item {
+    display: flex; gap: 8px; padding: 6px; border-radius: 6px; cursor: pointer;
+  }
+  #side-panel .panel-item:hover { background: rgba(255,255,255,0.08); }
+  #side-panel .panel-thumb {
+    flex: 0 0 auto; width: 28px; height: 28px; border-radius: 6px;
+    background: #f97316; color: #1a0f04;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; background-size: cover; background-position: center;
+  }
+  #side-panel .panel-thumb.has-photo { color: transparent; }
+  #side-panel .panel-name { font-size: 12.5px; font-weight: 600; }
+  #side-panel .panel-meta { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="summary" style="display:none"></div>
 <div id="legend" style="display:none"></div>
+<div id="side-panel" style="display:none"></div>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
 ${initialDataScript}
@@ -104,6 +130,11 @@ ${initialDataScript}
   var errorEl = document.getElementById('error');
   var summaryEl = document.getElementById('summary');
   var legendEl = document.getElementById('legend');
+  var panelEl = document.getElementById('side-panel');
+  // Populated by buildSearchMiniPayload's marker tagging so the panel (click
+  // -> flyTo) and Place Details enrichment can find a marker by mapbox_id
+  // without re-querying the map for it.
+  var markersById = {};
 
   var map = null;
   var mapLoaded = false;
@@ -376,6 +407,9 @@ ${initialDataScript}
     trackedLayerIds = [];
     trackedSourceIds = [];
     trackedMarkers = [];
+    markersById = {};
+    panelEl.style.display = 'none';
+    panelEl.innerHTML = '';
   }
 
   function bboxAccumulator() {
@@ -461,6 +495,10 @@ ${initialDataScript}
     if (m.popup) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
     marker.addTo(map);
     trackedMarkers.push(marker);
+    // Tagged by buildSearchMiniPayload with the result's mapbox_id so the
+    // side panel (click-to-flyTo) and Place Details enrichment can look the
+    // marker back up later without walking trackedMarkers.
+    if (m.id) markersById[m.id] = { marker: marker, popupText: m.popup || '' };
     bbox.extend(m.coordinates);
   }
 
@@ -1229,6 +1267,7 @@ ${initialDataScript}
     }
 
     var features = [];
+    var items = [];
     points.forEach(function(f, i) {
       var props = f.properties || {};
       var popupParts = [(i + 1) + '. ' + (props.name || 'Result')];
@@ -1239,6 +1278,7 @@ ${initialDataScript}
       }
       var coords = f.geometry.coordinates;
       markers.push({
+        id: props.mapbox_id,
         coordinates: coords,
         style: 'numbered',
         label: String(i + 1),
@@ -1250,6 +1290,19 @@ ${initialDataScript}
         geometry: { type: 'Point', coordinates: coords },
         properties: { idx: i + 1, label: props.name || ('Result ' + (i + 1)) }
       });
+      // Place Details enrichment (see enrichSidePanel) needs a mapbox_id to
+      // look the place back up — Search Box always returns one for POI/
+      // address results, but skip the panel row on the rare result that
+      // lacks it rather than render an unclickable, unenrichable entry.
+      if (props.mapbox_id) {
+        items.push({
+          id: props.mapbox_id,
+          number: i + 1,
+          name: props.name || ('Result ' + (i + 1)),
+          category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
+          distanceMeters: typeof props.distance === 'number' ? props.distance : undefined
+        });
+      }
     });
 
     var summary = query
@@ -1272,7 +1325,99 @@ ${initialDataScript}
       }
     ] : [];
 
-    return { summary: summary, layers: layers, markers: markers };
+    return { summary: summary, layers: layers, markers: markers, items: items };
+  }
+
+  // --- Side panel: result list + Place Details enrichment ----------------
+  // Renders the initial (Search Box only) list immediately so the panel
+  // never blocks on the slower enrichment call. sourceLabel is plain text
+  // shown as the panel heading (e.g. the query or category).
+  function renderSidePanel(items, sourceLabel) {
+    if (!Array.isArray(items) || items.length === 0) return;
+    var rows = items.map(function(it) {
+      var metaParts = [];
+      if (it.category) metaParts.push(it.category);
+      if (typeof it.distanceMeters === 'number') {
+        metaParts.push(Math.round(it.distanceMeters) + ' m');
+      }
+      return '<li class="panel-item" data-mapbox-id="' + escapeAttr(it.id) + '">' +
+        '<span class="panel-thumb" data-role="thumb">' + escapeText(String(it.number)) + '</span>' +
+        '<div>' +
+          '<div class="panel-name">' + escapeText(it.name) + '</div>' +
+          '<div class="panel-meta" data-role="meta">' + escapeText(metaParts.join(' · ')) + '</div>' +
+        '</div>' +
+      '</li>';
+    }).join('');
+    panelEl.innerHTML =
+      '<div class="panel-head">' + escapeText(sourceLabel || 'Results') + '</div>' +
+      '<ul class="panel-list">' + rows + '</ul>';
+    panelEl.style.display = 'flex';
+
+    Array.prototype.forEach.call(panelEl.querySelectorAll('.panel-item'), function(li) {
+      li.addEventListener('click', function() {
+        var entry = markersById[li.getAttribute('data-mapbox-id')];
+        if (entry) map.flyTo({ center: entry.marker.getLngLat(), zoom: 15, duration: 500 });
+      });
+    });
+  }
+
+  // Places API Details endpoint — batch form. Mirrors the single-record
+  // GET src/tools/place-details-tool/PlaceDetailsTool.ts calls server-side,
+  // but the panel needs details for every result at once, so this uses the
+  // POST /details/retrieve batch form (up to 100 ids) instead of one
+  // request per pin. Docs: https://docs.mapbox.com/api/search/places/
+  // Like every other self-fetch call, this runs client-side against the
+  // public token — the Places API's docs list no secret scope requirement
+  // for this endpoint, same as Search Box/Directions/etc.
+  function fetchPlaceDetailsBatch(ids, publicToken, apiEndpoint) {
+    if (!Array.isArray(ids) || ids.length === 0) return Promise.resolve(null);
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    var url = apiEndpoint + 'places/v1/details/retrieve?' + qp.toString();
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ids.slice(0, 100) })
+    })
+      .then(function(res) {
+        // 206 is a partial batch (some ids missing/unprocessed) — still
+        // has usable "results", so treat it the same as 200.
+        if (!res.ok && res.status !== 206) return null;
+        return res.json();
+      })
+      // Enrichment is a nice-to-have on top of an already-rendered panel —
+      // Public Preview quota (1,000 records/month) or a transient error
+      // here should never surface as a map error, just leave the
+      // Search-Box-only rows as they are.
+      .catch(function() { return null; });
+  }
+
+  function enrichSidePanel(detailsResult) {
+    if (!detailsResult || !Array.isArray(detailsResult.results)) return;
+    detailsResult.results.forEach(function(place) {
+      if (!place || !place.mapbox_id) return;
+      var li = panelEl.querySelector('.panel-item[data-mapbox-id="' + place.mapbox_id + '"]');
+      if (li) {
+        var thumb = li.querySelector('[data-role="thumb"]');
+        var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
+        if (thumb && photoUrl) {
+          thumb.style.backgroundImage = 'url("' + photoUrl.replace(/"/g, '') + '")';
+          thumb.classList.add('has-photo');
+        }
+        var meta = li.querySelector('[data-role="meta"]');
+        if (meta && place.score && typeof place.score.popularity === 'number') {
+          meta.textContent = (meta.textContent ? meta.textContent + ' · ' : '') +
+            Math.round(place.score.popularity * 100) + '% popularity';
+        }
+      }
+
+      var entry = markersById[place.mapbox_id];
+      if (entry && place.phone) {
+        entry.marker.setPopup(
+          new mapboxgl.Popup().setText(entry.popupText + ' — ' + place.phone)
+        );
+      }
+    });
   }
 
   function selfFetchSearch(params) {
@@ -1315,6 +1460,12 @@ ${initialDataScript}
           return;
         }
         mergeAdditionalPayload(mini);
+        renderSidePanel(mini.items, params.q);
+        fetchPlaceDetailsBatch(
+          mini.items.map(function(it) { return it.id; }),
+          TOKEN,
+          API_ENDPOINT
+        ).then(enrichSidePanel);
       })
       .catch(function(err) {
         showError(
@@ -1393,6 +1544,12 @@ ${initialDataScript}
           return;
         }
         mergeAdditionalPayload(mini);
+        renderSidePanel(mini.items, params.category);
+        fetchPlaceDetailsBatch(
+          mini.items.map(function(it) { return it.id; }),
+          TOKEN,
+          API_ENDPOINT
+        ).then(enrichSidePanel);
       })
       .catch(function(err) {
         showError(
