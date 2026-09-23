@@ -62,7 +62,31 @@ const markerSchema = z.object({
     .string()
     .optional()
     .describe('Optional CSS color override (defaults are style-derived)'),
-  popup: z.string().optional().describe('Popup text shown on marker click')
+  popup: z.string().optional().describe('Popup text shown on marker click'),
+  id: z
+    .string()
+    .optional()
+    .describe(
+      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results side panel (photo + popularity score, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Omit for non-POI markers (route endpoints, waypoints, etc.).'
+    ),
+  name: z
+    .string()
+    .optional()
+    .describe(
+      'Display name for the results panel row. Only used when `id` is also set; falls back to "Result N" if omitted.'
+    ),
+  category: z
+    .string()
+    .optional()
+    .describe(
+      'Category shown in the results panel row (e.g. "Coffee Shop"). Only used when `id` is also set.'
+    ),
+  distanceMeters: z
+    .number()
+    .optional()
+    .describe(
+      'Distance in meters, shown in the results panel row. Only used when `id` is also set.'
+    )
 });
 
 const legendEntrySchema = z.object({
@@ -157,7 +181,7 @@ export const RenderMapInputSchema = z.object({
     .array(markerSchema)
     .optional()
     .describe(
-      'Inline point markers (start/end, numbered visits, POI pins, etc.). Use only for hand-composed payloads.'
+      "Inline point markers (start/end, numbered visits, POI pins, etc.). Use only for hand-composed payloads. For POI markers, set `id` to the place's mapbox_id to get an auto-enriching results panel (see markerSchema's `id` field) instead of just a pin."
     ),
   legend: z
     .array(legendEntrySchema)

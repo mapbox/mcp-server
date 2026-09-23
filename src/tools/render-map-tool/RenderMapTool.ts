@@ -61,7 +61,12 @@ export class RenderMapTool extends BaseTool<
     'You can pass multiple refs to merge several datasets (e.g. a search ' +
     'result + a route) onto one map. ' +
     'Inline `layers`/`markers`/`legend` fields are also supported for ' +
-    'hand-composed payloads from raw GeoJSON. ' +
+    'hand-composed payloads from raw GeoJSON. For a hand-composed POI marker ' +
+    '(e.g. built from category_search_tool/search_and_geocode_tool/' +
+    "place_details_tool output), set `markers[].id` to the place's mapbox_id " +
+    '— this gets it the same auto-enriching results panel (photo + ' +
+    'popularity score) that a payload_refs-based search result gets ' +
+    'automatically, with no extra tool calls. ' +
     'To restyle the base map itself (e.g. "make the water red", switch to night ' +
     'lighting, hide POI labels) pass `baseMapConfig`. To switch to satellite ' +
     'imagery, pass `baseStyle: "standard-satellite"` (defaults to "standard"). ' +

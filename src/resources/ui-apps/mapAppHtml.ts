@@ -529,6 +529,7 @@ ${initialDataScript}
       summaryEl.textContent = payload.summary;
       summaryEl.style.display = 'block';
     }
+    maybeShowSidePanel(payload.markers, payload.summary);
     var bounds = bbox.bounds();
     if (bounds) fitToBounds(bounds);
   }
@@ -571,6 +572,11 @@ ${initialDataScript}
 
     layers.forEach(function(layer) { addOneLayer(layer, bbox); });
     markers.forEach(function(m) { addOneMarker(m, bbox); });
+    // Covers both inline markers (a caller-composed payload) and self-fetch
+    // markers (merged in later via mergeAdditionalPayload) — see
+    // maybeShowSidePanel below. Whichever path produced id-bearing POI
+    // markers gets the same results panel.
+    maybeShowSidePanel(markers, payload.summary);
 
     // Legend
     if (Array.isArray(payload.legend) && payload.legend.length > 0) {
@@ -1267,7 +1273,6 @@ ${initialDataScript}
     }
 
     var features = [];
-    var items = [];
     points.forEach(function(f, i) {
       var props = f.properties || {};
       var popupParts = [(i + 1) + '. ' + (props.name || 'Result')];
@@ -1277,32 +1282,28 @@ ${initialDataScript}
         popupParts.push(Math.round(props.distance) + ' m');
       }
       var coords = f.geometry.coordinates;
+      // id/name/category/distanceMeters are the same generic POI fields an
+      // inline (hand-composed) marker can carry — see maybeShowSidePanel,
+      // which builds the results panel from either source identically.
+      // mapbox_id is missing on the rare result that lacks one; the panel
+      // just skips that row rather than show an unclickable/unenrichable
+      // entry.
       markers.push({
         id: props.mapbox_id,
         coordinates: coords,
         style: 'numbered',
         label: String(i + 1),
         color: '#f97316',
-        popup: popupParts.join(' — ')
+        popup: popupParts.join(' — '),
+        name: props.name || ('Result ' + (i + 1)),
+        category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
+        distanceMeters: typeof props.distance === 'number' ? props.distance : undefined
       });
       features.push({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: coords },
         properties: { idx: i + 1, label: props.name || ('Result ' + (i + 1)) }
       });
-      // Place Details enrichment (see enrichSidePanel) needs a mapbox_id to
-      // look the place back up — Search Box always returns one for POI/
-      // address results, but skip the panel row on the rare result that
-      // lacks it rather than render an unclickable, unenrichable entry.
-      if (props.mapbox_id) {
-        items.push({
-          id: props.mapbox_id,
-          number: i + 1,
-          name: props.name || ('Result ' + (i + 1)),
-          category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
-          distanceMeters: typeof props.distance === 'number' ? props.distance : undefined
-        });
-      }
     });
 
     var summary = query
@@ -1325,13 +1326,47 @@ ${initialDataScript}
       }
     ] : [];
 
-    return { summary: summary, layers: layers, markers: markers, items: items };
+    return { summary: summary, layers: layers, markers: markers };
   }
 
   // --- Side panel: result list + Place Details enrichment ----------------
-  // Renders the initial (Search Box only) list immediately so the panel
+  // Triggered generically by maybeShowSidePanel for ANY marker set that
+  // includes id-bearing entries — self-fetch search/category-search
+  // results (via mergeAdditionalPayload) and hand-composed inline markers
+  // from render_map_tool's own "markers" input (via renderBody) both funnel
+  // through the same path. Renders the initial (Search Box-only, or
+  // whatever the caller already provided) list immediately so the panel
   // never blocks on the slower enrichment call. sourceLabel is plain text
-  // shown as the panel heading (e.g. the query or category).
+  // shown as the panel heading (e.g. the query, category, or the payload's
+  // own summary).
+  function derivePanelItems(markers) {
+    if (!Array.isArray(markers)) return [];
+    var items = [];
+    markers.forEach(function(m) {
+      if (!m || !m.id) return;
+      var labelNum = parseInt(m.label, 10);
+      items.push({
+        id: m.id,
+        number: isNaN(labelNum) ? items.length + 1 : labelNum,
+        name: m.name || ('Result ' + (items.length + 1)),
+        category: m.category,
+        distanceMeters: typeof m.distanceMeters === 'number' ? m.distanceMeters : undefined
+      });
+    });
+    return items;
+  }
+
+  function maybeShowSidePanel(markers, summary) {
+    var items = derivePanelItems(markers);
+    if (items.length === 0) return;
+    renderSidePanel(items, summary || 'Results');
+    fetchPlaceDetailsBatch(
+      items.map(function(it) { return it.id; }),
+      TOKEN,
+      API_ENDPOINT
+    ).then(enrichSidePanel);
+  }
+
   function renderSidePanel(items, sourceLabel) {
     if (!Array.isArray(items) || items.length === 0) return;
     var rows = items.map(function(it) {
@@ -1460,12 +1495,6 @@ ${initialDataScript}
           return;
         }
         mergeAdditionalPayload(mini);
-        renderSidePanel(mini.items, params.q);
-        fetchPlaceDetailsBatch(
-          mini.items.map(function(it) { return it.id; }),
-          TOKEN,
-          API_ENDPOINT
-        ).then(enrichSidePanel);
       })
       .catch(function(err) {
         showError(
@@ -1544,12 +1573,6 @@ ${initialDataScript}
           return;
         }
         mergeAdditionalPayload(mini);
-        renderSidePanel(mini.items, params.category);
-        fetchPlaceDetailsBatch(
-          mini.items.map(function(it) { return it.id; }),
-          TOKEN,
-          API_ENDPOINT
-        ).then(enrichSidePanel);
       })
       .catch(function(err) {
         showError(
