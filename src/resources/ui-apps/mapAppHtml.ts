@@ -1435,6 +1435,25 @@ ${initialDataScript}
     panelEl.style.display = 'flex';
   }
 
+  // Search Box results mix Mapbox-native POI ids (decode to
+  // "urn:mbxpoi:<uuid>") with OSM-sourced ones (decode to
+  // "urn:mbxpoi-osm:n<osm-node-id>") — confirmed live against a real
+  // category_search_tool-style query near Herndon, VA, where 2 of 10
+  // "cafe" results were OSM-sourced. The Places API's batch endpoint
+  // rejects the ENTIRE request with a 422 if even one id isn't its native
+  // scheme (same 422 PlaceDetailsTool.ts already works around server-side
+  // for boundary ids) — so filter client-side before sending, rather than
+  // let one incompatible id in a 10-result batch silently zero out
+  // enrichment for the other 9.
+  function isPlacesApiCompatibleId(id) {
+    if (typeof id !== 'string' || id.length === 0) return false;
+    try {
+      return (/^urn:mbxpoi:/).test(atob(id));
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Places API Details endpoint — batch form. Mirrors the single-record
   // GET src/tools/place-details-tool/PlaceDetailsTool.ts calls server-side,
   // but the panel needs details for every result at once, so this uses the
@@ -1444,14 +1463,15 @@ ${initialDataScript}
   // public token — the Places API's docs list no secret scope requirement
   // for this endpoint, same as Search Box/Directions/etc.
   function fetchPlaceDetailsBatch(ids, publicToken, apiEndpoint) {
-    if (!Array.isArray(ids) || ids.length === 0) return Promise.resolve(null);
+    var compatibleIds = (Array.isArray(ids) ? ids : []).filter(isPlacesApiCompatibleId);
+    if (compatibleIds.length === 0) return Promise.resolve(null);
     var qp = new URLSearchParams();
     qp.append('access_token', publicToken);
     var url = apiEndpoint + 'places/v1/details/retrieve?' + qp.toString();
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: ids.slice(0, 100) })
+      body: JSON.stringify({ ids: compatibleIds.slice(0, 100) })
     })
       .then(function(res) {
         // 206 is a partial batch (some ids missing/unprocessed) — still

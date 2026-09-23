@@ -7,6 +7,16 @@ import { renderMapAppHtml } from '../../../src/resources/ui-apps/mapAppHtml.js';
 import { buildInlinePayloadRef } from '../../../src/utils/inlinePayloadRef.js';
 
 /**
+ * A real Mapbox POI mapbox_id decodes to "urn:mbxpoi:<uuid>" — the panel's
+ * fetchPlaceDetailsBatch now filters out anything that doesn't match that
+ * shape (see isPlacesApiCompatibleId in mapAppHtml.ts), so a placeholder
+ * string like 'poi-1' would silently get filtered out of every test fixture
+ * below rather than reach the mocked fetch call.
+ */
+const mockPoiId = (suffix: string) =>
+  Buffer.from(`urn:mbxpoi:${suffix}`).toString('base64');
+
+/**
  * Extracts and runs the iframe's inline <script> in a sandboxed VM context,
  * with just enough of window/document/mapboxgl stubbed to exercise the
  * postMessage protocol handling without a real browser or GL JS. Verifies
@@ -183,6 +193,7 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
     console,
     setTimeout,
     URLSearchParams,
+    atob,
     fetch: (url: string, init?: unknown) => fetchImpl(url, init)
   };
   vm.createContext(sandbox);
@@ -1731,7 +1742,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
         expect(init).toEqual(
           expect.objectContaining({
             method: 'POST',
-            body: JSON.stringify({ ids: ['poi-1'] })
+            body: JSON.stringify({ ids: [mockPoiId('poi-1')] })
           })
         );
         return {
@@ -1739,7 +1750,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
           json: async () => ({
             results: [
               {
-                mapbox_id: 'poi-1',
+                mapbox_id: mockPoiId('poi-1'),
                 photos: [{ url: 'https://example.com/photo.jpg' }],
                 score: { popularity: 0.8 },
                 phone: '+15551234567'
@@ -1757,7 +1768,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
               type: 'Feature',
               properties: {
                 name: 'Cafe Reveille',
-                mapbox_id: 'poi-1',
+                mapbox_id: mockPoiId('poi-1'),
                 poi_category: ['cafe'],
                 distance: 120
               },
@@ -1875,7 +1886,10 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
           features: [
             {
               type: 'Feature',
-              properties: { name: 'Cafe Reveille', mapbox_id: 'poi-1' },
+              properties: {
+                name: 'Cafe Reveille',
+                mapbox_id: mockPoiId('poi-1')
+              },
               geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
             }
           ]
@@ -1900,6 +1914,74 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(row.children[0].className).toBe('panel-thumb');
     expect(errorEl?.style.display).not.toBe('block');
   });
+
+  it('filters out OSM-sourced ids before the batch call, so one incompatible id does not zero out enrichment for the rest', async () => {
+    // Confirmed live against the real API: a category_search-style query
+    // for "cafe" near Herndon, VA returned 2 OSM-sourced ids (decode to
+    // "urn:mbxpoi-osm:n<osm-node-id>") among 10 results, and Places API's
+    // batch endpoint 422s the ENTIRE request if even one id isn't its
+    // native "urn:mbxpoi:<uuid>" scheme — silently zeroing out enrichment
+    // for all 10, not just the 2 bad ones, before this filter existed.
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const osmId = Buffer.from('urn:mbxpoi-osm:n2678573672').toString('base64');
+    const nativeId = mockPoiId('poi-native');
+
+    const fetchSpy = vi.fn(async (url: string, init?: unknown) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        // Proves the OSM id never reached the request that would have
+        // 422'd the whole batch.
+        expect(JSON.parse((init as { body: string }).body)).toEqual({
+          ids: [nativeId]
+        });
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ mapbox_id: nativeId, score: { popularity: 0.5 } }]
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: { name: 'OSM Cafe', mapbox_id: osmId },
+              geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+            },
+            {
+              type: 'Feature',
+              properties: { name: 'Native Cafe', mapbox_id: nativeId },
+              geometry: { type: 'Point', coordinates: [-122.42, 37.79] }
+            }
+          ]
+        })
+      };
+    });
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    // Both rows still render — only enrichment eligibility differs.
+    const rows = sidePanelEl.children[1].children;
+    expect(rows).toHaveLength(2);
+    expect(rows[0].children[1].children[0].textContent).toBe('OSM Cafe');
+    expect(rows[0].children[1].children[1].textContent).not.toContain(
+      'popularity'
+    );
+    expect(rows[1].children[1].children[0].textContent).toBe('Native Cafe');
+    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
+  });
 });
 
 describe('mapAppHtml results side panel: inline markers', () => {
@@ -1922,7 +2004,7 @@ describe('mapAppHtml results side panel: inline markers', () => {
               coordinates: [-77.386, 38.9695],
               style: 'numbered',
               label: '1',
-              id: 'poi-inline-1',
+              id: mockPoiId('poi-inline-1'),
               name: 'Starbucks',
               category: 'Coffee Shop',
               distanceMeters: 400
@@ -1988,7 +2070,7 @@ describe('mapAppHtml results side panel: inline markers', () => {
         mapboxRender: {
           ref: 'mapbox://inline/a',
           layers: [],
-          markers: [markerFor('poi-1', 'First')]
+          markers: [markerFor(mockPoiId('poi-1'), 'First')]
         }
       }
     });
@@ -2000,7 +2082,7 @@ describe('mapAppHtml results side panel: inline markers', () => {
         mapboxRender: {
           ref: 'mapbox://inline/b',
           layers: [],
-          markers: [markerFor('poi-2', 'Second')]
+          markers: [markerFor(mockPoiId('poi-2'), 'Second')]
         }
       }
     });
