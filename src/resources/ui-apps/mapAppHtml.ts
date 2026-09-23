@@ -409,7 +409,7 @@ ${initialDataScript}
     trackedMarkers = [];
     markersById = {};
     panelEl.style.display = 'none';
-    panelEl.innerHTML = '';
+    clearPanel();
   }
 
   function bboxAccumulator() {
@@ -1355,6 +1355,8 @@ ${initialDataScript}
     });
     return items;
   }
+  // Exposed so tests can exercise the pure derivation logic without a DOM.
+  window.__derivePanelItems = derivePanelItems;
 
   function maybeShowSidePanel(markers, summary) {
     var items = derivePanelItems(markers);
@@ -1367,33 +1369,70 @@ ${initialDataScript}
     ).then(enrichSidePanel);
   }
 
+  // Keyed by mapbox_id -> { thumb, meta } elements, so enrichSidePanel can
+  // update a row directly once Place Details resolves, without re-parsing
+  // panelEl's markup back into a queryable DOM (innerHTML + querySelector
+  // round-trips don't work in every MCP Apps host's iframe sandbox, and
+  // building real nodes up front is simpler to reason about either way).
+  // Reset on every renderSidePanel call, same lifecycle as the panel itself.
+  var panelRowsById = {};
+
+  function buildPanelRow(it) {
+    var li = document.createElement('li');
+    li.className = 'panel-item';
+
+    var thumb = document.createElement('span');
+    thumb.className = 'panel-thumb';
+    thumb.textContent = String(it.number);
+
+    var name = document.createElement('div');
+    name.className = 'panel-name';
+    name.textContent = it.name;
+
+    var metaParts = [];
+    if (it.category) metaParts.push(it.category);
+    if (typeof it.distanceMeters === 'number') {
+      metaParts.push(Math.round(it.distanceMeters) + ' m');
+    }
+    var meta = document.createElement('div');
+    meta.className = 'panel-meta';
+    meta.textContent = metaParts.join(' · ');
+
+    var body = document.createElement('div');
+    body.appendChild(name);
+    body.appendChild(meta);
+    li.appendChild(thumb);
+    li.appendChild(body);
+
+    li.addEventListener('click', function() {
+      var entry = markersById[it.id];
+      if (entry) map.flyTo({ center: entry.marker.getLngLat(), zoom: 15, duration: 500 });
+    });
+
+    panelRowsById[it.id] = { thumb: thumb, meta: meta };
+    return li;
+  }
+
+  function clearPanel() {
+    while (panelEl.firstChild) panelEl.removeChild(panelEl.firstChild);
+    panelRowsById = {};
+  }
+
   function renderSidePanel(items, sourceLabel) {
     if (!Array.isArray(items) || items.length === 0) return;
-    var rows = items.map(function(it) {
-      var metaParts = [];
-      if (it.category) metaParts.push(it.category);
-      if (typeof it.distanceMeters === 'number') {
-        metaParts.push(Math.round(it.distanceMeters) + ' m');
-      }
-      return '<li class="panel-item" data-mapbox-id="' + escapeAttr(it.id) + '">' +
-        '<span class="panel-thumb" data-role="thumb">' + escapeText(String(it.number)) + '</span>' +
-        '<div>' +
-          '<div class="panel-name">' + escapeText(it.name) + '</div>' +
-          '<div class="panel-meta" data-role="meta">' + escapeText(metaParts.join(' · ')) + '</div>' +
-        '</div>' +
-      '</li>';
-    }).join('');
-    panelEl.innerHTML =
-      '<div class="panel-head">' + escapeText(sourceLabel || 'Results') + '</div>' +
-      '<ul class="panel-list">' + rows + '</ul>';
-    panelEl.style.display = 'flex';
+    clearPanel();
 
-    Array.prototype.forEach.call(panelEl.querySelectorAll('.panel-item'), function(li) {
-      li.addEventListener('click', function() {
-        var entry = markersById[li.getAttribute('data-mapbox-id')];
-        if (entry) map.flyTo({ center: entry.marker.getLngLat(), zoom: 15, duration: 500 });
-      });
-    });
+    var head = document.createElement('div');
+    head.className = 'panel-head';
+    head.textContent = sourceLabel || 'Results';
+
+    var list = document.createElement('ul');
+    list.className = 'panel-list';
+    items.forEach(function(it) { list.appendChild(buildPanelRow(it)); });
+
+    panelEl.appendChild(head);
+    panelEl.appendChild(list);
+    panelEl.style.display = 'flex';
   }
 
   // Places API Details endpoint — batch form. Mirrors the single-record
@@ -1431,18 +1470,16 @@ ${initialDataScript}
     if (!detailsResult || !Array.isArray(detailsResult.results)) return;
     detailsResult.results.forEach(function(place) {
       if (!place || !place.mapbox_id) return;
-      var li = panelEl.querySelector('.panel-item[data-mapbox-id="' + place.mapbox_id + '"]');
-      if (li) {
-        var thumb = li.querySelector('[data-role="thumb"]');
+      var row = panelRowsById[place.mapbox_id];
+      if (row) {
         var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
-        if (thumb && photoUrl) {
-          thumb.style.backgroundImage = 'url("' + photoUrl.replace(/"/g, '') + '")';
-          thumb.classList.add('has-photo');
+        if (photoUrl) {
+          row.thumb.style.backgroundImage = 'url("' + photoUrl.replace(/"/g, '') + '")';
+          row.thumb.className = 'panel-thumb has-photo';
         }
-        var meta = li.querySelector('[data-role="meta"]');
-        if (meta && place.score && typeof place.score.popularity === 'number') {
-          meta.textContent = (meta.textContent ? meta.textContent + ' · ' : '') +
-            Math.round(place.score.popularity * 100) + '% popularity';
+        if (place.score && typeof place.score.popularity === 'number') {
+          var extra = Math.round(place.score.popularity * 100) + '% popularity';
+          row.meta.textContent = row.meta.textContent ? row.meta.textContent + ' · ' + extra : extra;
         }
       }
 

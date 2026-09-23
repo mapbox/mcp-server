@@ -30,12 +30,49 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
   const postMessageCalls: Array<Record<string, unknown>> = [];
   let messageListener: ((event: { data: unknown }) => void) | undefined;
 
+  // A minimal stand-in for a DOM Element — enough for the panel code's
+  // createElement/appendChild/removeChild/addEventListener usage, without
+  // pulling in jsdom for a hand-rolled vm sandbox. `__fireClick` is a
+  // test-only convenience (not a real DOM API) for simulating a panel row
+  // click without constructing a real Event object.
   function fakeElement() {
-    return {
+    const children: FakeElement[] = [];
+    const clickListeners: Array<() => void> = [];
+    const el: FakeElement = {
       style: {} as Record<string, string>,
       textContent: '',
-      className: ''
+      className: '',
+      children,
+      appendChild: (child: FakeElement) => {
+        children.push(child);
+        return child;
+      },
+      removeChild: (child: FakeElement) => {
+        const idx = children.indexOf(child);
+        if (idx !== -1) children.splice(idx, 1);
+        return child;
+      },
+      get firstChild() {
+        return children[0];
+      },
+      addEventListener: (type: string, cb: () => void) => {
+        if (type === 'click') clickListeners.push(cb);
+      },
+      __fireClick: () => clickListeners.forEach((cb) => cb())
     };
+    return el;
+  }
+
+  interface FakeElement {
+    style: Record<string, string>;
+    textContent: string;
+    className: string;
+    children: FakeElement[];
+    appendChild: (child: FakeElement) => FakeElement;
+    removeChild: (child: FakeElement) => FakeElement;
+    readonly firstChild: FakeElement | undefined;
+    addEventListener: (type: string, cb: () => void) => void;
+    __fireClick: () => void;
   }
 
   // The script fetches each element by id exactly once at load time and
@@ -85,16 +122,29 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
     resize: () => {}
   };
 
+  // Every `new mapboxgl.Marker()` call below returns this same shared
+  // object — fine for assertions on setPopup/getLngLat calls in aggregate,
+  // but tests can't distinguish *which* marker a call came from by
+  // identity. None of the panel tests need to.
   const fakeMarkerInstance = {
     setLngLat: () => fakeMarkerInstance,
     addTo: () => fakeMarkerInstance,
     setPopup: () => fakeMarkerInstance,
+    getLngLat: () => ({ lng: 1, lat: 2 }),
     remove: () => {}
   };
 
-  // Overridable per-test; self-fetch tests replace this with a vi.fn().
-  let fetchImpl: (url: string) => Promise<unknown> = () =>
+  // Overridable per-test; self-fetch tests replace this with a vi.fn(). Must
+  // forward `init` too — the Place Details batch call is a POST with a JSON
+  // body, unlike every other self-fetch call, which is GET-only.
+  let fetchImpl: (url: string, init?: unknown) => Promise<unknown> = () =>
     Promise.resolve({ ok: false, status: 599, json: async () => ({}) });
+
+  // Captures the text passed to the most recent `new mapboxgl.Popup().setText(...)`
+  // call, so tests can verify Place Details enrichment (phone number) reaches
+  // a marker's popup without needing per-marker identity (fakeMarkerInstance
+  // is shared across every `new mapboxgl.Marker()` call).
+  let lastPopupText: string | undefined;
 
   const sandbox: Record<string, unknown> = {
     window: {
@@ -122,13 +172,18 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
         return fakeMarkerInstance;
       },
       Popup: function Popup() {
-        return { setText: () => ({}) };
+        return {
+          setText: (text: string) => {
+            lastPopupText = text;
+            return {};
+          }
+        };
       }
     },
     console,
     setTimeout,
     URLSearchParams,
-    fetch: (url: string) => fetchImpl(url)
+    fetch: (url: string, init?: unknown) => fetchImpl(url, init)
   };
   vm.createContext(sandbox);
   vm.runInContext(scriptSource, sandbox);
@@ -165,16 +220,32 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
         data: { jsonrpc: '2.0', id: call.id, result }
       });
     },
-    setFetchImpl: (impl: (url: string) => Promise<unknown>) => {
+    setFetchImpl: (impl: (url: string, init?: unknown) => Promise<unknown>) => {
       fetchImpl = impl;
     },
+    getLastPopupText: () => lastPopupText,
     postMessageCalls,
     map: fakeMapInstance,
+    marker: fakeMarkerInstance,
     mapConstructorCalls,
     setStyleCalls,
     errorEl: elementsById.error,
-    summaryEl: elementsById.summary
+    summaryEl: elementsById.summary,
+    sidePanelEl: getElementById('side-panel'),
+    derivePanelItems: (
+      sandbox.window as {
+        __derivePanelItems?: (markers: unknown[]) => PanelItem[];
+      }
+    ).__derivePanelItems
   };
+}
+
+interface PanelItem {
+  id: string;
+  number: number;
+  name: string;
+  category?: string;
+  distanceMeters?: number;
 }
 
 describe('mapAppHtml inline-payload-first tool-result handling', () => {
@@ -1600,5 +1671,343 @@ describe('mapAppHtml ground location self-fetch', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(errorEl?.textContent).toContain('Could not fetch location context');
+  });
+});
+
+describe('mapAppHtml results side panel: derivePanelItems', () => {
+  it('keeps only markers with an id, preferring a numeric label as the panel number', () => {
+    const { derivePanelItems } = loadScriptSandbox();
+
+    const items = derivePanelItems?.([
+      {
+        id: 'a',
+        label: '3',
+        name: 'Alpha',
+        category: 'Cafe',
+        distanceMeters: 120
+      },
+      // No id (e.g. a route waypoint marker) — must be dropped, not just
+      // rendered without enrichment.
+      { label: '1', name: 'No id' },
+      // No label — falls back to positional numbering among id-bearing markers.
+      { id: 'b', name: 'Beta' }
+    ]);
+
+    expect(items).toEqual([
+      {
+        id: 'a',
+        number: 3,
+        name: 'Alpha',
+        category: 'Cafe',
+        distanceMeters: 120
+      },
+      { id: 'b', number: 2, name: 'Beta' }
+    ]);
+  });
+
+  it('falls back to "Result N" when name is omitted', () => {
+    const { derivePanelItems } = loadScriptSandbox();
+    const items = derivePanelItems?.([{ id: 'a', label: '1' }]);
+    expect(items?.[0].name).toBe('Result 1');
+  });
+
+  it('returns an empty array for non-array input', () => {
+    const { derivePanelItems } = loadScriptSandbox();
+    expect(derivePanelItems?.(undefined as unknown as unknown[])).toEqual([]);
+  });
+});
+
+describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
+  it('renders the panel from category-search self-fetch results, then enriches it via one batched Place Details call', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl, map, getLastPopupText } =
+      loadScriptSandbox();
+    const flyToSpy = vi.fn();
+    map.flyTo = flyToSpy;
+
+    const fetchSpy = vi.fn(async (url: string, init?: unknown) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        // Assert the batch call's shape from inside the mock, where the
+        // real `init` object (dropped by a naive fetch stub) is available.
+        expect(init).toEqual(
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ ids: ['poi-1'] })
+          })
+        );
+        return {
+          ok: true,
+          json: async () => ({
+            results: [
+              {
+                mapbox_id: 'poi-1',
+                photos: [{ url: 'https://example.com/photo.jpg' }],
+                score: { popularity: 0.8 },
+                phone: '+15551234567'
+              }
+            ]
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {
+                name: 'Cafe Reveille',
+                mapbox_id: 'poi-1',
+                poi_category: ['cafe'],
+                distance: 120
+              },
+              geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+            }
+          ]
+        })
+      };
+    });
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'category_search',
+              params: {
+                category: 'cafe',
+                proximity: { longitude: -122.42, latitude: 37.78 }
+              }
+            }
+          ]
+        }
+      }
+    });
+    // Two sequential fetches (category search, then the Place Details
+    // batch), each chained through a couple of .then()s — matches the
+    // ground-location self-fetch test's tick count for the same reason.
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(sidePanelEl.style.display).toBe('flex');
+    const list = sidePanelEl.children[1];
+    expect(list.children).toHaveLength(1);
+    const [thumb, body] = list.children[0].children;
+    const [name, meta] = body.children;
+
+    expect(thumb.textContent).toBe('1');
+    expect(name.textContent).toBe('Cafe Reveille');
+    // Enriched with a real photo + popularity score.
+    expect(thumb.className).toBe('panel-thumb has-photo');
+    expect(thumb.style.backgroundImage).toContain(
+      'https://example.com/photo.jpg'
+    );
+    expect(meta.textContent).toBe('cafe · 120 m · 80% popularity');
+
+    // Clicking the row flies the map to that marker.
+    list.children[0].__fireClick();
+    expect(flyToSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ center: { lng: 1, lat: 2 } })
+    );
+
+    // The enriched phone number reaches the marker's popup.
+    expect(getLastPopupText()).toBe('1. Cafe Reveille — 120 m — +15551234567');
+  });
+
+  it('never renders a panel for markers without a mapbox_id (e.g. a directions route)', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({
+        routes: [
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-77, 38],
+                [-76, 39]
+              ]
+            },
+            distance: 1000,
+            duration: 60
+          }
+        ]
+      })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/directions?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'directions',
+              params: {
+                coordinates: [
+                  { longitude: -77, latitude: 38 },
+                  { longitude: -76, latitude: 39 }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(sidePanelEl.style.display).not.toBe('flex');
+  });
+
+  it('leaves the initial Search-Box-only panel row intact when the Place Details call fails (e.g. quota exceeded)', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl, errorEl } =
+      loadScriptSandbox();
+    const fetchSpy = vi.fn(async (url: string) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        return { ok: false, status: 429, json: async () => ({}) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: { name: 'Cafe Reveille', mapbox_id: 'poi-1' },
+              geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+            }
+          ]
+        })
+      };
+    });
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(sidePanelEl.style.display).toBe('flex');
+    const row = sidePanelEl.children[1].children[0];
+    expect(row.children[0].className).toBe('panel-thumb');
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+});
+
+describe('mapAppHtml results side panel: inline markers', () => {
+  it('renders and enriches the panel from inline markers that carry an id, with no selfFetch entries at all', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ results: [] })
+    }));
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/abc',
+          summary: 'Coffee shops near Herndon, VA',
+          layers: [],
+          markers: [
+            {
+              coordinates: [-77.386, 38.9695],
+              style: 'numbered',
+              label: '1',
+              id: 'poi-inline-1',
+              name: 'Starbucks',
+              category: 'Coffee Shop',
+              distanceMeters: 400
+            },
+            // A route/waypoint-style marker with no id must not get a row.
+            { coordinates: [-77.4, 38.97], style: 'start' }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(sidePanelEl.style.display).toBe('flex');
+    expect(sidePanelEl.children[0].textContent).toBe(
+      'Coffee shops near Herndon, VA'
+    );
+    const list = sidePanelEl.children[1];
+    expect(list.children).toHaveLength(1);
+    const [thumb, body] = list.children[0].children;
+    expect(thumb.textContent).toBe('1');
+    expect(body.children[0].textContent).toBe('Starbucks');
+    expect(body.children[1].textContent).toBe('Coffee Shop · 400 m');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      'places/v1/details/retrieve'
+    );
+  });
+
+  it('never renders a panel when no inline marker carries an id', () => {
+    const { sendToolResult, sidePanelEl } = loadScriptSandbox();
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/abc',
+          layers: [],
+          markers: [{ coordinates: [-77, 38], style: 'pin' }]
+        }
+      }
+    });
+
+    expect(sidePanelEl.style.display).not.toBe('flex');
+  });
+
+  it("replaces the previous render's panel rather than accumulating rows across renders", async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ results: [] })
+    }));
+
+    const markerFor = (id: string, name: string) => ({
+      coordinates: [-77.386, 38.9695] as [number, number],
+      style: 'numbered' as const,
+      label: '1',
+      id,
+      name
+    });
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/a',
+          layers: [],
+          markers: [markerFor('poi-1', 'First')]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(sidePanelEl.children[1].children).toHaveLength(1);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/b',
+          layers: [],
+          markers: [markerFor('poi-2', 'Second')]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    const list = sidePanelEl.children[1];
+    expect(list.children).toHaveLength(1);
+    expect(list.children[0].children[1].children[0].textContent).toBe('Second');
   });
 });
