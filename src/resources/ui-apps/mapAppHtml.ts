@@ -108,6 +108,9 @@ export function renderMapAppHtml(params: {
     font-size: 12px; font-weight: 700; background-size: cover; background-position: center;
   }
   #side-panel .panel-thumb.has-photo { color: transparent; }
+  #side-panel .panel-thumb.no-photo {
+    background: none; border: 1px dashed rgba(255,255,255,0.35); color: transparent;
+  }
   #side-panel .panel-name { font-size: 12.5px; font-weight: 600; }
   #side-panel .panel-meta { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
 </style>
@@ -1496,6 +1499,15 @@ ${initialDataScript}
         if (photoUrl) {
           row.thumb.style.backgroundImage = 'url("' + photoUrl.replace(/"/g, '') + '")';
           row.thumb.className = 'panel-thumb has-photo';
+          row.thumb.textContent = '';
+        } else {
+          // Enrichment succeeded for this place but it genuinely has no
+          // photo on file -- give it a distinct look rather than leaving
+          // the plain numbered badge, which otherwise looks identical to
+          // "not enriched yet" (e.g. still waiting on the batch call, or
+          // filtered out for an incompatible id).
+          row.thumb.className = 'panel-thumb no-photo';
+          row.thumb.textContent = '';
         }
         if (place.score && typeof place.score.popularity === 'number') {
           var extra = Math.round(place.score.popularity * 100) + '% popularity';

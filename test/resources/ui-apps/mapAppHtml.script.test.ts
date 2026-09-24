@@ -1808,10 +1808,11 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     const [thumb, body] = list.children[0].children;
     const [name, meta] = body.children;
 
-    expect(thumb.textContent).toBe('1');
     expect(name.textContent).toBe('Cafe Reveille');
-    // Enriched with a real photo + popularity score.
+    // Enriched with a real photo + popularity score — the number badge
+    // gives way to the photo entirely once one is available.
     expect(thumb.className).toBe('panel-thumb has-photo');
+    expect(thumb.textContent).toBe('');
     expect(thumb.style.backgroundImage).toContain(
       'https://example.com/photo.jpg'
     );
@@ -1979,8 +1980,60 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(rows[0].children[1].children[1].textContent).not.toContain(
       'popularity'
     );
+    // Never enriched (filtered out before the batch call) — stays the
+    // plain numbered badge, distinct from a confirmed "no photo" row.
+    expect(rows[0].children[0].className).toBe('panel-thumb');
+
     expect(rows[1].children[1].children[0].textContent).toBe('Native Cafe');
     expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
+    // Enriched successfully, but the response had no photos — gets the
+    // distinct "no-photo" look rather than looking identical to the
+    // never-enriched OSM Cafe row above.
+    expect(rows[1].children[0].className).toBe('panel-thumb no-photo');
+  });
+
+  it('gives an enriched-but-photo-less place a distinct look from a not-yet-enriched one', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const id = mockPoiId('no-photo-poi');
+
+    setFetchImpl(async (url: string) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ mapbox_id: id, score: { popularity: 0.42 } }]
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: { name: 'No Photo Cafe', mapbox_id: id },
+              geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+            }
+          ]
+        })
+      };
+    });
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    const thumb = sidePanelEl.children[1].children[0].children[0];
+    expect(thumb.className).toBe('panel-thumb no-photo');
+    expect(thumb.textContent).toBe('');
   });
 });
 
