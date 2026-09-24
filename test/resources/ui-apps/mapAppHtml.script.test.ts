@@ -1805,14 +1805,14 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(sidePanelEl.style.display).toBe('flex');
     const list = sidePanelEl.children[1];
     expect(list.children).toHaveLength(1);
-    const [thumb, body] = list.children[0].children;
+    const [thumb, badge, body] = list.children[0].children;
     const [name, meta] = body.children;
 
+    expect(badge.textContent).toBe('1');
     expect(name.textContent).toBe('Cafe Reveille');
-    // Enriched with a real photo + popularity score — the number badge
-    // gives way to the photo entirely once one is available.
+    // Enriched with a real photo + popularity score — the badge (a
+    // separate element) keeps showing the number regardless.
     expect(thumb.className).toBe('panel-thumb has-photo');
-    expect(thumb.textContent).toBe('');
     expect(thumb.style.backgroundImage).toContain(
       'https://example.com/photo.jpg'
     );
@@ -1976,16 +1976,16 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     // Both rows still render — only enrichment eligibility differs.
     const rows = sidePanelEl.children[1].children;
     expect(rows).toHaveLength(2);
-    expect(rows[0].children[1].children[0].textContent).toBe('OSM Cafe');
-    expect(rows[0].children[1].children[1].textContent).not.toContain(
+    expect(rows[0].children[2].children[0].textContent).toBe('OSM Cafe');
+    expect(rows[0].children[2].children[1].textContent).not.toContain(
       'popularity'
     );
     // Never enriched (filtered out before the batch call) — stays the
-    // plain numbered badge, distinct from a confirmed "no photo" row.
+    // plain thumb, distinct from a confirmed "no photo" row.
     expect(rows[0].children[0].className).toBe('panel-thumb');
 
-    expect(rows[1].children[1].children[0].textContent).toBe('Native Cafe');
-    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
+    expect(rows[1].children[2].children[0].textContent).toBe('Native Cafe');
+    expect(rows[1].children[2].children[1].textContent).toBe('50% popularity');
     // Enriched successfully, but the response had no photos — gets the
     // distinct "no-photo" look rather than looking identical to the
     // never-enriched OSM Cafe row above.
@@ -2031,11 +2031,12 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     });
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    const thumb = sidePanelEl.children[1].children[0].children[0];
+    const [thumb, badge] = sidePanelEl.children[1].children[0].children;
     expect(thumb.className).toBe('panel-thumb no-photo');
-    // Unlike the has-photo case, the number stays visible — an empty box
-    // reads as broken, not as an intentional "checked, nothing found".
-    expect(thumb.textContent).toBe('1');
+    expect(thumb.textContent).toBe('no photo');
+    // The visit-order number lives in the separate .panel-badge element,
+    // so it stays visible regardless of the thumb's photo state.
+    expect(badge.textContent).toBe('1');
   });
 });
 
@@ -2078,8 +2079,8 @@ describe('mapAppHtml results side panel: inline markers', () => {
     );
     const list = sidePanelEl.children[1];
     expect(list.children).toHaveLength(1);
-    const [thumb, body] = list.children[0].children;
-    expect(thumb.textContent).toBe('1');
+    const [, badge, body] = list.children[0].children;
+    expect(badge.textContent).toBe('1');
     expect(body.children[0].textContent).toBe('Starbucks');
     expect(body.children[1].textContent).toBe('Coffee Shop · 400 m');
 
@@ -2145,6 +2146,6 @@ describe('mapAppHtml results side panel: inline markers', () => {
 
     const list = sidePanelEl.children[1];
     expect(list.children).toHaveLength(1);
-    expect(list.children[0].children[1].children[0].textContent).toBe('Second');
+    expect(list.children[0].children[2].children[0].textContent).toBe('Second');
   });
 });

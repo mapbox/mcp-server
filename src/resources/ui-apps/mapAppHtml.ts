@@ -98,18 +98,28 @@ export function renderMapAppHtml(params: {
   }
   #side-panel .panel-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
   #side-panel .panel-item {
-    display: flex; gap: 8px; padding: 6px; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer;
   }
   #side-panel .panel-item:hover { background: rgba(255,255,255,0.08); }
   #side-panel .panel-thumb {
-    flex: 0 0 auto; width: 28px; height: 28px; border-radius: 6px;
+    flex: 0 0 auto; width: 32px; height: 32px; border-radius: 6px;
+    background: rgba(255,255,255,0.08);
+    background-size: cover; background-position: center;
+  }
+  #side-panel .panel-thumb.no-photo {
+    background: none; border: 1px dashed rgba(255,255,255,0.4);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.55); font-size: 6.5px; font-weight: 600;
+    line-height: 1.15; text-align: center; letter-spacing: .02em;
+  }
+  /* Always-visible visit-order badge, matching the numbered map marker --
+     separate from .panel-thumb so the photo/no-photo state never has to
+     fight the number for the same 28px square. */
+  #side-panel .panel-badge {
+    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; margin-top: 6px;
     background: #f97316; color: #1a0f04;
     display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; background-size: cover; background-position: center;
-  }
-  #side-panel .panel-thumb.has-photo { color: transparent; }
-  #side-panel .panel-thumb.no-photo {
-    background: none; border: 1px dashed rgba(255,255,255,0.45); color: rgba(255,255,255,0.7);
+    font-size: 10px; font-weight: 700;
   }
   #side-panel .panel-name { font-size: 12.5px; font-weight: 600; }
   #side-panel .panel-meta { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
@@ -1386,7 +1396,10 @@ ${initialDataScript}
 
     var thumb = document.createElement('span');
     thumb.className = 'panel-thumb';
-    thumb.textContent = String(it.number);
+
+    var badge = document.createElement('span');
+    badge.className = 'panel-badge';
+    badge.textContent = String(it.number);
 
     var name = document.createElement('div');
     name.className = 'panel-name';
@@ -1405,6 +1418,7 @@ ${initialDataScript}
     body.appendChild(name);
     body.appendChild(meta);
     li.appendChild(thumb);
+    li.appendChild(badge);
     li.appendChild(body);
 
     li.addEventListener('click', function() {
@@ -1499,16 +1513,14 @@ ${initialDataScript}
         if (photoUrl) {
           row.thumb.style.backgroundImage = 'url("' + photoUrl.replace(/"/g, '') + '")';
           row.thumb.className = 'panel-thumb has-photo';
-          row.thumb.textContent = '';
         } else {
           // Enrichment succeeded for this place but it genuinely has no
-          // photo on file -- switch to a dashed/unfilled look so it reads
-          // as "checked, nothing found" rather than "not enriched yet"
-          // (still waiting on the batch call, or filtered out for an
-          // incompatible id). Deliberately keeps the number visible
-          // (unlike the has-photo case above) -- an empty box with
-          // nothing in it just looks broken, not intentional.
+          // photo on file -- distinct dashed placeholder, not just an
+          // untouched thumb (which would look identical to "not enriched
+          // yet"). The visit-order number lives in .panel-badge, a
+          // separate element, so it stays visible either way.
           row.thumb.className = 'panel-thumb no-photo';
+          row.thumb.textContent = 'no photo';
         }
         if (place.score && typeof place.score.popularity === 'number') {
           var extra = Math.round(place.score.popularity * 100) + '% popularity';
