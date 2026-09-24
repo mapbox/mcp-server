@@ -106,6 +106,7 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
   }
 
   const mapConstructorCalls: Array<Record<string, unknown>> = [];
+  const markerConstructorCalls: Array<Record<string, unknown>> = [];
   const setStyleCalls: string[] = [];
   const fakeMapInstance = {
     addControl: () => {},
@@ -178,7 +179,8 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
         return fakeMapInstance;
       },
       NavigationControl: function NavigationControl() {},
-      Marker: function Marker() {
+      Marker: function Marker(options?: Record<string, unknown>) {
+        markerConstructorCalls.push(options ?? {});
         return fakeMarkerInstance;
       },
       Popup: function Popup() {
@@ -239,6 +241,7 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
     map: fakeMapInstance,
     marker: fakeMarkerInstance,
     mapConstructorCalls,
+    markerConstructorCalls,
     setStyleCalls,
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
@@ -2088,6 +2091,66 @@ describe('mapAppHtml results side panel: inline markers', () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain(
       'places/v1/details/retrieve'
     );
+  });
+
+  it('auto-promotes an id-bearing marker with no explicit style/label to a numbered badge, matching its panel row', async () => {
+    // Observed live: Claude built inline POI markers as plain unlabeled
+    // pins (default style, no label), so the map showed generic blue dots
+    // with no way to tell which one corresponded to which panel row. The
+    // panel's own numbering (positional, independent of what's drawn)
+    // still worked, but nothing on the map matched it.
+    const {
+      sendToolResult,
+      setFetchImpl,
+      sidePanelEl,
+      markerConstructorCalls
+    } = loadScriptSandbox();
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ results: [] })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/abc',
+          layers: [],
+          markers: [
+            {
+              coordinates: [-77.386, 38.9695],
+              id: mockPoiId('poi-plain-1'),
+              name: 'Starbucks'
+            },
+            {
+              coordinates: [-77.4, 38.97],
+              id: mockPoiId('poi-plain-2'),
+              name: 'Panera Bread'
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    // Both markers got promoted to the numbered-badge element path
+    // (buildBadgeElement), not the default plain-color pin path.
+    expect(markerConstructorCalls).toHaveLength(2);
+    const el1 = markerConstructorCalls[0].element as {
+      textContent: string;
+      style: Record<string, string>;
+    };
+    const el2 = markerConstructorCalls[1].element as {
+      textContent: string;
+      style: Record<string, string>;
+    };
+    expect(el1.textContent).toBe('1');
+    expect(el1.style.background).toBe('#f97316');
+    expect(el2.textContent).toBe('2');
+
+    // And the panel's badges show the exact same numbers.
+    const rows = sidePanelEl.children[1].children;
+    expect(rows[0].children[1].textContent).toBe('1');
+    expect(rows[1].children[1].textContent).toBe('2');
   });
 
   it('never renders a panel when no inline marker carries an id', () => {

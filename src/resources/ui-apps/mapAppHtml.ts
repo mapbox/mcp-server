@@ -515,6 +515,28 @@ ${initialDataScript}
     bbox.extend(m.coordinates);
   }
 
+  // Guarantees a marker that opts into the side panel (has .id) also gets
+  // a visible number on the map matching its panel row, unless the caller
+  // already gave it an explicit label. Without this, a caller that builds
+  // plain unlabeled pins for POI markers (observed live: Claude did this
+  // for inline markers, leaving the map showing generic blue pins with no
+  // way to tell which panel row is which) breaks the whole point of the
+  // panel numbering. Mutates markers in place, so it must run before
+  // addOneMarker draws them.
+  function applyPanelNumbering(markers) {
+    if (!Array.isArray(markers)) return;
+    var n = 0;
+    markers.forEach(function(m) {
+      if (!m || !m.id) return;
+      n += 1;
+      if (!m.label) {
+        m.label = String(n);
+        if (m.style !== 'start' && m.style !== 'end') m.style = 'numbered';
+        if (!m.color) m.color = '#f97316';
+      }
+    });
+  }
+
   function fitToBounds(bounds) {
     setTimeout(function() {
       map.resize();
@@ -535,6 +557,7 @@ ${initialDataScript}
     (Array.isArray(payload.layers) ? payload.layers : []).forEach(function(layer) {
       addOneLayer(layer, bbox);
     });
+    applyPanelNumbering(payload.markers);
     (Array.isArray(payload.markers) ? payload.markers : []).forEach(function(m) {
       addOneMarker(m, bbox);
     });
@@ -584,6 +607,7 @@ ${initialDataScript}
     var markers = Array.isArray(payload.markers) ? payload.markers : [];
 
     layers.forEach(function(layer) { addOneLayer(layer, bbox); });
+    applyPanelNumbering(markers);
     markers.forEach(function(m) { addOneMarker(m, bbox); });
     // Covers both inline markers (a caller-composed payload) and self-fetch
     // markers (merged in later via mergeAdditionalPayload) — see
