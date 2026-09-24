@@ -85,12 +85,51 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     cursor: pointer;
   }
+  #side-panel {
+    position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 10;
+    width: 280px; max-width: calc(100% - 24px);
+    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
+    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #side-panel .panel-head {
+    padding: 10px 12px; font-size: 13px; font-weight: 600;
+    border-bottom: 1px solid rgba(255,255,255,0.12); flex: 0 0 auto;
+  }
+  #side-panel .panel-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
+  #side-panel .panel-item {
+    display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer;
+  }
+  #side-panel .panel-item:hover { background: rgba(255,255,255,0.08); }
+  #side-panel .panel-thumb {
+    flex: 0 0 auto; width: 32px; height: 32px; border-radius: 6px;
+    background: rgba(255,255,255,0.08);
+    background-size: cover; background-position: center;
+  }
+  #side-panel .panel-thumb.no-photo {
+    background: none; border: 1px dashed rgba(255,255,255,0.4);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.55); font-size: 6.5px; font-weight: 600;
+    line-height: 1.15; text-align: center; letter-spacing: .02em;
+  }
+  /* Always-visible visit-order badge, matching the numbered map marker --
+     separate from .panel-thumb so the photo/no-photo state never has to
+     fight the number for the same 28px square. */
+  #side-panel .panel-badge {
+    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; margin-top: 6px;
+    background: #f97316; color: #1a0f04;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  #side-panel .panel-name { font-size: 12.5px; font-weight: 600; }
+  #side-panel .panel-meta { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="summary" style="display:none"></div>
 <div id="legend" style="display:none"></div>
+<div id="side-panel" style="display:none"></div>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
 ${initialDataScript}
@@ -104,6 +143,11 @@ ${initialDataScript}
   var errorEl = document.getElementById('error');
   var summaryEl = document.getElementById('summary');
   var legendEl = document.getElementById('legend');
+  var panelEl = document.getElementById('side-panel');
+  // Populated by buildSearchMiniPayload's marker tagging so the panel (click
+  // -> flyTo) and Place Details enrichment can find a marker by mapbox_id
+  // without re-querying the map for it.
+  var markersById = {};
 
   var map = null;
   var mapLoaded = false;
@@ -376,6 +420,9 @@ ${initialDataScript}
     trackedLayerIds = [];
     trackedSourceIds = [];
     trackedMarkers = [];
+    markersById = {};
+    panelEl.style.display = 'none';
+    clearPanel();
   }
 
   function bboxAccumulator() {
@@ -461,7 +508,33 @@ ${initialDataScript}
     if (m.popup) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
     marker.addTo(map);
     trackedMarkers.push(marker);
+    // Tagged by buildSearchMiniPayload with the result's mapbox_id so the
+    // side panel (click-to-flyTo) and Place Details enrichment can look the
+    // marker back up later without walking trackedMarkers.
+    if (m.id) markersById[m.id] = { marker: marker, popupText: m.popup || '' };
     bbox.extend(m.coordinates);
+  }
+
+  // Guarantees a marker that opts into the side panel (has .id) also gets
+  // a visible number on the map matching its panel row, unless the caller
+  // already gave it an explicit label. Without this, a caller that builds
+  // plain unlabeled pins for POI markers (observed live: Claude did this
+  // for inline markers, leaving the map showing generic blue pins with no
+  // way to tell which panel row is which) breaks the whole point of the
+  // panel numbering. Mutates markers in place, so it must run before
+  // addOneMarker draws them.
+  function applyPanelNumbering(markers) {
+    if (!Array.isArray(markers)) return;
+    var n = 0;
+    markers.forEach(function(m) {
+      if (!m || !m.id) return;
+      n += 1;
+      if (!m.label) {
+        m.label = String(n);
+        if (m.style !== 'start' && m.style !== 'end') m.style = 'numbered';
+        if (!m.color) m.color = '#f97316';
+      }
+    });
   }
 
   function fitToBounds(bounds) {
@@ -484,6 +557,7 @@ ${initialDataScript}
     (Array.isArray(payload.layers) ? payload.layers : []).forEach(function(layer) {
       addOneLayer(layer, bbox);
     });
+    applyPanelNumbering(payload.markers);
     (Array.isArray(payload.markers) ? payload.markers : []).forEach(function(m) {
       addOneMarker(m, bbox);
     });
@@ -491,6 +565,7 @@ ${initialDataScript}
       summaryEl.textContent = payload.summary;
       summaryEl.style.display = 'block';
     }
+    maybeShowSidePanel(payload.markers, payload.summary);
     var bounds = bbox.bounds();
     if (bounds) fitToBounds(bounds);
   }
@@ -532,7 +607,13 @@ ${initialDataScript}
     var markers = Array.isArray(payload.markers) ? payload.markers : [];
 
     layers.forEach(function(layer) { addOneLayer(layer, bbox); });
+    applyPanelNumbering(markers);
     markers.forEach(function(m) { addOneMarker(m, bbox); });
+    // Covers both inline markers (a caller-composed payload) and self-fetch
+    // markers (merged in later via mergeAdditionalPayload) — see
+    // maybeShowSidePanel below. Whichever path produced id-bearing POI
+    // markers gets the same results panel.
+    maybeShowSidePanel(markers, payload.summary);
 
     // Legend
     if (Array.isArray(payload.legend) && payload.legend.length > 0) {
@@ -1238,12 +1319,22 @@ ${initialDataScript}
         popupParts.push(Math.round(props.distance) + ' m');
       }
       var coords = f.geometry.coordinates;
+      // id/name/category/distanceMeters are the same generic POI fields an
+      // inline (hand-composed) marker can carry — see maybeShowSidePanel,
+      // which builds the results panel from either source identically.
+      // mapbox_id is missing on the rare result that lacks one; the panel
+      // just skips that row rather than show an unclickable/unenrichable
+      // entry.
       markers.push({
+        id: props.mapbox_id,
         coordinates: coords,
         style: 'numbered',
         label: String(i + 1),
         color: '#f97316',
-        popup: popupParts.join(' — ')
+        popup: popupParts.join(' — '),
+        name: props.name || ('Result ' + (i + 1)),
+        category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
+        distanceMeters: typeof props.distance === 'number' ? props.distance : undefined
       });
       features.push({
         type: 'Feature',
@@ -1273,6 +1364,201 @@ ${initialDataScript}
     ] : [];
 
     return { summary: summary, layers: layers, markers: markers };
+  }
+
+  // --- Side panel: result list + Place Details enrichment ----------------
+  // Triggered generically by maybeShowSidePanel for ANY marker set that
+  // includes id-bearing entries — self-fetch search/category-search
+  // results (via mergeAdditionalPayload) and hand-composed inline markers
+  // from render_map_tool's own "markers" input (via renderBody) both funnel
+  // through the same path. Renders the initial (Search Box-only, or
+  // whatever the caller already provided) list immediately so the panel
+  // never blocks on the slower enrichment call. sourceLabel is plain text
+  // shown as the panel heading (e.g. the query, category, or the payload's
+  // own summary).
+  function derivePanelItems(markers) {
+    if (!Array.isArray(markers)) return [];
+    var items = [];
+    markers.forEach(function(m) {
+      if (!m || !m.id) return;
+      var labelNum = parseInt(m.label, 10);
+      items.push({
+        id: m.id,
+        number: isNaN(labelNum) ? items.length + 1 : labelNum,
+        name: m.name || ('Result ' + (items.length + 1)),
+        category: m.category,
+        distanceMeters: typeof m.distanceMeters === 'number' ? m.distanceMeters : undefined
+      });
+    });
+    return items;
+  }
+  // Exposed so tests can exercise the pure derivation logic without a DOM.
+  window.__derivePanelItems = derivePanelItems;
+
+  function maybeShowSidePanel(markers, summary) {
+    var items = derivePanelItems(markers);
+    if (items.length === 0) return;
+    renderSidePanel(items, summary || 'Results');
+    fetchPlaceDetailsBatch(
+      items.map(function(it) { return it.id; }),
+      TOKEN,
+      API_ENDPOINT
+    ).then(enrichSidePanel);
+  }
+
+  // Keyed by mapbox_id -> { thumb, meta } elements, so enrichSidePanel can
+  // update a row directly once Place Details resolves, without re-parsing
+  // panelEl's markup back into a queryable DOM (innerHTML + querySelector
+  // round-trips don't work in every MCP Apps host's iframe sandbox, and
+  // building real nodes up front is simpler to reason about either way).
+  // Reset on every renderSidePanel call, same lifecycle as the panel itself.
+  var panelRowsById = {};
+
+  function buildPanelRow(it) {
+    var li = document.createElement('li');
+    li.className = 'panel-item';
+
+    var thumb = document.createElement('span');
+    thumb.className = 'panel-thumb';
+
+    var badge = document.createElement('span');
+    badge.className = 'panel-badge';
+    badge.textContent = String(it.number);
+
+    var name = document.createElement('div');
+    name.className = 'panel-name';
+    name.textContent = it.name;
+
+    var metaParts = [];
+    if (it.category) metaParts.push(it.category);
+    if (typeof it.distanceMeters === 'number') {
+      metaParts.push(Math.round(it.distanceMeters) + ' m');
+    }
+    var meta = document.createElement('div');
+    meta.className = 'panel-meta';
+    meta.textContent = metaParts.join(' · ');
+
+    var body = document.createElement('div');
+    body.appendChild(name);
+    body.appendChild(meta);
+    li.appendChild(thumb);
+    li.appendChild(badge);
+    li.appendChild(body);
+
+    li.addEventListener('click', function() {
+      var entry = markersById[it.id];
+      if (entry) map.flyTo({ center: entry.marker.getLngLat(), zoom: 15, duration: 500 });
+    });
+
+    panelRowsById[it.id] = { thumb: thumb, meta: meta };
+    return li;
+  }
+
+  function clearPanel() {
+    while (panelEl.firstChild) panelEl.removeChild(panelEl.firstChild);
+    panelRowsById = {};
+  }
+
+  function renderSidePanel(items, sourceLabel) {
+    if (!Array.isArray(items) || items.length === 0) return;
+    clearPanel();
+
+    var head = document.createElement('div');
+    head.className = 'panel-head';
+    head.textContent = sourceLabel || 'Results';
+
+    var list = document.createElement('ul');
+    list.className = 'panel-list';
+    items.forEach(function(it) { list.appendChild(buildPanelRow(it)); });
+
+    panelEl.appendChild(head);
+    panelEl.appendChild(list);
+    panelEl.style.display = 'flex';
+  }
+
+  // Search Box results mix Mapbox-native POI ids (decode to
+  // "urn:mbxpoi:<uuid>") with OSM-sourced ones (decode to
+  // "urn:mbxpoi-osm:n<osm-node-id>") — confirmed live against a real
+  // category_search_tool-style query near Herndon, VA, where 2 of 10
+  // "cafe" results were OSM-sourced. The Places API's batch endpoint
+  // rejects the ENTIRE request with a 422 if even one id isn't its native
+  // scheme (same 422 PlaceDetailsTool.ts already works around server-side
+  // for boundary ids) — so filter client-side before sending, rather than
+  // let one incompatible id in a 10-result batch silently zero out
+  // enrichment for the other 9.
+  function isPlacesApiCompatibleId(id) {
+    if (typeof id !== 'string' || id.length === 0) return false;
+    try {
+      return (/^urn:mbxpoi:/).test(atob(id));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Places API Details endpoint — batch form. Mirrors the single-record
+  // GET src/tools/place-details-tool/PlaceDetailsTool.ts calls server-side,
+  // but the panel needs details for every result at once, so this uses the
+  // POST /details/retrieve batch form (up to 100 ids) instead of one
+  // request per pin. Docs: https://docs.mapbox.com/api/search/places/
+  // Like every other self-fetch call, this runs client-side against the
+  // public token — the Places API's docs list no secret scope requirement
+  // for this endpoint, same as Search Box/Directions/etc.
+  function fetchPlaceDetailsBatch(ids, publicToken, apiEndpoint) {
+    var compatibleIds = (Array.isArray(ids) ? ids : []).filter(isPlacesApiCompatibleId);
+    if (compatibleIds.length === 0) return Promise.resolve(null);
+    var qp = new URLSearchParams();
+    qp.append('access_token', publicToken);
+    var url = apiEndpoint + 'places/v1/details/retrieve?' + qp.toString();
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: compatibleIds.slice(0, 100) })
+    })
+      .then(function(res) {
+        // 206 is a partial batch (some ids missing/unprocessed) — still
+        // has usable "results", so treat it the same as 200.
+        if (!res.ok && res.status !== 206) return null;
+        return res.json();
+      })
+      // Enrichment is a nice-to-have on top of an already-rendered panel —
+      // Public Preview quota (1,000 records/month) or a transient error
+      // here should never surface as a map error, just leave the
+      // Search-Box-only rows as they are.
+      .catch(function() { return null; });
+  }
+
+  function enrichSidePanel(detailsResult) {
+    if (!detailsResult || !Array.isArray(detailsResult.results)) return;
+    detailsResult.results.forEach(function(place) {
+      if (!place || !place.mapbox_id) return;
+      var row = panelRowsById[place.mapbox_id];
+      if (row) {
+        var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
+        if (photoUrl) {
+          row.thumb.style.backgroundImage = 'url("' + photoUrl.replace(/"/g, '') + '")';
+          row.thumb.className = 'panel-thumb has-photo';
+        } else {
+          // Enrichment succeeded for this place but it genuinely has no
+          // photo on file -- distinct dashed placeholder, not just an
+          // untouched thumb (which would look identical to "not enriched
+          // yet"). The visit-order number lives in .panel-badge, a
+          // separate element, so it stays visible either way.
+          row.thumb.className = 'panel-thumb no-photo';
+          row.thumb.textContent = 'no photo';
+        }
+        if (place.score && typeof place.score.popularity === 'number') {
+          var extra = Math.round(place.score.popularity * 100) + '% popularity';
+          row.meta.textContent = row.meta.textContent ? row.meta.textContent + ' · ' + extra : extra;
+        }
+      }
+
+      var entry = markersById[place.mapbox_id];
+      if (entry && place.phone) {
+        entry.marker.setPopup(
+          new mapboxgl.Popup().setText(entry.popupText + ' — ' + place.phone)
+        );
+      }
+    });
   }
 
   function selfFetchSearch(params) {
@@ -1604,11 +1890,15 @@ ${initialDataScript}
         parts.push(Math.round(poi.distance_meters) + ' m');
       }
       markers.push({
+        id: poi.id,
         coordinates: [poi.longitude, poi.latitude],
         style: 'numbered',
         label: String(i + 1),
         color: '#f97316',
-        popup: parts.join(' — ')
+        popup: parts.join(' — '),
+        name: poi.name,
+        category: poi.category,
+        distanceMeters: typeof poi.distance_meters === 'number' ? poi.distance_meters : undefined
       });
     });
     return { summary: place, layers: [], markers: markers };
@@ -1667,8 +1957,10 @@ ${initialDataScript}
         var props = f.properties || {};
         var coords = (f.geometry && f.geometry.coordinates) || [params.longitude, params.latitude];
         return {
+          id: props.mapbox_id,
           name: props.name || 'Unknown',
           address: props.full_address || props.place_formatted,
+          category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
           longitude: coords[0],
           latitude: coords[1],
           distance_meters: props.distance

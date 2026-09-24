@@ -117,6 +117,23 @@ export interface MapAppMarker {
   color?: string;
   /** Popup text (optional). */
   popup?: string;
+  /**
+   * A Mapbox POI's `mapbox_id` (e.g. the "Mapbox ID" field printed by
+   * category_search_tool/search_and_geocode_tool's text output, or a
+   * self-fetched search result's own id). Setting this gets the marker a
+   * row in the map's results side panel, which the iframe then enriches
+   * with a photo and popularity score via a batched Place Details lookup
+   * (see mapAppHtml.ts's maybeShowSidePanel/fetchPlaceDetailsBatch) — the
+   * same panel search/category-search results already get automatically,
+   * now also available for hand-composed markers.
+   */
+  id?: string;
+  /** Display name for the side panel row. Only used when `id` is also set; falls back to "Result N" if omitted. */
+  name?: string;
+  /** Category shown in the side panel row (e.g. "Coffee Shop"). Only used when `id` is also set. */
+  category?: string;
+  /** Distance in meters, shown in the side panel row. Only used when `id` is also set. */
+  distanceMeters?: number;
 }
 
 export interface MapAppLegendEntry {
@@ -254,7 +271,11 @@ const MapAppMarkerSchema = z.object({
   style: z.enum(['pin', 'numbered', 'start', 'end']).optional(),
   label: z.string().optional(),
   color: z.string().optional(),
-  popup: z.string().optional()
+  popup: z.string().optional(),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  category: z.string().optional(),
+  distanceMeters: z.number().optional()
 });
 
 const MapAppLegendEntrySchema = z.object({
