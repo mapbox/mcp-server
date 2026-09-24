@@ -2033,7 +2033,9 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     const thumb = sidePanelEl.children[1].children[0].children[0];
     expect(thumb.className).toBe('panel-thumb no-photo');
-    expect(thumb.textContent).toBe('');
+    // Unlike the has-photo case, the number stays visible — an empty box
+    // reads as broken, not as an intentional "checked, nothing found".
+    expect(thumb.textContent).toBe('1');
   });
 });
 

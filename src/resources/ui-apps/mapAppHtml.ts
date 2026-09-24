@@ -109,7 +109,7 @@ export function renderMapAppHtml(params: {
   }
   #side-panel .panel-thumb.has-photo { color: transparent; }
   #side-panel .panel-thumb.no-photo {
-    background: none; border: 1px dashed rgba(255,255,255,0.35); color: transparent;
+    background: none; border: 1px dashed rgba(255,255,255,0.45); color: rgba(255,255,255,0.7);
   }
   #side-panel .panel-name { font-size: 12.5px; font-weight: 600; }
   #side-panel .panel-meta { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
@@ -1502,12 +1502,13 @@ ${initialDataScript}
           row.thumb.textContent = '';
         } else {
           // Enrichment succeeded for this place but it genuinely has no
-          // photo on file -- give it a distinct look rather than leaving
-          // the plain numbered badge, which otherwise looks identical to
-          // "not enriched yet" (e.g. still waiting on the batch call, or
-          // filtered out for an incompatible id).
+          // photo on file -- switch to a dashed/unfilled look so it reads
+          // as "checked, nothing found" rather than "not enriched yet"
+          // (still waiting on the batch call, or filtered out for an
+          // incompatible id). Deliberately keeps the number visible
+          // (unlike the has-photo case above) -- an empty box with
+          // nothing in it just looks broken, not intentional.
           row.thumb.className = 'panel-thumb no-photo';
-          row.thumb.textContent = '';
         }
         if (place.score && typeof place.score.popularity === 'number') {
           var extra = Math.round(place.score.popularity * 100) + '% popularity';
