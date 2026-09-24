@@ -1509,6 +1509,87 @@ describe('mapAppHtml optimization self-fetch', () => {
 });
 
 describe('mapAppHtml ground location self-fetch', () => {
+  it('shows and enriches the results panel for nearby POI results that carry a mapbox_id', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const coffeeId = mockPoiId('four-barrel');
+
+    const fetchSpy = vi.fn(async (url: string) => {
+      if (url.includes('geocode/v6/reverse')) {
+        return {
+          ok: true,
+          json: async () => ({
+            features: [
+              {
+                type: 'Feature',
+                properties: { name: 'Mission District' },
+                geometry: { type: 'Point', coordinates: [-122.419, 37.759] }
+              }
+            ]
+          })
+        };
+      }
+      if (url.includes('places/v1/details/retrieve')) {
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ mapbox_id: coffeeId, score: { popularity: 0.65 } }]
+          })
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {
+                name: 'Four Barrel Coffee',
+                full_address: '375 Valencia St',
+                mapbox_id: coffeeId,
+                poi_category: ['cafe'],
+                distance: 120
+              },
+              geometry: { type: 'Point', coordinates: [-122.421, 37.762] }
+            }
+          ]
+        })
+      };
+    });
+    setFetchImpl(fetchSpy);
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/ground_location?data=abc',
+          layers: [],
+          selfFetch: [
+            {
+              tool: 'ground_location',
+              params: {
+                longitude: -122.419,
+                latitude: 37.759,
+                geocodeTypes: 'neighborhood,locality,place',
+                poi: { query: 'coffee', limit: 10 }
+              }
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(sidePanelEl.style.display).toBe('flex');
+    const [thumb, badge, body] = sidePanelEl.children[1].children[0].children;
+    expect(badge.textContent).toBe('1');
+    expect(body.children[0].textContent).toBe('Four Barrel Coffee');
+    expect(body.children[1].textContent).toBe('cafe · 120 m · 65% popularity');
+    // Enrichment ran (popularity above proves it), but no photo in the
+    // mocked response, so this should be the dashed no-photo state, not
+    // the plain not-yet-enriched thumb.
+    expect(thumb.className).toBe('panel-thumb no-photo');
+  });
+
   it('fetches the place name and draws origin + numbered POI markers from a selfFetch descriptor', async () => {
     const { sendToolResult, setFetchImpl, summaryEl, errorEl } =
       loadScriptSandbox();

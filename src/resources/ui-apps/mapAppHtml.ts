@@ -1890,11 +1890,15 @@ ${initialDataScript}
         parts.push(Math.round(poi.distance_meters) + ' m');
       }
       markers.push({
+        id: poi.id,
         coordinates: [poi.longitude, poi.latitude],
         style: 'numbered',
         label: String(i + 1),
         color: '#f97316',
-        popup: parts.join(' — ')
+        popup: parts.join(' — '),
+        name: poi.name,
+        category: poi.category,
+        distanceMeters: typeof poi.distance_meters === 'number' ? poi.distance_meters : undefined
       });
     });
     return { summary: place, layers: [], markers: markers };
@@ -1953,8 +1957,10 @@ ${initialDataScript}
         var props = f.properties || {};
         var coords = (f.geometry && f.geometry.coordinates) || [params.longitude, params.latitude];
         return {
+          id: props.mapbox_id,
           name: props.name || 'Unknown',
           address: props.full_address || props.place_formatted,
+          category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
           longitude: coords[0],
           latitude: coords[1],
           distance_meters: props.distance
