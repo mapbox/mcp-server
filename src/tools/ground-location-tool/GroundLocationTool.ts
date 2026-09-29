@@ -43,6 +43,8 @@ interface CategorySearchFeature {
     place_formatted?: string;
     poi_category?: string[];
     distance?: number;
+    mapbox_id?: string;
+    external_ids?: Record<string, string>;
   };
   geometry?: {
     type: string;
@@ -207,7 +209,9 @@ export class GroundLocationTool extends MapboxApiBasedTool<
         longitude: coords?.[0] ?? longitude,
         latitude: coords?.[1] ?? latitude,
         category: props.poi_category?.[0],
-        distance_meters: props.distance
+        distance_meters: props.distance,
+        mapbox_id: props.mapbox_id,
+        external_ids: props.external_ids
       };
     });
   }
