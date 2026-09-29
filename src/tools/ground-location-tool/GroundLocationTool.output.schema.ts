@@ -9,7 +9,19 @@ export const PoiSchema = z.object({
   longitude: z.number(),
   latitude: z.number(),
   category: z.string().optional(),
-  distance_meters: z.number().optional()
+  distance_meters: z.number().optional(),
+  mapbox_id: z
+    .string()
+    .optional()
+    .describe(
+      'Mapbox id for this place. Pass it to place_details_tool to retrieve ratings, popularity, opening hours, and phone number.'
+    ),
+  external_ids: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe(
+      'Upstream supplier ids for this place, keyed by supplier (e.g. dataplor, tripadvisor). Use to attribute where the record came from.'
+    )
 });
 
 export const IsochroneSummarySchema = z.object({
