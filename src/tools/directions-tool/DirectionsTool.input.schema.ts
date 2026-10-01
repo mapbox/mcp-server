@@ -146,9 +146,27 @@ export const DirectionsInputSchema = z.object({
         '- none (default): no geometry object is returned in the response. The map preview UI ' +
         'still renders the route on its own; use this whenever you do not need the raw ' +
         'coordinates yourself.\n' +
-        '- geojson: as GeoJSON LineString (might be very long as there could be a lot of ' +
-        'points). Only needed when you (the caller) require the coordinates directly — not ' +
-        'required for the map preview to work.'
+        '- geojson: as a GeoJSON LineString, always returned directly in this response — the ' +
+        'coordinate count depends on `overview` (see below), not on trip length, so this works ' +
+        'the same way for a 2-mile trip and a 400-mile one. Use this whenever you (the caller) ' +
+        'need the coordinates yourself, e.g. to draw the route in your own app; not required ' +
+        'for the map preview, which fetches its own full-detail geometry separately.'
+    ),
+  overview: z
+    .enum(['full', 'simplified'])
+    .optional()
+    .describe(
+      'Detail level of the geometry named above (has no effect when geometries="none", since no ' +
+        'geometry is returned either way). Defaults to "simplified" when geometries="geojson" ' +
+        '(a route across an entire country is typically well under 100 coordinate pairs — ' +
+        'enough to draw an accurate shape, not enough to bloat the response) and to "full" ' +
+        'otherwise. Pass "full" explicitly for the maximum-precision geometry (every road ' +
+        'segment vertex) if you specifically need that; on a long trip this can be tens of ' +
+        'thousands of coordinate pairs, at which point the response no longer fits in this ' +
+        'reply and this tool stores it as a `mapbox://temp/` resource instead (see the tool ' +
+        'description). Note: the Directions API cannot return per-segment congestion data ' +
+        '(`congestion_information` in the response) together with anything other than ' +
+        '"full" — congestion is only included when the effective overview is "full".'
     ),
   max_height: z
     .number()
