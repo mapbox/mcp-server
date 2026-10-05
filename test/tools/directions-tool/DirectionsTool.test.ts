@@ -11,7 +11,7 @@ import {
 import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
 import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
-import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { tokenFor, ownerKeyFor } from '../../utils/tokenTestUtils.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
@@ -1524,9 +1524,12 @@ describe('DirectionsTool — temporary resource ownership', () => {
     const uri = text.match(/mapbox:\/\/temp\/[^\s`]+/)?.[0];
     expect(uri).toBeTruthy();
 
-    // ...and that resource must be owned by the account from the token, not
-    // undefined — proving the tool wires `owner` from the real accessToken.
+    // ...and that resource must be owned by the key derived from the caller's
+    // token, not undefined — proving the tool wires `owner` from the real
+    // accessToken. The key is a fingerprint of the token bytes rather than the
+    // username claim, so a caller forging that claim cannot read it back.
     const stored = temporaryResourceManager.get(uri as string);
-    expect(stored?.owner).toBe('account-zhuwenlong');
+    expect(stored?.owner).toBe(ownerKeyFor('account-zhuwenlong'));
+    expect(stored?.owner).not.toBe('account-zhuwenlong');
   });
 });

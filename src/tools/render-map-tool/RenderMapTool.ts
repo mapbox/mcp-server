@@ -29,7 +29,7 @@ import {
   resolveInlinePayloadRef,
   buildInlinePayloadRef
 } from '../../utils/inlinePayloadRef.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 import type { HttpRequest } from '../../utils/types.js';
 
 /**
@@ -113,7 +113,7 @@ export class RenderMapTool extends BaseTool<
   ): Promise<CallToolResult> {
     const accessToken =
       extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
-    const owner = accessToken ? getUserNameFromToken(accessToken) : undefined;
+    const owner = getOwnerKeyFromToken(accessToken);
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(
       trace.setSpan(context.active(), toolContext.span),
