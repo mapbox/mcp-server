@@ -6,7 +6,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { RenderMapTool } from '../../../src/tools/render-map-tool/RenderMapTool.js';
-import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { tokenFor, ownerKeyFor } from '../../utils/tokenTestUtils.js';
 
 describe('RenderMapTool', () => {
   afterEach(() => {
@@ -183,7 +183,8 @@ describe('RenderMapTool', () => {
   it('resolves a payload_ref into a renderable payload', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const owner = 'account-test-render-map-ref';
+    const account = 'account-test-render-map-ref';
+    const owner = ownerKeyFor(account);
     const ref = storeMapPayload(
       {
         summary: 'Cached route',
@@ -209,7 +210,7 @@ describe('RenderMapTool', () => {
     );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const token = tokenFor(owner);
+    const token = tokenFor(account);
     const result = await tool.run(
       { payload_refs: [ref] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -227,7 +228,8 @@ describe('RenderMapTool', () => {
   it('merges multiple payload_refs into a single map', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const owner = 'account-test-render-map-merge';
+    const account = 'account-test-render-map-merge';
+    const owner = ownerKeyFor(account);
     const a = storeMapPayload(
       {
         summary: 'Iso A',
@@ -286,7 +288,7 @@ describe('RenderMapTool', () => {
     );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const token = tokenFor(owner);
+    const token = tokenFor(account);
     const result = await tool.run(
       { payload_refs: [a, b] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -319,7 +321,8 @@ describe('RenderMapTool', () => {
   it('renders with a note when some payload_refs resolve and others are stale', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const owner = 'account-test-render-map-partial';
+    const account = 'account-test-render-map-partial';
+    const owner = ownerKeyFor(account);
     const goodRef = storeMapPayload(
       {
         summary: 'Still fresh',
@@ -345,7 +348,7 @@ describe('RenderMapTool', () => {
     );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const token = tokenFor(owner);
+    const token = tokenFor(account);
     const result = await tool.run(
       { payload_refs: [goodRef, 'mapbox://temp/map-payload-stale-one'] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

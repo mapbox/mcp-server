@@ -17,7 +17,7 @@ import type { HttpRequest } from '../..//utils/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -375,7 +375,7 @@ export class DirectionsTool extends MapboxApiBasedTool<
         uri: resourceUri,
         data: validatedData,
         metadata: { toolName: this.name, size: responseSize },
-        owner: getUserNameFromToken(accessToken)
+        owner: getOwnerKeyFromToken(accessToken)
       });
 
       // Extract summary information

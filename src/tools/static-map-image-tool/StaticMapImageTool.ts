@@ -9,7 +9,7 @@ import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js'
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 
 // Images larger than this threshold are stored as temporary resources instead
 // of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
@@ -156,7 +156,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
         data: base64Data,
         metadata: { toolName: this.name, size: buffer.byteLength },
         mimeType,
-        owner: getUserNameFromToken(accessToken)
+        owner: getOwnerKeyFromToken(accessToken)
       });
       content.push({
         type: 'text',

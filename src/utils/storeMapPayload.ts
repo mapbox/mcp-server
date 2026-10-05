@@ -4,6 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { temporaryResourceManager } from './temporaryResourceManager.js';
+import { ownerKeyMatches } from './jwtUtils.js';
 import type { MapAppPayload } from './mapAppPayload.js';
 
 // Above this size, only the ref is included inline (the ref+resources/read
@@ -43,11 +44,11 @@ const TEMP_URI_PREFIX = 'mapbox://temp/map-payload-';
  * payloads (e.g. polygon-op chains). Passing a ref instead keeps the LLM's
  * emission down to a few tokens.
  *
- * `owner` must be the same account identifier (`getUserNameFromToken`) the
- * caller resolves for its own token — `TemporaryDataResource.read()` fails
- * closed on an unowned resource, so omitting this makes the ref permanently
- * unreadable via the real `resources/read` path the render iframe uses (it
- * always 404s), even though callers that read the manager directly (like
+ * `owner` must be the same ownership key (`getOwnerKeyFromToken`) the caller
+ * resolves for its own token — `TemporaryDataResource.read()` fails closed on
+ * an unowned resource, so omitting this makes the ref permanently unreadable
+ * via the real `resources/read` path the render iframe uses (it always 404s),
+ * even though callers that read the manager directly (like
  * `resolveMapPayloadRef`) wouldn't notice anything wrong.
  */
 export function storeMapPayload(
@@ -109,12 +110,12 @@ export function renderHint(ref: string): string {
 
 /**
  * Resolve a `mapbox://temp/map-payload-...` ref back to its `MapAppPayload`.
- * Returns null if the ref is unknown, expired, or owned by a different
- * account than `owner` — this is the same account-scoping enforced by
- * `TemporaryDataResource.read()` (a caller passing another account's ref
- * would otherwise have it silently merged and re-served under their own
- * ref, bypassing the read-side check entirely since this goes straight to
- * the manager rather than through `resources/read`).
+ * Returns null if the ref is unknown, expired, or owned by a key other than
+ * `owner` — this is the same token-scoping enforced by
+ * `TemporaryDataResource.read()` (a caller passing someone else's ref would
+ * otherwise have it silently merged and re-served under their own ref,
+ * bypassing the read-side check entirely since this goes straight to the
+ * manager rather than through `resources/read`).
  */
 export function resolveMapPayloadRef(
   ref: string,
@@ -123,7 +124,7 @@ export function resolveMapPayloadRef(
   if (!ref.startsWith(TEMP_URI_PREFIX)) return null;
   const entry = temporaryResourceManager.get(ref);
   if (!entry || !entry.data) return null;
-  if (!entry.owner || !owner || entry.owner !== owner) return null;
+  if (!ownerKeyMatches(entry.owner, owner)) return null;
   return entry.data as MapAppPayload;
 }
 
