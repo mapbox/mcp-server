@@ -213,26 +213,22 @@ describe('cleanResponseData', () => {
     expect(result.routes[0].incidents_summary[0].extra_field).toBeUndefined();
   });
 
-  it('should collect voice instructions when within limits', () => {
+  it('should collect turn-by-turn instructions from step.maneuver.instruction', () => {
     const mockData = {
       routes: [
         {
           legs: [
             {
               steps: [
+                { maneuver: { instruction: 'Drive northeast on Main St.' } },
                 {
-                  voiceInstructions: [
-                    { announcement: 'Turn right in 100 meters' },
-                    { announcement: 'Turn right now' }
-                  ]
+                  maneuver: {
+                    instruction: 'Bear right onto Elm St. Continue on Elm St.'
+                  }
                 },
-                {
-                  voiceInstructions: [
-                    { announcement: 'Continue straight for 500 meters' }
-                  ]
-                }
+                { maneuver: { instruction: 'Arrive at your destination.' } }
               ],
-              summary: 'Leg with voice instructions'
+              summary: 'Leg with turn-by-turn instructions'
             }
           ]
         }
@@ -242,27 +238,24 @@ describe('cleanResponseData', () => {
     const result = cleanResponseData(mockInput, mockData);
 
     expect(result.routes[0].instructions).toEqual([
-      'Turn right in 100 meters',
-      'Turn right now',
-      'Continue straight for 500 meters'
+      'Drive northeast on Main St.',
+      'Bear right onto Elm St. Continue on Elm St.',
+      'Arrive at your destination.'
     ]);
   });
 
-  it('should not include instructions when there are too many', () => {
+  it('ignores steps with no maneuver.instruction', () => {
     const mockData = {
       routes: [
         {
           legs: [
             {
-              steps: Array(6)
-                .fill(0)
-                .map(() => ({
-                  voiceInstructions: [
-                    { announcement: 'Instruction 1' },
-                    { announcement: 'Instruction 2' }
-                  ]
-                })),
-              summary: 'Leg with many instructions'
+              steps: [
+                { maneuver: { instruction: 'Drive north on Main St.' } },
+                { maneuver: {} },
+                {}
+              ],
+              summary: 'Leg with a step missing an instruction'
             }
           ]
         }
@@ -271,8 +264,54 @@ describe('cleanResponseData', () => {
 
     const result = cleanResponseData(mockInput, mockData);
 
-    // With 6 steps and 2 instructions each, we'd have 12 instructions total
-    // The function should exclude them since it's > 10
+    expect(result.routes[0].instructions).toEqual(['Drive north on Main St.']);
+  });
+
+  it('still includes turn-by-turn instructions for a long route with dozens of real turns', () => {
+    // Mirrors a real long driving route (confirmed live: London->Edinburgh
+    // has ~40 steps in a single leg) -- well within the new cap, unlike the
+    // old 10-instruction cap (calibrated for a different, always-empty
+    // voice-announcement source) which would have excluded this outright.
+    const mockData = {
+      routes: [
+        {
+          legs: [
+            {
+              steps: Array.from({ length: 40 }, (_, i) => ({
+                maneuver: { instruction: `Turn ${i + 1}` }
+              })),
+              summary: 'Leg with many real turns'
+            }
+          ]
+        }
+      ]
+    };
+
+    const result = cleanResponseData(mockInput, mockData);
+
+    expect(result.routes[0].instructions).toHaveLength(40);
+    expect(result.routes[0].instructions?.[0]).toBe('Turn 1');
+    expect(result.routes[0].instructions?.[39]).toBe('Turn 40');
+  });
+
+  it('excludes instructions entirely past the pathological-case cap', () => {
+    const mockData = {
+      routes: [
+        {
+          legs: [
+            {
+              steps: Array.from({ length: 201 }, (_, i) => ({
+                maneuver: { instruction: `Turn ${i + 1}` }
+              })),
+              summary: 'Leg with an unreasonable number of turns'
+            }
+          ]
+        }
+      ]
+    };
+
+    const result = cleanResponseData(mockInput, mockData);
+
     expect(result.routes[0].instructions).toBeUndefined();
   });
 

@@ -42,13 +42,13 @@ interface RawIncident {
   [key: string]: unknown;
 }
 
-interface RawVoiceInstruction {
-  announcement?: string;
+interface RawManeuver {
+  instruction?: string;
   [key: string]: unknown;
 }
 
 interface RawStep {
-  voiceInstructions?: RawVoiceInstruction[];
+  maneuver?: RawManeuver;
   [key: string]: unknown;
 }
 
@@ -200,8 +200,8 @@ export function cleanResponseData(
       length?: number;
     }> = [];
 
-    // Collect voice instruction announcements from all steps
-    const routeAnnouncements: string[] = [];
+    // Collect turn-by-turn instructions from all steps
+    const routeInstructions: string[] = [];
 
     let totalDistanceWeightedSpeed = 0; // Sum of (speed × distance) for each segment
     let sumDistanceMeters = 0;
@@ -284,15 +284,17 @@ export function cleanResponseData(
           });
         }
 
-        // Process steps if they exist to collect voice instructions
+        // Process steps if they exist to collect turn-by-turn instructions.
+        // `maneuver.instruction` (e.g. "Bear right onto Great Portland
+        // Street/A4201") is present on every step whenever steps=true is
+        // requested, unlike `step.voiceInstructions`, which requires the
+        // separate voice_instructions=true parameter -- never sent by this
+        // tool, so that field was always empty and `instructions` never
+        // actually populated.
         if (leg.steps) {
           leg.steps.forEach((step) => {
-            if (step.voiceInstructions) {
-              step.voiceInstructions.forEach((instruction) => {
-                if (instruction.announcement) {
-                  routeAnnouncements.push(instruction.announcement);
-                }
-              });
+            if (step.maneuver?.instruction) {
+              routeInstructions.push(step.maneuver.instruction);
             }
           });
         }
@@ -312,10 +314,18 @@ export function cleanResponseData(
     // Add all incidents with the specified fields as a new property on the route
     cleanedRoute.incidents_summary = routeIncidents;
 
-    // Add voice instruction announcements only if there are 1 to 10 of them
-    // If there are more than 10, it's just too many, and if there is 0 then we don't have them.
-    if (routeAnnouncements.length >= 1 && routeAnnouncements.length <= 10) {
-      cleanedRoute.instructions = routeAnnouncements;
+    // One instruction per real maneuver (unlike the old voice-announcement
+    // source, which could repeat several announcements per turn), so a
+    // normal route -- even a long one with dozens of turns -- stays well
+    // within a generous cap. The cap here is just a backstop against a
+    // pathological case (e.g. many waypoints each with a complex urban leg),
+    // not a limit expected to bite in practice.
+    const MAX_INSTRUCTIONS = 200;
+    if (
+      routeInstructions.length >= 1 &&
+      routeInstructions.length <= MAX_INSTRUCTIONS
+    ) {
+      cleanedRoute.instructions = routeInstructions;
     }
 
     cleanedRoute.num_legs = route.legs?.length || 0;
