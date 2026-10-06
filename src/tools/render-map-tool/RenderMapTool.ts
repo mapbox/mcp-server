@@ -5,6 +5,10 @@ import { context, SpanStatusCode, trace } from '@opentelemetry/api';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
+import {
+  mapAppCsp,
+  type MapAppCsp
+} from '../../resources/ui-apps/mapAppCsp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   RenderMapInputSchema,
@@ -79,15 +83,7 @@ export class RenderMapTool extends BaseTool<
     openWorldHint: false
   };
 
-  readonly meta = {
-    ui: {
-      resourceUri: 'ui://mapbox/map-app/index.html',
-      csp: {
-        connectDomains: ['https://*.mapbox.com', 'https://events.mapbox.com'],
-        resourceDomains: ['https://api.mapbox.com']
-      }
-    }
-  };
+  readonly meta: { ui: { resourceUri: string; csp: MapAppCsp } };
 
   private readonly httpRequest: HttpRequest;
   private readonly apiEndpoint: () => string;
@@ -104,6 +100,12 @@ export class RenderMapTool extends BaseTool<
     this.apiEndpoint =
       params.apiEndpoint ??
       (() => process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/');
+    this.meta = {
+      ui: {
+        resourceUri: 'ui://mapbox/map-app/index.html',
+        csp: mapAppCsp(this.apiEndpoint())
+      }
+    };
   }
 
   async run(
