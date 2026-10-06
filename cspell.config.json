@@ -9,7 +9,9 @@
     "mmss",
     "tilequery",
     "GHSA",
-    "mxjg"
+    "mxjg",
+    "dataplor",
+    "tripadvisor"
   ],
   "ignorePaths": [
     "node_modules",
