@@ -18,6 +18,22 @@ describe('RenderMapTool', () => {
     expect(tool.meta?.ui?.resourceUri).toBe('ui://mapbox/map-app/index.html');
   });
 
+  it('declares the same CSP as the map-app resource, including a custom API endpoint', () => {
+    const tool = new RenderMapTool({
+      httpRequest: vi.fn(),
+      apiEndpoint: () => 'https://api-staging.example.com/'
+    });
+    expect(tool.meta?.ui?.csp).toEqual({
+      connectDomains: [
+        'https://api.mapbox.com',
+        'https://events.mapbox.com',
+        'https://api-staging.example.com'
+      ],
+      resourceDomains: ['https://api.mapbox.com'],
+      workerDomains: ['blob:']
+    });
+  });
+
   it('echoes layer + marker counts in the result', async () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     const token = tokenFor('account-test-render-map');
