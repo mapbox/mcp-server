@@ -378,6 +378,33 @@ describe('RenderMapTool', () => {
     expect(text).toContain('Re-run the source tool');
   });
 
+  // Regression: in the ChatGPT app a hand-written isochrone ref with no
+  // contours plus a `summary` returned isError: false, because the summary
+  // alone counted as renderable — the map drew an empty globe and the LLM
+  // described an isochrone the user never saw.
+  it('errors when the only data ref is unresolved, even with a summary', async () => {
+    const { buildSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const badRef = buildSelfFetchRef('isochrone', {
+      profile: 'mapbox/driving-traffic',
+      coordinates: { longitude: -122.119931, latitude: 47.683984 },
+      contours_minutes: 15,
+      generalize: 2000
+    });
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run(
+      { payload_refs: [badRef], summary: '15-min drive-time area' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token: tokenFor('alice') } } as any
+    );
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain(
+      'none of the provided payload_refs could be resolved'
+    );
+    expect(text).toContain('mapboxRender.ref values verbatim');
+  });
+
   it('renders a union_tool compute ref with no owner and no prior server-side state (simulated restart)', async () => {
     const { buildComputeRef } =
       await import('../../../src/utils/computeRef.js');
@@ -666,7 +693,7 @@ describe('RenderMapTool', () => {
     const { buildSelfFetchRef } =
       await import('../../../src/utils/selfFetchRef.js');
     const ref = buildSelfFetchRef('isochrone', {
-      coordinates: [-122.4194, 37.7749],
+      coordinates: { longitude: -122.4194, latitude: 37.7749 },
       contours_minutes: [10]
     });
 
@@ -704,7 +731,7 @@ describe('RenderMapTool', () => {
     const { buildSelfFetchRef } =
       await import('../../../src/utils/selfFetchRef.js');
     const ref = buildSelfFetchRef('isochrone', {
-      coordinates: [-122.4194, 37.7749],
+      coordinates: { longitude: -122.4194, latitude: 37.7749 },
       contours_minutes: [10]
     });
 

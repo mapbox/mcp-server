@@ -128,7 +128,17 @@ export class RenderMapTool extends BaseTool<
             owner
           );
 
-          if (!payload) {
+          // A summary/legend alone counts as renderable, so without this a
+          // call whose only data ref failed would still "succeed" and draw
+          // an empty globe under the summary — and the LLM, seeing success,
+          // describes a map the user never got.
+          const nothingDrawable =
+            unresolvedRefs.length > 0 &&
+            (payload?.layers?.length ?? 0) === 0 &&
+            (payload?.markers?.length ?? 0) === 0 &&
+            (payload?.selfFetch?.length ?? 0) === 0;
+
+          if (!payload || nothingDrawable) {
             // A ref that fails to resolve is usually a payload that expired
             // (30-minute TTL) or was created in a different process/session
             // — e.g. the conversation was rehydrated and the LLM reused a
@@ -141,9 +151,10 @@ export class RenderMapTool extends BaseTool<
                   type: 'text' as const,
                   text: hadOnlyStaleRefs
                     ? `RenderMapTool: none of the provided payload_refs could be resolved — ` +
-                      `they've likely expired (temporary map data lasts ~30 minutes) or belong ` +
-                      `to a different session. Re-run the tool(s) that produced this data to get ` +
-                      `fresh refs, then call render_map_tool again.`
+                      `they've likely expired (temporary map data lasts ~30 minutes), belong ` +
+                      `to a different session, or are malformed. Re-run the tool(s) that produced ` +
+                      `this data and pass their mapboxRender.ref values verbatim, then call ` +
+                      `render_map_tool again.`
                     : 'RenderMapTool: nothing to render. Pass either `payload_refs` or inline `layers`/`markers`.'
                 }
               ],
@@ -158,7 +169,7 @@ export class RenderMapTool extends BaseTool<
           const staleNote =
             unresolvedRefs.length > 0
               ? ` (Note: ${unresolvedRefs.length} payload ref${unresolvedRefs.length === 1 ? '' : 's'} ` +
-                `could not be resolved — likely expired — and ${unresolvedRefs.length === 1 ? 'was' : 'were'} ` +
+                `could not be resolved — likely expired or malformed — and ${unresolvedRefs.length === 1 ? 'was' : 'were'} ` +
                 `skipped. Re-run the source tool(s) if that data should be included.)`
               : '';
 
