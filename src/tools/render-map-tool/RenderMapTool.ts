@@ -128,7 +128,17 @@ export class RenderMapTool extends BaseTool<
             owner
           );
 
-          if (!payload) {
+          // A summary/legend alone counts as renderable, so without this a
+          // call whose only data ref failed would still "succeed" and draw
+          // an empty globe under the summary — and the LLM, seeing success,
+          // describes a map the user never got.
+          const nothingDrawable =
+            unresolvedRefs.length > 0 &&
+            (payload?.layers?.length ?? 0) === 0 &&
+            (payload?.markers?.length ?? 0) === 0 &&
+            (payload?.selfFetch?.length ?? 0) === 0;
+
+          if (!payload || nothingDrawable) {
             // A ref that fails to resolve is usually a payload that expired
             // (30-minute TTL) or was created in a different process/session
             // — e.g. the conversation was rehydrated and the LLM reused a
