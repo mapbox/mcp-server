@@ -103,7 +103,7 @@ export function buildMapboxRenderField(
  */
 export function renderHint(ref: string): string {
   return (
-    `\n\n📍 To show this on a live Mapbox GL JS map, call:\n` +
+    `\n\n📍 To show this on a map, call render_map_tool (not static_map_image_tool) with this ref unchanged:\n` +
     `   render_map_tool({ "payload_refs": ["${ref}"] })`
   );
 }
