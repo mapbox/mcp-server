@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.15.0 - 2026-10-08
+
 ### Security
 
 - **Temporary resource ownership is now keyed on the caller's token, not on the unverified username claim inside it.** `TemporaryDataResource.read()` gated access to cached large tool responses (route geometry, isochrone GeoJSON, static-map images, `render_map_tool` payload refs) by comparing the resource's recorded owner to `getUserNameFromToken(callerToken)`. That helper base64-decodes the JWT payload and returns the `u` field with no signature verification — and none is possible here, since Mapbox signs its tokens with a secret this server does not hold. The entire authorization decision therefore rested on a claim the caller controls: anyone who knew a resource URI and the owner's Mapbox username could fabricate a token asserting that username and read the cached data. Unlike a tool invocation, which hands the token to a live Mapbox API call that rejects a fake, the resource read never made that call, so nothing downstream caught it.
