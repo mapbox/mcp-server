@@ -896,6 +896,11 @@ ${initialDataScript}
       if (typeof params.profile !== 'string') return false;
       if (!/^mapbox\\/[a-z-]+$/.test(params.profile)) return false;
     }
+    // The Isochrone API requires one of these; a scalar (e.g. 15 instead
+    // of [15]) would be silently dropped by buildIsochroneApiUrl.
+    var hasMinutes = Array.isArray(params.contours_minutes) && params.contours_minutes.length > 0;
+    var hasMeters = Array.isArray(params.contours_meters) && params.contours_meters.length > 0;
+    if (!hasMinutes && !hasMeters) return false;
     return true;
   }
 

@@ -30,6 +30,7 @@ import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
+import { publishJsonSchema2020 } from './utils/jsonSchema2020.js';
 import { buildServerInstructions } from './utils/serverInstructions.js';
 import { handleCliMetadataArgs } from './cli.js';
 import {
@@ -134,6 +135,9 @@ const server = new McpServer(
     }
   }
 );
+
+// Must run before the first tool is registered — see jsonSchema2020.ts.
+publishJsonSchema2020(server);
 
 // Register only core tools before connection
 // Capability-dependent tools will be registered dynamically after connection
