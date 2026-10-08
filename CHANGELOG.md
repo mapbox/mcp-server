@@ -1,5 +1,9 @@
 ## Unreleased
 
+### New Features
+
+- **`@mapbox/mcp-server/utils` now exports the server setup helpers, so servers built from the subpath exports get the #268 and #269 fixes.** `publishJsonSchema2020`, `toJsonSchema2020`, and `buildServerInstructions` were only used by this package's own entry point (`src/index.ts`). Anything that builds its own `McpServer` from `@mapbox/mcp-server/tools` and installs the tools itself, which is how the hosted server at `mcp.mapbox.com` works, still published draft-07 schemas (rejected by Claude Desktop) and sent no server instructions (so models that load tools lazily keep picking `static_map_image_tool` over `render_map_tool`). Upgrading to 0.15.0 alone fixed neither. Such a server can now call `publishJsonSchema2020(server)` before installing tools and pass `instructions: buildServerInstructions(<enabled tool names>)` when creating the server. The custom-server example in `docs/importing-tools.md` called `.definition` and `.execute()`, which the tools don't have; it now uses `getAllTools()`/`getAllResources()`, `installTo()`, and both helpers. Added export tests, including one that builds an external `McpServer` from the subpath exports and checks that it lists 2020-12 schemas and sends the instructions. Checked that the built package exposes all three helpers under both ESM and CommonJS.
+
 ## 0.15.0 - 2026-10-08
 
 ### Security

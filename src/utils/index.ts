@@ -55,3 +55,10 @@ export { redactToken } from './redactToken.js';
 // Export version utilities
 export { getVersionInfo } from './versionUtils.js';
 export type { VersionInfo } from './versionUtils.js';
+
+// Export server setup helpers for consumers building their own McpServer
+// (e.g. a hosted deployment) rather than running this package's entry point.
+// Call publishJsonSchema2020(server) before installing any tool, and pass
+// buildServerInstructions(<enabled tool names>) as the server's instructions.
+export { publishJsonSchema2020, toJsonSchema2020 } from './jsonSchema2020.js';
+export { buildServerInstructions } from './serverInstructions.js';
