@@ -1,5 +1,14 @@
 ## Unreleased
 
+### New Features
+
+- **`export_map_html_tool`: the `render_map_tool` map as a standalone HTML page, for agents building sites or files.** `render_map_tool` renders only inside the chat (as an MCP App), so an agent building a page had to write its own Mapbox GL JS code and ask the user for a public token. That's what happened in ChatGPT/Codex when someone asked for a site with a map. The new tool takes the same input as `render_map_tool` and returns a complete HTML document of about 3 KB plus the map data. The data and a public token are written into JSON tags in the page, and the map script loads from jsDelivr. The token is the account's default public token, resolved the same way the in-chat map does it, or `public_token` if passed. The tool result recommends a URL-restricted token for published sites. The page stays small because the agent has to copy the whole document into a file write; inlining the ~60 KB map script would mean re-emitting ~16k tokens.
+  - **Shared map script:** the in-chat page's script is now `mapAppScript()`, and its markup and styles are `mapAppShell()`. The in-chat page output is byte-for-byte unchanged. The build writes a standalone copy that reads its token and API endpoint from the page (`dist/map-app/standalone.js`, shipped in the npm package). Pages pin it by package version and a sha384 integrity hash. Running from source, where the version can't be read, the tool inlines the script instead.
+  - **Live layers:** routes, isochrones and search results are still fetched by the page on load, as the in-chat map does, so each page view calls the Mapbox API on the token's account. The tool result says how many layers do this.
+  - **Server instructions:** when the tool is enabled, they now point page building at it.
+  - **Shared payload assembly:** `render_map_tool`'s ref resolution and payload merging moved to `assembleMapPayload()` so both tools share it; `render_map_tool` behavior is unchanged.
+  - **Testing:** added tests for the tool, the standalone script (run in a VM sandbox: it reads its token and endpoint from the page and calls the configured endpoint), and the server instructions. Checked in headless Chrome that a generated page loads the hosted script with its integrity hash and creates the map, and that a page with a wrong hash does not run the script.
+
 ## 0.15.1 - 2026-10-09
 
 ### New Features

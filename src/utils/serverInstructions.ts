@@ -19,6 +19,11 @@ export function buildServerInstructions(
     'To show anything on a map, use render_map_tool: it renders an interactive Mapbox GL JS map inline.',
     'When a tool result includes mapboxRender.ref, pass that ref unchanged in render_map_tool payload_refs (several refs can share one map). Never write or edit a ref by hand.'
   ];
+  if (enabledToolNames.includes('export_map_html_tool')) {
+    lines.push(
+      'When you are building a web page, site or file that needs a map, use export_map_html_tool: it returns the same map as a standalone HTML page, with the data and a public token included.'
+    );
+  }
   if (enabledToolNames.includes('static_map_image_tool')) {
     lines.push(
       'Use static_map_image_tool only when the user explicitly asks for a static image file (PNG/JPEG), never as the default way to show a map.'
