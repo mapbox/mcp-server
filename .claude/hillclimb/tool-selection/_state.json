@@ -1,0 +1,36 @@
+{
+  "flow": "tool-selection",
+  "metrics": [
+    {
+      "id": "pass",
+      "label": "Pass",
+      "kind": "binary"
+    },
+    {
+      "id": "first_ok",
+      "label": "First tool ok",
+      "kind": "binary"
+    },
+    {
+      "id": "no_forbidden",
+      "label": "No forbidden",
+      "kind": "binary"
+    },
+    {
+      "id": "ref_ok",
+      "label": "Ref passed",
+      "kind": "binary"
+    }
+  ],
+  "perf_fields": [
+    "tool_calls",
+    "tool_searches",
+    "latency_s",
+    "usage"
+  ],
+  "harness_paths": [
+    "evals/tool-selection/cases.json",
+    "evals/tool-selection/harness.ts"
+  ],
+  "harness_sha": "31d09b8e2336c02342caeed5edbd9a5ddfc6d4760662d16fcdc217c38e780a6f"
+}

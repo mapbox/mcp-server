@@ -1,0 +1,253 @@
+[
+  {
+    "id": "address-no-map",
+    "category": "no-unrequested-map",
+    "prompt": "What's the address of the post office closest to 2400 Larimer St in Denver?",
+    "why": "Connector review: render_map_tool must not draw a map nobody asked for. Needs live data, so Claude can't answer from memory.",
+    "expect": {
+      "any_of": ["search_and_geocode_tool", "category_search_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. 2400 Larimer St, Denver, CO 80205 (39.7569, -104.9862)\n2. USPS Post Office, 2160 Market St, Denver, CO 80205 (39.7537, -104.9925), 0.6 km from 2400 Larimer St",
+      "category_search_tool": "1. USPS Post Office, 2160 Market St, Denver, CO 80205 (39.7537, -104.9925), 0.6 km\n2. USPS Post Office, 3600 Downing St, Denver, CO 80205 (39.7672, -104.9732), 1.6 km",
+      "place_details_tool": "USPS Post Office, 2160 Market St, Denver, CO 80205. Hours: Mon-Fri 9am-5pm.",
+      "web_search": "1. \"Post office locations near Five Points, Denver\" usps.com: 2160 Market St, Denver, CO 80205."
+    }
+  },
+  {
+    "id": "drive-time-no-map",
+    "category": "no-unrequested-map",
+    "prompt": "How long does it take to drive from Boulder to Denver Union Station?",
+    "why": "A route lookup returns a render hint; a text question should still get a text answer.",
+    "expect": {
+      "must": ["directions_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Boulder, Colorado, United States (40.0150, -105.2705)\n2. Denver Union Station, 1701 Wynkoop St, Denver, CO 80202 (39.7531, -105.0000)",
+      "directions_tool": "Route 1: 45.2 km, 37 min via US-36 E (current traffic). Route 2: 49.8 km, 44 min via CO-93 S and I-70 E."
+    }
+  },
+  {
+    "id": "museums-no-map",
+    "category": "no-unrequested-map",
+    "prompt": "What museums are near the National Mall in Washington, DC?",
+    "why": "Generic place type goes to category search; no map requested.",
+    "expect": {
+      "must": ["category_search_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "category_search_tool": "1. Smithsonian National Air and Space Museum, 600 Independence Ave SW (38.8882, -77.0199)\n2. National Museum of Natural History, 10th St & Constitution Ave NW (38.8913, -77.0261)\n3. National Gallery of Art, Constitution Ave NW (38.8913, -77.0200)\n4. National Museum of American History, 1300 Constitution Ave NW (38.8912, -77.0300)\n5. Hirshhorn Museum, Independence Ave & 7th St SW (38.8882, -77.0230)",
+      "search_and_geocode_tool": "1. National Mall, Washington, DC, United States (38.8896, -77.0230)"
+    }
+  },
+  {
+    "id": "route-on-map",
+    "category": "map-requested",
+    "prompt": "Show me the driving route from the Golden Gate Bridge to Stanford University on a map.",
+    "why": "Map requested: route data then render_map_tool, not static or the host map.",
+    "expect": {
+      "must": ["directions_tool", "render_map_tool"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Golden Gate Bridge, San Francisco, CA (37.8199, -122.4783)\n2. Stanford University, 450 Jane Stanford Way, Stanford, CA 94305 (37.4275, -122.1697)",
+      "directions_tool": "Route 1: 62.1 km, 52 min via US-101 S and I-280 S. Route 2: 58.4 km, 57 min via US-101 S."
+    }
+  },
+  {
+    "id": "coffee-on-map",
+    "category": "map-requested",
+    "prompt": "Find coffee shops near Union Square in San Francisco and put them on a map.",
+    "why": "Map requested after a category search.",
+    "expect": {
+      "must": ["category_search_tool", "render_map_tool"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Union Square, San Francisco, CA 94108 (37.7880, -122.4075)",
+      "category_search_tool": "1. Blue Bottle Coffee, 66 Mint St (37.7825, -122.4079), 0.6 km\n2. Sightglass Coffee, 270 7th St (37.7767, -122.4083), 1.3 km\n3. Philz Coffee, 201 Berry St (37.7766, -122.3921), 1.8 km\n4. Peet's Coffee, 291 Geary St (37.7873, -122.4079), 0.1 km\n5. Saint Frank Coffee, 2340 Polk St (37.7983, -122.4220), 1.9 km"
+    }
+  },
+  {
+    "id": "landmark-on-map",
+    "category": "map-requested",
+    "prompt": "Show me where the Space Needle is on a map.",
+    "why": "Single-place map request; the host map tool is the tempting alternative.",
+    "expect": {
+      "must": ["render_map_tool"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Space Needle, 400 Broad St, Seattle, WA 98109, United States (47.6205, -122.3493)",
+      "place_details_tool": "Space Needle, 400 Broad St, Seattle, WA 98109. Category: observation tower, landmark."
+    }
+  },
+  {
+    "id": "walk-isochrone-map",
+    "category": "map-requested",
+    "prompt": "Show me everywhere I can walk to within 15 minutes of Times Square.",
+    "why": "Reachability plus an implied map.",
+    "expect": {
+      "must": ["isochrone_tool", "render_map_tool"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Times Square, Manhattan, New York, NY 10036 (40.7580, -73.9855)",
+      "isochrone_tool": "Walking isochrone from Times Square: 15 min contour covers about 2.3 sq km, reaching roughly from 34th St to 57th St and from 5th Ave to 10th Ave."
+    }
+  },
+  {
+    "id": "static-png",
+    "category": "static-image",
+    "prompt": "Generate a static PNG map image of downtown Denver at 800x600 that I can paste into a slide.",
+    "why": "Server instructions: static_map_image_tool only when a static image file is explicitly requested.",
+    "expect": {
+      "must": ["static_map_image_tool"],
+      "must_not": ["render_map_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Downtown Denver, Denver, CO (39.7447, -104.9918)"
+    }
+  },
+  {
+    "id": "coords-lunch",
+    "category": "coordinates",
+    "prompt": "I'm at 37.7955, -122.3937. Any good lunch spots within walking distance?",
+    "why": "ground_location_tool already includes reverse geocoding; no separate reverse_geocode_tool call.",
+    "expect": {
+      "first": ["ground_location_tool"],
+      "must_not": ["reverse_geocode_tool"]
+    },
+    "stubs": {
+      "ground_location_tool": "Place: Ferry Building, Embarcadero, San Francisco, CA 94111. Nearby restaurants (walking): Hog Island Oyster Co. (90 m), Gott's Roadside (120 m), Slanted Door (110 m), Boulettes Larder (150 m), Sens Restaurant (260 m). A 15 min walk reaches the Financial District and North Beach.",
+      "category_search_tool": "1. Hog Island Oyster Co., 1 Ferry Building (37.7956, -122.3934), 90 m\n2. Gott's Roadside, 1 Ferry Building (37.7953, -122.3938), 120 m\n3. Slanted Door, 1 Ferry Building (37.7956, -122.3932), 110 m",
+      "web_search": "1. \"Best lunch at the Ferry Building\" sfchronicle.com: Hog Island Oyster Co., Gott's Roadside, Slanted Door..."
+    }
+  },
+  {
+    "id": "coords-neighborhood",
+    "category": "coordinates",
+    "prompt": "What neighborhood is 40.7411, -73.9897 in?",
+    "why": "Neighborhood context: ground_location_tool covers it, and reverse_geocode_tool with a neighborhood type is also a fine first call. No map requested.",
+    "expect": {
+      "first": ["ground_location_tool", "reverse_geocode_tool"],
+      "must_not": ["render_map_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "ground_location_tool": "Place: Flatiron District, Manhattan, New York, NY 10010. Near the Flatiron Building and Madison Square Park. Nearby: Eataly (100 m), Madison Square Park (150 m).",
+      "reverse_geocode_tool": "175 5th Ave, Flatiron District, Manhattan, New York, NY 10010, United States"
+    }
+  },
+  {
+    "id": "coords-address",
+    "category": "coordinates",
+    "prompt": "What's the street address at 38.8977, -77.0365?",
+    "why": "reverse_geocode_tool description: use when you only need an address.",
+    "expect": {
+      "first": ["reverse_geocode_tool"],
+      "must_not": ["ground_location_tool"]
+    },
+    "stubs": {
+      "reverse_geocode_tool": "1600 Pennsylvania Avenue NW, Washington, DC 20500, United States",
+      "ground_location_tool": "Place: 1600 Pennsylvania Avenue NW, Washington, DC 20500 (the White House). Nearby: Lafayette Square (200 m), The Ellipse (300 m)."
+    }
+  },
+  {
+    "id": "brand-search",
+    "category": "search-routing",
+    "prompt": "Find the nearest Blue Bottle Coffee to 1 Market St, San Francisco.",
+    "why": "Named brand goes to search_and_geocode_tool, not category search.",
+    "expect": {
+      "must": ["search_and_geocode_tool"],
+      "must_not": ["category_search_tool"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Blue Bottle Coffee, 1 Ferry Building #7, San Francisco, CA 94111 (37.7956, -122.3935), 0.2 km from 1 Market St\n2. Blue Bottle Coffee, 66 Mint St, San Francisco, CA 94103 (37.7825, -122.4079), 1.7 km\n3. 1 Market St, San Francisco, CA 94105 (37.7941, -122.3947)",
+      "category_search_tool": "1. Blue Bottle Coffee, 1 Ferry Building #7 (37.7956, -122.3935), 0.2 km\n2. Peet's Coffee, 1 Ferry Building (37.7955, -122.3937), 0.2 km",
+      "directions_tool": "Route 1: 0.3 km, 4 min walking via The Embarcadero.",
+      "web_search": "1. \"Blue Bottle Coffee Ferry Building\" bluebottlecoffee.com: 1 Ferry Building #7, San Francisco, CA 94111."
+    }
+  },
+  {
+    "id": "visit-order",
+    "category": "search-routing",
+    "prompt": "Starting at the Ferry Building, what's the fastest order to drive to Coit Tower and the Painted Ladies?",
+    "why": "Multi-stop ordering goes to optimization or matrix; no map requested.",
+    "expect": {
+      "any_of": ["optimization_tool", "matrix_tool"],
+      "must_not": ["render_map_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Ferry Building, 1 Ferry Building, San Francisco, CA (37.7955, -122.3937)\n2. Coit Tower, 1 Telegraph Hill Blvd, San Francisco, CA (37.8024, -122.4058)\n3. Painted Ladies, 710-720 Steiner St, San Francisco, CA (37.7763, -122.4328)",
+      "matrix_tool": "Driving durations (min): Ferry Building->Coit Tower 9, Ferry Building->Painted Ladies 15, Coit Tower->Painted Ladies 18, Painted Ladies->Coit Tower 19, Coit Tower->Ferry Building 8, Painted Ladies->Ferry Building 16.",
+      "optimization_tool": "Optimized order: Ferry Building -> Coit Tower -> Painted Ladies. Total 27 min, 8.9 km.",
+      "directions_tool": "Route 1: Ferry Building -> Coit Tower -> Painted Ladies, 8.9 km, 27 min."
+    }
+  },
+  {
+    "id": "straight-line",
+    "category": "search-routing",
+    "prompt": "How far is it in a straight line from (48.8584, 2.2945) to (48.8606, 2.3376)?",
+    "why": "Offline distance: no routing call and no map. Computing it without a tool is fine.",
+    "expect": {
+      "must_not": ["directions_tool", "render_map_tool"]
+    },
+    "stubs": {
+      "distance_tool": "3.16 km"
+    }
+  },
+  {
+    "id": "reviews-web",
+    "category": "other-sources",
+    "prompt": "Is Tartine Bakery in San Francisco any good? What do people say about it?",
+    "why": "Connector review: Mapbox must not keep other sources away from a place question. Reviews need the web.",
+    "expect": {
+      "must": ["web_search"],
+      "must_not": ["render_map_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "web_search": "1. \"Tartine Bakery\" yelp.com: 4.3 stars from 8,000+ reviews. Known for morning buns and country bread; long lines on weekends.\n2. \"Is Tartine still worth it?\" sfgate.com: The bread is still excellent; pastries are pricey.",
+      "search_and_geocode_tool": "1. Tartine Bakery, 600 Guerrero St, San Francisco, CA 94110 (37.7614, -122.4241)",
+      "place_details_tool": "Tartine Bakery, 600 Guerrero St, San Francisco, CA 94110. Category: bakery, cafe. Hours: 8am-5pm daily."
+    }
+  },
+  {
+    "id": "history-web",
+    "category": "other-sources",
+    "prompt": "Search for the history of the Ferry Building in San Francisco. When was it built and who designed it?",
+    "why": "Explicit search request about a place; web search must stay available.",
+    "expect": {
+      "must": ["web_search"],
+      "must_not": ["render_map_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "web_search": "1. \"Ferry Building history\" sfport.com: Completed in 1898, designed by architect A. Page Brown; the clock tower is modeled on the Giralda in Seville. Restored and reopened as a marketplace in 2003.",
+      "search_and_geocode_tool": "1. Ferry Building, 1 Ferry Building, San Francisco, CA 94111 (37.7955, -122.3937)"
+    }
+  },
+  {
+    "id": "non-geo",
+    "category": "other-sources",
+    "prompt": "Write a haiku about autumn leaves.",
+    "why": "Unrelated request; no Mapbox tool should fire.",
+    "expect": {
+      "must_not": ["*mapbox*"]
+    },
+    "stubs": {}
+  }
+]
