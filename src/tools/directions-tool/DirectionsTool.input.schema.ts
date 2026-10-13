@@ -148,7 +148,7 @@ export const DirectionsInputSchema = z.object({
         'coordinates yourself.\n' +
         '- geojson: as GeoJSON LineString (might be very long as there could be a lot of ' +
         'points). Only needed when you (the caller) require the coordinates directly — not ' +
-        'required for the map preview to work.'
+        'required for render_map_tool.'
     ),
   max_height: z
     .number()
