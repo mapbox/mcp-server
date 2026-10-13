@@ -15,6 +15,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -27,7 +28,10 @@ const SERVER_ROOT = resolve(
   process.env.EVAL_SERVER_ROOT ?? resolve(here, '../..')
 );
 const MAX_MODEL_CALLS = 5;
-const FAKE_REF = 'mapbox://temp/map-payload-eval-0001';
+// Each stubbed data result gets its own ref, as on the real server; sharing
+// one ref across results confuses models about which dataset it points to.
+const REF_PREFIX = 'mapbox://temp/map-payload-eval-';
+const REF_PATTERN = /mapbox:\/\/temp\/map-payload-eval-\d+/g;
 
 // Distractors standing in for tools a host provides alongside the connector.
 // They let the eval see whether our descriptions crowd out other sources,
@@ -60,9 +64,48 @@ const HOST_TOOLS: Anthropic.Tool[] = [
     }
   }
 ];
-const HOST_TOOL_NAMES = new Set(HOST_TOOLS.map((t) => t.name));
+// Host tools only some cases get (via `host_tools` in cases.json), so adding
+// one never changes what the other cases see.
+const EXTRA_HOST_TOOLS: Record<string, Anthropic.Tool> = {
+  write_file: {
+    name: 'write_file',
+    description:
+      "Write a file in the user's project, e.g. a page of the site you are building. Creates or overwrites the file.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'File path, e.g. index.html' },
+        content: { type: 'string', description: 'Full file contents' }
+      },
+      required: ['path', 'content']
+    }
+  }
+};
+const HOST_TOOL_NAMES = new Set([
+  ...HOST_TOOLS.map((t) => t.name),
+  ...Object.keys(EXTRA_HOST_TOOLS)
+]);
+
+function hostToolsFor(c: EvalCase): Anthropic.Tool[] {
+  return [
+    ...HOST_TOOLS,
+    ...c.host_tools.map((name) => {
+      const tool = EXTRA_HOST_TOOLS[name];
+      if (!tool) throw new Error(`case ${c.id}: unknown host tool ${name}`);
+      return tool;
+    })
+  ];
+}
 
 export type Mode = 'eager' | 'deferred';
+type Provider = 'anthropic' | 'openai';
+
+// Which model family to test. Each provider should write to its own --flow
+// directory so baseline/vN comparisons stay within one provider.
+const PROVIDER = (process.env.EVAL_PROVIDER ?? 'anthropic') as Provider;
+if (PROVIDER !== 'anthropic' && PROVIDER !== 'openai') {
+  throw new Error(`EVAL_PROVIDER must be anthropic or openai, got ${PROVIDER}`);
+}
 
 export interface Expectation {
   /** Acceptable names for the first client tool called. */
@@ -82,6 +125,14 @@ export interface EvalCase {
   expect: Expectation;
   /** Canned results keyed by tool name, written to match this prompt. */
   stubs: Record<string, string>;
+  /** Extra host tools for this case, from EXTRA_HOST_TOOLS. */
+  host_tools: string[];
+  /**
+   * Mapbox tools the case needs that a given server may not have yet. The
+   * case still runs on such a server, to record what the model does instead,
+   * but it can't pass.
+   */
+  needs_tools: string[];
   meta?: Record<string, unknown>;
 }
 
@@ -92,6 +143,8 @@ interface BaseCase {
   why: string;
   expect: Expectation;
   stubs?: Record<string, string>;
+  host_tools?: string[];
+  needs_tools?: string[];
 }
 
 interface ServerSurface {
@@ -168,10 +221,23 @@ export function loadSurface(): Promise<ServerSurface> {
 
 /** Each base case runs once per mode, so one row = (case, mode). */
 export function loadCases(): EvalCase[] {
+  // The runner defaults --model to a Claude id; fail before spending anything.
+  if (PROVIDER === 'openai' && !process.argv.includes('--model')) {
+    throw new Error('EVAL_PROVIDER=openai needs --model <OpenAI model id>');
+  }
   const base = JSON.parse(
     readFileSync(resolve(here, 'cases.json'), 'utf8')
   ) as BaseCase[];
-  const modes: Mode[] = ['eager', 'deferred'];
+  // EVAL_MODES=eager skips tool search, for models that don't support it
+  // (e.g. OpenAI's chat-latest).
+  const modes = (process.env.EVAL_MODES ?? 'eager,deferred')
+    .split(',')
+    .map((m) => m.trim()) as Mode[];
+  for (const m of modes) {
+    if (m !== 'eager' && m !== 'deferred') {
+      throw new Error(`EVAL_MODES entries must be eager or deferred, got ${m}`);
+    }
+  }
   return base.flatMap((c) =>
     modes.map((mode) => ({
       id: `${c.id}__${mode}`,
@@ -179,14 +245,24 @@ export function loadCases(): EvalCase[] {
       tags: [mode, c.category],
       expect: c.expect,
       stubs: c.stubs ?? {},
+      host_tools: c.host_tools ?? [],
+      needs_tools: c.needs_tools ?? [],
       meta: { base_id: c.id, mode, why: c.why }
     }))
   );
 }
 
-function systemPrompt(instructions: string | undefined, mode: Mode): string {
+function systemPrompt(
+  instructions: string | undefined,
+  mode: Mode,
+  hostTools: Anthropic.Tool[]
+): string {
+  const assistant =
+    PROVIDER === 'anthropic'
+      ? 'You are Claude, a helpful'
+      : 'You are a helpful';
   const lines = [
-    "You are Claude, a helpful assistant in a chat app. The user has connected the Mapbox MCP server; its tools are available to you alongside the app's built-in tools (web_search, places_map_display_v0)."
+    `${assistant} assistant in a chat app. The user has connected the Mapbox MCP server; its tools are available to you alongside the app's built-in tools (${hostTools.map((t) => t.name).join(', ')}).`
   ];
   if (mode === 'deferred') {
     lines.push(
@@ -210,7 +286,10 @@ function systemPrompt(instructions: string | undefined, mode: Mode): string {
 const COMMON_STUBS: Record<string, string> = {
   render_map_tool: 'Map rendered for the user.',
   static_map_image_tool: 'Static map image generated (PNG).',
-  places_map_display_v0: 'Map with pins displayed to the user.'
+  places_map_display_v0: 'Map with pins displayed to the user.',
+  write_file: 'File written.',
+  export_map_html_tool:
+    '<!doctype html><html><head><meta charset="utf-8"><title>Map</title></head><body><div id="map"></div><script>/* Mapbox GL JS map with the data and a public token inlined (eval stub) */</script></body></html>'
 };
 const UNSTUBBED = 'No results. (This tool returned nothing for this request.)';
 
@@ -223,12 +302,13 @@ const UNSTUBBED = 'No results. (This tool returned nothing for this request.)';
 function stubResult(
   name: string,
   c: EvalCase,
-  surface: ServerSurface
+  surface: ServerSurface,
+  nextRef: () => string
 ): { text: string; stubbed: boolean } {
   const base = c.stubs[name] ?? COMMON_STUBS[name];
   if (base === undefined) return { text: UNSTUBBED, stubbed: false };
   return {
-    text: HINTED_TOOLS.has(name) ? base + surface.renderHint(FAKE_REF) : base,
+    text: HINTED_TOOLS.has(name) ? base + surface.renderHint(nextRef()) : base,
     stubbed: true
   };
 }
@@ -263,7 +343,9 @@ export interface RunOutput {
   unstubbed: string[];
 }
 
-const client = new Anthropic();
+// Created on first use so a run only needs the key for its own provider.
+let anthropic: Anthropic | undefined;
+let openai: OpenAI | undefined;
 
 function addUsage(total: Record<string, number>, u: Anthropic.Usage): void {
   for (const k of [
@@ -276,11 +358,18 @@ function addUsage(total: Record<string, number>, u: Anthropic.Usage): void {
   }
 }
 
-export async function runCase(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
+export function runCase(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
+  return PROVIDER === 'openai' ? runOpenAI(c, ctx) : runClaude(c, ctx);
+}
+
+async function runClaude(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
+  anthropic ??= new Anthropic();
+  const client = anthropic;
   const surface = await loadSurface();
   const mode = (c.meta?.mode as Mode) ?? 'eager';
   const model = ctx.model ?? 'claude-opus-5-5';
-  const system = systemPrompt(surface.instructions, mode);
+  const hostTools = hostToolsFor(c);
+  const system = systemPrompt(surface.instructions, mode, hostTools);
 
   const tools: Anthropic.ToolUnion[] =
     mode === 'deferred'
@@ -289,10 +378,10 @@ export async function runCase(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
             type: 'tool_search_tool_bm25_20251119',
             name: 'tool_search_tool_bm25'
           },
-          ...HOST_TOOLS,
+          ...hostTools,
           ...surface.tools.map((t) => ({ ...t, defer_loading: true }))
         ]
-      : [...HOST_TOOLS, ...surface.tools];
+      : [...hostTools, ...surface.tools];
 
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: c.prompt }
@@ -305,6 +394,8 @@ export async function runCase(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
   const toolCalls: string[] = [];
   const toolSearches: string[] = [];
   const unstubbed: string[] = [];
+  let refCount = 0;
+  const nextRef = () => `${REF_PREFIX}${String(++refCount).padStart(4, '0')}`;
   let servedModel = model;
   let stopReason: string | null = null;
 
@@ -345,7 +436,12 @@ export async function runCase(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
         transcript.push({ role: 'tool_result', content: `found: ${found}` });
       } else if (block.type === 'tool_use') {
         toolCalls.push(block.name);
-        const { text: result, stubbed } = stubResult(block.name, c, surface);
+        const { text: result, stubbed } = stubResult(
+          block.name,
+          c,
+          surface,
+          nextRef
+        );
         if (!stubbed) unstubbed.push(block.name);
         transcript.push({
           role: 'tool_call',
@@ -386,23 +482,186 @@ export async function runCase(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
   };
 }
 
+function addOpenAIUsage(
+  total: Record<string, number>,
+  u: OpenAI.Responses.ResponseUsage | undefined
+): void {
+  if (!u) return;
+  const cached = u.input_tokens_details?.cached_tokens ?? 0;
+  const add = (k: string, n: number) => (total[k] = (total[k] ?? 0) + n);
+  // Same shape as Claude usage: input_tokens excludes cache reads.
+  add('input_tokens', u.input_tokens - cached);
+  add('cache_read_input_tokens', cached);
+  add(
+    'cache_creation_input_tokens',
+    u.input_tokens_details?.cache_write_tokens ?? 0
+  );
+  add('output_tokens', u.output_tokens);
+}
+
+/**
+ * Same conversation as runClaude, on OpenAI's Responses API. Deferred mode
+ * uses OpenAI's server-executed tool search with defer_loading, the closest
+ * equivalent of Anthropic's. Turns are chained with previous_response_id, so
+ * reasoning items carry over without being resent.
+ */
+async function runOpenAI(c: EvalCase, ctx: RunCtx): Promise<RunOutput> {
+  openai ??= new OpenAI();
+  const client = openai;
+  const surface = await loadSurface();
+  const mode = (c.meta?.mode as Mode) ?? 'eager';
+  if (!ctx.model) throw new Error('missing --model');
+  const model = ctx.model;
+  const hostTools = hostToolsFor(c);
+  const system = systemPrompt(surface.instructions, mode, hostTools);
+
+  const asFunction = (
+    t: Anthropic.Tool,
+    deferred: boolean
+  ): OpenAI.Responses.FunctionTool => {
+    // Drop the $schema marker; the rest of the 2020-12 schema is passed as-is.
+    const parameters: Record<string, unknown> = { ...t.input_schema };
+    delete parameters.$schema;
+    return {
+      type: 'function',
+      name: t.name,
+      description: t.description,
+      parameters,
+      strict: false,
+      ...(deferred ? { defer_loading: true } : {})
+    };
+  };
+  const tools: OpenAI.Responses.Tool[] = [
+    ...(mode === 'deferred'
+      ? [{ type: 'tool_search', execution: 'server' } as const]
+      : []),
+    ...hostTools.map((t) => asFunction(t, false)),
+    ...surface.tools.map((t) => asFunction(t, mode === 'deferred'))
+  ];
+
+  const transcript: Array<Record<string, unknown>> = [
+    { role: 'system', content: system },
+    { role: 'user', content: c.prompt }
+  ];
+  const usage: Record<string, number> = {};
+  const toolCalls: string[] = [];
+  const toolSearches: string[] = [];
+  const unstubbed: string[] = [];
+  let refCount = 0;
+  const nextRef = () => `${REF_PREFIX}${String(++refCount).padStart(4, '0')}`;
+  let servedModel = model;
+  let stopReason: string | null = null;
+  let status = 'ok';
+  let input: OpenAI.Responses.ResponseInput = [
+    { role: 'user', content: c.prompt }
+  ];
+  let previous: string | undefined;
+
+  for (let call = 0; call < MAX_MODEL_CALLS; call++) {
+    const res = await client.responses.create({
+      model,
+      instructions: system,
+      input,
+      tools,
+      previous_response_id: previous,
+      max_output_tokens: 16000,
+      prompt_cache_key: `mapbox-tool-selection-${mode}`
+    });
+    servedModel = res.model;
+    addOpenAIUsage(usage, res.usage);
+    stopReason = res.incomplete_details?.reason ?? res.status ?? null;
+    if (res.incomplete_details?.reason === 'max_output_tokens') {
+      status = 'truncated';
+    } else if (res.incomplete_details?.reason === 'content_filter') {
+      status = 'refusal';
+    }
+
+    const outputs: OpenAI.Responses.ResponseInputItem.FunctionCallOutput[] = [];
+    for (const item of res.output) {
+      if (item.type === 'message') {
+        for (const part of item.content) {
+          if (part.type === 'refusal') status = 'refusal';
+          const text = part.type === 'output_text' ? part.text : part.refusal;
+          if (text.trim())
+            transcript.push({ role: 'assistant', content: text });
+        }
+      } else if (item.type === 'tool_search_call') {
+        const query = JSON.stringify(item.arguments);
+        toolSearches.push(query);
+        transcript.push({
+          role: 'tool_call',
+          name: 'tool_search',
+          content: query
+        });
+      } else if (item.type === 'tool_search_output') {
+        const found = item.tools
+          .map((t) => ('name' in t && t.name ? t.name : t.type))
+          .join(', ');
+        transcript.push({ role: 'tool_result', content: `found: ${found}` });
+      } else if (item.type === 'function_call') {
+        toolCalls.push(item.name);
+        const { text: result, stubbed } = stubResult(
+          item.name,
+          c,
+          surface,
+          nextRef
+        );
+        if (!stubbed) unstubbed.push(item.name);
+        let args: string = item.arguments;
+        try {
+          args = JSON.stringify(JSON.parse(item.arguments), null, 2);
+        } catch {
+          // keep the raw string; the ref check reports it as unparseable
+        }
+        transcript.push({ role: 'tool_call', name: item.name, content: args });
+        transcript.push({ role: 'tool_result', content: result });
+        outputs.push({
+          type: 'function_call_output',
+          call_id: item.call_id,
+          output: result
+        });
+      }
+    }
+
+    if (status !== 'ok' || outputs.length === 0) break;
+    previous = res.id;
+    input = outputs;
+  }
+
+  return {
+    output: toolCalls.join(' > '),
+    transcript,
+    model: servedModel,
+    usage,
+    stop_reason: stopReason,
+    status,
+    tool_calls: toolCalls,
+    tool_searches: toolSearches,
+    unstubbed
+  };
+}
+
 /**
  * Did every render_map_tool call pass the map ref unchanged? Data tools return
  * a ref plus a hint telling Claude to pass it as-is; before the hint existed,
- * Claude invented refs. Once a data tool has returned a ref, a render call must
- * include it, and no render call may carry any other mapbox:// ref. Returns
- * null when render_map_tool wasn't called.
+ * Claude invented refs. Once a tool result has handed out a ref, a render call
+ * must pass at least one ref, and every ref it passes must be one a tool
+ * result handed out. Refs are read from the transcript, so old rows can be
+ * re-scored. Returns null when render_map_tool wasn't called.
  */
 function checkRefs(
   transcript: RunOutput['transcript']
 ): { ok: boolean; why: string } | null {
-  let refAvailable = false;
+  const issued = new Set<string>();
   let renders = 0;
   for (const turn of transcript) {
-    if (turn.role !== 'tool_call') continue;
-    const name = String(turn.name);
-    if (HINTED_TOOLS.has(name)) refAvailable = true;
-    if (name !== 'render_map_tool') continue;
+    if (turn.role === 'tool_result') {
+      for (const ref of String(turn.content).match(REF_PATTERN) ?? []) {
+        issued.add(ref);
+      }
+      continue;
+    }
+    if (turn.role !== 'tool_call' || turn.name !== 'render_map_tool') continue;
     renders++;
     let input: { payload_refs?: unknown };
     try {
@@ -413,11 +672,11 @@ function checkRefs(
     const refs = Array.isArray(input.payload_refs)
       ? input.payload_refs.map(String)
       : [];
-    const invented = refs.filter((r) => r !== FAKE_REF);
+    const invented = refs.filter((r) => !issued.has(r));
     if (invented.length) {
       return { ok: false, why: `invented ref ${invented[0]}` };
     }
-    if (refAvailable && !refs.includes(FAKE_REF)) {
+    if (issued.size && refs.length === 0) {
       return {
         ok: false,
         why: 'ref available but not passed (hand-built map)'
@@ -425,6 +684,32 @@ function checkRefs(
     }
   }
   return renders ? { ok: true, why: 'ref passed unchanged' } : null;
+}
+
+// The symptom from the field: an agent building a page asks the user for a
+// Mapbox token, or writes one in as a placeholder. Heuristic, so the
+// explanation quotes what matched.
+const TOKEN_ASK =
+  /\b(provide|enter|paste|share|send|add|need)\b[^.?!\n]{0,40}\b(your|a|an)\b[^.?!\n]{0,20}\b(mapbox\s+)?(public\s+|access\s+)?token\b/i;
+const TOKEN_PLACEHOLDER =
+  /YOUR_MAPBOX[A-Z_]*|<\s*your[^>]*token[^>]*>|pk\.\.\.|ACCESS_TOKEN_HERE|REPLACE_WITH[A-Z_]*TOKEN|accessToken\s*=\s*(['"`])\1/i;
+
+function checkTokenAsk(
+  transcript: RunOutput['transcript']
+): { ok: boolean; why: string } | null {
+  let relevant = false;
+  for (const turn of transcript) {
+    const text = String(turn.content);
+    if (turn.role === 'assistant') {
+      const m = text.match(TOKEN_ASK);
+      if (m) return { ok: false, why: `asked for a token: "${m[0]}"` };
+    } else if (turn.role === 'tool_call' && turn.name === 'write_file') {
+      relevant = true;
+      const m = text.match(TOKEN_PLACEHOLDER);
+      if (m) return { ok: false, why: `placeholder token in file: ${m[0]}` };
+    }
+  }
+  return relevant ? { ok: true, why: 'no token request or placeholder' } : null;
 }
 
 export async function gradeCase(
@@ -445,12 +730,20 @@ export async function gradeCase(
     ...expand(c.expect.must_not)
   ]) {
     // A renamed or removed tool would otherwise turn a must_not into a silent pass.
-    if (!surface.names.has(n) && !HOST_TOOL_NAMES.has(n)) {
+    if (
+      !surface.names.has(n) &&
+      !HOST_TOOL_NAMES.has(n) &&
+      !c.needs_tools.includes(n)
+    ) {
       throw new Error(`case ${c.id} references unknown tool ${n}`);
     }
   }
 
   const problems: string[] = [];
+  const absent = c.needs_tools.filter((n) => !surface.names.has(n));
+  if (absent.length) {
+    problems.push(`needs ${absent.join(', ')}, which this server doesn't have`);
+  }
   const first = run.tool_calls[0];
   const firstOk =
     !c.expect.first ||
@@ -475,18 +768,21 @@ export async function gradeCase(
   // Rows without a render call score 1 on ref_ok so the metric's failures
   // are only real ref mistakes.
   const refs = checkRefs(run.transcript);
+  const token = checkTokenAsk(run.transcript);
   return {
     grade: {
       pass,
       first_ok: firstOk ? 1 : 0,
       no_forbidden: forbidden.length ? 0 : 1,
-      ref_ok: refs && !refs.ok ? 0 : 1
+      ref_ok: refs && !refs.ok ? 0 : 1,
+      no_token_ask: token && !token.ok ? 0 : 1
     },
     explanation: {
       pass: pass
         ? `ok: ${trajectory}`
         : `${problems.join('; ')} | ${trajectory}`,
-      ref_ok: refs ? refs.why : 'no render_map_tool call'
+      ref_ok: refs ? refs.why : 'no render_map_tool call',
+      no_token_ask: token ? token.why : 'no page written'
     }
   };
 }

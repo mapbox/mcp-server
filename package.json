@@ -29,7 +29,9 @@
     "tracing:jaeger:stop": "docker stop jaeger",
     "tracing:verify": "node -e \"console.log('🔍 Verifying tracing setup with Jaeger...\\n1. Copy .env.example to .env and add your MAPBOX_ACCESS_TOKEN\\n2. Start Jaeger: npm run tracing:jaeger:start\\n3. Run server: npm run inspect:build\\n4. Check traces at: http://localhost:16686')\"",
     "eval:tools": "tsx evals/tool-selection/run-eval.mjs",
-    "eval:tools:report": "node evals/tool-selection/build-report-lite.mjs .claude/hillclimb/tool-selection"
+    "eval:tools:report": "node evals/tool-selection/build-report-lite.mjs .claude/hillclimb/tool-selection",
+    "eval:tools:openai": "EVAL_PROVIDER=openai tsx evals/tool-selection/run-eval.mjs --flow .claude/hillclimb/tool-selection-openai",
+    "eval:tools:report:openai": "node evals/tool-selection/build-report-lite.mjs .claude/hillclimb/tool-selection-openai"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --fix",
@@ -53,6 +55,7 @@
     "globals": "^16.3.0",
     "husky": "^9.0.0",
     "lint-staged": "^16.1.0",
+    "openai": "^7.32.0",
     "plop": "^4.0.1",
     "prettier": "^3.0.0",
     "tshy": "^4.1.1",

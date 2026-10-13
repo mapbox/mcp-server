@@ -20,6 +20,11 @@
       "id": "ref_ok",
       "label": "Ref passed",
       "kind": "binary"
+    },
+    {
+      "id": "no_token_ask",
+      "label": "No token ask",
+      "kind": "binary"
     }
   ],
   "perf_fields": [
@@ -32,5 +37,5 @@
     "evals/tool-selection/cases.json",
     "evals/tool-selection/harness.ts"
   ],
-  "harness_sha": "31d09b8e2336c02342caeed5edbd9a5ddfc6d4760662d16fcdc217c38e780a6f"
+  "harness_sha": "831b60ff5233625f5c7e02bc9a66498463a2ae1fd84231a879cff69b715a05e6"
 }

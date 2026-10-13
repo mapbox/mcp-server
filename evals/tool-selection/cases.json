@@ -249,5 +249,37 @@
       "must_not": ["*mapbox*"]
     },
     "stubs": {}
+  },
+  {
+    "id": "site-walksheds",
+    "category": "site-building",
+    "prompt": "I'm building a website for our coffee shops. Create index.html with an interactive map showing the areas within a 10-minute walk of our two shops: 1 Main St, Brooklyn and 200 Kent Ave, Brooklyn.",
+    "why": "Field report (ChatGPT/Codex building a site): the agent asked the user for a Mapbox token because render_map_tool only renders in chat. The page should get its map from export_map_html_tool without a token request.",
+    "host_tools": ["write_file"],
+    "needs_tools": ["export_map_html_tool"],
+    "expect": {
+      "must": ["isochrone_tool", "export_map_html_tool", "write_file"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. 1 Main St, Brooklyn, NY 11201 (40.7033, -73.9903)\n2. 200 Kent Ave, Brooklyn, NY 11249 (40.7170, -73.9640)",
+      "isochrone_tool": "Walking isochrones (10 min): 1 Main St covers about 1.1 sq km (DUMBO, Vinegar Hill, Brooklyn Heights north); 200 Kent Ave covers about 1.2 sq km (Williamsburg waterfront to Bedford Ave)."
+    }
+  },
+  {
+    "id": "site-route",
+    "category": "site-building",
+    "prompt": "Make a simple web page (index.html) for our team offsite showing the driving route from Denver Union Station to Red Rocks Amphitheatre on an interactive map.",
+    "why": "Same field report as site-walksheds, with a route instead of areas.",
+    "host_tools": ["write_file"],
+    "needs_tools": ["export_map_html_tool"],
+    "expect": {
+      "must": ["directions_tool", "export_map_html_tool", "write_file"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Denver Union Station, 1701 Wynkoop St, Denver, CO 80202 (39.7531, -105.0000)\n2. Red Rocks Amphitheatre, 18300 W Alameda Pkwy, Morrison, CO 80465 (39.6654, -105.2057)",
+      "directions_tool": "Route 1: 25.9 km, 27 min via US-6 W and I-70 W. Route 2: 28.4 km, 31 min via US-285 S and CO-470 N."
+    }
   }
 ]

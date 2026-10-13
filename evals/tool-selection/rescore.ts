@@ -7,13 +7,14 @@
  * scored the same way as new ones.
  *
  *   npx tsx evals/tool-selection/rescore.ts baseline v1
+ *   EVAL_FLOW=.claude/hillclimb/tool-selection-openai npx tsx evals/tool-selection/rescore.ts baseline
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gradeCase, loadCases } from './harness.ts';
 
-const FLOW = '.claude/hillclimb/tool-selection';
+const FLOW = process.env.EVAL_FLOW ?? '.claude/hillclimb/tool-selection';
 
 const cases = new Map(loadCases().map((c) => [c.id, c]));
 
