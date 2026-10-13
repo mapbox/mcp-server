@@ -23,6 +23,14 @@ import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 import { getVersionInfo } from '../../utils/versionUtils.js';
 
 /**
+ * Largest map payload (serialized JSON) the tool writes into a page. Unlike
+ * render_map_tool, which stores large payloads server-side and passes a ref,
+ * the page has to carry its data, and the agent copies the whole page into a
+ * file write, so every byte costs output tokens.
+ */
+export const MAX_EXPORT_PAYLOAD_BYTES = 200 * 1024;
+
+/**
  * `export_map_html_tool` — the same map `render_map_tool` draws in chat, as a
  * standalone HTML page an agent can save into a site or project. Hosts render
  * `render_map_tool` only inside the conversation, so without this an agent
@@ -42,7 +50,7 @@ export class ExportMapHtmlTool extends MapboxApiBasedTool<
   description =
     'Generate a standalone HTML page with an interactive Mapbox GL JS map, for when you are building a web page, site or file that needs a map. ' +
     'Takes the same input as render_map_tool: `payload_refs` from other Mapbox tools (pass `mapboxRender.ref` values unchanged), or inline `layers`/`markers`/`legend`. ' +
-    'Returns a complete HTML document of a few KB, with the map data and a Mapbox public token included, to save as its own file (e.g. map.html) or embed with an iframe. ' +
+    'Returns a complete HTML document with the map data and a Mapbox public token included (a few KB plus the data, which is limited to 200 KB), to save as its own file (e.g. map.html) or embed with an iframe. ' +
     'To show a map in this conversation instead, use render_map_tool.';
   annotations = {
     title: 'Export Map as HTML',
@@ -98,6 +106,22 @@ export class ExportMapHtmlTool extends MapboxApiBasedTool<
     // A deferred layer is fetched from the MCP host with resources/read, which
     // a standalone page doesn't have.
     delete payload.defer;
+
+    const payloadBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+    if (payloadBytes > MAX_EXPORT_PAYLOAD_BYTES) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `ExportMapHtmlTool: the map data is ${Math.round(payloadBytes / 1024)} KB, over the ${MAX_EXPORT_PAYLOAD_BYTES / 1024} KB limit for a standalone page. ` +
+              'Reduce it before exporting: run large polygons or lines through simplify_tool, drop features or properties the page does not need, ' +
+              'or split the data across several maps.'
+          }
+        ],
+        isError: true
+      };
+    }
 
     const apiEndpoint = MapboxApiBasedTool.mapboxApiEndpoint;
     const publicToken =
@@ -167,8 +191,9 @@ export class ExportMapHtmlTool extends MapboxApiBasedTool<
         : ''
     ].filter(Boolean);
 
+    // The page goes in the text content only. Repeating it here would double
+    // the tokens the host passes to the model.
     const structured: ExportMapHtmlOutput = {
-      html,
       bytes,
       layer_count: layerCount,
       marker_count: markerCount,

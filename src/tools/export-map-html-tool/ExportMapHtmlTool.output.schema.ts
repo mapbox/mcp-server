@@ -4,12 +4,12 @@
 import { z } from 'zod';
 
 export const ExportMapHtmlOutputSchema = z.object({
-  html: z
-    .string()
+  bytes: z
+    .number()
+    .int()
     .describe(
-      'Complete HTML document. Save it as its own file, e.g. map.html.'
+      'Size of the HTML document, which is the second text content item. Save it as its own file, e.g. map.html.'
     ),
-  bytes: z.number().int(),
   layer_count: z.number().int(),
   marker_count: z.number().int(),
   live_layer_count: z

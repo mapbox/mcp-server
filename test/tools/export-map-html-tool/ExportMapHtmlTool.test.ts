@@ -7,7 +7,10 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { createHash } from 'node:crypto';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
-import { ExportMapHtmlTool } from '../../../src/tools/export-map-html-tool/ExportMapHtmlTool.js';
+import {
+  ExportMapHtmlTool,
+  MAX_EXPORT_PAYLOAD_BYTES
+} from '../../../src/tools/export-map-html-tool/ExportMapHtmlTool.js';
 import { standaloneMapAppScript } from '../../../src/resources/ui-apps/mapAppStandalone.js';
 import { buildSelfFetchRef } from '../../../src/utils/selfFetchRef.js';
 
@@ -81,6 +84,9 @@ describe('ExportMapHtmlTool', () => {
       token_source: 'server_default',
       bytes: Buffer.byteLength(html, 'utf8')
     });
+    // The page is returned once, as text, not repeated in structuredContent.
+    expect(result.structuredContent).not.toHaveProperty('html');
+    expect(JSON.stringify(result.structuredContent)).not.toContain('<html');
     expect(textOf(result, 0)).toContain('URL-restricted public token');
   });
 
@@ -147,6 +153,37 @@ describe('ExportMapHtmlTool', () => {
     expect(jsonTag(html, 'initial-data')).toMatchObject({
       summary: 'a</script><script>alert(1)</script>b'
     });
+  });
+
+  it('rejects map data over the size limit with next steps', async () => {
+    const { httpRequest } = setupHttpRequest();
+    // One long line: ~16 bytes per coordinate pair, well over the limit.
+    const count = Math.ceil(MAX_EXPORT_PAYLOAD_BYTES / 16) + 1000;
+    const coordinates = Array.from({ length: count }, (_, i) => [
+      -105 + i * 1e-5,
+      39.7
+    ]);
+    const result = await new ExportMapHtmlTool({
+      httpRequest,
+      packageVersion: () => '9.9.9'
+    }).run({
+      layers: [
+        {
+          id: 'long-line',
+          type: 'line',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'LineString', coordinates }
+          }
+        }
+      ]
+    });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result, 0)).toContain('limit for a standalone page');
+    expect(textOf(result, 0)).toContain('simplify_tool');
+    expect(result.content).toHaveLength(1);
   });
 
   it('errors when there is nothing to draw', async () => {

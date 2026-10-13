@@ -165,7 +165,7 @@ If you need a guaranteed static image in clients without MCP Apps support, use `
 
 ### Maps in pages you build (`export_map_html_tool`)
 
-`render_map_tool` only renders inside the chat. When an agent is building a web page, site or file that needs a map, **`export_map_html_tool`** returns the same map as a standalone HTML page. It takes the same input as `render_map_tool` (refs from other tools, or your own GeoJSON) and returns a document of a few KB with the map data and a Mapbox public token included, ready to save as `map.html` or embed with an iframe. The agent doesn't need to write Mapbox GL JS code or ask for a token.
+`render_map_tool` only renders inside the chat. When an agent is building a web page, site or file that needs a map, **`export_map_html_tool`** returns the same map as a standalone HTML page. It takes the same input as `render_map_tool` (refs from other tools, or your own GeoJSON) and returns a document of a few KB with the map data and a Mapbox public token included, ready to save as `map.html` or embed with an iframe. The agent doesn't need to write Mapbox GL JS code or ask for a token. Map data is limited to 200 KB per page, since the agent copies the whole page into a file; simplify large polygons with `simplify_tool` first.
 
 - **Token:** the page uses the account's default public token unless you pass `public_token`. For a published site, a [URL-restricted public token](https://docs.mapbox.com/accounts/guides/tokens/#url-restrictions) is safer.
 - **Map script:** the page loads it from jsDelivr (`@mapbox/mcp-server@<version>/dist/map-app/standalone.js`), pinned by version and a subresource-integrity hash, so the page itself stays small.
