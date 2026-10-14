@@ -2667,4 +2667,48 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     expect(sidePanelEl.className).toBe('collapsed');
     expect(fitBoundsCalls.at(-1)?.padding.right).toBe(30);
   });
+
+  it("colors a row's badge like its pin when the caller set a color", async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ results: [] })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/x',
+          layers: [],
+          markers: [
+            {
+              coordinates: at(-122.41),
+              id: mockPoiId('color-1'),
+              name: 'Gray',
+              color: '#6b7280'
+            },
+            {
+              coordinates: at(-122.42),
+              id: mockPoiId('color-2'),
+              name: 'Default'
+            },
+            {
+              coordinates: at(-122.43),
+              id: mockPoiId('color-3'),
+              name: 'Bad',
+              color: 'red;x:y'
+            }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    const badges = (
+      sidePanelEl.children[1] as unknown as {
+        children: Array<{ children: Array<{ style: Record<string, string> }> }>;
+      }
+    ).children.map((row) => row.children[0].style.background);
+    expect(badges).toEqual(['#6b7280', undefined, undefined]);
+  });
 });

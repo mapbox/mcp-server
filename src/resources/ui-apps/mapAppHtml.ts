@@ -587,6 +587,17 @@ export function mapAppScript(config: {
     });
   }
 
+  // Bottom padding that keeps fitted data out from under the legend
+  // (bottom-left), unless the map is too short to spare the room.
+  function bottomPadding() {
+    if (legendEl.style.display !== 'block') return 50;
+    var bottom = (legendEl.offsetHeight || 0) + 24;
+    var el = document.getElementById('map');
+    var height = (el && el.clientHeight) || window.innerHeight || 0;
+    if (bottom <= 50 || (height && height - bottom - 70 < 160)) return 50;
+    return bottom;
+  }
+
   // Right padding that keeps fitted data out from under an open panel. On
   // a narrow map there's no room beside it, so fit as if it weren't there
   // (the panel starts collapsed there anyway; see appendPanelRows).
@@ -609,7 +620,7 @@ export function mapAppScript(config: {
     setTimeout(function() {
       map.resize();
       map.fitBounds(bounds, {
-        padding: { top: 70, bottom: 50, left: 30, right: rightPadding() },
+        padding: { top: 70, bottom: bottomPadding(), left: 30, right: rightPadding() },
         duration: 600
       });
     }, 60);
@@ -1456,7 +1467,8 @@ export function mapAppScript(config: {
         number: isNaN(labelNum) ? items.length + 1 : labelNum,
         name: m.name || ('Result ' + (items.length + 1)),
         category: m.category,
-        distanceMeters: typeof m.distanceMeters === 'number' ? m.distanceMeters : undefined
+        distanceMeters: typeof m.distanceMeters === 'number' ? m.distanceMeters : undefined,
+        color: m.color
       });
     });
     return items;
@@ -1508,6 +1520,13 @@ export function mapAppScript(config: {
     var badge = document.createElement('span');
     badge.className = 'panel-badge';
     badge.textContent = String(it.number);
+    // Match the pin when the caller colored it (e.g. gray for "other
+    // results" next to a legend); the default orange is in the CSS.
+    if (typeof it.color === 'string' && it.color.toLowerCase() !== '#f97316' &&
+        (/^#[0-9a-f]{3,8}$/i).test(it.color)) {
+      badge.style.background = it.color;
+      badge.style.color = '#fff';
+    }
 
     var name = document.createElement('div');
     name.className = 'panel-name';
