@@ -8,7 +8,7 @@ import type { HttpRequest } from '../../utils/types.js';
 const URI_PREFIX = 'mapbox://place-photo/';
 
 /** Largest photo the resource returns; bigger ones are treated as missing. */
-export const MAX_PLACE_PHOTO_BYTES = 512 * 1024;
+export const MAX_PLACE_PHOTO_BYTES = 1024 * 1024;
 
 const PHOTO_FETCH_TIMEOUT_MS = 5000;
 const CACHE_TTL_MS = 30 * 60 * 1000;

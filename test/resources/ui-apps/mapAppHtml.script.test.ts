@@ -75,11 +75,6 @@ function loadScriptSandbox(options?: {
       get firstChild() {
         return children[0];
       },
-      insertBefore: (child: FakeElement, ref: FakeElement | undefined) => {
-        const idx = ref ? children.indexOf(ref) : -1;
-        children.splice(idx === -1 ? children.length : idx, 0, child);
-        return child;
-      },
       addEventListener: (type: string, cb: () => void) => {
         if (type === 'click') clickListeners.push(cb);
       },
@@ -96,10 +91,6 @@ function loadScriptSandbox(options?: {
     appendChild: (child: FakeElement) => FakeElement;
     removeChild: (child: FakeElement) => FakeElement;
     readonly firstChild: FakeElement | undefined;
-    insertBefore: (
-      child: FakeElement,
-      ref: FakeElement | undefined
-    ) => FakeElement;
     addEventListener: (type: string, cb: () => void) => void;
     __fireClick: () => void;
   }
@@ -2254,7 +2245,8 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     });
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
-    const [thumb, badge, body] = row.children;
+    // At the end of the row, so badge and name stay where they were.
+    const [badge, body, thumb] = row.children;
     expect(thumb.className).toBe('panel-thumb');
     expect(thumb.style.backgroundImage).toBe(
       'url("data:image/jpeg;base64,QUJD")'
@@ -2290,7 +2282,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(postMessageCalls.some((m) => m.method === 'resources/read')).toBe(
       false
     );
-    const [thumb] = sidePanelEl.children[1].children[0].children;
+    const [, , thumb] = sidePanelEl.children[1].children[0].children;
     expect(thumb.className).toBe('panel-thumb');
     expect(thumb.style.backgroundImage).toBe(
       'url("https://dyn.mktgcdn.com/p/photo.jpg")'

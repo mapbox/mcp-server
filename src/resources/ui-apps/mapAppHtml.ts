@@ -120,9 +120,10 @@ export function mapAppShell(glVersion: string): string {
     display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer;
   }
   #side-panel .panel-item:hover { background: rgba(255,255,255,0.08); }
-  /* Only added once a photo has loaded (see loadPanelPhoto). */
+  /* Only added once a photo has loaded (see loadPanelPhoto), at the end of
+     the row so names stay aligned whether or not a row has one. */
   #side-panel .panel-thumb {
-    flex: 0 0 auto; width: 32px; height: 32px; border-radius: 6px;
+    flex: 0 0 auto; width: 40px; height: 40px; border-radius: 6px; margin-left: auto;
     background-size: cover; background-position: center;
   }
   /* Visit-order badge, matching the numbered map marker. */
@@ -1579,7 +1580,7 @@ export function mapAppScript(config: {
       var thumb = document.createElement('span');
       thumb.className = 'panel-thumb';
       thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
-      row.li.insertBefore(thumb, row.li.firstChild);
+      row.li.appendChild(thumb);
     };
     if (!EMBEDDED) {
       if (photoUrl.indexOf('https://') === 0) show(photoUrl);
