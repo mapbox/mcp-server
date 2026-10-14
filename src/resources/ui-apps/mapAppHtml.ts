@@ -114,7 +114,14 @@ export function mapAppShell(glVersion: string): string {
   #side-panel .panel-head {
     padding: 10px 12px; font-size: 13px; font-weight: 600;
     border-bottom: 1px solid rgba(255,255,255,0.12); flex: 0 0 auto;
+    display: flex; justify-content: space-between; gap: 8px; cursor: pointer;
   }
+  /* Click the heading to collapse the list (see togglePanel). */
+  #side-panel .panel-head::after { content: '▾'; opacity: 0.7; }
+  #side-panel.collapsed { bottom: auto; }
+  #side-panel.collapsed .panel-list { display: none; }
+  #side-panel.collapsed .panel-head { border-bottom: none; }
+  #side-panel.collapsed .panel-head::after { content: '▸'; }
   #side-panel .panel-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
   #side-panel .panel-item {
     display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer;
@@ -444,6 +451,10 @@ export function mapAppScript(config: {
     markersById = {};
     panelEl.style.display = 'none';
     clearPanel();
+    // Place Details responses still in flight belong to the old render.
+    panelGeneration += 1;
+    panelCount = 0;
+    panelIds = {};
   }
 
   function bboxAccumulator() {
@@ -544,25 +555,61 @@ export function mapAppScript(config: {
   // way to tell which panel row is which) breaks the whole point of the
   // panel numbering. Mutates markers in place, so it must run before
   // addOneMarker draws them.
+  //
+  // Numbering runs across the whole render, not per call: a render can
+  // draw inline markers and then merge in self-fetched search results, and
+  // each set arrives numbered from 1. So numeric (or missing) labels on
+  // id-bearing markers are renumbered to continue the panel's count, and a
+  // place already in the panel this render is dropped rather than drawn and
+  // listed twice. Returns the markers to draw.
   function applyPanelNumbering(markers) {
-    if (!Array.isArray(markers)) return;
-    var n = 0;
-    markers.forEach(function(m) {
-      if (!m || !m.id) return;
-      n += 1;
+    if (!Array.isArray(markers)) return [];
+    var seen = {};
+    return markers.filter(function(m) {
+      if (!m || !m.id) return true;
+      if (panelIds[m.id] || seen[m.id]) return false;
+      seen[m.id] = true;
+      panelCount += 1;
+      var n = String(panelCount);
       if (!m.label) {
-        m.label = String(n);
         if (m.style !== 'start' && m.style !== 'end') m.style = 'numbered';
         if (!m.color) m.color = '#f97316';
+      } else if (String(parseInt(m.label, 10)) === String(m.label)) {
+        // Search popups start with the old number ("3. Name").
+        if (typeof m.popup === 'string' && m.popup.indexOf(m.label + '. ') === 0) {
+          m.popup = n + '. ' + m.popup.slice(String(m.label).length + 2);
+        }
+      } else {
+        return true;
       }
+      m.label = n;
+      return true;
     });
   }
 
+  // Right padding that keeps fitted data out from under an open panel. On
+  // a narrow map there's no room beside it, so fit as if it weren't there
+  // (the panel starts collapsed there anyway; see appendPanelRows).
+  function rightPadding() {
+    if (panelEl.style.display !== 'flex' || panelCollapsed) return 30;
+    var right = (panelEl.offsetWidth || 280) + 24;
+    var mapWidth = mapContainerWidth();
+    if (mapWidth && mapWidth - right < 240) return 30;
+    return right;
+  }
+
+  function mapContainerWidth() {
+    var el = document.getElementById('map');
+    return (el && el.clientWidth) || window.innerWidth || 0;
+  }
+
+  var lastFitBounds = null;
   function fitToBounds(bounds) {
+    lastFitBounds = bounds;
     setTimeout(function() {
       map.resize();
       map.fitBounds(bounds, {
-        padding: { top: 70, bottom: 50, left: 30, right: 30 },
+        padding: { top: 70, bottom: 50, left: 30, right: rightPadding() },
         duration: 600
       });
     }, 60);
@@ -578,15 +625,13 @@ export function mapAppScript(config: {
     (Array.isArray(payload.layers) ? payload.layers : []).forEach(function(layer) {
       addOneLayer(layer, bbox);
     });
-    applyPanelNumbering(payload.markers);
-    (Array.isArray(payload.markers) ? payload.markers : []).forEach(function(m) {
-      addOneMarker(m, bbox);
-    });
+    var markers = applyPanelNumbering(payload.markers);
+    markers.forEach(function(m) { addOneMarker(m, bbox); });
     if (payload.summary && summaryEl.style.display === 'none') {
       summaryEl.textContent = payload.summary;
       summaryEl.style.display = 'block';
     }
-    maybeShowSidePanel(payload.markers, payload.summary);
+    maybeShowSidePanel(markers, payload.summary);
     var bounds = bbox.bounds();
     if (bounds) fitToBounds(bounds);
   }
@@ -625,10 +670,8 @@ export function mapAppScript(config: {
 
     var bbox = bboxAccumulator();
     var layers = Array.isArray(payload.layers) ? payload.layers : [];
-    var markers = Array.isArray(payload.markers) ? payload.markers : [];
-
     layers.forEach(function(layer) { addOneLayer(layer, bbox); });
-    applyPanelNumbering(markers);
+    var markers = applyPanelNumbering(payload.markers);
     markers.forEach(function(m) { addOneMarker(m, bbox); });
     // Covers both inline markers (a caller-composed payload) and self-fetch
     // markers (merged in later via mergeAdditionalPayload) — see
@@ -1421,15 +1464,24 @@ export function mapAppScript(config: {
   // Exposed so tests can exercise the pure derivation logic without a DOM.
   window.__derivePanelItems = derivePanelItems;
 
+  // Adds rows for places not yet in this render's panel and enriches just
+  // those. A response is applied only if no newer render has started since
+  // (panelGeneration), so a slow lookup can't write into a newer panel.
   function maybeShowSidePanel(markers, summary) {
-    var items = derivePanelItems(markers);
+    var items = derivePanelItems(markers).filter(function(it) {
+      return !panelIds[it.id];
+    });
     if (items.length === 0) return;
-    renderSidePanel(items, summary || 'Results');
+    items.forEach(function(it) { panelIds[it.id] = true; });
+    appendPanelRows(items, summary || 'Results');
+    var generation = panelGeneration;
     fetchPlaceDetailsBatch(
       items.map(function(it) { return it.id; }),
       TOKEN,
       API_ENDPOINT
-    ).then(enrichSidePanel);
+    ).then(function(result) {
+      if (generation === panelGeneration) enrichSidePanel(result);
+    });
   }
 
   // Keyed by mapbox_id -> { li, meta } elements, so enrichSidePanel can
@@ -1437,8 +1489,17 @@ export function mapAppScript(config: {
   // panelEl's markup back into a queryable DOM (innerHTML + querySelector
   // round-trips don't work in every MCP Apps host's iframe sandbox, and
   // building real nodes up front is simpler to reason about either way).
-  // Reset on every renderSidePanel call, same lifecycle as the panel itself.
+  // Reset by clearPanel, same lifecycle as the panel itself.
   var panelRowsById = {};
+  // Bumped by teardown(), so responses from an earlier render are dropped.
+  var panelGeneration = 0;
+  // Id-bearing markers numbered so far this render, and the ids listed.
+  var panelCount = 0;
+  var panelIds = {};
+  // The viewer's collapse choice, kept across renders; null until the first
+  // panel decides a default from the map's width.
+  var panelCollapsed = null;
+  var panelListEl = null;
 
   function buildPanelRow(it) {
     var li = document.createElement('li');
@@ -1479,23 +1540,45 @@ export function mapAppScript(config: {
   function clearPanel() {
     while (panelEl.firstChild) panelEl.removeChild(panelEl.firstChild);
     panelRowsById = {};
+    panelListEl = null;
   }
 
-  function renderSidePanel(items, sourceLabel) {
+  function applyPanelCollapsed() {
+    panelEl.className = panelCollapsed ? 'collapsed' : '';
+  }
+
+  function togglePanel() {
+    panelCollapsed = !panelCollapsed;
+    applyPanelCollapsed();
+    if (lastFitBounds) fitToBounds(lastFitBounds);
+  }
+
+  // Creates the panel on the render's first id-bearing markers, and adds
+  // rows to it for later ones (e.g. search results merged in after inline
+  // markers), so every numbered pin has a row.
+  function appendPanelRows(items, sourceLabel) {
     if (!Array.isArray(items) || items.length === 0) return;
-    clearPanel();
+    if (!panelListEl) {
+      var head = document.createElement('div');
+      head.className = 'panel-head';
+      head.textContent = sourceLabel || 'Results';
+      head.addEventListener('click', togglePanel);
 
-    var head = document.createElement('div');
-    head.className = 'panel-head';
-    head.textContent = sourceLabel || 'Results';
+      panelListEl = document.createElement('ul');
+      panelListEl.className = 'panel-list';
 
-    var list = document.createElement('ul');
-    list.className = 'panel-list';
+      panelEl.appendChild(head);
+      panelEl.appendChild(panelListEl);
+      // On a narrow map the open panel would cover most of it.
+      if (panelCollapsed === null) {
+        var width = mapContainerWidth();
+        panelCollapsed = width > 0 && width < 560;
+      }
+      applyPanelCollapsed();
+      panelEl.style.display = 'flex';
+    }
+    var list = panelListEl;
     items.forEach(function(it) { list.appendChild(buildPanelRow(it)); });
-
-    panelEl.appendChild(head);
-    panelEl.appendChild(list);
-    panelEl.style.display = 'flex';
   }
 
   // Search Box results mix Mapbox-native POI ids (decode to

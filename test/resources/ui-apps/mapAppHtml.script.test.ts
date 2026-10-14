@@ -118,6 +118,7 @@ function loadScriptSandbox(options?: {
   const mapConstructorCalls: Array<Record<string, unknown>> = [];
   const markerConstructorCalls: Array<Record<string, unknown>> = [];
   const setStyleCalls: string[] = [];
+  const fitBoundsCalls: Array<{ padding: Record<string, number> }> = [];
   const fakeMapInstance = {
     addControl: () => {},
     on: (event: string, cb: () => void) => {
@@ -138,7 +139,12 @@ function loadScriptSandbox(options?: {
     getSource: () => null,
     removeLayer: () => {},
     removeSource: () => {},
-    fitBounds: () => {},
+    fitBounds: (
+      _bounds: unknown,
+      opts: { padding: Record<string, number> }
+    ) => {
+      fitBoundsCalls.push(opts);
+    },
     flyTo: () => {},
     resize: () => {}
   };
@@ -262,6 +268,8 @@ function loadScriptSandbox(options?: {
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
     sidePanelEl: getElementById('side-panel'),
+    mapEl: getElementById('map') as unknown as { clientWidth?: number },
+    fitBoundsCalls,
     derivePanelItems: (
       sandbox.window as {
         __derivePanelItems?: (markers: unknown[]) => PanelItem[];
@@ -2457,5 +2465,206 @@ describe('mapAppHtml results side panel: inline markers', () => {
     const list = sidePanelEl.children[1];
     expect(list.children).toHaveLength(1);
     expect(list.children[0].children[1].children[0].textContent).toBe('Second');
+  });
+});
+
+// From Chris's review of #262 (2026-10-14).
+describe('mapAppHtml results side panel: one panel per render', () => {
+  const at = (lng: number) => [lng, 37.78] as [number, number];
+  const labelsDrawn = (calls: Array<Record<string, unknown>>) =>
+    calls
+      .map(
+        (c) => (c.element as { textContent?: string } | undefined)?.textContent
+      )
+      .filter((t): t is string => typeof t === 'string' && t !== '');
+  const rowNames = (panel: { children: Array<{ children: unknown[] }> }) =>
+    (
+      panel.children[1] as unknown as {
+        children: Array<{
+          children: Array<{ children: Array<{ textContent: string }> }>;
+        }>;
+      }
+    ).children.map((row) => row.children[1].children[0].textContent);
+
+  it('numbers inline markers and merged search results as one list', async () => {
+    const {
+      sendToolResult,
+      setFetchImpl,
+      sidePanelEl,
+      markerConstructorCalls
+    } = loadScriptSandbox();
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((x) =>
+      mockPoiId('one-list-' + x)
+    );
+    const detailsBodies: string[][] = [];
+    setFetchImpl(async (url: string, init?: unknown) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        detailsBodies.push(JSON.parse((init as { body: string }).body).ids);
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
+      const feature = (id: string, name: string, lng: number) => ({
+        type: 'Feature',
+        properties: { name, mapbox_id: id },
+        geometry: { type: 'Point', coordinates: at(lng) }
+      });
+      return {
+        ok: true,
+        json: async () => ({
+          type: 'FeatureCollection',
+          // "A" is also an inline marker, so it must not be listed twice.
+          features: [
+            feature(c, 'C', -122.43),
+            feature(a, 'A', -122.41),
+            feature(d, 'D', -122.44)
+          ]
+        })
+      };
+    });
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/x',
+          layers: [],
+          markers: [
+            {
+              coordinates: at(-122.41),
+              id: a,
+              name: 'A',
+              label: '1',
+              style: 'numbered'
+            },
+            {
+              coordinates: at(-122.42),
+              id: b,
+              name: 'B',
+              label: '2',
+              style: 'numbered'
+            }
+          ],
+          selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(labelsDrawn(markerConstructorCalls)).toEqual(['1', '2', '3', '4']);
+    expect(rowNames(sidePanelEl)).toEqual(['A', 'B', 'C', 'D']);
+    // Each place is looked up once.
+    expect(detailsBodies).toEqual([
+      [a, b],
+      [c, d]
+    ]);
+  });
+
+  it('ignores a Place Details response from an earlier render', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const id = mockPoiId('stale');
+    const pending: Array<(v: unknown) => void> = [];
+    setFetchImpl(
+      () =>
+        new Promise((resolve) => {
+          pending.push(resolve);
+        })
+    );
+    const render = () =>
+      sendToolResult({
+        structuredContent: {
+          mapboxRender: {
+            ref: 'mapbox://inline/x',
+            layers: [],
+            markers: [{ coordinates: at(-122.41), id, name: 'Cafe' }]
+          }
+        }
+      });
+
+    render();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    render();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(pending).toHaveLength(2);
+
+    const respond = (resolve: (v: unknown) => void) =>
+      resolve({
+        ok: true,
+        json: async () => ({
+          results: [{ mapbox_id: id, score: { popularity: 0.45 } }]
+        })
+      });
+    respond(pending[0]);
+    respond(pending[1]);
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    const row = (
+      sidePanelEl.children[1] as unknown as {
+        children: Array<{
+          children: Array<{ children: Array<{ textContent: string }> }>;
+        }>;
+      }
+    ).children[0];
+    expect(row.children[1].children[1].textContent).toBe('45% popularity');
+  });
+
+  it('fits the map beside an open panel, and refits when it is collapsed', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl, fitBoundsCalls } =
+      loadScriptSandbox();
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ results: [] })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/x',
+          layers: [],
+          markers: [
+            { coordinates: at(-122.41), id: mockPoiId('fit-1'), name: 'One' },
+            { coordinates: at(-122.42), id: mockPoiId('fit-2'), name: 'Two' }
+          ]
+        }
+      }
+    });
+    await new Promise((r) => setTimeout(r, 80));
+    // 280px panel + 24px gap.
+    expect(fitBoundsCalls.at(-1)?.padding.right).toBe(304);
+
+    (
+      sidePanelEl.children[0] as unknown as { __fireClick: () => void }
+    ).__fireClick();
+    expect(sidePanelEl.className).toBe('collapsed');
+    await new Promise((r) => setTimeout(r, 80));
+    expect(fitBoundsCalls.at(-1)?.padding.right).toBe(30);
+  });
+
+  it('starts collapsed on a narrow map', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl, mapEl, fitBoundsCalls } =
+      loadScriptSandbox();
+    mapEl.clientWidth = 400;
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ results: [] })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/x',
+          layers: [],
+          markers: [
+            {
+              coordinates: at(-122.41),
+              id: mockPoiId('narrow-1'),
+              name: 'One'
+            },
+            { coordinates: at(-122.42), id: mockPoiId('narrow-2'), name: 'Two' }
+          ]
+        }
+      }
+    });
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(sidePanelEl.className).toBe('collapsed');
+    expect(fitBoundsCalls.at(-1)?.padding.right).toBe(30);
   });
 });
