@@ -1685,7 +1685,12 @@ export function mapAppScript(config: {
       row.li.appendChild(thumb);
     };
     if (!EMBEDDED) {
-      if (photoUrl.indexOf('https://') === 0) show(photoUrl);
+      // Load it first: some sites refuse hotlinked photos (403), which
+      // would leave an empty box in the row.
+      if (photoUrl.indexOf('https://') !== 0 || typeof Image !== 'function') return;
+      var img = new Image();
+      img.onload = function() { show(photoUrl); };
+      img.src = photoUrl;
       return;
     }
     sendRequest('resources/read', {

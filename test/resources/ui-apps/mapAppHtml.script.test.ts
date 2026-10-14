@@ -219,6 +219,13 @@ function loadScriptSandbox(options?: {
     const win = sandbox.window as Record<string, unknown>;
     win.postMessage = (win.parent as { postMessage: unknown }).postMessage;
     win.parent = win;
+    // Loads any image whose URL doesn't contain "403"; never fires onerror.
+    sandbox.Image = class {
+      onload: (() => void) | null = null;
+      set src(url: string) {
+        if (!url.includes('403')) Promise.resolve().then(() => this.onload?.());
+      }
+    };
   }
   vm.createContext(sandbox);
   vm.runInContext(scriptSource, sandbox);
@@ -2295,6 +2302,33 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(thumb.style.backgroundImage).toBe(
       'url("https://dyn.mktgcdn.com/p/photo.jpg")'
     );
+  });
+
+  it('adds no thumbnail on a standalone page when the photo fails to load', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox({
+      topLevel: true
+    });
+    const id = mockPoiId('photo-poi');
+    const base = photoFetch(id);
+    setFetchImpl(async (url: string) => {
+      const res = (await base(url)) as {
+        json: () => Promise<{ results?: unknown[] }>;
+      };
+      if (!String(url).includes('places/v1/details/retrieve')) return res;
+      return {
+        ok: true,
+        json: async () => ({
+          results: [
+            { mapbox_id: id, photos: [{ url: 'https://example.com/403.jpg' }] }
+          ]
+        })
+      };
+    });
+
+    sendToolResult(searchResult);
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(sidePanelEl.children[1].children[0].children).toHaveLength(2);
   });
 });
 
