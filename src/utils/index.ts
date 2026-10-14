@@ -62,3 +62,12 @@ export type { VersionInfo } from './versionUtils.js';
 // buildServerInstructions(<enabled tool names>) as the server's instructions.
 export { publishJsonSchema2020, toJsonSchema2020 } from './jsonSchema2020.js';
 export { buildServerInstructions } from './serverInstructions.js';
+
+// Export ref helpers for apps that hand the model a short ref instead of a
+// large result and resolve it themselves. directionsRequestFromRef turns a
+// directions_tool result's structuredContent.mapboxRender.ref into a
+// Directions API URL for the full route.
+export { directionsRequestFromRef } from './directionsRef.js';
+export type { DirectionsRefRequest } from './directionsRef.js';
+export { resolveSelfFetchRef, isSelfFetchRef } from './selfFetchRef.js';
+export type { MapAppPayload, MapAppSelfFetch } from './mapAppPayload.js';
