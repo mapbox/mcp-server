@@ -36,6 +36,25 @@ export function renderMapAppHtml(params: {
       )}</script>`
     : '';
 
+  return `${mapAppShell(glVersion)}
+${initialDataScript}
+
+<script>
+${mapAppScript({
+  token: JSON.stringify(publicToken),
+  apiEndpoint: JSON.stringify(apiEndpoint)
+})}
+</script>
+</body>
+</html>`;
+}
+
+/**
+ * Everything in the map page before its data and script: Mapbox GL JS, styles,
+ * and the elements the script draws into. Shared by the in-chat MCP App page
+ * and the standalone page `export_map_html_tool` returns.
+ */
+export function mapAppShell(glVersion: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -131,13 +150,22 @@ export function renderMapAppHtml(params: {
 <div id="legend" style="display:none"></div>
 <div id="side-panel" style="display:none"></div>
 <div id="loading">Loading…</div>
-<div id="error" style="display:none"></div>
-${initialDataScript}
+<div id="error" style="display:none"></div>`;
+}
 
-<script>
-(function() {
-  var TOKEN = ${JSON.stringify(publicToken)};
-  var API_ENDPOINT = ${JSON.stringify(apiEndpoint)};
+/**
+ * The map page's script. `token` and `apiEndpoint` are JavaScript expressions,
+ * not values: the in-chat page passes JSON string literals, and the standalone
+ * build (MAP_APP_STANDALONE_CONFIG) reads them from a JSON tag in the page so
+ * one hosted copy works for every exported map.
+ */
+export function mapAppScript(config: {
+  token: string;
+  apiEndpoint: string;
+}): string {
+  return `(function() {
+  var TOKEN = ${config.token};
+  var API_ENDPOINT = ${config.apiEndpoint};
 
   var loadingEl = document.getElementById('loading');
   var errorEl = document.getElementById('error');
@@ -977,6 +1005,11 @@ ${initialDataScript}
       if (typeof params.profile !== 'string') return false;
       if (!/^mapbox\\/[a-z-]+$/.test(params.profile)) return false;
     }
+    // The Isochrone API requires one of these; a scalar (e.g. 15 instead
+    // of [15]) would be silently dropped by buildIsochroneApiUrl.
+    var hasMinutes = Array.isArray(params.contours_minutes) && params.contours_minutes.length > 0;
+    var hasMeters = Array.isArray(params.contours_meters) && params.contours_meters.length > 0;
+    if (!hasMinutes && !hasMeters) return false;
     return true;
   }
 
@@ -1983,12 +2016,9 @@ ${initialDataScript}
   function escapeAttr(s) {
     return escapeText(s).replace(/"/g, '&quot;');
   }
-})();
-</script>
-</body>
-</html>`;
+})();`;
 }
 
-function escapeForScript(s: string): string {
+export function escapeForScript(s: string): string {
   return s.replace(/<\/script>/gi, '<\\/script>');
 }

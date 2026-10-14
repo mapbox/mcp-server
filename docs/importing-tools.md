@@ -9,7 +9,7 @@ The Mapbox MCP Server exposes several subpath exports for direct integration:
 - `@mapbox/mcp-server/tools` - Geospatial tools (routing, search, geocoding, etc.)
 - `@mapbox/mcp-server/resources` - Static resources (category lists, etc.)
 - `@mapbox/mcp-server/prompts` - Pre-built prompts for common workflows
-- `@mapbox/mcp-server/utils` - HTTP pipeline utilities
+- `@mapbox/mcp-server/utils` - HTTP pipeline utilities and server setup helpers
 
 All exports support both **ESM** and **CommonJS** via dual builds powered by [tshy](https://github.com/isaacs/tshy).
 
@@ -328,59 +328,58 @@ import type { PromptInstance } from '@mapbox/mcp-server/prompts';
 
 ## Example: Building a Custom MCP Server
 
-Here's how you might use these exports to build your own MCP server with a subset of tools:
+Here's how you might use these exports to build your own MCP server with a subset of tools. Each tool and resource registers itself with `installTo(server)`:
 
 ```typescript
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-// Import only the tools you need
+import { getAllTools } from '@mapbox/mcp-server/tools';
+import { getAllResources } from '@mapbox/mcp-server/resources';
 import {
-  directions,
-  searchAndGeocode,
-  isochrone
-} from '@mapbox/mcp-server/tools';
+  buildServerInstructions,
+  publishJsonSchema2020
+} from '@mapbox/mcp-server/utils';
 
-const server = new Server(
+// Pick only the tools you need. render_map_tool is only available through
+// the registry, and it needs the map UI resource from getAllResources().
+const wanted = new Set([
+  'directions_tool',
+  'search_and_geocode_tool',
+  'isochrone_tool',
+  'render_map_tool'
+]);
+const tools = getAllTools().filter((tool) => wanted.has(tool.name));
+
+const server = new McpServer(
+  { name: 'my-custom-mcp-server', version: '1.0.0' },
   {
-    name: 'my-custom-mcp-server',
-    version: '1.0.0'
-  },
-  {
-    capabilities: {
-      tools: {}
-    }
+    capabilities: { tools: {}, resources: {} },
+    // Tells the model to show maps with render_map_tool and to pass
+    // mapboxRender refs through unchanged. Hosts that load tools lazily only
+    // see tool names up front, so tool descriptions alone can't do this.
+    instructions: buildServerInstructions(tools.map((tool) => tool.name))
   }
 );
 
-// Register selected tools
-server.setRequestHandler('tools/list', async () => ({
-  tools: [
-    directions.definition,
-    searchAndGeocode.definition,
-    isochrone.definition
-  ]
-}));
+// Publish tool schemas as JSON Schema 2020-12 instead of the SDK's draft-07.
+// Some clients (e.g. Claude Desktop) reject draft-07 output schemas.
+// Must be called before the first tool is installed.
+publishJsonSchema2020(server);
 
-server.setRequestHandler('tools/call', async (request) => {
-  const { name, arguments: args } = request.params;
-
-  switch (name) {
-    case 'directions_tool':
-      return await directions.execute(args);
-    case 'search_and_geocode_tool':
-      return await searchAndGeocode.execute(args);
-    case 'isochrone_tool':
-      return await isochrone.execute(args);
-    default:
-      throw new Error(`Unknown tool: ${name}`);
-  }
-});
+tools.forEach((tool) => tool.installTo(server));
+getAllResources().forEach((resource) => resource.installTo(server));
 
 // Start server
 const transport = new StdioServerTransport();
 await server.connect(transport);
 ```
+
+### Server setup helpers
+
+- `publishJsonSchema2020(server)`: converts every tool's `inputSchema`/`outputSchema` in `tools/list` from draft-07 to JSON Schema 2020-12. Call it on the `McpServer` before installing any tool.
+- `buildServerInstructions(toolNames)`: returns the server `instructions` text for the given enabled tool names, or `undefined` when `render_map_tool` isn't among them.
+- `toJsonSchema2020(schema)`: the converter behind `publishJsonSchema2020`, for converting a single schema.
 
 ## Example: Using in a Web Application
 

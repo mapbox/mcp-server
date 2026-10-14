@@ -15,7 +15,7 @@ import {
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -156,7 +156,7 @@ export class IsochroneTool extends MapboxApiBasedTool<
         uri: resourceUri,
         data,
         metadata: { toolName: this.name, size: responseSize },
-        owner: getUserNameFromToken(accessToken)
+        owner: getOwnerKeyFromToken(accessToken)
       });
 
       const contourCount =

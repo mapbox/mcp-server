@@ -155,3 +155,8 @@ test-results.xml
 # Build artifacts
 *.tsbuildinfo
 PR_DESCRIPTION.md
+
+# Tool-selection eval output (state and case files are committed)
+.claude/hillclimb/*/*/
+.claude/hillclimb/*/report.html
+.claude/hillclimb/*/trajectory/

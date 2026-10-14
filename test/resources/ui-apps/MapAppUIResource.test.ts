@@ -64,9 +64,13 @@ describe('MapAppUIResource', () => {
     expect(entry.text as string).toContain('mapbox-gl.js');
 
     const meta = (entry as { _meta?: unknown })._meta as
-      | { ui?: { csp?: { workerDomains?: string[] } } }
+      | { ui?: { csp?: Record<string, string[]> } }
       | undefined;
-    expect(meta?.ui?.csp?.workerDomains).toContain('blob:');
+    expect(meta?.ui?.csp).toEqual({
+      connectDomains: ['https://api.mapbox.com', 'https://events.mapbox.com'],
+      resourceDomains: ['https://api.mapbox.com'],
+      workerDomains: ['blob:']
+    });
   });
 
   it('still returns HTML when no token can be resolved', async () => {

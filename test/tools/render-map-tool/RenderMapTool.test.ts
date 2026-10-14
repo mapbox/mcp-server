@@ -6,7 +6,7 @@ process.env.MAPBOX_ACCESS_TOKEN =
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { RenderMapTool } from '../../../src/tools/render-map-tool/RenderMapTool.js';
-import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { tokenFor, ownerKeyFor } from '../../utils/tokenTestUtils.js';
 
 describe('RenderMapTool', () => {
   afterEach(() => {
@@ -16,6 +16,22 @@ describe('RenderMapTool', () => {
   it('declares meta.ui.resourceUri targeting the shared map-app resource', () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     expect(tool.meta?.ui?.resourceUri).toBe('ui://mapbox/map-app/index.html');
+  });
+
+  it('declares the same CSP as the map-app resource, including a custom API endpoint', () => {
+    const tool = new RenderMapTool({
+      httpRequest: vi.fn(),
+      apiEndpoint: () => 'https://api-staging.example.com/'
+    });
+    expect(tool.meta?.ui?.csp).toEqual({
+      connectDomains: [
+        'https://api.mapbox.com',
+        'https://events.mapbox.com',
+        'https://api-staging.example.com'
+      ],
+      resourceDomains: ['https://api.mapbox.com'],
+      workerDomains: ['blob:']
+    });
   });
 
   it('echoes layer + marker counts in the result', async () => {
@@ -183,7 +199,8 @@ describe('RenderMapTool', () => {
   it('resolves a payload_ref into a renderable payload', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const owner = 'account-test-render-map-ref';
+    const account = 'account-test-render-map-ref';
+    const owner = ownerKeyFor(account);
     const ref = storeMapPayload(
       {
         summary: 'Cached route',
@@ -209,7 +226,7 @@ describe('RenderMapTool', () => {
     );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const token = tokenFor(owner);
+    const token = tokenFor(account);
     const result = await tool.run(
       { payload_refs: [ref] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -227,7 +244,8 @@ describe('RenderMapTool', () => {
   it('merges multiple payload_refs into a single map', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const owner = 'account-test-render-map-merge';
+    const account = 'account-test-render-map-merge';
+    const owner = ownerKeyFor(account);
     const a = storeMapPayload(
       {
         summary: 'Iso A',
@@ -286,7 +304,7 @@ describe('RenderMapTool', () => {
     );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const token = tokenFor(owner);
+    const token = tokenFor(account);
     const result = await tool.run(
       { payload_refs: [a, b] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -319,7 +337,8 @@ describe('RenderMapTool', () => {
   it('renders with a note when some payload_refs resolve and others are stale', async () => {
     const { storeMapPayload } =
       await import('../../../src/utils/storeMapPayload.js');
-    const owner = 'account-test-render-map-partial';
+    const account = 'account-test-render-map-partial';
+    const owner = ownerKeyFor(account);
     const goodRef = storeMapPayload(
       {
         summary: 'Still fresh',
@@ -345,7 +364,7 @@ describe('RenderMapTool', () => {
     );
 
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
-    const token = tokenFor(owner);
+    const token = tokenFor(account);
     const result = await tool.run(
       { payload_refs: [goodRef, 'mapbox://temp/map-payload-stale-one'] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -357,6 +376,33 @@ describe('RenderMapTool', () => {
     const text = (result.content[0] as { type: 'text'; text: string }).text;
     expect(text).toContain('1 payload ref could not be resolved');
     expect(text).toContain('Re-run the source tool');
+  });
+
+  // Regression: in the ChatGPT app a hand-written isochrone ref with no
+  // contours plus a `summary` returned isError: false, because the summary
+  // alone counted as renderable — the map drew an empty globe and the LLM
+  // described an isochrone the user never saw.
+  it('errors when the only data ref is unresolved, even with a summary', async () => {
+    const { buildSelfFetchRef } =
+      await import('../../../src/utils/selfFetchRef.js');
+    const badRef = buildSelfFetchRef('isochrone', {
+      profile: 'mapbox/driving-traffic',
+      coordinates: { longitude: -122.119931, latitude: 47.683984 },
+      contours_minutes: 15,
+      generalize: 2000
+    });
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run(
+      { payload_refs: [badRef], summary: '15-min drive-time area' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { authInfo: { token: tokenFor('alice') } } as any
+    );
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain(
+      'none of the provided payload_refs could be resolved'
+    );
+    expect(text).toContain('mapboxRender.ref values verbatim');
   });
 
   it('renders a union_tool compute ref with no owner and no prior server-side state (simulated restart)', async () => {
@@ -647,7 +693,7 @@ describe('RenderMapTool', () => {
     const { buildSelfFetchRef } =
       await import('../../../src/utils/selfFetchRef.js');
     const ref = buildSelfFetchRef('isochrone', {
-      coordinates: [-122.4194, 37.7749],
+      coordinates: { longitude: -122.4194, latitude: 37.7749 },
       contours_minutes: [10]
     });
 
@@ -685,7 +731,7 @@ describe('RenderMapTool', () => {
     const { buildSelfFetchRef } =
       await import('../../../src/utils/selfFetchRef.js');
     const ref = buildSelfFetchRef('isochrone', {
-      coordinates: [-122.4194, 37.7749],
+      coordinates: { longitude: -122.4194, latitude: 37.7749 },
       contours_minutes: [10]
     });
 

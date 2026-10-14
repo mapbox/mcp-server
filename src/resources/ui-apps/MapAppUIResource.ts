@@ -12,6 +12,7 @@ import { BaseResource } from '../BaseResource.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
 import { renderMapAppHtml } from './mapAppHtml.js';
+import { mapAppCsp } from './mapAppCsp.js';
 
 /**
  * Single Mapbox MCP App resource targeted by `render_map_tool`.
@@ -71,14 +72,7 @@ export class MapAppUIResource extends BaseResource {
           text: html,
           _meta: {
             ui: {
-              csp: {
-                connectDomains: [
-                  'https://*.mapbox.com',
-                  'https://events.mapbox.com'
-                ],
-                resourceDomains: ['https://api.mapbox.com'],
-                workerDomains: ['blob:']
-              },
+              csp: mapAppCsp(this.apiEndpoint()),
               preferredSize: { width: 1000, height: 600 }
             }
           }

@@ -28,9 +28,20 @@ const categoryResponse = {
         name: 'Four Barrel Coffee',
         full_address: '375 Valencia St, San Francisco, CA',
         poi_category: ['coffee'],
-        distance: 120
+        distance: 120,
+        mapbox_id: 'dXJuOm1ieHBvaTp0ZXN0LWZvdXItYmFycmVs',
+        external_ids: { dataplor: 'dp-4b-001', tripadvisor: '12345678' }
       },
       geometry: { type: 'Point', coordinates: [-122.421, 37.762] }
+    },
+    {
+      properties: {
+        name: 'Plain Cafe',
+        full_address: '1 Nowhere St, San Francisco, CA',
+        poi_category: ['coffee'],
+        distance: 300
+      },
+      geometry: { type: 'Point', coordinates: [-122.422, 37.763] }
     }
   ]
 };
@@ -115,6 +126,42 @@ describe('GroundLocationTool', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('category/coffee')
     );
+  });
+
+  it('threads mapbox_id and external_ids through to nearby_pois', async () => {
+    const { tool } = setupMockHttp({
+      'geocode/v6/reverse': geocodeResponse,
+      'category/coffee': categoryResponse,
+      'isochrone/v1': isochroneResponse
+    });
+
+    const result = await tool.run({
+      longitude: -122.419,
+      latitude: 37.759,
+      query: 'coffee'
+    });
+
+    expect(result.isError).toBe(false);
+    const pois = (
+      result.structuredContent as {
+        nearby_pois?: {
+          name: string;
+          mapbox_id?: string;
+          external_ids?: Record<string, string>;
+        }[];
+      }
+    ).nearby_pois;
+
+    expect(pois?.[0]).toMatchObject({
+      name: 'Four Barrel Coffee',
+      mapbox_id: 'dXJuOm1ieHBvaTp0ZXN0LWZvdXItYmFycmVs',
+      external_ids: { dataplor: 'dp-4b-001', tripadvisor: '12345678' }
+    });
+
+    // A feature the API returns without ids stays valid, with the keys absent.
+    expect(pois?.[1].name).toBe('Plain Cafe');
+    expect(pois?.[1].mapbox_id).toBeUndefined();
+    expect(pois?.[1].external_ids).toBeUndefined();
   });
 
   it('skips isochrone for routing strategy via sampling', async () => {
