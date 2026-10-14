@@ -7,7 +7,8 @@ process.env.MAPBOX_ACCESS_TOKEN =
 import { describe, it, expect, vi } from 'vitest';
 import {
   PlacePhotoResource,
-  MAX_PLACE_PHOTO_BYTES
+  MAX_PLACE_PHOTO_BYTES,
+  MAX_PLACE_PHOTO_CACHE_BYTES
 } from '../../../src/resources/place-photo/PlacePhotoResource.js';
 
 const ID = Buffer.from(
@@ -27,10 +28,21 @@ function image(body: Uint8Array, type = 'image/jpeg', status = 200) {
   return new Response(body, { status, headers: { 'content-type': type } });
 }
 
+// A public address, so no test resolves a real hostname.
+const publicDns = async () => ['93.184.215.14'];
+
 function setup(...responses: Response[]) {
   const httpRequest = vi.fn();
   for (const r of responses) httpRequest.mockResolvedValueOnce(r);
-  return { httpRequest, resource: new PlacePhotoResource({ httpRequest }) };
+  return {
+    httpRequest,
+    resource: new PlacePhotoResource({ httpRequest, lookupHost: publicDns })
+  };
+}
+
+function placeId(n: number) {
+  const uuid = `7a4b2c1d-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  return Buffer.from(`urn:mbxpoi:${uuid}`).toString('base64');
 }
 
 describe('PlacePhotoResource', () => {
@@ -95,6 +107,66 @@ describe('PlacePhotoResource', () => {
   });
 
   it.each([
+    ['a private address', ['10.0.0.5']],
+    ['loopback among public addresses', ['93.184.215.14', '127.0.0.1']],
+    ['an IPv6 unique-local address', ['fd00::1']],
+    ['no addresses', []]
+  ])('never fetches a photo whose host resolves to %s', async (_l, addrs) => {
+    const httpRequest = vi
+      .fn()
+      .mockResolvedValueOnce(details([{ url: PHOTO_URL }]));
+    const lookupHost = vi.fn(async () => addrs);
+    const resource = new PlacePhotoResource({ httpRequest, lookupHost });
+    const result = await resource.read(URI);
+    expect(result.contents[0]).toMatchObject({ mimeType: 'text/plain' });
+    expect(lookupHost).toHaveBeenCalledWith('dyn.mktgcdn.com');
+    expect(httpRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('never fetches a photo whose host fails to resolve', async () => {
+    const httpRequest = vi
+      .fn()
+      .mockResolvedValueOnce(details([{ url: PHOTO_URL }]));
+    const lookupHost = vi.fn().mockRejectedValue(new Error('ENOTFOUND'));
+    const resource = new PlacePhotoResource({ httpRequest, lookupHost });
+    const result = await resource.read(URI);
+    expect(result.contents[0]).toMatchObject({ mimeType: 'text/plain' });
+    expect(httpRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the shared cache under its byte cap by dropping the oldest photos', async () => {
+    // Just under the per-photo cap, so the byte cap binds before the
+    // entry cap: base64 makes each about 1.33 MB.
+    const big = new Uint8Array(MAX_PLACE_PHOTO_BYTES - 1);
+    const fits = Math.floor(
+      MAX_PLACE_PHOTO_CACHE_BYTES / (big.length * (4 / 3))
+    );
+    const httpRequest = vi.fn();
+    const resource = new PlacePhotoResource({
+      httpRequest,
+      lookupHost: publicDns
+    });
+    const uriFor = (n: number) =>
+      `mapbox://place-photo/${encodeURIComponent(placeId(n))}`;
+    for (let n = 0; n <= fits; n++) {
+      httpRequest
+        .mockResolvedValueOnce(details([{ url: PHOTO_URL }]))
+        .mockResolvedValueOnce(image(big));
+      await resource.read(uriFor(n));
+    }
+    expect(httpRequest).toHaveBeenCalledTimes(2 * (fits + 1));
+
+    // The newest is still cached; the oldest was dropped to make room.
+    await resource.read(uriFor(fits));
+    expect(httpRequest).toHaveBeenCalledTimes(2 * (fits + 1));
+    httpRequest
+      .mockResolvedValueOnce(details([{ url: PHOTO_URL }]))
+      .mockResolvedValueOnce(image(big));
+    await resource.read(uriFor(0));
+    expect(httpRequest).toHaveBeenCalledTimes(2 * (fits + 2));
+  });
+
+  it.each([
     ['SVG', image(JPEG, 'image/svg+xml')],
     ['HTML', image(JPEG, 'text/html')],
     ['a redirect', image(new Uint8Array(), 'image/jpeg', 302)],
@@ -112,7 +184,10 @@ describe('PlacePhotoResource', () => {
       .fn()
       .mockResolvedValueOnce(details([{ url: PHOTO_URL }]))
       .mockRejectedValueOnce(new Error('timeout'));
-    const result = await new PlacePhotoResource({ httpRequest }).read(URI);
+    const result = await new PlacePhotoResource({
+      httpRequest,
+      lookupHost: publicDns
+    }).read(URI);
     expect(result.contents[0]).toMatchObject({ mimeType: 'text/plain' });
   });
 

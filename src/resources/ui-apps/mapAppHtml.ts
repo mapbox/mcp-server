@@ -195,7 +195,9 @@ export function mapAppScript(config: {
   var messageId = 0;
   var pendingRequests = new Map();
 
-  function sendRequest(method, params) {
+  // timeoutMs (optional) rejects a request nobody answers, for hosts that
+  // don't implement the method.
+  function sendRequest(method, params, timeoutMs) {
     var id = ++messageId;
     try {
       window.parent.postMessage({
@@ -204,6 +206,13 @@ export function mapAppScript(config: {
     } catch (_) {}
     return new Promise(function(resolve, reject) {
       pendingRequests.set(id, { resolve: resolve, reject: reject });
+      if (timeoutMs) {
+        setTimeout(function() {
+          if (!pendingRequests.has(id)) return;
+          pendingRequests.delete(id);
+          reject(new Error(method + ' timed out'));
+        }, timeoutMs);
+      }
     });
   }
   function sendNotification(method, params) {
@@ -238,13 +247,22 @@ export function mapAppScript(config: {
     }
   });
 
+  // Set once a host answers ui/initialize, even with an error. A page from
+  // export_map_html_tool framed by some other site never gets an answer.
+  var hostAnswered = false;
   sendRequest('ui/initialize', {
     protocolVersion: '2026-01-26',
     appCapabilities: {},
     appInfo: { name: 'Mapbox Map', version: '1.0.0' }
   }).then(
-    function() { sendNotification('ui/notifications/initialized', {}); },
-    function() { sendNotification('ui/notifications/initialized', {}); }
+    function() {
+      hostAnswered = true;
+      sendNotification('ui/notifications/initialized', {});
+    },
+    function() {
+      hostAnswered = true;
+      sendNotification('ui/notifications/initialized', {});
+    }
   );
 
   // --- Map setup ------------------------------------------------------------
@@ -558,33 +576,54 @@ export function mapAppScript(config: {
   //
   // Numbering runs across the whole render, not per call: a render can
   // draw inline markers and then merge in self-fetched search results, and
-  // each set arrives numbered from 1. So numeric (or missing) labels on
-  // id-bearing markers are renumbered to continue the panel's count, and a
-  // place already in the panel this render is dropped rather than drawn and
-  // listed twice. Returns the markers to draw.
+  // each set arrives numbered from 1. The first set keeps the caller's
+  // numbers when they're unique (a visit order, say); a later set, or one
+  // with repeated numbers, is renumbered to continue the panel's count.
+  // Letter labels ("A") are kept as they are. A place already in the panel
+  // this render is dropped rather than drawn and listed twice. Returns the
+  // markers to draw.
   function applyPanelNumbering(markers) {
     if (!Array.isArray(markers)) return [];
     var seen = {};
-    return markers.filter(function(m) {
+    var fresh = markers.filter(function(m) {
       if (!m || !m.id) return true;
       if (panelIds[m.id] || seen[m.id]) return false;
       seen[m.id] = true;
+      return true;
+    });
+    var keep = panelCount === 0;
+    var used = {};
+    fresh.forEach(function(m) {
+      if (!m || !m.id || !isWholeNumber(m.label)) return;
+      if (used[m.label]) keep = false;
+      used[m.label] = true;
+    });
+    if (keep) {
+      Object.keys(used).forEach(function(n) {
+        panelCount = Math.max(panelCount, parseInt(n, 10));
+      });
+    }
+    fresh.forEach(function(m) {
+      if (!m || !m.id) return;
+      if (m.label && (keep || !isWholeNumber(m.label))) return;
       panelCount += 1;
       var n = String(panelCount);
       if (!m.label) {
         if (m.style !== 'start' && m.style !== 'end') m.style = 'numbered';
         if (!m.color) m.color = '#f97316';
-      } else if (String(parseInt(m.label, 10)) === String(m.label)) {
+      } else if (typeof m.popup === 'string' && m.popup.indexOf(m.label + '. ') === 0) {
         // Search popups start with the old number ("3. Name").
-        if (typeof m.popup === 'string' && m.popup.indexOf(m.label + '. ') === 0) {
-          m.popup = n + '. ' + m.popup.slice(String(m.label).length + 2);
-        }
-      } else {
-        return true;
+        m.popup = n + '. ' + m.popup.slice(String(m.label).length + 2);
       }
       m.label = n;
-      return true;
     });
+    return fresh;
+  }
+
+  function isWholeNumber(label) {
+    if (label === undefined || label === null || label === '') return false;
+    var n = parseInt(label, 10);
+    return n > 0 && String(n) === String(label);
   }
 
   // Bottom padding that keeps fitted data out from under the legend
@@ -1461,10 +1500,12 @@ export function mapAppScript(config: {
     var items = [];
     markers.forEach(function(m) {
       if (!m || !m.id) return;
-      var labelNum = parseInt(m.label, 10);
+      // The pin's own label, so a row reads the same as its pin ("A" too).
+      var badge = isWholeNumber(m.label) ? parseInt(m.label, 10)
+        : (m.label ? String(m.label) : items.length + 1);
       items.push({
         id: m.id,
-        number: isNaN(labelNum) ? items.length + 1 : labelNum,
+        number: badge,
         name: m.name || ('Result ' + (items.length + 1)),
         category: m.category,
         distanceMeters: typeof m.distanceMeters === 'number' ? m.distanceMeters : undefined,
@@ -1674,6 +1715,7 @@ export function mapAppScript(config: {
   var MAX_PANEL_PHOTOS = 10;
   var EMBEDDED = window.parent !== window;
   var PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  var PHOTO_TIMEOUT_MS = 15000;
 
   function loadPanelPhoto(row, id, photoUrl) {
     var show = function(src) {
@@ -1684,8 +1726,9 @@ export function mapAppScript(config: {
       thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
       row.li.appendChild(thumb);
     };
-    if (!EMBEDDED) {
-      // Load it first: some sites refuse hotlinked photos (403), which
+    if (!EMBEDDED || !hostAnswered) {
+      // No MCP host (a standalone or framed exported page), so no CSP of
+      // ours either. Load it first: some sites refuse hotlinked photos (403), which
       // would leave an empty box in the row.
       if (photoUrl.indexOf('https://') !== 0 || typeof Image !== 'function') return;
       var img = new Image();
@@ -1693,9 +1736,10 @@ export function mapAppScript(config: {
       img.src = photoUrl;
       return;
     }
+    // Hosts that don't support resources/read (ChatGPT) may never answer.
     sendRequest('resources/read', {
       uri: 'mapbox://place-photo/' + encodeURIComponent(id)
-    }).then(function(rr) {
+    }, PHOTO_TIMEOUT_MS).then(function(rr) {
       var c = rr && Array.isArray(rr.contents) ? rr.contents[0] : null;
       if (c && typeof c.blob === 'string' &&
           PHOTO_TYPES.indexOf(c.mimeType) !== -1) {

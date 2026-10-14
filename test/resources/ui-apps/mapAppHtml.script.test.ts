@@ -35,6 +35,8 @@ function loadScriptSandbox(options?: {
   initialData?: unknown;
   /** A page opened directly (export_map_html_tool), not inside a host. */
   topLevel?: boolean;
+  /** Framed by a page that isn't an MCP host, so ui/initialize gets no answer. */
+  noHost?: boolean;
 }) {
   const html = renderMapAppHtml({ publicToken: 'pk.test-token' });
   const scriptMatch = html.match(
@@ -219,6 +221,8 @@ function loadScriptSandbox(options?: {
     const win = sandbox.window as Record<string, unknown>;
     win.postMessage = (win.parent as { postMessage: unknown }).postMessage;
     win.parent = win;
+  }
+  if (options?.topLevel || options?.noHost) {
     // Loads any image whose URL doesn't contain "403"; never fires onerror.
     sandbox.Image = class {
       onload: (() => void) | null = null;
@@ -234,7 +238,7 @@ function loadScriptSandbox(options?: {
   // its handshake (mirrors what a real host would respond with).
   const initId = postMessageCalls.find((m) => m.method === 'ui/initialize')
     ?.id as number | undefined;
-  if (initId !== undefined && messageListener) {
+  if (initId !== undefined && messageListener && !options?.noHost) {
     messageListener({ data: { jsonrpc: '2.0', id: initId, result: {} } });
   }
 
@@ -2744,5 +2748,151 @@ describe('mapAppHtml results side panel: one panel per render', () => {
       }
     ).children.map((row) => row.children[0].style.background);
     expect(badges).toEqual(['#6b7280', undefined, undefined]);
+  });
+});
+
+describe('mapAppHtml results side panel: caller labels', () => {
+  const at = (lng: number) => [lng, 37.78] as [number, number];
+  const badges = (panel: { children: unknown[] }) =>
+    (
+      panel.children[1] as {
+        children: Array<{ children: Array<{ textContent: string }> }>;
+      }
+    ).children.map((row) => row.children[0].textContent);
+  const labelsDrawn = (calls: Array<Record<string, unknown>>) =>
+    calls.map(
+      (c) => (c.element as { textContent?: string } | undefined)?.textContent
+    );
+  const render = (markers: Array<Record<string, unknown>>) => ({
+    structuredContent: {
+      mapboxRender: { ref: 'mapbox://inline/x', layers: [], markers }
+    }
+  });
+  const noDetails = async () => ({
+    ok: true,
+    json: async () => ({ results: [] })
+  });
+
+  it("keeps the caller's own numbers when they're unique, such as a visit order", async () => {
+    const {
+      sendToolResult,
+      setFetchImpl,
+      sidePanelEl,
+      markerConstructorCalls
+    } = loadScriptSandbox();
+    setFetchImpl(noDetails);
+    sendToolResult(
+      render(
+        ['3', '1', '2'].map((label, i) => ({
+          coordinates: at(-122.41 - i / 100),
+          id: mockPoiId('visit-' + label),
+          name: 'Stop ' + label,
+          label,
+          style: 'numbered'
+        }))
+      )
+    );
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+
+    expect(labelsDrawn(markerConstructorCalls)).toEqual(['3', '1', '2']);
+    expect(badges(sidePanelEl)).toEqual(['3', '1', '2']);
+  });
+
+  it('renumbers repeated numbers so each pin matches one row', async () => {
+    const {
+      sendToolResult,
+      setFetchImpl,
+      sidePanelEl,
+      markerConstructorCalls
+    } = loadScriptSandbox();
+    setFetchImpl(noDetails);
+    sendToolResult(
+      render(
+        ['1', '1', '2'].map((label, i) => ({
+          coordinates: at(-122.41 - i / 100),
+          id: mockPoiId('repeat-' + i),
+          name: 'Place ' + i,
+          label,
+          style: 'numbered'
+        }))
+      )
+    );
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+
+    expect(labelsDrawn(markerConstructorCalls)).toEqual(['1', '2', '3']);
+    expect(badges(sidePanelEl)).toEqual(['1', '2', '3']);
+  });
+
+  it('shows a letter label in the panel row, as on its pin', async () => {
+    const {
+      sendToolResult,
+      setFetchImpl,
+      sidePanelEl,
+      markerConstructorCalls
+    } = loadScriptSandbox();
+    setFetchImpl(noDetails);
+    sendToolResult(
+      render([
+        {
+          coordinates: at(-122.41),
+          id: mockPoiId('letter-a'),
+          name: 'Home',
+          label: 'A',
+          style: 'numbered'
+        },
+        { coordinates: at(-122.42), id: mockPoiId('letter-b'), name: 'Cafe' }
+      ])
+    );
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+
+    expect(labelsDrawn(markerConstructorCalls)).toEqual(['A', '1']);
+    expect(badges(sidePanelEl)).toEqual(['A', '1']);
+  });
+});
+
+describe('mapAppHtml results side panel: photos without an MCP host', () => {
+  it('loads photos directly when framed by a page that never answers ui/initialize', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl, postMessageCalls } =
+      loadScriptSandbox({ noHost: true });
+    const id = mockPoiId('framed-photo');
+    setFetchImpl(async (url: string) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        return {
+          ok: true,
+          json: async () => ({
+            results: [
+              { mapbox_id: id, photos: [{ url: 'https://example.com/a.jpg' }] }
+            ]
+          })
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/x',
+          layers: [],
+          markers: [{ coordinates: [-122.41, 37.78], id, name: 'Framed Cafe' }]
+        }
+      }
+    });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(postMessageCalls.some((m) => m.method === 'resources/read')).toBe(
+      false
+    );
+    const row = (
+      sidePanelEl.children[1] as {
+        children: Array<{
+          children: Array<{ className: string; style: Record<string, string> }>;
+        }>;
+      }
+    ).children[0];
+    expect(row.children[2].className).toBe('panel-thumb');
+    expect(row.children[2].style.backgroundImage).toBe(
+      'url("https://example.com/a.jpg")'
+    );
   });
 });
