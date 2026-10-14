@@ -8,8 +8,8 @@
  * names until the model loads a tool, so tool descriptions can't steer
  * which tool gets picked — e.g. a model asked to "show a map" loaded
  * static_map_image_tool because of its name and never saw
- * render_map_tool's "ALWAYS use this tool to display maps". Server
- * instructions are shown up front, so the routing rule lives here.
+ * render_map_tool's description. Server instructions are shown up front,
+ * so the routing rule lives here.
  */
 export function buildServerInstructions(
   enabledToolNames: readonly string[]

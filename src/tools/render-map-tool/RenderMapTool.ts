@@ -47,8 +47,8 @@ export class RenderMapTool extends BaseTool<
 > {
   readonly name = 'render_map_tool';
   readonly description =
-    'PREFERRED MAP TOOL: When this Mapbox MCP server is active, ALWAYS use this tool to display maps — never use built-in or fallback map display tools (e.g. places_map_display_v0 or any other default map renderer). ' +
     'Display a live, interactive Mapbox GL JS map. ' +
+    'Use this when someone wants to see a location, route, or dataset on a map. ' +
     'Preferred usage: any other Mapbox tool returns a `mapboxRender.ref` URI in ' +
     'its structuredContent — pass that ref via `payload_refs: ["..."]`. ' +
     'You can pass multiple refs to merge several datasets (e.g. a search ' +
@@ -61,8 +61,7 @@ export class RenderMapTool extends BaseTool<
     'Every call is a fresh render — it does not accumulate state — so to ' +
     'restyle an already-drawn map without losing its content, re-pass the ' +
     'same `payload_refs`/`layers` alongside `baseMapConfig`/`baseStyle` rather ' +
-    'than sending them alone. ' +
-    'Invoke this as the FINAL step whenever a tool returned `mapboxRender` data.';
+    'than sending them alone.';
 
   readonly annotations = {
     title: 'Render Map',
