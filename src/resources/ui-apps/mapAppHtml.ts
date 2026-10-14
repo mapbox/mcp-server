@@ -120,22 +120,14 @@ export function mapAppShell(glVersion: string): string {
     display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer;
   }
   #side-panel .panel-item:hover { background: rgba(255,255,255,0.08); }
+  /* Only added once a photo has loaded (see loadPanelPhoto). */
   #side-panel .panel-thumb {
     flex: 0 0 auto; width: 32px; height: 32px; border-radius: 6px;
-    background: rgba(255,255,255,0.08);
     background-size: cover; background-position: center;
   }
-  #side-panel .panel-thumb.no-photo {
-    background: none; border: 1px dashed rgba(255,255,255,0.4);
-    display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.55); font-size: 6.5px; font-weight: 600;
-    line-height: 1.15; text-align: center; letter-spacing: .02em;
-  }
-  /* Always-visible visit-order badge, matching the numbered map marker --
-     separate from .panel-thumb so the photo/no-photo state never has to
-     fight the number for the same 28px square. */
+  /* Visit-order badge, matching the numbered map marker. */
   #side-panel .panel-badge {
-    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; margin-top: 6px;
+    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; margin-top: 1px;
     background: #f97316; color: #1a0f04;
     display: flex; align-items: center; justify-content: center;
     font-size: 10px; font-weight: 700;
@@ -1439,7 +1431,7 @@ export function mapAppScript(config: {
     ).then(enrichSidePanel);
   }
 
-  // Keyed by mapbox_id -> { thumb, meta } elements, so enrichSidePanel can
+  // Keyed by mapbox_id -> { li, meta } elements, so enrichSidePanel can
   // update a row directly once Place Details resolves, without re-parsing
   // panelEl's markup back into a queryable DOM (innerHTML + querySelector
   // round-trips don't work in every MCP Apps host's iframe sandbox, and
@@ -1450,9 +1442,6 @@ export function mapAppScript(config: {
   function buildPanelRow(it) {
     var li = document.createElement('li');
     li.className = 'panel-item';
-
-    var thumb = document.createElement('span');
-    thumb.className = 'panel-thumb';
 
     var badge = document.createElement('span');
     badge.className = 'panel-badge';
@@ -1474,7 +1463,6 @@ export function mapAppScript(config: {
     var body = document.createElement('div');
     body.appendChild(name);
     body.appendChild(meta);
-    li.appendChild(thumb);
     li.appendChild(badge);
     li.appendChild(body);
 
@@ -1483,7 +1471,7 @@ export function mapAppScript(config: {
       if (entry) map.flyTo({ center: entry.marker.getLngLat(), zoom: 15, duration: 500 });
     });
 
-    panelRowsById[it.id] = { thumb: thumb, meta: meta };
+    panelRowsById[it.id] = { li: li, meta: meta };
     return li;
   }
 
@@ -1560,24 +1548,50 @@ export function mapAppScript(config: {
       .catch(function() { return null; });
   }
 
+  // Place Details photos are hosted wherever each business's site hosts
+  // them, so the in-chat CSP (mapAppCsp.ts) can't allow them. Inside a host,
+  // the page asks the server for the photo (PlacePhotoResource, by mapbox_id)
+  // and shows it as a data: URL. A standalone page from export_map_html_tool
+  // has no host and no CSP, so it loads the photo URL directly.
+  var MAX_PANEL_PHOTOS = 10;
+  var EMBEDDED = window.parent !== window;
+  var PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+  function loadPanelPhoto(row, id, photoUrl) {
+    var show = function(src) {
+      // A later render may have replaced the panel while this loaded.
+      if (panelRowsById[id] !== row) return;
+      var thumb = document.createElement('span');
+      thumb.className = 'panel-thumb';
+      thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
+      row.li.insertBefore(thumb, row.li.firstChild);
+    };
+    if (!EMBEDDED) {
+      if (photoUrl.indexOf('https://') === 0) show(photoUrl);
+      return;
+    }
+    sendRequest('resources/read', {
+      uri: 'mapbox://place-photo/' + encodeURIComponent(id)
+    }).then(function(rr) {
+      var c = rr && Array.isArray(rr.contents) ? rr.contents[0] : null;
+      if (c && typeof c.blob === 'string' &&
+          PHOTO_TYPES.indexOf(c.mimeType) !== -1) {
+        show('data:' + c.mimeType + ';base64,' + c.blob);
+      }
+    }, function() {});
+  }
+
   function enrichSidePanel(detailsResult) {
     if (!detailsResult || !Array.isArray(detailsResult.results)) return;
+    var photosRequested = 0;
     detailsResult.results.forEach(function(place) {
       if (!place || !place.mapbox_id) return;
       var row = panelRowsById[place.mapbox_id];
       if (row) {
         var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
-        if (photoUrl) {
-          row.thumb.style.backgroundImage = 'url("' + photoUrl.replace(/"/g, '') + '")';
-          row.thumb.className = 'panel-thumb has-photo';
-        } else {
-          // Enrichment succeeded for this place but it genuinely has no
-          // photo on file -- distinct dashed placeholder, not just an
-          // untouched thumb (which would look identical to "not enriched
-          // yet"). The visit-order number lives in .panel-badge, a
-          // separate element, so it stays visible either way.
-          row.thumb.className = 'panel-thumb no-photo';
-          row.thumb.textContent = 'no photo';
+        if (typeof photoUrl === 'string' && photosRequested < MAX_PANEL_PHOTOS) {
+          photosRequested++;
+          loadPanelPhoto(row, place.mapbox_id, photoUrl);
         }
         if (place.score && typeof place.score.popularity === 'number') {
           var extra = Math.round(place.score.popularity * 100) + '% popularity';

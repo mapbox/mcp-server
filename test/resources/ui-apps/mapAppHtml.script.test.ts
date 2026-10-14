@@ -25,7 +25,11 @@ const mockPoiId = (suffix: string) =>
  * bridge doesn't support at all), while a ref-only result (Claude
  * Desktop, which strips structuredContent) still falls back to it.
  */
-function loadScriptSandbox(options?: { initialData?: unknown }) {
+function loadScriptSandbox(options?: {
+  initialData?: unknown;
+  /** A page opened directly (export_map_html_tool), not inside a host. */
+  topLevel?: boolean;
+}) {
   const html = renderMapAppHtml({ publicToken: 'pk.test-token' });
   const scriptMatch = html.match(
     /<script>\n\(function\(\) \{[\s\S]*?\}\)\(\);\n<\/script>/
@@ -65,6 +69,11 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
       get firstChild() {
         return children[0];
       },
+      insertBefore: (child: FakeElement, ref: FakeElement | undefined) => {
+        const idx = ref ? children.indexOf(ref) : -1;
+        children.splice(idx === -1 ? children.length : idx, 0, child);
+        return child;
+      },
       addEventListener: (type: string, cb: () => void) => {
         if (type === 'click') clickListeners.push(cb);
       },
@@ -81,6 +90,10 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
     appendChild: (child: FakeElement) => FakeElement;
     removeChild: (child: FakeElement) => FakeElement;
     readonly firstChild: FakeElement | undefined;
+    insertBefore: (
+      child: FakeElement,
+      ref: FakeElement | undefined
+    ) => FakeElement;
     addEventListener: (type: string, cb: () => void) => void;
     __fireClick: () => void;
   }
@@ -198,6 +211,12 @@ function loadScriptSandbox(options?: { initialData?: unknown }) {
     atob,
     fetch: (url: string, init?: unknown) => fetchImpl(url, init)
   };
+  if (options?.topLevel) {
+    // In a real browser, a page with no host is its own parent.
+    const win = sandbox.window as Record<string, unknown>;
+    win.postMessage = (win.parent as { postMessage: unknown }).postMessage;
+    win.parent = win;
+  }
   vm.createContext(sandbox);
   vm.runInContext(scriptSource, sandbox);
 
@@ -1580,14 +1599,10 @@ describe('mapAppHtml ground location self-fetch', () => {
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
     expect(sidePanelEl.style.display).toBe('flex');
-    const [thumb, badge, body] = sidePanelEl.children[1].children[0].children;
+    const [badge, body] = sidePanelEl.children[1].children[0].children;
     expect(badge.textContent).toBe('1');
     expect(body.children[0].textContent).toBe('Four Barrel Coffee');
     expect(body.children[1].textContent).toBe('cafe · 120 m · 65% popularity');
-    // Enrichment ran (popularity above proves it), but no photo in the
-    // mocked response, so this should be the dashed no-photo state, not
-    // the plain not-yet-enriched thumb.
-    expect(thumb.className).toBe('panel-thumb no-photo');
   });
 
   it('fetches the place name and draws origin + numbered POI markers from a selfFetch descriptor', async () => {
@@ -1889,17 +1904,11 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(sidePanelEl.style.display).toBe('flex');
     const list = sidePanelEl.children[1];
     expect(list.children).toHaveLength(1);
-    const [thumb, badge, body] = list.children[0].children;
+    const [badge, body] = list.children[0].children;
     const [name, meta] = body.children;
 
     expect(badge.textContent).toBe('1');
     expect(name.textContent).toBe('Cafe Reveille');
-    // Enriched with a real photo + popularity score — the badge (a
-    // separate element) keeps showing the number regardless.
-    expect(thumb.className).toBe('panel-thumb has-photo');
-    expect(thumb.style.backgroundImage).toContain(
-      'https://example.com/photo.jpg'
-    );
     expect(meta.textContent).toBe('cafe · 120 m · 80% popularity');
 
     // Clicking the row flies the map to that marker.
@@ -1996,7 +2005,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     expect(sidePanelEl.style.display).toBe('flex');
     const row = sidePanelEl.children[1].children[0];
-    expect(row.children[0].className).toBe('panel-thumb');
+    expect(row.children[0].className).toBe('panel-badge');
     expect(errorEl?.style.display).not.toBe('block');
   });
 
@@ -2060,32 +2069,32 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     // Both rows still render — only enrichment eligibility differs.
     const rows = sidePanelEl.children[1].children;
     expect(rows).toHaveLength(2);
-    expect(rows[0].children[2].children[0].textContent).toBe('OSM Cafe');
-    expect(rows[0].children[2].children[1].textContent).not.toContain(
+    expect(rows[0].children[1].children[0].textContent).toBe('OSM Cafe');
+    // Never enriched (filtered out before the batch call).
+    expect(rows[0].children[1].children[1].textContent).not.toContain(
       'popularity'
     );
-    // Never enriched (filtered out before the batch call) — stays the
-    // plain thumb, distinct from a confirmed "no photo" row.
-    expect(rows[0].children[0].className).toBe('panel-thumb');
 
-    expect(rows[1].children[2].children[0].textContent).toBe('Native Cafe');
-    expect(rows[1].children[2].children[1].textContent).toBe('50% popularity');
-    // Enriched successfully, but the response had no photos — gets the
-    // distinct "no-photo" look rather than looking identical to the
-    // never-enriched OSM Cafe row above.
-    expect(rows[1].children[0].className).toBe('panel-thumb no-photo');
+    expect(rows[1].children[1].children[0].textContent).toBe('Native Cafe');
+    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
   });
 
-  it('gives an enriched-but-photo-less place a distinct look from a not-yet-enriched one', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
-    const id = mockPoiId('no-photo-poi');
-
-    setFetchImpl(async (url: string) => {
+  // Place Details photos are hosted on third-party CDNs (e.g.
+  // dyn.mktgcdn.com), which the map app's CSP doesn't allow images from. In a
+  // host, the page reads them through the server (PlacePhotoResource) instead.
+  function photoFetch(id: string) {
+    return async (url: string) => {
       if (String(url).includes('places/v1/details/retrieve')) {
         return {
           ok: true,
           json: async () => ({
-            results: [{ mapbox_id: id, score: { popularity: 0.42 } }]
+            results: [
+              {
+                mapbox_id: id,
+                photos: [{ url: 'https://dyn.mktgcdn.com/p/photo.jpg' }],
+                score: { popularity: 0.42 }
+              }
+            ]
           })
         };
       }
@@ -2096,31 +2105,93 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
           features: [
             {
               type: 'Feature',
-              properties: { name: 'No Photo Cafe', mapbox_id: id },
+              properties: { name: 'Photo Cafe', mapbox_id: id },
               geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
             }
           ]
         })
       };
-    });
-
-    sendToolResult({
-      structuredContent: {
-        mapboxRender: {
-          ref: 'mapbox://selffetch/category_search?data=abc',
-          layers: [],
-          selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
-        }
+    };
+  }
+  const searchResult = {
+    structuredContent: {
+      mapboxRender: {
+        ref: 'mapbox://selffetch/category_search?data=abc',
+        layers: [],
+        selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
       }
-    });
+    }
+  };
+
+  it('loads a photo through the server and shows it as a data: URL', async () => {
+    const {
+      sendToolResult,
+      setFetchImpl,
+      sidePanelEl,
+      postMessageCalls,
+      resolveResourcesRead
+    } = loadScriptSandbox();
+    const id = mockPoiId('photo-poi');
+    setFetchImpl(photoFetch(id));
+
+    sendToolResult(searchResult);
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    const [thumb, badge] = sidePanelEl.children[1].children[0].children;
-    expect(thumb.className).toBe('panel-thumb no-photo');
-    expect(thumb.textContent).toBe('no photo');
-    // The visit-order number lives in the separate .panel-badge element,
-    // so it stays visible regardless of the thumb's photo state.
+    const reads = postMessageCalls.filter((m) => m.method === 'resources/read');
+    expect(reads).toHaveLength(1);
+    expect(reads[0].params).toEqual({
+      uri: 'mapbox://place-photo/' + encodeURIComponent(id)
+    });
+    // The CDN URL is never used directly.
+    const row = sidePanelEl.children[1].children[0];
+    expect(row.children).toHaveLength(2);
+
+    resolveResourcesRead({
+      contents: [{ uri: 'x', mimeType: 'image/jpeg', blob: 'QUJD' }]
+    });
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    const [thumb, badge, body] = row.children;
+    expect(thumb.className).toBe('panel-thumb');
+    expect(thumb.style.backgroundImage).toBe(
+      'url("data:image/jpeg;base64,QUJD")'
+    );
     expect(badge.textContent).toBe('1');
+    expect(body.children[1].textContent).toBe('42% popularity');
+    expect(JSON.stringify(row)).not.toContain('mktgcdn');
+  });
+
+  it('adds no thumbnail when the server has no photo', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl, resolveResourcesRead } =
+      loadScriptSandbox();
+    setFetchImpl(photoFetch(mockPoiId('photo-poi')));
+
+    sendToolResult(searchResult);
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    resolveResourcesRead({
+      contents: [{ uri: 'x', mimeType: 'text/plain', text: 'No photo' }]
+    });
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(sidePanelEl.children[1].children[0].children).toHaveLength(2);
+  });
+
+  it('loads the photo URL directly on a standalone page, which has no host or CSP', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl, postMessageCalls } =
+      loadScriptSandbox({ topLevel: true });
+    setFetchImpl(photoFetch(mockPoiId('photo-poi')));
+
+    sendToolResult(searchResult);
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(postMessageCalls.some((m) => m.method === 'resources/read')).toBe(
+      false
+    );
+    const [thumb] = sidePanelEl.children[1].children[0].children;
+    expect(thumb.className).toBe('panel-thumb');
+    expect(thumb.style.backgroundImage).toBe(
+      'url("https://dyn.mktgcdn.com/p/photo.jpg")'
+    );
   });
 });
 
@@ -2163,7 +2234,7 @@ describe('mapAppHtml results side panel: inline markers', () => {
     );
     const list = sidePanelEl.children[1];
     expect(list.children).toHaveLength(1);
-    const [, badge, body] = list.children[0].children;
+    const [badge, body] = list.children[0].children;
     expect(badge.textContent).toBe('1');
     expect(body.children[0].textContent).toBe('Starbucks');
     expect(body.children[1].textContent).toBe('Coffee Shop · 400 m');
@@ -2230,8 +2301,8 @@ describe('mapAppHtml results side panel: inline markers', () => {
 
     // And the panel's badges show the exact same numbers.
     const rows = sidePanelEl.children[1].children;
-    expect(rows[0].children[1].textContent).toBe('1');
-    expect(rows[1].children[1].textContent).toBe('2');
+    expect(rows[0].children[0].textContent).toBe('1');
+    expect(rows[1].children[0].textContent).toBe('2');
   });
 
   it('never renders a panel when no inline marker carries an id', () => {
@@ -2290,6 +2361,6 @@ describe('mapAppHtml results side panel: inline markers', () => {
 
     const list = sidePanelEl.children[1];
     expect(list.children).toHaveLength(1);
-    expect(list.children[0].children[2].children[0].textContent).toBe('Second');
+    expect(list.children[0].children[1].children[0].textContent).toBe('Second');
   });
 });

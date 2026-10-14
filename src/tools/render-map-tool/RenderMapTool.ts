@@ -57,8 +57,8 @@ export class RenderMapTool extends BaseTool<
     'hand-composed payloads from raw GeoJSON. For a hand-composed POI marker ' +
     '(e.g. built from category_search_tool/search_and_geocode_tool/' +
     "place_details_tool output), set `markers[].id` to the place's mapbox_id " +
-    '— this gets it the same auto-enriching results panel (photo + ' +
-    'popularity score) that a payload_refs-based search result gets ' +
+    '— this gets it the same auto-enriching results panel (popularity ' +
+    'score and photo) that a payload_refs-based search result gets ' +
     'automatically, with no extra tool calls. ' +
     'To restyle the base map itself (e.g. "make the water red", switch to night ' +
     'lighting, hide POI labels) pass `baseMapConfig`. To switch to satellite ' +

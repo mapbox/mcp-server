@@ -122,7 +122,7 @@ export interface MapAppMarker {
    * category_search_tool/search_and_geocode_tool's text output, or a
    * self-fetched search result's own id). Setting this gets the marker a
    * row in the map's results side panel, which the iframe then enriches
-   * with a photo and popularity score via a batched Place Details lookup
+   * with a popularity score and photo via a batched Place Details lookup
    * (see mapAppHtml.ts's maybeShowSidePanel/fetchPlaceDetailsBatch) — the
    * same panel search/category-search results already get automatically,
    * now also available for hand-composed markers.

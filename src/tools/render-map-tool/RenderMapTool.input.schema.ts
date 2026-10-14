@@ -67,7 +67,7 @@ const markerSchema = z.object({
     .string()
     .optional()
     .describe(
-      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results side panel (photo + popularity score, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Omit for non-POI markers (route endpoints, waypoints, etc.).'
+      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results side panel (popularity score and photo when available, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Omit for non-POI markers (route endpoints, waypoints, etc.).'
     ),
   name: z
     .string()
