@@ -1506,11 +1506,14 @@ export function mapAppScript(config: {
   // scheme (same 422 PlaceDetailsTool.ts already works around server-side
   // for boundary ids) — so filter client-side before sending, rather than
   // let one incompatible id in a 10-result batch silently zero out
-  // enrichment for the other 9.
+  // enrichment for the other 9. The prefix alone isn't enough: near Union
+  // Square, SF, a Starbucks decodes to "urn:mbxpoi:mapbox-n408854", which
+  // the endpoint also rejects, so require the UUID form.
+  var PLACES_ID = /^urn:mbxpoi:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function isPlacesApiCompatibleId(id) {
     if (typeof id !== 'string' || id.length === 0) return false;
     try {
-      return (/^urn:mbxpoi:/).test(atob(id));
+      return PLACES_ID.test(atob(id));
     } catch (e) {
       return false;
     }
@@ -1530,17 +1533,29 @@ export function mapAppScript(config: {
     var qp = new URLSearchParams();
     qp.append('access_token', publicToken);
     var url = apiEndpoint + 'places/v1/details/retrieve?' + qp.toString();
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: compatibleIds.slice(0, 100) })
-    })
-      .then(function(res) {
+    var post = function(batch, retried) {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: batch })
+      }).then(function(res) {
         // 206 is a partial batch (some ids missing/unprocessed) — still
         // has usable "results", so treat it the same as 200.
-        if (!res.ok && res.status !== 206) return null;
-        return res.json();
-      })
+        if (res.ok || res.status === 206) return res.json();
+        // A 422 names the one id it rejected ("Invalid mapbox_id format:
+        // <id>"), in case an id format slips past the filter above. Drop
+        // that id and try once more, rather than lose the whole batch.
+        if (res.status !== 422 || retried) return null;
+        return res.json().then(function(body) {
+          var msg = body && typeof body.message === 'string' ? body.message : '';
+          var bad = msg.slice(msg.lastIndexOf(' ') + 1).split('=')[0];
+          var rest = batch.filter(function(id) { return id.split('=')[0] !== bad; });
+          if (!bad || rest.length === batch.length || rest.length === 0) return null;
+          return post(rest, true);
+        });
+      });
+    };
+    return post(compatibleIds.slice(0, 100), false)
       // Enrichment is a nice-to-have on top of an already-rendered panel —
       // Public Preview quota (1,000 records/month) or a transient error
       // here should never surface as a map error, just leave the

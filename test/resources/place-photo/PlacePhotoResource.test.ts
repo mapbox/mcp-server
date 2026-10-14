@@ -69,6 +69,10 @@ describe('PlacePhotoResource', () => {
     await expect(
       resource.read(`mapbox://place-photo/${encodeURIComponent(osm)}`)
     ).rejects.toThrow('Not a Places API mapbox_id');
+    const mapboxN = Buffer.from('urn:mbxpoi:mapbox-n408854').toString('base64');
+    await expect(
+      resource.read(`mapbox://place-photo/${encodeURIComponent(mapboxN)}`)
+    ).rejects.toThrow('Not a Places API mapbox_id');
     await expect(
       resource.read('mapbox://place-photo/https%3A%2F%2Fevil.example%2F')
     ).rejects.toThrow();

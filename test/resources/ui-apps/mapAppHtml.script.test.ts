@@ -3,6 +3,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as vm from 'node:vm';
+import { createHash } from 'node:crypto';
 import { renderMapAppHtml } from '../../../src/resources/ui-apps/mapAppHtml.js';
 import { buildInlinePayloadRef } from '../../../src/utils/inlinePayloadRef.js';
 
@@ -13,8 +14,13 @@ import { buildInlinePayloadRef } from '../../../src/utils/inlinePayloadRef.js';
  * string like 'poi-1' would silently get filtered out of every test fixture
  * below rather than reach the mocked fetch call.
  */
-const mockPoiId = (suffix: string) =>
-  Buffer.from(`urn:mbxpoi:${suffix}`).toString('base64');
+// A native Places id ("urn:mbxpoi:<uuid>"), with a UUID derived from
+// `suffix` so each test's ids are distinct and stable.
+const mockPoiId = (suffix: string) => {
+  const h = createHash('md5').update(suffix).digest('hex');
+  const uuid = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+  return Buffer.from(`urn:mbxpoi:${uuid}`).toString('base64');
+};
 
 /**
  * Extracts and runs the iframe's inline <script> in a sandboxed VM context,
@@ -2007,6 +2013,103 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     const row = sidePanelEl.children[1].children[0];
     expect(row.children[0].className).toBe('panel-badge');
     expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  // Two cafes from one category search, for the id-format tests below.
+  function twoCafeSearch(badId: string, goodId: string) {
+    return {
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Bad Id Cafe', mapbox_id: badId },
+            geometry: { type: 'Point', coordinates: [-122.41, 37.78] }
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Good Id Cafe', mapbox_id: goodId },
+            geometry: { type: 'Point', coordinates: [-122.42, 37.79] }
+          }
+        ]
+      })
+    };
+  }
+  const cafeSearchResult = {
+    structuredContent: {
+      mapboxRender: {
+        ref: 'mapbox://selffetch/category_search?data=abc',
+        layers: [],
+        selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
+      }
+    }
+  };
+
+  // Seen live near Union Square, SF: a Starbucks whose id decodes to
+  // "urn:mbxpoi:mapbox-n408854" has the native prefix but not a UUID, and
+  // the batch endpoint 422'd the whole request for it.
+  it('filters out urn:mbxpoi ids that are not UUIDs', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const badId = Buffer.from('urn:mbxpoi:mapbox-n408854').toString('base64');
+    const goodId = mockPoiId('good');
+    const bodies: unknown[] = [];
+    setFetchImpl(async (url: string, init?: unknown) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        bodies.push(JSON.parse((init as { body: string }).body));
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ mapbox_id: goodId, score: { popularity: 0.5 } }]
+          })
+        };
+      }
+      return twoCafeSearch(badId, goodId);
+    });
+
+    sendToolResult(cafeSearchResult);
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(bodies).toEqual([{ ids: [goodId] }]);
+    const rows = sidePanelEl.children[1].children;
+    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
+  });
+
+  it('drops the id a 422 names and retries the batch once', async () => {
+    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    // Passes the client-side filter, but the API rejects it anyway.
+    const rejectedId = mockPoiId('rejected');
+    const goodId = mockPoiId('good');
+    const bodies: Array<{ ids: string[] }> = [];
+    setFetchImpl(async (url: string, init?: unknown) => {
+      if (String(url).includes('places/v1/details/retrieve')) {
+        const body = JSON.parse((init as { body: string }).body);
+        bodies.push(body);
+        if (body.ids.includes(rejectedId)) {
+          return {
+            ok: false,
+            status: 422,
+            json: async () => ({
+              message: `Invalid mapbox_id format: ${rejectedId.replace(/=+$/, '')}`
+            })
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ mapbox_id: goodId, score: { popularity: 0.5 } }]
+          })
+        };
+      }
+      return twoCafeSearch(rejectedId, goodId);
+    });
+
+    sendToolResult(cafeSearchResult);
+    for (let i = 0; i < 30; i++) await Promise.resolve();
+
+    expect(bodies.map((b) => b.ids)).toEqual([[rejectedId, goodId], [goodId]]);
+    const rows = sidePanelEl.children[1].children;
+    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
   });
 
   it('filters out OSM-sourced ids before the batch call, so one incompatible id does not zero out enrichment for the rest', async () => {

@@ -164,14 +164,16 @@ async function readCapped(
   return Buffer.concat(chunks);
 }
 
-/** Native Places ids decode to "urn:mbxpoi:<uuid>"; others 422 the API. */
+const PLACES_ID =
+  /^urn:mbxpoi:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Native Places ids decode to "urn:mbxpoi:<uuid>". Others, including
+ * OSM-sourced ids and "urn:mbxpoi:mapbox-n<id>", 422 the API.
+ */
 function isPlacesApiId(id: string): boolean {
   if (!/^[A-Za-z0-9+/_=-]{8,200}$/.test(id)) return false;
-  try {
-    return Buffer.from(id, 'base64').toString('utf8').startsWith('urn:mbxpoi:');
-  } catch {
-    return false;
-  }
+  return PLACES_ID.test(Buffer.from(id, 'base64').toString('utf8'));
 }
 
 /**
