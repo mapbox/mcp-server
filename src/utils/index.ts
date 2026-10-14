@@ -70,4 +70,8 @@ export { buildServerInstructions } from './serverInstructions.js';
 export { directionsRequestFromRef } from './directionsRef.js';
 export type { DirectionsRefRequest } from './directionsRef.js';
 export { resolveSelfFetchRef, isSelfFetchRef } from './selfFetchRef.js';
+// The Directions URL builder directions_tool and the map preview use, for
+// apps that build their own request from a ref's params.
+export { buildDirectionsRequestUrl } from '../tools/directions-tool/buildDirectionsRequestUrl.js';
+export type { DirectionsRequestInput } from '../tools/directions-tool/buildDirectionsRequestUrl.js';
 export type { MapAppPayload, MapAppSelfFetch } from './mapAppPayload.js';

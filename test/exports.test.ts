@@ -167,12 +167,17 @@ describe('Package exports', () => {
     });
 
     it('should export ref helpers', async () => {
-      const { directionsRequestFromRef, resolveSelfFetchRef, isSelfFetchRef } =
-        await import('../src/utils/index.js');
+      const {
+        directionsRequestFromRef,
+        resolveSelfFetchRef,
+        isSelfFetchRef,
+        buildDirectionsRequestUrl
+      } = await import('../src/utils/index.js');
 
       expect(typeof directionsRequestFromRef).toBe('function');
       expect(typeof resolveSelfFetchRef).toBe('function');
       expect(typeof isSelfFetchRef).toBe('function');
+      expect(typeof buildDirectionsRequestUrl).toBe('function');
     });
 
     // Mirrors how an external deployment (e.g. hosted-mcp-server) builds its
