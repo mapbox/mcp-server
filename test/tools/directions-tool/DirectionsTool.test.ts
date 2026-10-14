@@ -10,7 +10,9 @@ import {
 } from '../../utils/httpPipelineUtils.js';
 import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsTool.js';
 import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
+import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { resolveResponseRef } from '../../../src/utils/responseRef.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
@@ -1255,8 +1257,8 @@ describe('DirectionsTool', () => {
       );
     });
 
-    it('still attaches a self-fetch mapboxRender ref when the response is large enough to trigger the temp-resource/summary path', async () => {
-      // A geojson response large enough (>50KB) to be stored as a temp resource.
+    it('still attaches a self-fetch mapboxRender ref when the response is large enough to trigger the summary path', async () => {
+      // A geojson response large enough (>50KB) to take the summary path.
       const bigGeometry = {
         type: 'LineString',
         coordinates: Array.from({ length: 4000 }, (_, i) => [
@@ -1291,36 +1293,16 @@ describe('DirectionsTool', () => {
 
       expect(result.isError).toBe(false);
 
-      // Confirm we actually exercised the large-response summary path,
-      // and that the fallback is a self-describing inline-response ref
-      // (not a mapbox://temp/... ref backed by process-local storage,
-      // which would only be readable on the one hosted task that handled
-      // this call).
+      // Confirm we actually exercised the large-response summary path...
       const textBlock = result.content.find(
         (c) => (c as { type?: string }).type === 'text'
       ) as { text?: string } | undefined;
       expect(textBlock?.text).toContain('exceeds context limit');
-      expect(textBlock?.text).not.toContain('mapbox://temp/');
-      expect(textBlock?.text).not.toContain('TTL');
-      expect(textBlock?.text).toMatch(
-        /mapbox:\/\/inline-response\/directions\?data=/
-      );
-
-      // The large-response ref carries the full route data directly, so
-      // it's readable with zero prior server-side state.
-      const uri = textBlock!.text!.match(
-        /mapbox:\/\/inline-response\/directions\?data=\S+/
-      )![0];
-      const { resolveInlineResponseRef } =
-        await import('../../../src/utils/inlineResponseRef.js');
-      const resolved = resolveInlineResponseRef<{
-        routes?: Array<{ geometry?: { coordinates?: unknown[] } }>;
-      }>(uri);
-      expect(resolved?.routes?.[0]?.geometry?.coordinates).toHaveLength(4000);
+      expect(textBlock?.text).toMatch(/mapbox:\/\/response\/directions\?data=/);
 
       // ...and that a self-fetch mapboxRender ref is still attached
-      // alongside it (distinct from the large-response inline-response
-      // ref above, which holds the full JSON, not the map ref).
+      // alongside it (distinct from the mapbox://response/ ref above,
+      // which reads back the full JSON, not the map).
       const sc = result.structuredContent as
         | { mapboxRender?: { ref?: string } }
         | undefined;
@@ -1499,16 +1481,16 @@ describe('DirectionsTool', () => {
   });
 });
 
-describe('DirectionsTool — large-response ref survives a process boundary', () => {
+describe('DirectionsTool — large response ref', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('is readable with zero prior server-side state, unlike the account-scoped temp store it replaced', async () => {
-    // A geojson response large enough (>50KB) to trigger the fallback.
+  it('gives the model a short ref carrying the inputs, never the route itself', async () => {
+    // A geojson response well over the 50KB threshold.
     const bigGeometry = {
       type: 'LineString',
-      coordinates: Array.from({ length: 4000 }, (_, i) => [
+      coordinates: Array.from({ length: 8000 }, (_, i) => [
         i * 0.001,
         i * 0.001
       ])
@@ -1522,34 +1504,29 @@ describe('DirectionsTool — large-response ref survives a process boundary', ()
       json: async () => largeResponse
     });
 
-    const token = tokenFor('account-zhuwenlong');
-    const result = await new DirectionsTool({ httpRequest }).run(
-      {
-        coordinates: [
-          { longitude: -73.989, latitude: 40.733 },
-          { longitude: -73.979, latitude: 40.743 }
-        ],
-        geometries: 'geojson'
-      },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
-    );
+    const input = {
+      coordinates: [
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
+      ],
+      geometries: 'geojson' as const,
+      exclude: 'toll'
+    };
+    const result = await new DirectionsTool({ httpRequest }).run(input);
 
     const text = (result.content ?? [])
       .map((c) => (c as { text?: string }).text ?? '')
       .join('\n');
-    const uri = text.match(/mapbox:\/\/inline-response\/\S+/)?.[0];
+    expect(text).not.toContain('mapbox://temp/');
+    // The whole text the model sees stays small, unlike the response.
+    expect(text.length).toBeLessThan(4 * 1024);
+    const uri = text.match(/mapbox:\/\/response\/directions\?data=\S+/)?.[0];
     expect(uri).toBeTruthy();
 
-    // No temporaryResourceManager, no owner, no store involved at all —
-    // resolving the ref is a pure function of the URI string, so it works
-    // identically regardless of which process (hosted task) reads it,
-    // or which account's token happened to make the original call.
-    const { resolveInlineResponseRef } =
-      await import('../../../src/utils/inlineResponseRef.js');
-    const resolved = resolveInlineResponseRef<{
-      routes?: Array<{ distance?: number }>;
-    }>(uri as string);
-    expect(resolved?.routes?.[0]?.distance).toBe(1);
+    const spec = resolveResponseRef(uri as string);
+    expect(spec?.tool).toBe('directions');
+    expect(spec?.input).toMatchObject(input);
+    // No server-side store is involved.
+    expect(temporaryResourceManager.count()).toBe(0);
   });
 });

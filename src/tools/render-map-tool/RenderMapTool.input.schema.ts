@@ -62,7 +62,31 @@ const markerSchema = z.object({
     .string()
     .optional()
     .describe('Optional CSS color override (defaults are style-derived)'),
-  popup: z.string().optional().describe('Popup text shown on marker click')
+  popup: z.string().optional().describe('Popup text shown on marker click'),
+  id: z
+    .string()
+    .optional()
+    .describe(
+      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results side panel (popularity score and photo when available, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Omit for non-POI markers (route endpoints, waypoints, etc.).'
+    ),
+  name: z
+    .string()
+    .optional()
+    .describe(
+      'Display name for the results panel row. Only used when `id` is also set; falls back to "Result N" if omitted.'
+    ),
+  category: z
+    .string()
+    .optional()
+    .describe(
+      'Category shown in the results panel row (e.g. "Coffee Shop"). Only used when `id` is also set.'
+    ),
+  distanceMeters: z
+    .number()
+    .optional()
+    .describe(
+      'Distance in meters, shown in the results panel row. Only used when `id` is also set.'
+    )
 });
 
 const legendEntrySchema = z.object({
@@ -157,7 +181,7 @@ export const RenderMapInputSchema = z.object({
     .array(markerSchema)
     .optional()
     .describe(
-      'Inline point markers (start/end, numbered visits, POI pins, etc.). Use only for hand-composed payloads.'
+      "Inline point markers (start/end, numbered visits, POI pins, etc.). Use only for hand-composed payloads. For POI markers, set `id` to the place's mapbox_id to get an auto-enriching results panel (see markerSchema's `id` field) instead of just a pin."
     ),
   legend: z
     .array(legendEntrySchema)
@@ -168,7 +192,13 @@ export const RenderMapInputSchema = z.object({
     .describe(
       'Initial camera position. If omitted, the map auto-fits to the union of all data.'
     ),
-  baseMapConfig: baseMapConfigSchema.optional()
+  baseMapConfig: baseMapConfigSchema.optional(),
+  baseStyle: z
+    .enum(['standard', 'standard-satellite'])
+    .optional()
+    .describe(
+      'Which Mapbox-owned base style to load; defaults to "standard". "standard-satellite" is the same Standard style family rendered over global satellite imagery instead of a vector basemap — same config-property system and bottom/middle/top slots apply, but it has no theme and no flat-color overrides like colorWater/colorBuildings (there\'s no vector surface to recolor). See https://docs.mapbox.com/map-styles/reference/standard-satellite/ for its supported baseMapConfig properties.'
+    )
 });
 
 export type RenderMapInput = z.infer<typeof RenderMapInputSchema>;

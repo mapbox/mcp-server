@@ -13,7 +13,7 @@ import {
 } from './IsochroneTool.output.schema.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
-import { buildInlineResponseRef } from '../../utils/inlineResponseRef.js';
+import { buildResponseRef } from '../../utils/responseRef.js';
 
 export class IsochroneTool extends MapboxApiBasedTool<
   typeof IsochroneInputSchema,
@@ -146,17 +146,14 @@ export class IsochroneTool extends MapboxApiBasedTool<
     });
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
-      // Self-describing ref carrying the full response, rather than a
-      // mapbox://temp/... ref backed by process-local storage: the hosted
-      // deployment runs multiple stateless tasks with no session
-      // stickiness, so a ref only readable on the one task that handled
-      // this call would fail whenever the follow-up resources/read landed
-      // on a different task. See inlineResponseRef.ts.
-      const resourceUri = buildInlineResponseRef('isochrone', data);
+      // A ref carrying the call's inputs, not the response, so the summary
+      // stays small and any server process can answer a later read (see
+      // responseRef.ts).
+      const resourceUri = buildResponseRef({ tool: 'isochrone', input });
 
       const contourCount =
         (data as { features?: unknown[] }).features?.length ?? 0;
-      const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON is available now (already computed, nothing to wait for) via the MCP resources API.\nResource URI: ${resourceUri}`;
+      const summaryText = `Isochrone computed: ${contourCount} contour${contourCount !== 1 ? 's' : ''}\n\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull GeoJSON: read ${resourceUri} with the MCP resource API if needed. Reading it fetches the contours again.`;
 
       const summaryStructured: Record<string, unknown> = {
         mapboxRender: { ref: selfFetchRef }

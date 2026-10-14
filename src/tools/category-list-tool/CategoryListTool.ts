@@ -32,7 +32,7 @@ export class CategoryListTool extends MapboxApiBasedTool<
 > {
   name = 'category_list_tool';
   description =
-    '[DEPRECATED: Use resource_reader_tool with "mapbox://categories" URI instead] Tool for retrieving the list of supported categories from Mapbox Search API. This tool is kept for backward compatibility with clients that do not support MCP resources. Use this when another function requires a list of categories. Returns all available category IDs by default. Only use pagination (limit/offset) if token usage optimization is required. If using pagination, make multiple calls to retrieve ALL categories before proceeding with other tasks to ensure complete data.';
+    '[DEPRECATED: Use resource_reader_tool with "mapbox://categories" URI instead] Tool for retrieving the list of supported categories from Mapbox Search API. This tool is kept for backward compatibility with clients that do not support MCP resources. Use this when another function requires a list of categories. Returns all available category IDs by default. Supports limit/offset pagination.';
   annotations = {
     title: 'Category List Tool (Deprecated)',
     readOnlyHint: true,

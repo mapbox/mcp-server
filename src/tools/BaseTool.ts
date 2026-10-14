@@ -31,6 +31,7 @@ export abstract class BaseTool<
         connectDomains?: string[];
         resourceDomains?: string[];
         frameDomains?: string[];
+        workerDomains?: string[];
       };
     };
   };
@@ -87,6 +88,7 @@ export abstract class BaseTool<
             connectDomains?: string[];
             resourceDomains?: string[];
             frameDomains?: string[];
+            workerDomains?: string[];
           };
         };
       };

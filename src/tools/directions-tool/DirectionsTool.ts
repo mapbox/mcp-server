@@ -15,7 +15,7 @@ import {
 import type { HttpRequest } from '../..//utils/types.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
-import { buildInlineResponseRef } from '../../utils/inlineResponseRef.js';
+import { buildResponseRef } from '../../utils/responseRef.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -26,11 +26,11 @@ export class DirectionsTool extends MapboxApiBasedTool<
   name = 'directions_tool';
   description =
     'Fetches directions from Mapbox API based on provided coordinates and direction method. ' +
-    'Returns a `mapboxRender.ref` in structuredContent regardless of the geometries value - pass ' +
-    'it to render_map_tool to display the route on a live Mapbox GL JS map. ' +
+    'Returns a `mapboxRender.ref` in structuredContent regardless of the geometries value; if the ' +
+    'user wants to see the route on a map, pass it to render_map_tool. ' +
     'Use geometries="none" (default) for compact text/data responses (distance, duration, ' +
     'turn-by-turn instructions). Use geometries="geojson" only when you need the raw route ' +
-    'coordinates in the response yourself - the map preview works either way.';
+    'coordinates in the response yourself - render_map_tool works either way.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,
@@ -334,8 +334,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
       }
     }
 
-    // Check response size and fall back to a resource ref if it's too big
-    // to return inline
+    // Check response size; above the threshold the model gets a summary
+    // and a short ref for the full response
     const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
     const responseText = JSON.stringify(validatedData, null, 2);
     const responseSize = responseText.length;
@@ -365,14 +365,14 @@ export class DirectionsTool extends MapboxApiBasedTool<
     });
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
-      // Self-describing ref carrying the full response, rather than a
-      // mapbox://temp/... ref backed by process-local storage: the hosted
-      // deployment runs multiple stateless tasks with no session
-      // stickiness, so a ref only readable on the one task that handled
-      // this call would fail (indistinguishable from "still computing")
-      // whenever the follow-up resources/read landed on a different task.
-      // See inlineResponseRef.ts.
-      const resourceUri = buildInlineResponseRef('directions', validatedData);
+      // A ref carrying the call's inputs, not the response, so the summary
+      // stays small and any server process can answer a later read (see
+      // responseRef.ts).
+      const resourceUri = buildResponseRef({
+        tool: 'directions',
+        input,
+        selectedRouteIndex
+      });
 
       // Extract summary information
       const route = validatedData.routes?.[0];
@@ -390,8 +390,7 @@ Waypoints: ${waypointCount}
 
 ⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.
 
-Full geometry and details are available now (already computed, nothing to wait for) via the MCP resources API.
-Resource URI: ${resourceUri}`;
+Full geometry and details: read ${resourceUri} with the MCP resource API if needed. Reading it fetches the route again.`;
 
       // Create minimal structured content for validation (without large geometry)
       const summaryStructuredContent: Record<string, unknown> = {

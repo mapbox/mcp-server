@@ -17,10 +17,16 @@ export interface TemporaryResource {
   created: number;
   ttl: number;
   /**
-   * Account (Mapbox username) that created this resource. Reads are restricted
-   * to the same account so one account cannot read another account's temporary
-   * data. Undefined means no owner could be determined, in which case reads
-   * fail closed.
+   * Opaque ownership key for the token that created this resource — a SHA-256
+   * fingerprint of that token, produced by `getOwnerKeyFromToken`. Reads are
+   * restricted to a caller presenting the same token so one caller cannot read
+   * another's temporary data. Undefined means no owner could be determined, in
+   * which case reads fail closed.
+   *
+   * Deliberately NOT the Mapbox username: that comes from an unsigned, locally
+   * unverifiable `u` claim, so a username-scoped check could be defeated by
+   * fabricating a token asserting the victim's name. Never store or compare a
+   * username here.
    */
   owner?: string;
   metadata?: {

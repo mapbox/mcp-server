@@ -212,7 +212,7 @@ describe('IsochroneTool', () => {
     ]);
   });
 
-  it('falls back to a self-describing inline-response ref (not mapbox://temp/) when the response is large', async () => {
+  it('returns a short response ref (not mapbox://temp/) when the response is large', async () => {
     // A response large enough (>50KB) to trigger the fallback.
     const bigContour = {
       type: 'Feature',
@@ -244,22 +244,16 @@ describe('IsochroneTool', () => {
     expect(text).toContain('exceeds context limit');
     expect(text).not.toContain('mapbox://temp/');
     expect(text).not.toContain('TTL');
-    expect(text).toMatch(/mapbox:\/\/inline-response\/isochrone\?data=/);
-
-    // No temporaryResourceManager, no owner, no store involved at all —
-    // resolving the ref is a pure function of the URI string.
-    const uri = text.match(
-      /mapbox:\/\/inline-response\/isochrone\?data=\S+/
-    )?.[0];
+    // The summary stays small; the ref carries the inputs, not the contours.
+    expect(text.length).toBeLessThan(4 * 1024);
+    const uri = text.match(/mapbox:\/\/response\/isochrone\?data=\S+/)?.[0];
     expect(uri).toBeTruthy();
-    const { resolveInlineResponseRef } =
-      await import('../../../src/utils/inlineResponseRef.js');
-    const resolved = resolveInlineResponseRef<{
-      features?: Array<{ geometry?: { coordinates?: unknown[][] } }>;
-    }>(uri as string);
-    expect(resolved?.features?.[0]?.geometry?.coordinates?.[0]).toHaveLength(
-      4000
-    );
+    const { resolveResponseRef } =
+      await import('../../../src/utils/responseRef.js');
+    expect(resolveResponseRef(uri as string)).toMatchObject({
+      tool: 'isochrone',
+      input: { profile: 'mapbox/driving', contours_minutes: [10] }
+    });
 
     // A self-fetch mapboxRender ref is still attached alongside it.
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };

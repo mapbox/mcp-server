@@ -21,8 +21,9 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
  * different task — indistinguishable from staleness or "still computing"
  * (it isn't; Directions is synchronous and already finished).
  *
- * This test proves the fix (a self-describing `mapbox://inline-response/`
- * ref — see inlineResponseRef.ts) survives exactly that scenario: the ref
+ * This test proves the fix (a `mapbox://response/` ref carrying the call's
+ * inputs, which any process re-runs on read — see responseRef.ts) survives
+ * exactly that scenario: the ref
  * is produced by one real, spawned server process, that process is killed
  * outright, and a second, completely independent process — standing in for
  * a different ECS task with zero shared memory — resolves it successfully
@@ -116,7 +117,7 @@ async function closeClient(client: Client): Promise<void> {
 describe.skipIf(!existsSync(SERVER_ENTRY))(
   'hosted stateless follow-up (real server process, real MCP protocol, simulated two-task deployment)',
   () => {
-    it('reads a large directions_tool inline-response ref from a completely independent process, with zero shared state', async () => {
+    it('reads a large directions_tool response ref from a completely independent process, with zero shared state', async () => {
       // Process A: stands in for the ECS task that handles the original
       // tool call.
       const taskA = await spawnFreshServerClient();
@@ -140,10 +141,10 @@ describe.skipIf(!existsSync(SERVER_ENTRY))(
           result.content as Array<{ type: string; text?: string }>
         ).find((c) => c.type === 'text');
         expect(textBlock?.text).toContain('exceeds context limit');
+        // The model sees a summary and a short ref, not the route.
+        expect(textBlock!.text!.length).toBeLessThan(4 * 1024);
 
-        resourceUri = textBlock!.text!.match(
-          /mapbox:\/\/inline-response\/\S+/
-        )?.[0];
+        resourceUri = textBlock!.text!.match(/mapbox:\/\/response\/\S+/)?.[0];
         expect(resourceUri).toBeTruthy();
       } finally {
         // Kill task A entirely — no shared memory, no shared temp-file

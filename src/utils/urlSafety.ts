@@ -98,7 +98,17 @@ export function parseSafeExternalUrl(rawUrl: string): URL | null {
   if (!ipaddr.isValid(host)) {
     return host.includes('.') ? parsed : null;
   }
-  const addr = ipaddr.parse(host);
+  return isPublicIpAddress(host) ? parsed : null;
+}
+
+/**
+ * True for a plain global unicast IPv4 or IPv6 address, the only kind
+ * parseSafeExternalUrl allows as a literal host. Also used to check what a
+ * hostname resolves to before fetching it.
+ */
+export function isPublicIpAddress(address: string): boolean {
+  if (!ipaddr.isValid(address)) return false;
+  const addr = ipaddr.parse(address);
 
   // Deny by default for both IPv4 and IPv6: only plain global unicast
   // addresses are allowed. Every other named range (private, loopback,
@@ -106,7 +116,7 @@ export function parseSafeExternalUrl(rawUrl: string): URL | null {
   // every IPv4-in-IPv6 transition/translation mechanism) is rejected,
   // regardless of what it does or doesn't embed.
   if (addr.range() !== 'unicast') {
-    return null;
+    return false;
   }
 
   if (addr.kind() === 'ipv6') {
@@ -119,9 +129,9 @@ export function parseSafeExternalUrl(rawUrl: string): URL | null {
     // ranges, so this only affects addresses with a genuine embedded IPv4.)
     const bytes = addr.toByteArray();
     if (bytes.slice(0, 12).every((b) => b === 0)) {
-      return null;
+      return false;
     }
   }
 
-  return parsed;
+  return true;
 }
