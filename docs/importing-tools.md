@@ -381,6 +381,23 @@ await server.connect(transport);
 - `buildServerInstructions(toolNames)`: returns the server `instructions` text for the given enabled tool names, or `undefined` when `render_map_tool` isn't among them.
 - `toJsonSchema2020(schema)`: the converter behind `publishJsonSchema2020`, for converting a single schema.
 
+### Directions routes by reference
+
+Long `directions_tool` routes are too big to hand to a model: above 50 KB the tool returns a summary without the geometry. If your app draws routes itself, pass the model the short ref from `structuredContent.mapboxRender.ref` (a few hundred bytes, in every result) and fetch the full route when you need it:
+
+```typescript
+import { directionsRequestFromRef } from '@mapbox/mcp-server/utils';
+
+const request = directionsRequestFromRef(ref, { accessToken });
+if (request) {
+  const response = await fetch(request.url);
+  const { routes } = await response.json();
+  const route = routes[request.selectedRouteIndex ?? 0]; // GeoJSON geometry
+}
+```
+
+The ref holds only the original call's inputs, so it resolves in any process with no server-side state. The route is fetched again, so with live traffic it can differ slightly from the original call. `resolveSelfFetchRef` decodes any of these refs (directions, isochrone, search and others) to the tool and parameters behind it. To build the request yourself, `buildDirectionsRequestUrl` is the URL builder `directions_tool` and `directionsRequestFromRef` both use, so your request matches the tool's.
+
 ## Example: Using in a Web Application
 
 Use tools directly in a web app without MCP:

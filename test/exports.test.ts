@@ -166,6 +166,20 @@ describe('Package exports', () => {
       expect(typeof buildServerInstructions).toBe('function');
     });
 
+    it('should export ref helpers', async () => {
+      const {
+        directionsRequestFromRef,
+        resolveSelfFetchRef,
+        isSelfFetchRef,
+        buildDirectionsRequestUrl
+      } = await import('../src/utils/index.js');
+
+      expect(typeof directionsRequestFromRef).toBe('function');
+      expect(typeof resolveSelfFetchRef).toBe('function');
+      expect(typeof isSelfFetchRef).toBe('function');
+      expect(typeof buildDirectionsRequestUrl).toBe('function');
+    });
+
     // Mirrors how an external deployment (e.g. hosted-mcp-server) builds its
     // own McpServer from the subpath exports instead of running src/index.ts.
     it('should give an externally built server 2020-12 schemas and instructions', async () => {
