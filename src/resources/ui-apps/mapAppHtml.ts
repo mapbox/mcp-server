@@ -76,8 +76,10 @@ export function mapAppShell(glVersion: string): string {
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     max-width: calc(100% - 24px); white-space: pre-line;
   }
+  /* Bottom offsets keep the Mapbox logo (bottom left) and attribution
+     (bottom right) visible, as the Mapbox terms require. */
   #legend {
-    position: absolute; bottom: 12px; left: 12px; z-index: 10;
+    position: absolute; bottom: 40px; left: 12px; z-index: 10;
     background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
     padding: 8px 12px; border-radius: 6px;
     font-size: 11px;
@@ -111,7 +113,7 @@ export function mapAppShell(glVersion: string): string {
   .mapboxgl-ctrl-group.layer-toggles button.active { color: #2563eb; background: #dbeafe; }
   .mapboxgl-ctrl-group.layer-toggles button:focus:not(:focus-visible) { box-shadow: none; }
   #side-panel {
-    position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 10;
+    position: absolute; top: 12px; right: 12px; bottom: 34px; z-index: 10;
     width: 280px; max-width: calc(100% - 24px);
     background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
     border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -839,7 +841,8 @@ export function mapAppScript(config: {
   // (bottom-left), unless the map is too short to spare the room.
   function bottomPadding() {
     if (legendEl.style.display !== 'block') return 50;
-    var bottom = (legendEl.offsetHeight || 0) + 24;
+    // The legend sits 40px up, above the logo.
+    var bottom = (legendEl.offsetHeight || 0) + 52;
     var el = document.getElementById('map');
     var height = (el && el.clientHeight) || window.innerHeight || 0;
     if (bottom <= 50 || (height && height - bottom - 70 < 160)) return 50;
