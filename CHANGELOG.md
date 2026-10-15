@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.16.0 - 2026-10-15
+
 ### New Features
 
 - **`render_map_tool`: a results panel for search results, with popularity from Place Details (#262).** When a map shows places from `search_and_geocode_tool`, `category_search_tool` or `ground_location_tool`, a list docked at the top right shows one row per pin (name, category, distance), numbered to match the pins. Clicking a row flies to that pin. The page then makes one batched `POST` to the Places API's `/details/retrieve` (up to 100 ids) and adds each place's popularity score to its row and its phone number to its popup. It runs client-side on the public token, like the other self-fetched layers, and if the call fails, the rows stay as they were.
