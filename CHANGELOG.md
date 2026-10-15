@@ -2,7 +2,7 @@
 
 ### New Features
 
-- **`render_map_tool`: live traffic, and Satellite/Traffic buttons on the map (#PRNUM).** Asked to show traffic downtown, ChatGPT told a user the map couldn't do it, which was true: the map only drew GeoJSON, and traffic showed up only in route summaries. Switching to satellite also took another tool call. Fixes #277.
+- **`render_map_tool`: live traffic, and Satellite/Traffic buttons on the map (#278).** Asked to show traffic downtown, ChatGPT told a user the map couldn't do it, which was true: the map only drew GeoJSON, and traffic showed up only in route summaries. Switching to satellite also took another tool call. Fixes #277.
   - **Buttons:** a Satellite button and a Traffic button sit under the zoom control. They show which one is on (`aria-pressed`). Pages from `export_map_html_tool` get them too, since they share the script.
   - **Traffic:** the Mapbox Traffic v1 tileset (`mapbox://mapbox.mapbox-traffic-v1`) is drawn as lines colored by congestion (light, moderate, heavy, severe) in the `middle` slot, so road labels and our own layers stay on top. While it's on, the legend lists the four colors. The tiles come from `api.mapbox.com`, which the CSP already allows. The map doesn't refetch them on a timer, so a map left open goes stale until it's moved or reloaded.
   - **`showTraffic`:** a new `render_map_tool` input, and a line in the tool description, so the model knows it can show traffic and can open the map with it on. `false` turns it off. Left out, the map keeps whatever the user picked, the same way `baseStyle` works. A `showTraffic`-only call is renderable on its own, like `baseStyle`.
