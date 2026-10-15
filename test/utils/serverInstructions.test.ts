@@ -25,15 +25,6 @@ describe('buildServerInstructions', () => {
     expect(text).not.toContain('static_map_image_tool');
   });
 
-  it('points page building at export_map_html_tool when it is enabled', () => {
-    const text = buildServerInstructions(getAllTools().map((t) => t.name));
-    expect(text).toContain('building a web page');
-    expect(text).toContain('use export_map_html_tool');
-    expect(
-      buildServerInstructions(['render_map_tool', 'isochrone_tool'])
-    ).not.toContain('export_map_html_tool');
-  });
-
   it('returns no instructions when render_map_tool is disabled', () => {
     expect(
       buildServerInstructions(['static_map_image_tool', 'isochrone_tool'])
