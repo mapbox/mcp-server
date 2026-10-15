@@ -748,8 +748,8 @@ describe('mapAppHtml Satellite and Traffic toggles', () => {
     const { satellite, traffic } = buttons(sandbox);
 
     expect(sandbox.controls[0].className).toContain('mapboxgl-ctrl-group');
-    expect(satellite.textContent).toBe('Satellite');
-    expect(traffic.textContent).toBe('Traffic');
+    expect(satellite.attributes['aria-label']).toBe('Satellite view');
+    expect(traffic.attributes['aria-label']).toBe('Live traffic');
     expect(satellite.attributes['aria-pressed']).toBe('false');
     expect(traffic.attributes['aria-pressed']).toBe('false');
   });
@@ -774,6 +774,11 @@ describe('mapAppHtml Satellite and Traffic toggles', () => {
     expect((layer.paint as Record<string, unknown>)['line-color']).toContain(
       'severe'
     );
+    // Light traffic only on main roads; slowdowns on every road.
+    const filter = JSON.stringify(layer.filter);
+    expect(filter).toContain('["!=",["get","congestion"],"low"]');
+    expect(filter).toContain('"primary"');
+    expect(filter).not.toContain('"street"');
     expect(traffic.attributes['aria-pressed']).toBe('true');
     expect(traffic.className).toBe('active');
     expect(sandbox.legendEl.style.display).toBe('block');

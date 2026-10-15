@@ -106,10 +106,10 @@ export function mapAppShell(glVersion: string): string {
   }
   /* Satellite / Traffic buttons under the zoom control (see buildLayerToggles). */
   .mapboxgl-ctrl-group.layer-toggles button {
-    width: auto; min-width: 29px; padding: 0 8px;
-    font-size: 11px; font-weight: 600; color: #1f2937;
+    display: flex; align-items: center; justify-content: center; color: #333;
   }
-  .mapboxgl-ctrl-group.layer-toggles button.active { background: #2563eb; color: #fff; }
+  .mapboxgl-ctrl-group.layer-toggles button.active { color: #2563eb; background: #dbeafe; }
+  .mapboxgl-ctrl-group.layer-toggles button:focus:not(:focus-visible) { box-shadow: none; }
   #side-panel {
     position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 10;
     width: 280px; max-width: calc(100% - 24px);
@@ -212,6 +212,18 @@ export function mapAppScript(config: {
     { value: 'heavy', label: 'Heavy traffic', color: '#ef4444' },
     { value: 'severe', label: 'Severe traffic', color: '#7f1d1d' }
   ];
+  var TRAFFIC_MAIN_ROADS = [
+    'motorway', 'motorway_link', 'trunk', 'trunk_link',
+    'primary', 'secondary', 'tertiary', 'link'
+  ];
+  // 24px stroke icons, sized to match the zoom buttons.
+  var TOGGLE_ICONS = {
+    satellite: '<circle cx="12" cy="12" r="9"/>' +
+      '<path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    traffic: '<rect x="8" y="2.5" width="8" height="19" rx="3"/>' +
+      '<circle cx="12" cy="7" r="1.4"/><circle cx="12" cy="12" r="1.4"/>' +
+      '<circle cx="12" cy="17" r="1.4"/>'
+  };
 
   // Set by the layer toggle control, which initMap() adds before the rest
   // of this script has run.
@@ -596,10 +608,19 @@ export function mapAppScript(config: {
       'source-layer': 'traffic',
       // Above land and water, below roads' labels and anything we draw.
       slot: 'middle',
+      // Light traffic on every side street turns the whole map green, so
+      // show it only on main roads; any slowdown shows on every road.
+      filter: ['any',
+        ['!=', ['get', 'congestion'], 'low'],
+        ['match', ['get', 'class'], TRAFFIC_MAIN_ROADS, true, false]
+      ],
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: {
         'line-color': colors,
-        'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 2.5, 18, 6]
+        'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 15, 2, 18, 4],
+        // Each direction is its own line; shift it to its side of the road.
+        'line-offset': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 1.5, 18, 3],
+        'line-opacity': 0.9
       }
     });
   }
@@ -658,19 +679,24 @@ export function mapAppScript(config: {
   function buildLayerToggles() {
     var container = document.createElement('div');
     container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group layer-toggles';
-    satelliteButton = buildToggleButton('Satellite', toggleSatellite);
-    trafficButton = buildToggleButton('Traffic', function() { setTraffic(!trafficOn); });
+    satelliteButton = buildToggleButton('Satellite view', TOGGLE_ICONS.satellite, toggleSatellite);
+    trafficButton = buildToggleButton('Live traffic', TOGGLE_ICONS.traffic, function() {
+      setTraffic(!trafficOn);
+    });
     container.appendChild(satelliteButton);
     container.appendChild(trafficButton);
     syncToggleButtons();
     return container;
   }
 
-  function buildToggleButton(label, onClick) {
+  function buildToggleButton(label, icon, onClick) {
     var button = document.createElement('button');
     button.type = 'button';
-    button.textContent = label;
-    button.title = 'Show ' + label.toLowerCase();
+    button.title = label;
+    if (typeof button.setAttribute === 'function') button.setAttribute('aria-label', label);
+    button.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+      'stroke-linejoin="round" aria-hidden="true">' + icon + '</svg>';
     button.addEventListener('click', onClick);
     return button;
   }
