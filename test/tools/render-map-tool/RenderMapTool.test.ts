@@ -747,4 +747,37 @@ describe('RenderMapTool', () => {
     };
     expect(sc.mapboxRender?.baseStyle).toBe('standard-satellite');
   });
+
+  it('accepts a showTraffic-only call and carries it through the inline ref', async () => {
+    const { resolveInlinePayloadRef } =
+      await import('../../../src/utils/inlinePayloadRef.js');
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ showTraffic: true });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      mapboxRender?: { showTraffic?: boolean; ref?: string };
+    };
+    expect(sc.mapboxRender?.showTraffic).toBe(true);
+    expect(sc.mapboxRender?.ref).toBeDefined();
+    expect(resolveInlinePayloadRef(sc.mapboxRender!.ref!)?.showTraffic).toBe(
+      true
+    );
+  });
+
+  it('carries showTraffic: false through so the model can turn traffic off', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ showTraffic: false });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      mapboxRender?: { showTraffic?: boolean };
+    };
+    expect(sc.mapboxRender?.showTraffic).toBe(false);
+  });
+
+  it('tells the model it can show live traffic', () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    expect(tool.description).toContain('showTraffic: true');
+  });
 });
