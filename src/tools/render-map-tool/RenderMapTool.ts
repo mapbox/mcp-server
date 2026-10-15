@@ -63,6 +63,9 @@ export class RenderMapTool extends BaseTool<
     'To restyle the base map itself (e.g. "make the water red", switch to night ' +
     'lighting, hide POI labels) pass `baseMapConfig`. To switch to satellite ' +
     'imagery, pass `baseStyle: "standard-satellite"` (defaults to "standard"). ' +
+    'To show live traffic congestion on the roads in view, pass ' +
+    '`showTraffic: true`. The map also has Satellite and Traffic buttons ' +
+    'users can toggle themselves. ' +
     'Every call is a fresh render — it does not accumulate state — so to ' +
     'restyle an already-drawn map without losing its content, re-pass the ' +
     'same `payload_refs`/`layers` alongside `baseMapConfig`/`baseStyle` rather ' +
@@ -172,7 +175,9 @@ export class RenderMapTool extends BaseTool<
               : '';
 
           const baseMapConfigNote =
-            payload.baseMapConfig || payload.baseStyle
+            payload.baseMapConfig ||
+            payload.baseStyle ||
+            payload.showTraffic !== undefined
               ? ' Updated the base map style.'
               : '';
 

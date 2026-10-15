@@ -61,32 +61,35 @@ export function assembleMapPayload(
     camera: input.camera as MapAppPayload['camera'],
     summary: input.summary,
     baseMapConfig: input.baseMapConfig,
-    baseStyle: input.baseStyle
+    baseStyle: input.baseStyle,
+    showTraffic: input.showTraffic
   };
   const hasInlineContent =
     (inline.layers && inline.layers.length > 0) ||
     (inline.markers && inline.markers.length > 0);
 
   const all: MapAppPayload[] = [...fromRefs];
-  // baseMapConfig/baseStyle-only calls (e.g. "now turn the water red" or
-  // "switch to satellite" with no new data) are renderable on their own —
-  // treated like summary/legend.
+  // baseMapConfig/baseStyle/showTraffic-only calls (e.g. "now turn the
+  // water red", "switch to satellite" or "show traffic" with no new data)
+  // are renderable on their own — treated like summary/legend.
   if (
     hasInlineContent ||
     inline.summary ||
     inline.legend ||
     inline.baseMapConfig ||
-    inline.baseStyle
+    inline.baseStyle ||
+    inline.showTraffic !== undefined
   )
     all.push(inline);
   if (all.length === 0) return { payload: null, unresolvedRefs };
 
   const merged = mergeMapPayloads(all);
-  // Inline summary/camera/legend/baseMapConfig/baseStyle take precedence when provided.
+  // Inline summary/camera/legend/baseMapConfig/baseStyle/showTraffic take precedence when provided.
   if (input.summary) merged.summary = input.summary;
   if (input.camera) merged.camera = inline.camera;
   if (input.legend) merged.legend = input.legend;
   if (input.baseMapConfig) merged.baseMapConfig = input.baseMapConfig;
   if (input.baseStyle) merged.baseStyle = input.baseStyle;
+  if (input.showTraffic !== undefined) merged.showTraffic = input.showTraffic;
   return { payload: merged, unresolvedRefs };
 }
