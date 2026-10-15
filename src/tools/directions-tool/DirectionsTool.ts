@@ -1,7 +1,6 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomBytes } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -14,10 +13,9 @@ import {
   type Route
 } from './DirectionsTool.output.schema.js';
 import type { HttpRequest } from '../..//utils/types.js';
-import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
-import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
+import { buildResponseRef } from '../../utils/responseRef.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/directions/
 
@@ -336,7 +334,8 @@ export class DirectionsTool extends MapboxApiBasedTool<
       }
     }
 
-    // Check response size and conditionally create temporary resource
+    // Check response size; above the threshold the model gets a summary
+    // and a short ref for the full response
     const RESPONSE_SIZE_THRESHOLD = 50 * 1024; // 50KB
     const responseText = JSON.stringify(validatedData, null, 2);
     const responseSize = responseText.length;
@@ -366,16 +365,13 @@ export class DirectionsTool extends MapboxApiBasedTool<
     });
 
     if (responseSize > RESPONSE_SIZE_THRESHOLD) {
-      // Create temporary resource for large response
-      const resourceId = randomBytes(16).toString('hex');
-      const resourceUri = `mapbox://temp/directions-${resourceId}`;
-
-      temporaryResourceManager.create({
-        id: resourceId,
-        uri: resourceUri,
-        data: validatedData,
-        metadata: { toolName: this.name, size: responseSize },
-        owner: getOwnerKeyFromToken(accessToken)
+      // A ref carrying the call's inputs, not the response, so the summary
+      // stays small and any server process can answer a later read (see
+      // responseRef.ts).
+      const resourceUri = buildResponseRef({
+        tool: 'directions',
+        input,
+        selectedRouteIndex
       });
 
       // Extract summary information
@@ -391,7 +387,10 @@ export class DirectionsTool extends MapboxApiBasedTool<
       const summaryText = `Route found: ${distance}, ${duration}
 
 Waypoints: ${waypointCount}
-${responseSize > RESPONSE_SIZE_THRESHOLD ? `\n⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.\n\nFull geometry and details stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes\n\nUse the MCP resource API to retrieve full details if needed.\nOr ask to read the resource by its URI.` : ''}`;
+
+⚠️ Full response (${Math.round(responseSize / 1024)}KB) exceeds context limit.
+
+Full geometry and details: read ${resourceUri} with the MCP resource API if needed. Reading it fetches the route again.`;
 
       // Create minimal structured content for validation (without large geometry)
       const summaryStructuredContent: Record<string, unknown> = {
