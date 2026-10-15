@@ -6,6 +6,7 @@ import { CategoryListResource } from './category-list/CategoryListResource.js';
 import { TemporaryDataResource } from './temporary/TemporaryDataResource.js';
 import { ComputeResource } from './compute/ComputeResource.js';
 import { InlinePayloadResource } from './inline-payload/InlinePayloadResource.js';
+import { ToolResponseResource } from './tool-response/ToolResponseResource.js';
 import { MapAppUIResource } from './ui-apps/MapAppUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { PlacePhotoResource } from './place-photo/PlacePhotoResource.js';
@@ -18,6 +19,7 @@ export const ALL_RESOURCES = [
   new TemporaryDataResource(),
   new ComputeResource(),
   new InlinePayloadResource(),
+  new ToolResponseResource({ httpRequest }),
   // Single shared map renderer, targeted exclusively by render_map_tool.
   new MapAppUIResource({ httpRequest }),
   // Photos for the map app's results panel, which its CSP can't load directly.
