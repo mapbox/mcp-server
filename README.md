@@ -91,7 +91,6 @@ Each of the four prompts below exercises a different strategy in one tool call:
 - "Show me a satellite view of Manhattan with key landmarks marked"
 - "Generate a map highlighting all Starbucks locations within a mile of downtown Seattle"
 - "Show a fill polygon over these coordinates: [...], with a marker labeled 'Warehouse' at [...]" — renders your own GeoJSON directly via `render_map_tool`, no other Mapbox tool needed
-- "Build an index.html for our coffee shops with a map of the areas within a 10-minute walk of each shop" — `export_map_html_tool` returns a standalone map page for the site
 
 ### Analysis & Planning
 
@@ -162,14 +161,6 @@ Every geospatial tool in this server (directions, isochrone, search, and more) c
 **You don't need any of this server's other tools to use it.** `render_map_tool` also accepts hand-composed GeoJSON directly — your own polygons, markers, and routes — with no dependency on `directions_tool`, `isochrone_tool`, or any other Mapbox API call. See **[the full `render_map_tool` guide](./docs/render-map-tool.md)** for the payload schema and a complete standalone example.
 
 If you need a guaranteed static image in clients without MCP Apps support, use `static_map_image_tool` instead — it returns a base64-encoded PNG/JPEG that every client can display.
-
-### Maps in pages you build (`export_map_html_tool`)
-
-`render_map_tool` only renders inside the chat. When an agent is building a web page, site or file that needs a map, **`export_map_html_tool`** returns the same map as a standalone HTML page. It takes the same input as `render_map_tool` (refs from other tools, or your own GeoJSON) and returns a document of a few KB with the map data and a Mapbox public token included, ready to save as `map.html` or embed with an iframe. The agent doesn't need to write Mapbox GL JS code or ask for a token. Map data is limited to 200 KB per page, since the agent copies the whole page into a file; simplify large polygons with `simplify_tool` first.
-
-- **Token:** the page uses the account's default public token unless you pass `public_token`. For a published site, a [URL-restricted public token](https://docs.mapbox.com/accounts/guides/tokens/#url-restrictions) is safer.
-- **Map script:** the page loads it from jsDelivr (`@mapbox/mcp-server@<version>/dist/map-app/standalone.js`), pinned by version and a subresource-integrity hash, so the page itself stays small.
-- **Live layers:** routes, isochrones and search results are fetched from the Mapbox API each time the page loads, billed to the token's account. The tool result says how many layers do this.
 
 #### CLIENT_NEEDS_RESOURCE_FALLBACK
 
