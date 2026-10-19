@@ -62,7 +62,13 @@ export const FeedbackInputSchema = z.object({
     ),
   coordinates: coordinateSchema.describe(
     'Where the problem is: the place or the spot on the route, usually taken from an earlier search or directions result. Do not guess.'
-  )
+  ),
+  send_anyway: z
+    .boolean()
+    .optional()
+    .describe(
+      'Skip the check for an earlier report from this account. Set it only after the tool said a report already exists and the user says theirs is about a different problem.'
+    )
 });
 
 export type FeedbackInput = z.infer<typeof FeedbackInputSchema>;

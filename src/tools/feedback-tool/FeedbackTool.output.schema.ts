@@ -28,7 +28,13 @@ export const FeedbackOutputSchema = z
     trace_id: z.string().optional(),
     received_at: z.string().optional(),
     created_at: z.string().optional(),
-    updated_at: z.string().optional()
+    updated_at: z.string().optional(),
+    duplicate: z
+      .boolean()
+      .optional()
+      .describe(
+        'True when nothing was sent because this account already has a matching report awaiting review; the fields describe that earlier report.'
+      )
   })
   .passthrough();
 

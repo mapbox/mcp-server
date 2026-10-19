@@ -527,7 +527,9 @@ Reports a problem with Mapbox map, place or routing data to Mapbox through the [
 
 It sends the report text, a category and the location, and returns the report's id and status. Nothing is sent without the user's go-ahead: clients that support elicitation show a confirmation prompt first, and the tool description asks the model to confirm in chat everywhere else.
 
-**Requirements**: the access token needs the `user-feedback:write` scope. Without it the tool returns an error saying so. To leave the tool out, start the server with `--disable-tools feedback_tool`.
+Each report may be billed ($0.02 per item once the Feedback API leaves Public Preview), so before sending, the tool checks the account's own reports from the last 30 days. If one in the same category within 50 m is still awaiting review, it returns that report instead of sending a new one. The Feedback API only lists the account's own reports, so this can't catch reports from other accounts. `send_anyway: true` skips the check when the user says theirs is a different problem.
+
+**Requirements**: the access token needs the `user-feedback:write` scope to send, and `user-feedback:read` for the duplicate check. Without the write scope the tool returns an error saying so. Without the read scope it sends without checking and says so in its result. To leave the tool out, start the server with `--disable-tools feedback_tool`.
 
 **Example Usage**: "Blue Bottle on Mint St closed last year, can you report that to Mapbox?"
 
