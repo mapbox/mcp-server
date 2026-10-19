@@ -55,11 +55,12 @@ function loadScriptSandbox(options?: {
   // A minimal stand-in for a DOM Element — enough for the panel code's
   // createElement/appendChild/removeChild/addEventListener usage, without
   // pulling in jsdom for a hand-rolled vm sandbox. `__fireClick` is a
-  // test-only convenience (not a real DOM API) for simulating a panel row
-  // click without constructing a real Event object.
+  // test-only convenience (not a real DOM API) for simulating a card click
+  // without constructing a real Event object; `__fire` does the same for
+  // any event type (the carousel listens for scroll).
   function fakeElement() {
     const children: FakeElement[] = [];
-    const clickListeners: Array<() => void> = [];
+    const listeners: Record<string, Array<(e?: unknown) => void>> = {};
     const el: FakeElement = {
       style: {} as Record<string, string>,
       textContent: '',
@@ -77,10 +78,11 @@ function loadScriptSandbox(options?: {
       get firstChild() {
         return children[0];
       },
-      addEventListener: (type: string, cb: () => void) => {
-        if (type === 'click') clickListeners.push(cb);
+      addEventListener: (type: string, cb: (e?: unknown) => void) => {
+        (listeners[type] ??= []).push(cb);
       },
-      __fireClick: () => clickListeners.forEach((cb) => cb())
+      __fireClick: () => (listeners.click ?? []).forEach((cb) => cb({})),
+      __fire: (type: string) => (listeners[type] ?? []).forEach((cb) => cb({}))
     };
     return el;
   }
@@ -93,8 +95,14 @@ function loadScriptSandbox(options?: {
     appendChild: (child: FakeElement) => FakeElement;
     removeChild: (child: FakeElement) => FakeElement;
     readonly firstChild: FakeElement | undefined;
-    addEventListener: (type: string, cb: () => void) => void;
+    addEventListener: (type: string, cb: (e?: unknown) => void) => void;
     __fireClick: () => void;
+    __fire: (type: string) => void;
+    scrollLeft?: number;
+    clientWidth?: number;
+    offsetLeft?: number;
+    offsetWidth?: number;
+    scrollIntoView?: (opts: unknown) => void;
   }
 
   // The script fetches each element by id exactly once at load time and
@@ -160,8 +168,12 @@ function loadScriptSandbox(options?: {
     addTo: () => fakeMarkerInstance,
     setPopup: () => fakeMarkerInstance,
     getLngLat: () => ({ lng: 1, lat: 2 }),
+    getElement: () => lastMarkerElement,
     remove: () => {}
   };
+  // The element passed to the most recent `new mapboxgl.Marker()`, which
+  // getElement() returns: the script reads it right after constructing.
+  let lastMarkerElement: unknown;
 
   // Overridable per-test; self-fetch tests replace this with a vi.fn(). Must
   // forward `init` too — the Place Details batch call is a POST with a JSON
@@ -199,6 +211,7 @@ function loadScriptSandbox(options?: {
       NavigationControl: function NavigationControl() {},
       Marker: function Marker(options?: Record<string, unknown>) {
         markerConstructorCalls.push(options ?? {});
+        lastMarkerElement = options?.element;
         return fakeMarkerInstance;
       },
       Popup: function Popup() {
@@ -278,9 +291,15 @@ function loadScriptSandbox(options?: {
     setStyleCalls,
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
-    sidePanelEl: getElementById('side-panel'),
+    carouselEl: getElementById('carousel'),
+    legendEl: getElementById('legend'),
     mapEl: getElementById('map') as unknown as { clientWidth?: number },
     fitBoundsCalls,
+    hoursToday: (
+      sandbox.window as {
+        __hoursToday?: (spec: unknown, now: Date) => string | null;
+      }
+    ).__hoursToday,
     derivePanelItems: (
       sandbox.window as {
         __derivePanelItems?: (markers: unknown[]) => PanelItem[];
@@ -1545,7 +1564,7 @@ describe('mapAppHtml optimization self-fetch', () => {
 
 describe('mapAppHtml ground location self-fetch', () => {
   it('shows and enriches the results panel for nearby POI results that carry a mapbox_id', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     const coffeeId = mockPoiId('four-barrel');
 
     const fetchSpy = vi.fn(async (url: string) => {
@@ -1614,8 +1633,8 @@ describe('mapAppHtml ground location self-fetch', () => {
     });
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    expect(sidePanelEl.style.display).toBe('flex');
-    const [badge, body] = sidePanelEl.children[1].children[0].children;
+    expect(carouselEl.style.display).toBe('block');
+    const [badge, body] = carouselEl.children[0].children[0].children;
     expect(badge.textContent).toBe('1');
     expect(body.children[0].textContent).toBe('Four Barrel Coffee');
     expect(body.children[1].textContent).toBe('cafe · 120 m · 65% popularity');
@@ -1844,11 +1863,9 @@ describe('mapAppHtml results side panel: derivePanelItems', () => {
 });
 
 describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
-  it('renders the panel from category-search self-fetch results, then enriches it via one batched Place Details call', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl, map, getLastPopupText } =
+  it('renders a card per result from category-search self-fetch results, then enriches it via one batched Place Details call', async () => {
+    const { sendToolResult, setFetchImpl, carouselEl, getLastPopupText } =
       loadScriptSandbox();
-    const flyToSpy = vi.fn();
-    map.flyTo = flyToSpy;
 
     const fetchSpy = vi.fn(async (url: string, init?: unknown) => {
       if (String(url).includes('places/v1/details/retrieve')) {
@@ -1868,7 +1885,8 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
                 mapbox_id: mockPoiId('poi-1'),
                 photos: [{ url: 'https://example.com/photo.jpg' }],
                 score: { popularity: 0.8 },
-                phone: '+15551234567'
+                phone: '+15551234567',
+                opening_hours: '24/7'
               }
             ]
           })
@@ -1917,28 +1935,29 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     // ground-location self-fetch test's tick count for the same reason.
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    expect(sidePanelEl.style.display).toBe('flex');
-    const list = sidePanelEl.children[1];
+    expect(carouselEl.style.display).toBe('block');
+    const list = carouselEl.children[0];
+    expect(list.className).toBe('card-list');
     expect(list.children).toHaveLength(1);
-    const [badge, body] = list.children[0].children;
-    const [name, meta] = body.children;
+    const card = list.children[0];
+    const [badge, body] = card.children;
+    const [name, meta, extra] = body.children;
 
     expect(badge.textContent).toBe('1');
     expect(name.textContent).toBe('Cafe Reveille');
     expect(meta.textContent).toBe('cafe · 120 m · 80% popularity');
-
-    // Clicking the row flies the map to that marker.
-    list.children[0].__fireClick();
-    expect(flyToSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ center: { lng: 1, lat: 2 } })
-    );
-
-    // The enriched phone number reaches the marker's popup.
-    expect(getLastPopupText()).toBe('1. Cafe Reveille — 120 m — +15551234567');
+    // Hours and phone go on a second line of the card.
+    expect(extra.className).toBe('card-extra');
+    expect(extra.textContent).toBe('Open 24 hours · +15551234567');
+    // The first card starts selected.
+    expect(card.className).toBe('card active');
+    // A place with a card gets no popup on its pin (the search center
+    // marker, which has no id, still has one).
+    expect(getLastPopupText() ?? '').not.toContain('Cafe Reveille');
   });
 
   it('never renders a panel for markers without a mapbox_id (e.g. a directions route)', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
       json: async () => ({
@@ -1979,11 +1998,11 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     });
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
-    expect(sidePanelEl.style.display).not.toBe('flex');
+    expect(carouselEl.style.display).not.toBe('block');
   });
 
   it('leaves the initial Search-Box-only panel row intact when the Place Details call fails (e.g. quota exceeded)', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl, errorEl } =
+    const { sendToolResult, setFetchImpl, carouselEl, errorEl } =
       loadScriptSandbox();
     const fetchSpy = vi.fn(async (url: string) => {
       if (String(url).includes('places/v1/details/retrieve')) {
@@ -2019,9 +2038,9 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     });
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    expect(sidePanelEl.style.display).toBe('flex');
-    const row = sidePanelEl.children[1].children[0];
-    expect(row.children[0].className).toBe('panel-badge');
+    expect(carouselEl.style.display).toBe('block');
+    const row = carouselEl.children[0].children[0];
+    expect(row.children[0].className).toBe('card-badge');
     expect(errorEl?.style.display).not.toBe('block');
   });
 
@@ -2060,7 +2079,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
   // "urn:mbxpoi:mapbox-n408854" has the native prefix but not a UUID, and
   // the batch endpoint 422'd the whole request for it.
   it('filters out urn:mbxpoi ids that are not UUIDs', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     const badId = Buffer.from('urn:mbxpoi:mapbox-n408854').toString('base64');
     const goodId = mockPoiId('good');
     const bodies: unknown[] = [];
@@ -2081,12 +2100,12 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
     expect(bodies).toEqual([{ ids: [goodId] }]);
-    const rows = sidePanelEl.children[1].children;
+    const rows = carouselEl.children[0].children;
     expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
   });
 
   it('drops the id a 422 names and retries the batch once', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     // Passes the client-side filter, but the API rejects it anyway.
     const rejectedId = mockPoiId('rejected');
     const goodId = mockPoiId('good');
@@ -2118,7 +2137,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     for (let i = 0; i < 30; i++) await Promise.resolve();
 
     expect(bodies.map((b) => b.ids)).toEqual([[rejectedId, goodId], [goodId]]);
-    const rows = sidePanelEl.children[1].children;
+    const rows = carouselEl.children[0].children;
     expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
   });
 
@@ -2129,7 +2148,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     // batch endpoint 422s the ENTIRE request if even one id isn't its
     // native "urn:mbxpoi:<uuid>" scheme — silently zeroing out enrichment
     // for all 10, not just the 2 bad ones, before this filter existed.
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     const osmId = Buffer.from('urn:mbxpoi-osm:n2678573672').toString('base64');
     const nativeId = mockPoiId('poi-native');
 
@@ -2180,7 +2199,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
     // Both rows still render — only enrichment eligibility differs.
-    const rows = sidePanelEl.children[1].children;
+    const rows = carouselEl.children[0].children;
     expect(rows).toHaveLength(2);
     expect(rows[0].children[1].children[0].textContent).toBe('OSM Cafe');
     // Never enriched (filtered out before the batch call).
@@ -2240,7 +2259,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     const {
       sendToolResult,
       setFetchImpl,
-      sidePanelEl,
+      carouselEl,
       postMessageCalls,
       resolveResourcesRead
     } = loadScriptSandbox();
@@ -2256,7 +2275,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
       uri: 'mapbox://place-photo/' + encodeURIComponent(id)
     });
     // The CDN URL is never used directly.
-    const row = sidePanelEl.children[1].children[0];
+    const row = carouselEl.children[0].children[0];
     expect(row.children).toHaveLength(2);
 
     resolveResourcesRead({
@@ -2266,7 +2285,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     // At the end of the row, so badge and name stay where they were.
     const [badge, body, thumb] = row.children;
-    expect(thumb.className).toBe('panel-thumb');
+    expect(thumb.className).toBe('card-thumb');
     expect(thumb.style.backgroundImage).toBe(
       'url("data:image/jpeg;base64,QUJD")'
     );
@@ -2276,7 +2295,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
   });
 
   it('adds no thumbnail when the server has no photo', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl, resolveResourcesRead } =
+    const { sendToolResult, setFetchImpl, carouselEl, resolveResourcesRead } =
       loadScriptSandbox();
     setFetchImpl(photoFetch(mockPoiId('photo-poi')));
 
@@ -2287,11 +2306,11 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     });
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
-    expect(sidePanelEl.children[1].children[0].children).toHaveLength(2);
+    expect(carouselEl.children[0].children[0].children).toHaveLength(2);
   });
 
   it('loads the photo URL directly on a standalone page, which has no host or CSP', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl, postMessageCalls } =
+    const { sendToolResult, setFetchImpl, carouselEl, postMessageCalls } =
       loadScriptSandbox({ topLevel: true });
     setFetchImpl(photoFetch(mockPoiId('photo-poi')));
 
@@ -2301,15 +2320,15 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(postMessageCalls.some((m) => m.method === 'resources/read')).toBe(
       false
     );
-    const [, , thumb] = sidePanelEl.children[1].children[0].children;
-    expect(thumb.className).toBe('panel-thumb');
+    const [, , thumb] = carouselEl.children[0].children[0].children;
+    expect(thumb.className).toBe('card-thumb');
     expect(thumb.style.backgroundImage).toBe(
       'url("https://dyn.mktgcdn.com/p/photo.jpg")'
     );
   });
 
   it('adds no thumbnail on a standalone page when the photo fails to load', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox({
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox({
       topLevel: true
     });
     const id = mockPoiId('photo-poi');
@@ -2332,13 +2351,13 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     sendToolResult(searchResult);
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    expect(sidePanelEl.children[1].children[0].children).toHaveLength(2);
+    expect(carouselEl.children[0].children[0].children).toHaveLength(2);
   });
 });
 
 describe('mapAppHtml results side panel: inline markers', () => {
   it('renders and enriches the panel from inline markers that carry an id, with no selfFetch entries at all', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     const fetchSpy = vi.fn(async () => ({
       ok: true,
       json: async () => ({ results: [] })
@@ -2369,11 +2388,8 @@ describe('mapAppHtml results side panel: inline markers', () => {
     });
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
-    expect(sidePanelEl.style.display).toBe('flex');
-    expect(sidePanelEl.children[0].textContent).toBe(
-      'Coffee shops near Herndon, VA'
-    );
-    const list = sidePanelEl.children[1];
+    expect(carouselEl.style.display).toBe('block');
+    const list = carouselEl.children[0];
     expect(list.children).toHaveLength(1);
     const [badge, body] = list.children[0].children;
     expect(badge.textContent).toBe('1');
@@ -2392,12 +2408,8 @@ describe('mapAppHtml results side panel: inline markers', () => {
     // with no way to tell which one corresponded to which panel row. The
     // panel's own numbering (positional, independent of what's drawn)
     // still worked, but nothing on the map matched it.
-    const {
-      sendToolResult,
-      setFetchImpl,
-      sidePanelEl,
-      markerConstructorCalls
-    } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl, markerConstructorCalls } =
+      loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
       json: async () => ({ results: [] })
@@ -2441,13 +2453,13 @@ describe('mapAppHtml results side panel: inline markers', () => {
     expect(el2.textContent).toBe('2');
 
     // And the panel's badges show the exact same numbers.
-    const rows = sidePanelEl.children[1].children;
+    const rows = carouselEl.children[0].children;
     expect(rows[0].children[0].textContent).toBe('1');
     expect(rows[1].children[0].textContent).toBe('2');
   });
 
   it('never renders a panel when no inline marker carries an id', () => {
-    const { sendToolResult, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, carouselEl } = loadScriptSandbox();
 
     sendToolResult({
       structuredContent: {
@@ -2459,11 +2471,11 @@ describe('mapAppHtml results side panel: inline markers', () => {
       }
     });
 
-    expect(sidePanelEl.style.display).not.toBe('flex');
+    expect(carouselEl.style.display).not.toBe('block');
   });
 
   it("replaces the previous render's panel rather than accumulating rows across renders", async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
       json: async () => ({ results: [] })
@@ -2487,7 +2499,7 @@ describe('mapAppHtml results side panel: inline markers', () => {
       }
     });
     for (let i = 0; i < 6; i++) await Promise.resolve();
-    expect(sidePanelEl.children[1].children).toHaveLength(1);
+    expect(carouselEl.children[0].children).toHaveLength(1);
 
     sendToolResult({
       structuredContent: {
@@ -2500,7 +2512,7 @@ describe('mapAppHtml results side panel: inline markers', () => {
     });
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
-    const list = sidePanelEl.children[1];
+    const list = carouselEl.children[0];
     expect(list.children).toHaveLength(1);
     expect(list.children[0].children[1].children[0].textContent).toBe('Second');
   });
@@ -2517,7 +2529,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
       .filter((t): t is string => typeof t === 'string' && t !== '');
   const rowNames = (panel: { children: Array<{ children: unknown[] }> }) =>
     (
-      panel.children[1] as unknown as {
+      panel.children[0] as unknown as {
         children: Array<{
           children: Array<{ children: Array<{ textContent: string }> }>;
         }>;
@@ -2525,12 +2537,8 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     ).children.map((row) => row.children[1].children[0].textContent);
 
   it('numbers inline markers and merged search results as one list', async () => {
-    const {
-      sendToolResult,
-      setFetchImpl,
-      sidePanelEl,
-      markerConstructorCalls
-    } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl, markerConstructorCalls } =
+      loadScriptSandbox();
     const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((x) =>
       mockPoiId('one-list-' + x)
     );
@@ -2587,7 +2595,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
     expect(labelsDrawn(markerConstructorCalls)).toEqual(['1', '2', '3', '4']);
-    expect(rowNames(sidePanelEl)).toEqual(['A', 'B', 'C', 'D']);
+    expect(rowNames(carouselEl)).toEqual(['A', 'B', 'C', 'D']);
     // Each place is looked up once.
     expect(detailsBodies).toEqual([
       [a, b],
@@ -2596,7 +2604,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
   });
 
   it('ignores a Place Details response from an earlier render', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     const id = mockPoiId('stale');
     const pending: Array<(v: unknown) => void> = [];
     setFetchImpl(
@@ -2634,7 +2642,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
     const row = (
-      sidePanelEl.children[1] as unknown as {
+      carouselEl.children[0] as unknown as {
         children: Array<{
           children: Array<{ children: Array<{ textContent: string }> }>;
         }>;
@@ -2643,8 +2651,8 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     expect(row.children[1].children[1].textContent).toBe('45% popularity');
   });
 
-  it('fits the map beside an open panel, and refits when it is collapsed', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl, fitBoundsCalls } =
+  it('fits the map above the carousel, and moves the legend up above it', async () => {
+    const { sendToolResult, setFetchImpl, fitBoundsCalls } =
       loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
@@ -2656,6 +2664,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
         mapboxRender: {
           ref: 'mapbox://inline/x',
           layers: [],
+          legend: [{ label: 'Cafes', color: '#f97316' }],
           markers: [
             { coordinates: at(-122.41), id: mockPoiId('fit-1'), name: 'One' },
             { coordinates: at(-122.42), id: mockPoiId('fit-2'), name: 'Two' }
@@ -2664,50 +2673,45 @@ describe('mapAppHtml results side panel: one panel per render', () => {
       }
     });
     await new Promise((r) => setTimeout(r, 80));
-    // 280px panel + 24px gap.
-    expect(fitBoundsCalls.at(-1)?.padding.right).toBe(304);
-
-    (
-      sidePanelEl.children[0] as unknown as { __fireClick: () => void }
-    ).__fireClick();
-    expect(sidePanelEl.className).toBe('collapsed');
-    await new Promise((r) => setTimeout(r, 80));
-    expect(fitBoundsCalls.at(-1)?.padding.right).toBe(30);
+    // The legend sits 8px above the carousel (36px above the logo + 100px
+    // before layout), and the fit leaves 12px above that.
+    expect(fitBoundsCalls.at(-1)?.padding).toEqual({
+      top: 70,
+      bottom: 156,
+      left: 30,
+      right: 30
+    });
   });
 
-  it('starts collapsed on a narrow map', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl, mapEl, fitBoundsCalls } =
-      loadScriptSandbox();
-    mapEl.clientWidth = 400;
+  it('puts the legend above the carousel, and back when a render has no cards', async () => {
+    const { sendToolResult, setFetchImpl, legendEl } = loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
       json: async () => ({ results: [] })
     }));
-
-    sendToolResult({
-      structuredContent: {
-        mapboxRender: {
-          ref: 'mapbox://inline/x',
-          layers: [],
-          markers: [
-            {
-              coordinates: at(-122.41),
-              id: mockPoiId('narrow-1'),
-              name: 'One'
-            },
-            { coordinates: at(-122.42), id: mockPoiId('narrow-2'), name: 'Two' }
-          ]
+    const render = (markers: Array<Record<string, unknown>>) =>
+      sendToolResult({
+        structuredContent: {
+          mapboxRender: {
+            ref: 'mapbox://inline/x',
+            layers: [],
+            legend: [{ label: 'Cafes', color: '#f97316' }],
+            markers
+          }
         }
-      }
-    });
-    await new Promise((r) => setTimeout(r, 80));
+      });
 
-    expect(sidePanelEl.className).toBe('collapsed');
-    expect(fitBoundsCalls.at(-1)?.padding.right).toBe(30);
+    render([{ coordinates: at(-122.41), id: mockPoiId('lg-1'), name: 'One' }]);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(legendEl.style.bottom).toBe('144px');
+
+    render([{ coordinates: at(-122.41), name: 'No id' }]);
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(legendEl.style.bottom).toBe('');
   });
 
   it("colors a row's badge like its pin when the caller set a color", async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
       json: async () => ({ results: [] })
@@ -2743,7 +2747,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
     const badges = (
-      sidePanelEl.children[1] as unknown as {
+      carouselEl.children[0] as unknown as {
         children: Array<{ children: Array<{ style: Record<string, string> }> }>;
       }
     ).children.map((row) => row.children[0].style.background);
@@ -2755,7 +2759,7 @@ describe('mapAppHtml results side panel: caller labels', () => {
   const at = (lng: number) => [lng, 37.78] as [number, number];
   const badges = (panel: { children: unknown[] }) =>
     (
-      panel.children[1] as {
+      panel.children[0] as {
         children: Array<{ children: Array<{ textContent: string }> }>;
       }
     ).children.map((row) => row.children[0].textContent);
@@ -2774,12 +2778,8 @@ describe('mapAppHtml results side panel: caller labels', () => {
   });
 
   it("keeps the caller's own numbers when they're unique, such as a visit order", async () => {
-    const {
-      sendToolResult,
-      setFetchImpl,
-      sidePanelEl,
-      markerConstructorCalls
-    } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl, markerConstructorCalls } =
+      loadScriptSandbox();
     setFetchImpl(noDetails);
     sendToolResult(
       render(
@@ -2795,16 +2795,12 @@ describe('mapAppHtml results side panel: caller labels', () => {
     for (let i = 0; i < 10; i++) await Promise.resolve();
 
     expect(labelsDrawn(markerConstructorCalls)).toEqual(['3', '1', '2']);
-    expect(badges(sidePanelEl)).toEqual(['3', '1', '2']);
+    expect(badges(carouselEl)).toEqual(['3', '1', '2']);
   });
 
   it('renumbers repeated numbers so each pin matches one row', async () => {
-    const {
-      sendToolResult,
-      setFetchImpl,
-      sidePanelEl,
-      markerConstructorCalls
-    } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl, markerConstructorCalls } =
+      loadScriptSandbox();
     setFetchImpl(noDetails);
     sendToolResult(
       render(
@@ -2820,16 +2816,12 @@ describe('mapAppHtml results side panel: caller labels', () => {
     for (let i = 0; i < 10; i++) await Promise.resolve();
 
     expect(labelsDrawn(markerConstructorCalls)).toEqual(['1', '2', '3']);
-    expect(badges(sidePanelEl)).toEqual(['1', '2', '3']);
+    expect(badges(carouselEl)).toEqual(['1', '2', '3']);
   });
 
   it('shows a letter label in the panel row, as on its pin', async () => {
-    const {
-      sendToolResult,
-      setFetchImpl,
-      sidePanelEl,
-      markerConstructorCalls
-    } = loadScriptSandbox();
+    const { sendToolResult, setFetchImpl, carouselEl, markerConstructorCalls } =
+      loadScriptSandbox();
     setFetchImpl(noDetails);
     sendToolResult(
       render([
@@ -2846,13 +2838,13 @@ describe('mapAppHtml results side panel: caller labels', () => {
     for (let i = 0; i < 10; i++) await Promise.resolve();
 
     expect(labelsDrawn(markerConstructorCalls)).toEqual(['A', '1']);
-    expect(badges(sidePanelEl)).toEqual(['A', '1']);
+    expect(badges(carouselEl)).toEqual(['A', '1']);
   });
 });
 
 describe('mapAppHtml results side panel: photos without an MCP host', () => {
   it('loads photos directly when framed by a page that never answers ui/initialize', async () => {
-    const { sendToolResult, setFetchImpl, sidePanelEl, postMessageCalls } =
+    const { sendToolResult, setFetchImpl, carouselEl, postMessageCalls } =
       loadScriptSandbox({ noHost: true });
     const id = mockPoiId('framed-photo');
     setFetchImpl(async (url: string) => {
@@ -2884,15 +2876,160 @@ describe('mapAppHtml results side panel: photos without an MCP host', () => {
       false
     );
     const row = (
-      sidePanelEl.children[1] as {
+      carouselEl.children[0] as {
         children: Array<{
           children: Array<{ className: string; style: Record<string, string> }>;
         }>;
       }
     ).children[0];
-    expect(row.children[2].className).toBe('panel-thumb');
+    expect(row.children[2].className).toBe('card-thumb');
     expect(row.children[2].style.backgroundImage).toBe(
       'url("https://example.com/a.jpg")'
     );
+  });
+});
+
+describe('mapAppHtml results carousel: selecting a place', () => {
+  const at = (lng: number) => [lng, 37.78] as [number, number];
+  type El = {
+    className: string;
+    style: Record<string, string>;
+    children: El[];
+    __fireClick: () => void;
+    __fire: (type: string) => void;
+    scrollLeft?: number;
+    clientWidth?: number;
+    offsetLeft?: number;
+    offsetWidth?: number;
+    scrollIntoView?: (opts: unknown) => void;
+  };
+  async function threePlaces() {
+    const sandbox = loadScriptSandbox();
+    sandbox.setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ results: [] })
+    }));
+    sandbox.sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://inline/x',
+          layers: [],
+          markers: ['One', 'Two', 'Three'].map((name, i) => ({
+            coordinates: at(-122.41 - i / 100),
+            id: mockPoiId('select-' + i),
+            name
+          }))
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    const cards = (sandbox.carouselEl.children[0] as unknown as El).children;
+    const pins = sandbox.markerConstructorCalls.map((c) => c.element as El);
+    return { ...sandbox, cards, pins };
+  }
+  const active = (els: El[]) =>
+    els.map((el) => el.className.split(' ').includes('active'));
+
+  it('starts with the first card and its pin selected, with the name under the pin', async () => {
+    const { cards, pins } = await threePlaces();
+
+    expect(active(cards)).toEqual([true, false, false]);
+    expect(active(pins)).toEqual([true, false, false]);
+    expect(pins[0].className).toBe('marker-badge active');
+    expect(pins[0].style.zIndex).toBe('2');
+    const label = pins[0].children[0] as unknown as {
+      className: string;
+      textContent: string;
+    };
+    expect(label.className).toBe('marker-name');
+    expect(label.textContent).toBe('One');
+  });
+
+  it('selects a card and its pin when the card is clicked', async () => {
+    const { cards, pins } = await threePlaces();
+    const scrolled = vi.fn();
+    cards[2].scrollIntoView = scrolled;
+
+    cards[2].__fireClick();
+
+    expect(active(cards)).toEqual([false, false, true]);
+    expect(active(pins)).toEqual([false, false, true]);
+    expect(pins[0].style.zIndex).toBe('');
+    expect(scrolled).toHaveBeenCalledWith(
+      expect.objectContaining({ inline: 'center' })
+    );
+  });
+
+  it('scrolls to the card when its pin is clicked', async () => {
+    const { cards, pins } = await threePlaces();
+    const scrolled = vi.fn();
+    cards[1].scrollIntoView = scrolled;
+
+    pins[1].__fireClick();
+
+    expect(active(cards)).toEqual([false, true, false]);
+    expect(active(pins)).toEqual([false, true, false]);
+    expect(scrolled).toHaveBeenCalledOnce();
+  });
+
+  it('selects the card that ends up in the middle after a swipe', async () => {
+    const { carouselEl, cards, pins } = await threePlaces();
+    const list = carouselEl.children[0] as unknown as El;
+    cards.forEach((card, i) => {
+      card.offsetLeft = 32 + i * 310;
+      card.offsetWidth = 300;
+    });
+    list.clientWidth = 364;
+    list.scrollLeft = 310;
+
+    list.__fire('scroll');
+    await new Promise((r) => setTimeout(r, 150));
+
+    expect(active(cards)).toEqual([false, true, false]);
+    expect(active(pins)).toEqual([false, true, false]);
+  });
+
+  it('pans to a hidden pin when its card is picked, but not to a visible one', async () => {
+    const { cards, map, mapEl } = await threePlaces();
+    const easeTo = vi.fn();
+    const m = map as unknown as Record<string, unknown>;
+    m.easeTo = easeTo;
+    (mapEl as { clientHeight?: number }).clientHeight = 500;
+    mapEl.clientWidth = 600;
+
+    // In view, above the carousel.
+    m.project = () => ({ x: 300, y: 200 });
+    cards[1].__fireClick();
+    expect(easeTo).not.toHaveBeenCalled();
+
+    // Behind the carousel.
+    m.project = () => ({ x: 300, y: 450 });
+    cards[2].__fireClick();
+    expect(easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({ center: { lng: 1, lat: 2 } })
+    );
+  });
+});
+
+describe('mapAppHtml results carousel: hours today', () => {
+  const { hoursToday } = loadScriptSandbox();
+  // 2026-10-19 is a Monday; 2026-10-25 a Sunday.
+  const monday = new Date(2026, 9, 19, 12);
+  const sunday = new Date(2026, 9, 25, 12);
+
+  it.each([
+    ['24/7', monday, 'Open 24 hours'],
+    ['Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00', monday, 'Today 07:00–19:00'],
+    ['Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00', sunday, 'Today 08:00–17:00'],
+    ['Mo 09:00-12:00,13:00-17:00', monday, 'Today 09:00–12:00, 13:00–17:00'],
+    ['Mo-Su 08:00-20:00; Su off', sunday, 'Closed today'],
+    ['Fr-Mo 10:00-22:00', monday, 'Today 10:00–22:00'],
+    ['Tu-Sa 10:00-18:00', monday, null],
+    ['Mo-Fr 07:00-19:00; PH off', monday, null],
+    ['Mo 9am-5pm', monday, null],
+    ['', monday, null],
+    [undefined, monday, null]
+  ])('%s', (spec, now, expected) => {
+    expect(hoursToday?.(spec, now)).toBe(expected);
   });
 });

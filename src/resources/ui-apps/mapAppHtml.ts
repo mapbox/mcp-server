@@ -85,51 +85,66 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     cursor: pointer;
   }
-  #side-panel {
-    position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 10;
-    width: 280px; max-width: calc(100% - 24px);
-    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
-    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    display: flex; flex-direction: column; overflow: hidden;
+  /* Selected place (see selectPlace): the pin inverts and shows its name,
+     like the card it matches. */
+  .marker-badge.active {
+    background: #fff !important; color: #0f172a;
+    transform: scale(1.18); box-shadow: 0 3px 10px rgba(0,0,0,0.5);
   }
-  #side-panel .panel-head {
-    padding: 10px 12px; font-size: 13px; font-weight: 600;
-    border-bottom: 1px solid rgba(255,255,255,0.12); flex: 0 0 auto;
-    display: flex; justify-content: space-between; gap: 8px; cursor: pointer;
+  .marker-badge .marker-name {
+    display: none; position: absolute; top: 32px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; font-size: 11px; font-weight: 600; color: #0f172a;
+    background: rgba(255,255,255,0.92); padding: 1px 6px; border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;
   }
-  /* Click the heading to collapse the list (see togglePanel). */
-  #side-panel .panel-head::after { content: '▾'; opacity: 0.7; }
-  #side-panel.collapsed { bottom: auto; }
-  #side-panel.collapsed .panel-list { display: none; }
-  #side-panel.collapsed .panel-head { border-bottom: none; }
-  #side-panel.collapsed .panel-head::after { content: '▸'; }
-  #side-panel .panel-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
-  #side-panel .panel-item {
-    display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer;
+  .marker-badge.active .marker-name { display: block; }
+  /* Results carousel. Sits above the Mapbox logo and attribution, which
+     must stay visible; the legend moves up above it (see showCarousel). */
+  #carousel { position: absolute; left: 0; right: 0; bottom: 36px; z-index: 10; }
+  #carousel .card-list {
+    list-style: none; margin: 0; padding: 4px 32px 6px;
+    display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; scrollbar-width: none;
   }
-  #side-panel .panel-item:hover { background: rgba(255,255,255,0.08); }
-  /* Only added once a photo has loaded (see loadPanelPhoto), at the end of
-     the row so names stay aligned whether or not a row has one. */
-  #side-panel .panel-thumb {
-    flex: 0 0 auto; width: 40px; height: 40px; border-radius: 6px; margin-left: auto;
+  #carousel .card-list::-webkit-scrollbar { display: none; }
+  #carousel .card {
+    flex: 0 0 auto; width: 300px; max-width: calc(100vw - 64px); min-height: 84px;
+    scroll-snap-align: center;
+    display: flex; align-items: center; gap: 10px; padding: 10px;
+    background: rgba(15, 23, 42, 0.92); color: #f1f5f9;
+    border: 2px solid transparent; border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35); cursor: pointer;
+  }
+  #carousel .card.active { border-color: #f8fafc; }
+  /* Added once a photo loads (see loadPanelPhoto), after the text in the
+     DOM but shown first. */
+  #carousel .card-thumb {
+    order: -1; flex: 0 0 auto; width: 64px; height: 64px; border-radius: 10px;
     background-size: cover; background-position: center;
   }
-  /* Visit-order badge, matching the numbered map marker. */
-  #side-panel .panel-badge {
-    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; margin-top: 1px;
+  /* Matches the numbered pin. */
+  #carousel .card-badge {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
     background: #f97316; color: #1a0f04;
     display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 700;
+    font-size: 11px; font-weight: 700;
   }
-  #side-panel .panel-name { font-size: 12.5px; font-weight: 600; }
-  #side-panel .panel-meta { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
+  #carousel .card-body { flex: 1 1 auto; min-width: 0; }
+  #carousel .card-name {
+    font-size: 14px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #carousel .card-meta, #carousel .card-extra {
+    font-size: 12px; color: #cbd5e1; margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="summary" style="display:none"></div>
 <div id="legend" style="display:none"></div>
-<div id="side-panel" style="display:none"></div>
+<div id="carousel" style="display:none"></div>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
 ${initialDataScript}
@@ -143,9 +158,9 @@ ${initialDataScript}
   var errorEl = document.getElementById('error');
   var summaryEl = document.getElementById('summary');
   var legendEl = document.getElementById('legend');
-  var panelEl = document.getElementById('side-panel');
-  // Populated by buildSearchMiniPayload's marker tagging so the panel (click
-  // -> flyTo) and Place Details enrichment can find a marker by mapbox_id
+  var carouselEl = document.getElementById('carousel');
+  // Populated by buildSearchMiniPayload's marker tagging so the carousel (card
+  // <-> pin) and Place Details enrichment can find a marker by mapbox_id
   // without re-querying the map for it.
   var markersById = {};
 
@@ -439,7 +454,8 @@ ${initialDataScript}
     trackedSourceIds = [];
     trackedMarkers = [];
     markersById = {};
-    panelEl.style.display = 'none';
+    carouselEl.style.display = 'none';
+    legendEl.style.bottom = '';
     clearPanel();
     // Place Details responses still in flight belong to the old render.
     panelGeneration += 1;
@@ -527,31 +543,49 @@ ${initialDataScript}
       marker = new mapboxgl.Marker({ color: color });
     }
     marker.setLngLat(m.coordinates);
-    if (m.popup) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
+    // A place with an id gets a carousel card instead of a popup: clicking
+    // its pin selects the card (see selectPlace).
+    if (m.popup && !m.id) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
     marker.addTo(map);
     trackedMarkers.push(marker);
     // Tagged by buildSearchMiniPayload with the result's mapbox_id so the
-    // side panel (click-to-flyTo) and Place Details enrichment can look the
-    // marker back up later without walking trackedMarkers.
-    if (m.id) markersById[m.id] = { marker: marker, popupText: m.popup || '' };
+    // carousel and Place Details enrichment can look the marker back up
+    // later without walking trackedMarkers.
+    if (m.id) {
+      var badgeEl = typeof marker.getElement === 'function' ? marker.getElement() : null;
+      markersById[m.id] = { marker: marker, el: badgeEl, color: color };
+      if (badgeEl && m.name) {
+        var nameEl = document.createElement('span');
+        nameEl.className = 'marker-name';
+        nameEl.textContent = m.name;
+        badgeEl.appendChild(nameEl);
+      }
+      if (badgeEl && typeof badgeEl.addEventListener === 'function') {
+        var placeId = m.id;
+        badgeEl.addEventListener('click', function(e) {
+          if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+          selectPlace(placeId, { scrollCard: true });
+        });
+      }
+    }
     bbox.extend(m.coordinates);
   }
 
-  // Guarantees a marker that opts into the side panel (has .id) also gets
-  // a visible number on the map matching its panel row, unless the caller
+  // Guarantees a marker that opts into the carousel (has .id) also gets
+  // a visible number on the map matching its card, unless the caller
   // already gave it an explicit label. Without this, a caller that builds
   // plain unlabeled pins for POI markers (observed live: Claude did this
   // for inline markers, leaving the map showing generic blue pins with no
-  // way to tell which panel row is which) breaks the whole point of the
-  // panel numbering. Mutates markers in place, so it must run before
+  // way to tell which card is which) breaks the whole point of the
+  // numbering. Mutates markers in place, so it must run before
   // addOneMarker draws them.
   //
   // Numbering runs across the whole render, not per call: a render can
   // draw inline markers and then merge in self-fetched search results, and
   // each set arrives numbered from 1. The first set keeps the caller's
   // numbers when they're unique (a visit order, say); a later set, or one
-  // with repeated numbers, is renumbered to continue the panel's count.
-  // Letter labels ("A") are kept as they are. A place already in the panel
+  // with repeated numbers, is renumbered to continue the carousel's count.
+  // Letter labels ("A") are kept as they are. A place already in the carousel
   // this render is dropped rather than drawn and listed twice. Returns the
   // markers to draw.
   function applyPanelNumbering(markers) {
@@ -598,26 +632,30 @@ ${initialDataScript}
     return n > 0 && String(n) === String(label);
   }
 
-  // Bottom padding that keeps fitted data out from under the legend
-  // (bottom-left), unless the map is too short to spare the room.
+  // Bottom padding that keeps fitted data out from under the carousel and
+  // the legend above it, unless the map is too short to spare the room.
   function bottomPadding() {
-    if (legendEl.style.display !== 'block') return 50;
-    var bottom = (legendEl.offsetHeight || 0) + 24;
+    var bottom = 0;
+    if (carouselEl.style.display === 'block') bottom = carouselTop() + 12;
+    if (legendEl.style.display === 'block') {
+      bottom = Math.max(bottom, legendTop() + 12);
+    }
     var el = document.getElementById('map');
     var height = (el && el.clientHeight) || window.innerHeight || 0;
-    if (bottom <= 50 || (height && height - bottom - 70 < 160)) return 50;
+    if (bottom <= 50 || (height && height - bottom - 70 < 120)) return 50;
     return bottom;
   }
 
-  // Right padding that keeps fitted data out from under an open panel. On
-  // a narrow map there's no room beside it, so fit as if it weren't there
-  // (the panel starts collapsed there anyway; see appendPanelRows).
-  function rightPadding() {
-    if (panelEl.style.display !== 'flex' || panelCollapsed) return 30;
-    var right = (panelEl.offsetWidth || 280) + 24;
-    var mapWidth = mapContainerWidth();
-    if (mapWidth && mapWidth - right < 240) return 30;
-    return right;
+  // Distance from the bottom of the map to the top of the carousel. 36px
+  // keeps it clear of the Mapbox logo and attribution.
+  var CAROUSEL_BOTTOM = 36;
+  function carouselTop() {
+    return CAROUSEL_BOTTOM + (carouselEl.offsetHeight || 100);
+  }
+
+  function legendTop() {
+    var bottom = parseInt(legendEl.style.bottom, 10) || 12;
+    return bottom + (legendEl.offsetHeight || 0);
   }
 
   function mapContainerWidth() {
@@ -631,7 +669,7 @@ ${initialDataScript}
     setTimeout(function() {
       map.resize();
       map.fitBounds(bounds, {
-        padding: { top: 70, bottom: bottomPadding(), left: 30, right: rightPadding() },
+        padding: { top: 70, bottom: bottomPadding(), left: 30, right: 30 },
         duration: 600
       });
     }, 60);
@@ -653,7 +691,7 @@ ${initialDataScript}
       summaryEl.textContent = payload.summary;
       summaryEl.style.display = 'block';
     }
-    maybeShowSidePanel(markers, payload.summary);
+    maybeShowSidePanel(markers);
     var bounds = bbox.bounds();
     if (bounds) fitToBounds(bounds);
   }
@@ -698,8 +736,8 @@ ${initialDataScript}
     // Covers both inline markers (a caller-composed payload) and self-fetch
     // markers (merged in later via mergeAdditionalPayload) — see
     // maybeShowSidePanel below. Whichever path produced id-bearing POI
-    // markers gets the same results panel.
-    maybeShowSidePanel(markers, payload.summary);
+    // markers gets the same results carousel.
+    maybeShowSidePanel(markers);
 
     // Legend
     if (Array.isArray(payload.legend) && payload.legend.length > 0) {
@@ -1412,8 +1450,8 @@ ${initialDataScript}
       var coords = f.geometry.coordinates;
       // id/name/category/distanceMeters are the same generic POI fields an
       // inline (hand-composed) marker can carry — see maybeShowSidePanel,
-      // which builds the results panel from either source identically.
-      // mapbox_id is missing on the rare result that lacks one; the panel
+      // which builds the results carousel from either source identically.
+      // mapbox_id is missing on the rare result that lacks one; the carousel
       // just skips that row rather than show an unclickable/unenrichable
       // entry.
       markers.push({
@@ -1457,22 +1495,20 @@ ${initialDataScript}
     return { summary: summary, layers: layers, markers: markers };
   }
 
-  // --- Side panel: result list + Place Details enrichment ----------------
+  // --- Results carousel: one card per place + Place Details enrichment ---
   // Triggered generically by maybeShowSidePanel for ANY marker set that
   // includes id-bearing entries — self-fetch search/category-search
   // results (via mergeAdditionalPayload) and hand-composed inline markers
   // from render_map_tool's own "markers" input (via renderBody) both funnel
   // through the same path. Renders the initial (Search Box-only, or
-  // whatever the caller already provided) list immediately so the panel
-  // never blocks on the slower enrichment call. sourceLabel is plain text
-  // shown as the panel heading (e.g. the query, category, or the payload's
-  // own summary).
+  // whatever the caller already provided) cards immediately so the
+  // carousel never blocks on the slower enrichment call.
   function derivePanelItems(markers) {
     if (!Array.isArray(markers)) return [];
     var items = [];
     markers.forEach(function(m) {
       if (!m || !m.id) return;
-      // The pin's own label, so a row reads the same as its pin ("A" too).
+      // The pin's own label, so a card reads the same as its pin ("A" too).
       var badge = isWholeNumber(m.label) ? parseInt(m.label, 10)
         : (m.label ? String(m.label) : items.length + 1);
       items.push({
@@ -1489,16 +1525,16 @@ ${initialDataScript}
   // Exposed so tests can exercise the pure derivation logic without a DOM.
   window.__derivePanelItems = derivePanelItems;
 
-  // Adds rows for places not yet in this render's panel and enriches just
-  // those. A response is applied only if no newer render has started since
-  // (panelGeneration), so a slow lookup can't write into a newer panel.
-  function maybeShowSidePanel(markers, summary) {
+  // Adds cards for places not yet in this render's carousel and enriches
+  // just those. A response is applied only if no newer render has started
+  // since (panelGeneration), so a slow lookup can't write into newer cards.
+  function maybeShowSidePanel(markers) {
     var items = derivePanelItems(markers).filter(function(it) {
       return !panelIds[it.id];
     });
     if (items.length === 0) return;
     items.forEach(function(it) { panelIds[it.id] = true; });
-    appendPanelRows(items, summary || 'Results');
+    appendCards(items);
     var generation = panelGeneration;
     fetchPlaceDetailsBatch(
       items.map(function(it) { return it.id; }),
@@ -1509,29 +1545,92 @@ ${initialDataScript}
     });
   }
 
-  // Keyed by mapbox_id -> { li, meta } elements, so enrichSidePanel can
-  // update a row directly once Place Details resolves, without re-parsing
-  // panelEl's markup back into a queryable DOM (innerHTML + querySelector
+  // Keyed by mapbox_id -> { li, meta, body } elements, so enrichSidePanel
+  // can update a card directly once Place Details resolves, without
+  // re-parsing markup back into a queryable DOM (innerHTML + querySelector
   // round-trips don't work in every MCP Apps host's iframe sandbox, and
   // building real nodes up front is simpler to reason about either way).
-  // Reset by clearPanel, same lifecycle as the panel itself.
+  // Reset by clearPanel, same lifecycle as the carousel itself.
   var panelRowsById = {};
   // Bumped by teardown(), so responses from an earlier render are dropped.
   var panelGeneration = 0;
   // Id-bearing markers numbered so far this render, and the ids listed.
   var panelCount = 0;
   var panelIds = {};
-  // The viewer's collapse choice, kept across renders; null until the first
-  // panel decides a default from the map's width.
-  var panelCollapsed = null;
-  var panelListEl = null;
+  var cardListEl = null;
+  var cardOrder = [];
+  var activePlaceId = null;
 
-  function buildPanelRow(it) {
+  // classList when there is one: GL JS adds its own classes to a marker's
+  // element, which assigning className would wipe out.
+  function setActiveClass(el, on) {
+    if (!el) return;
+    if (el.classList && typeof el.classList.toggle === 'function') {
+      el.classList.toggle('active', on);
+      return;
+    }
+    var names = String(el.className || '').split(' ').filter(function(c) {
+      return c && c !== 'active';
+    });
+    if (on) names.push('active');
+    el.className = names.join(' ');
+  }
+
+  // Highlights one place: its card gets a border and its pin inverts and
+  // shows the name. scrollCard brings the card into view (a pin was
+  // clicked); panTo moves the map when the pin is hidden (a card was
+  // picked).
+  function selectPlace(id, opts) {
+    var row = panelRowsById[id];
+    if (!row) return;
+    opts = opts || {};
+    if (activePlaceId !== id) {
+      if (activePlaceId) {
+        var prevRow = panelRowsById[activePlaceId];
+        var prevPin = markersById[activePlaceId];
+        if (prevRow) setActiveClass(prevRow.li, false);
+        if (prevPin && prevPin.el) {
+          setActiveClass(prevPin.el, false);
+          prevPin.el.style.zIndex = '';
+        }
+      }
+      activePlaceId = id;
+      setActiveClass(row.li, true);
+      var pin = markersById[id];
+      if (pin && pin.el) {
+        setActiveClass(pin.el, true);
+        pin.el.style.zIndex = '2';
+      }
+    }
+    if (opts.scrollCard && typeof row.li.scrollIntoView === 'function') {
+      row.li.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+    if (opts.panTo) panToIfHidden(id);
+  }
+  window.__selectPlace = selectPlace;
+
+  // Moves the map only when the pin is off screen or under the carousel,
+  // so swiping through nearby results doesn't keep shifting it.
+  function panToIfHidden(id) {
+    var entry = markersById[id];
+    if (!entry || !map || typeof map.project !== 'function') return;
+    var lngLat = entry.marker.getLngLat();
+    var p = map.project(lngLat);
+    var el = document.getElementById('map');
+    var width = (el && el.clientWidth) || 0;
+    var height = (el && el.clientHeight) || 0;
+    if (!width || !height) return;
+    var visibleBottom = height - carouselTop() - 8;
+    if (p.x >= 24 && p.x <= width - 24 && p.y >= 24 && p.y <= visibleBottom) return;
+    map.easeTo({ center: lngLat, offset: [0, -carouselTop() / 2], duration: 500 });
+  }
+
+  function buildCard(it) {
     var li = document.createElement('li');
-    li.className = 'panel-item';
+    li.className = 'card';
 
     var badge = document.createElement('span');
-    badge.className = 'panel-badge';
+    badge.className = 'card-badge';
     badge.textContent = String(it.number);
     // Match the pin when the caller colored it (e.g. gray for "other
     // results" next to a legend); the default orange is in the CSS.
@@ -1542,7 +1641,7 @@ ${initialDataScript}
     }
 
     var name = document.createElement('div');
-    name.className = 'panel-name';
+    name.className = 'card-name';
     name.textContent = it.name;
 
     var metaParts = [];
@@ -1551,67 +1650,129 @@ ${initialDataScript}
       metaParts.push(Math.round(it.distanceMeters) + ' m');
     }
     var meta = document.createElement('div');
-    meta.className = 'panel-meta';
+    meta.className = 'card-meta';
     meta.textContent = metaParts.join(' · ');
 
     var body = document.createElement('div');
+    body.className = 'card-body';
     body.appendChild(name);
     body.appendChild(meta);
     li.appendChild(badge);
     li.appendChild(body);
 
     li.addEventListener('click', function() {
-      var entry = markersById[it.id];
-      if (entry) map.flyTo({ center: entry.marker.getLngLat(), zoom: 15, duration: 500 });
+      selectPlace(it.id, { scrollCard: true, panTo: true });
     });
 
-    panelRowsById[it.id] = { li: li, meta: meta };
+    panelRowsById[it.id] = { li: li, meta: meta, body: body };
     return li;
   }
 
   function clearPanel() {
-    while (panelEl.firstChild) panelEl.removeChild(panelEl.firstChild);
+    while (carouselEl.firstChild) carouselEl.removeChild(carouselEl.firstChild);
     panelRowsById = {};
-    panelListEl = null;
+    cardListEl = null;
+    cardOrder = [];
+    activePlaceId = null;
   }
 
-  function applyPanelCollapsed() {
-    panelEl.className = panelCollapsed ? 'collapsed' : '';
+  // Swiping selects whichever card ends up in the middle.
+  var scrollTimer = null;
+  function onCardScroll() {
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function() {
+      scrollTimer = null;
+      if (!cardListEl) return;
+      var center = (cardListEl.scrollLeft || 0) + (cardListEl.clientWidth || 0) / 2;
+      var best = null;
+      var bestDist = Infinity;
+      cardOrder.forEach(function(id) {
+        var row = panelRowsById[id];
+        if (!row) return;
+        var mid = (row.li.offsetLeft || 0) + (row.li.offsetWidth || 0) / 2;
+        var d = Math.abs(mid - center);
+        if (d < bestDist) { bestDist = d; best = id; }
+      });
+      if (best && best !== activePlaceId) selectPlace(best, { panTo: true });
+    }, 120);
   }
 
-  function togglePanel() {
-    panelCollapsed = !panelCollapsed;
-    applyPanelCollapsed();
-    if (lastFitBounds) fitToBounds(lastFitBounds);
-  }
-
-  // Creates the panel on the render's first id-bearing markers, and adds
-  // rows to it for later ones (e.g. search results merged in after inline
-  // markers), so every numbered pin has a row.
-  function appendPanelRows(items, sourceLabel) {
+  // Creates the carousel on the render's first id-bearing markers, and adds
+  // cards for later ones (e.g. search results merged in after inline
+  // markers), so every numbered pin has a card. The first card starts
+  // selected.
+  function appendCards(items) {
     if (!Array.isArray(items) || items.length === 0) return;
-    if (!panelListEl) {
-      var head = document.createElement('div');
-      head.className = 'panel-head';
-      head.textContent = sourceLabel || 'Results';
-      head.addEventListener('click', togglePanel);
-
-      panelListEl = document.createElement('ul');
-      panelListEl.className = 'panel-list';
-
-      panelEl.appendChild(head);
-      panelEl.appendChild(panelListEl);
-      // On a narrow map the open panel would cover most of it.
-      if (panelCollapsed === null) {
-        var width = mapContainerWidth();
-        panelCollapsed = width > 0 && width < 560;
-      }
-      applyPanelCollapsed();
-      panelEl.style.display = 'flex';
+    var created = false;
+    if (!cardListEl) {
+      cardListEl = document.createElement('ul');
+      cardListEl.className = 'card-list';
+      cardListEl.addEventListener('scroll', onCardScroll);
+      carouselEl.appendChild(cardListEl);
+      carouselEl.style.display = 'block';
+      created = true;
     }
-    var list = panelListEl;
-    items.forEach(function(it) { list.appendChild(buildPanelRow(it)); });
+    var list = cardListEl;
+    items.forEach(function(it) {
+      list.appendChild(buildCard(it));
+      cardOrder.push(it.id);
+    });
+    // The legend (bottom-left) moves up above the cards.
+    legendEl.style.bottom = (carouselTop() + 8) + 'px';
+    if (created) selectPlace(items[0].id);
   }
+
+  // Today's hours from a Places API opening_hours string, which uses OSM
+  // syntax: "Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00", "Mo 09:00-12:00,13:00-17:00",
+  // "Su off", "24/7". Returns null for anything else (holidays, months, week
+  // numbers), so a card shows no hours rather than wrong ones. "Today" is
+  // the viewer's day, which can differ from the place's near midnight when
+  // they're in different time zones.
+  var OSM_WEEK = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+  var HOURS_RANGE = /^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$/;
+  function osmDaysInclude(days, day) {
+    var parts = days.split(',');
+    var hit = false;
+    for (var i = 0; i < parts.length; i++) {
+      var ends = parts[i].split('-');
+      var a = OSM_WEEK.indexOf(ends[0]);
+      var b = ends.length === 2 ? OSM_WEEK.indexOf(ends[1]) : a;
+      if (a === -1 || b === -1 || ends.length > 2) return null;
+      var d = OSM_WEEK.indexOf(day);
+      if (a <= b ? (d >= a && d <= b) : (d >= a || d <= b)) hit = true;
+    }
+    return hit;
+  }
+  function hoursToday(spec, now) {
+    if (typeof spec !== 'string') return null;
+    var text = spec.trim();
+    if (!text) return null;
+    if (text === '24/7') return 'Open 24 hours';
+    var day = OSM_WEEK[(now.getDay() + 6) % 7];
+    var result = null;
+    var rules = text.split(';');
+    for (var i = 0; i < rules.length; i++) {
+      var rule = rules[i].trim();
+      if (!rule) continue;
+      var space = rule.indexOf(' ');
+      if (space === -1) return null;
+      var applies = osmDaysInclude(rule.slice(0, space), day);
+      if (applies === null) return null;
+      var times = rule.slice(space + 1).trim();
+      var ranges = times === 'off' || times === 'closed' ? [] : times.split(',');
+      for (var j = 0; j < ranges.length; j++) {
+        if (!HOURS_RANGE.test(ranges[j].trim())) return null;
+      }
+      // In OSM a later rule for the same day overrides an earlier one.
+      if (applies) {
+        result = ranges.length === 0
+          ? 'Closed today'
+          : 'Today ' + ranges.map(function(r) { return r.trim().replace('-', '–'); }).join(', ');
+      }
+    }
+    return result;
+  }
+  window.__hoursToday = hoursToday;
 
   // Search Box results mix Mapbox-native POI ids (decode to
   // "urn:mbxpoi:<uuid>") with OSM-sourced ones (decode to
@@ -1637,7 +1798,7 @@ ${initialDataScript}
 
   // Places API Details endpoint — batch form. Mirrors the single-record
   // GET src/tools/place-details-tool/PlaceDetailsTool.ts calls server-side,
-  // but the panel needs details for every result at once, so this uses the
+  // but the carousel needs details for every result at once, so this uses the
   // POST /details/retrieve batch form (up to 100 ids) instead of one
   // request per pin. Docs: https://docs.mapbox.com/api/search/places/
   // Like every other self-fetch call, this runs client-side against the
@@ -1672,18 +1833,18 @@ ${initialDataScript}
       });
     };
     return post(compatibleIds.slice(0, 100), false)
-      // Enrichment is a nice-to-have on top of an already-rendered panel —
+      // Enrichment is a nice-to-have on top of already-rendered cards —
       // Public Preview quota (1,000 records/month) or a transient error
       // here should never surface as a map error, just leave the
-      // Search-Box-only rows as they are.
+      // Search-Box-only cards as they are.
       .catch(function() { return null; });
   }
 
   // Place Details photos are hosted wherever each business's site hosts
   // them, so the in-chat CSP (mapAppCsp.ts) can't allow them. Inside a host,
   // the page asks the server for the photo (PlacePhotoResource, by mapbox_id)
-  // and shows it as a data: URL. A standalone page from export_map_html_tool
-  // has no host and no CSP, so it loads the photo URL directly.
+  // and shows it as a data: URL. A page with no host has no CSP of ours, so
+  // it loads the photo URL directly.
   var MAX_PANEL_PHOTOS = 10;
   var EMBEDDED = window.parent !== window;
   var PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -1691,17 +1852,17 @@ ${initialDataScript}
 
   function loadPanelPhoto(row, id, photoUrl) {
     var show = function(src) {
-      // A later render may have replaced the panel while this loaded.
+      // A later render may have replaced the carousel while this loaded.
       if (panelRowsById[id] !== row) return;
       var thumb = document.createElement('span');
-      thumb.className = 'panel-thumb';
+      thumb.className = 'card-thumb';
       thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
       row.li.appendChild(thumb);
     };
     if (!EMBEDDED || !hostAnswered) {
-      // No MCP host (a standalone or framed exported page), so no CSP of
-      // ours either. Load it first: some sites refuse hotlinked photos (403), which
-      // would leave an empty box in the row.
+      // No MCP host (a standalone or framed page), so no CSP of ours
+      // either. Load it first: some sites refuse hotlinked photos (403),
+      // which would leave an empty box on the card.
       if (photoUrl.indexOf('https://') !== 0 || typeof Image !== 'function') return;
       var img = new Image();
       img.onload = function() { show(photoUrl); };
@@ -1726,23 +1887,26 @@ ${initialDataScript}
     detailsResult.results.forEach(function(place) {
       if (!place || !place.mapbox_id) return;
       var row = panelRowsById[place.mapbox_id];
-      if (row) {
-        var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
-        if (typeof photoUrl === 'string' && photosRequested < MAX_PANEL_PHOTOS) {
-          photosRequested++;
-          loadPanelPhoto(row, place.mapbox_id, photoUrl);
-        }
-        if (place.score && typeof place.score.popularity === 'number') {
-          var extra = Math.round(place.score.popularity * 100) + '% popularity';
-          row.meta.textContent = row.meta.textContent ? row.meta.textContent + ' · ' + extra : extra;
-        }
+      if (!row) return;
+      var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
+      if (typeof photoUrl === 'string' && photosRequested < MAX_PANEL_PHOTOS) {
+        photosRequested++;
+        loadPanelPhoto(row, place.mapbox_id, photoUrl);
       }
-
-      var entry = markersById[place.mapbox_id];
-      if (entry && place.phone) {
-        entry.marker.setPopup(
-          new mapboxgl.Popup().setText(entry.popupText + ' — ' + place.phone)
-        );
+      if (place.score && typeof place.score.popularity === 'number') {
+        var extra = Math.round(place.score.popularity * 100) + '% popularity';
+        row.meta.textContent = row.meta.textContent ? row.meta.textContent + ' · ' + extra : extra;
+      }
+      // Today's hours and the phone number on a second line.
+      var lineParts = [];
+      var hours = hoursToday(place.opening_hours, new Date());
+      if (hours) lineParts.push(hours);
+      if (typeof place.phone === 'string' && place.phone) lineParts.push(place.phone);
+      if (lineParts.length > 0) {
+        var line = document.createElement('div');
+        line.className = 'card-extra';
+        line.textContent = lineParts.join(' · ');
+        row.body.appendChild(line);
       }
     });
   }
