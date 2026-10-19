@@ -516,6 +516,21 @@ Finds the optimal route through multiple locations using the [Mapbox Optimizatio
 
 **Note**: A V2 API with advanced features (time windows, capacity constraints, multiple vehicles) is available but requires beta access. The V2 implementation is included in the codebase but not registered by default.
 
+#### Feedback tool
+
+Reports a problem with Mapbox map, place or routing data to Mapbox through the [Mapbox Feedback API](https://docs.mapbox.com/api/feedback/) (Public Preview). Mapbox reviews each report and may fix the data. Use it for things like:
+
+- A place that has closed, has wrong details, or sits on the wrong spot
+- A place or address that can't be found
+- A closed road, a wrong speed limit, or traffic shown wrong
+- A route with an illegal turn or entrance, or no route at all
+
+It sends the report text, a category and the location, and returns the report's id and status. Nothing is sent without the user's go-ahead: clients that support elicitation show a confirmation prompt first, and the tool description asks the model to confirm in chat everywhere else.
+
+**Requirements**: the access token needs the `user-feedback:write` scope. Without it the tool returns an error saying so. To leave the tool out, start the server with `--disable-tools feedback_tool`.
+
+**Example Usage**: "Blue Bottle on Mint St closed last year, can you report that to Mapbox?"
+
 # Development
 
 ## Inspecting server

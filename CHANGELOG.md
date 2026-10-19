@@ -1,5 +1,14 @@
 ## Unreleased
 
+### New Features
+
+- **`feedback_tool`: report wrong map, place or routing data to Mapbox (#290).** When someone says a place has closed, a road is closed, or a route took an illegal turn, the agent can send it to the [Feedback API](https://docs.mapbox.com/api/feedback/) (`POST /user-feedback/v1/feedback`, Public Preview) with the text, a category and the location, usually taken from an earlier search or directions result. It returns the report's id and status (`received`).
+  - **Confirm first:** the report goes to Mapbox under the user's account, so the description tells the model to show the user what it will send and get a yes. Clients that support elicitation also get a confirmation prompt from the tool itself. Declining sends nothing, and so does a failed prompt.
+  - **Categories:** an enum of the Feedback Agent's default categories that make sense from chat (`poi_closed`, `poi_details`, `road_closure_issue`, `illegal_turn` and so on), leaving out the navigation-app ones such as voice guidance and rerouting.
+  - **No duplicates on retry:** the HTTP pipeline retries 5xx and 429 responses, POSTs included, so the tool picks the item `id` itself and a retry resends the same item. If the report goes through but the response body is unexpected, the tool still reports success with the id it sent, so the model doesn't send it again.
+  - **Token scope:** it needs `user-feedback:write`. On a 401 or 403 the error says so. `--disable-tools feedback_tool` leaves it out.
+  - Annotated `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`. The location goes as top-level `lat`/`lon`; the optional GeoJSON `feature` and `screenshot` fields aren't sent yet, since the docs give `feature` coordinates as `[latitude, longitude]` and that needs checking first.
+
 ## 0.16.1-dev - 2026-10-16
 
 ## 0.16.0 - 2026-10-15
