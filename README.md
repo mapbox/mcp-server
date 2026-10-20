@@ -82,6 +82,7 @@ Each of the four prompts below exercises a different strategy in one tool call:
 
 - "Get driving directions from LAX to Hollywood with current traffic"
 - "How long would it take to walk from Central Park to Times Square?"
+- "How much climbing is on a bike ride from the Ferry Building to Twin Peaks?"
 - "Calculate travel time from my hotel (Four Seasons) to JFK Airport by taxi during rush hour"
 
 ### Visualization & Maps
@@ -515,6 +516,18 @@ Finds the optimal route through multiple locations using the [Mapbox Optimizatio
 **Example Usage**: "Find the optimal route to visit these 5 stops: [list of addresses or coordinates]"
 
 **Note**: A V2 API with advanced features (time windows, capacity constraints, multiple vehicles) is available but requires beta access. The V2 implementation is included in the codebase but not registered by default.
+
+#### Elevation tool
+
+Gets ground elevation from Mapbox's terrain data ([Mapbox Terrain-DEM v1](https://docs.mapbox.com/data/tilesets/reference/mapbox-terrain-dem-v1/)). Give it up to 25 places for the height above sea level of each, or a line for:
+
+- Total climb and descent
+- The highest and lowest points, and how far along the line they are
+- An elevation profile of up to 50 points
+
+The line can be a `path` of coordinates, or the `directions_ref` from a `directions_tool` result, which the tool turns back into the full route itself. The server reads the terrain tiles and decodes each pixel's height, so values aren't rounded to contour steps the way Tilequery's Terrain v2 contours are. Points along a line share tiles, and long lines are read at a coarser zoom so a call stays under 50 tile requests; `resolution_m` in the result says how coarse. Swings under 2 m don't count toward climb or descent, so DEM noise on flat ground doesn't add up. Heights are of the ground, not of buildings or bridges. The result includes a map ref with the line and its high and low points.
+
+**Example Usage**: "How hilly is the bike route from the Ferry Building to Twin Peaks?" or "How high is Longs Peak?"
 
 #### Feedback tool
 
