@@ -564,7 +564,7 @@ ${initialDataScript}
         var placeId = m.id;
         badgeEl.addEventListener('click', function(e) {
           if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
-          selectPlace(placeId, { scrollCard: true });
+          selectPlace(placeId, { scrollCard: true, panTo: true });
         });
       }
     }
@@ -1609,8 +1609,10 @@ ${initialDataScript}
   }
   window.__selectPlace = selectPlace;
 
-  // Moves the map only when the pin is off screen or under the carousel,
-  // so swiping through nearby results doesn't keep shifting it.
+  // Moves the map only when the pin, or the name label under it, is off
+  // screen or under the carousel, so swiping through nearby results
+  // doesn't keep shifting it.
+  var PIN_LABEL_ROOM = 52;
   function panToIfHidden(id) {
     var entry = markersById[id];
     if (!entry || !map || typeof map.project !== 'function') return;
@@ -1620,9 +1622,13 @@ ${initialDataScript}
     var width = (el && el.clientWidth) || 0;
     var height = (el && el.clientHeight) || 0;
     if (!width || !height) return;
-    var visibleBottom = height - carouselTop() - 8;
+    var visibleBottom = height - carouselTop() - PIN_LABEL_ROOM;
     if (p.x >= 24 && p.x <= width - 24 && p.y >= 24 && p.y <= visibleBottom) return;
-    map.easeTo({ center: lngLat, offset: [0, -carouselTop() / 2], duration: 500 });
+    // Just far enough to bring it 24px inside the visible area, so the
+    // pins around it mostly stay in view.
+    var x = Math.min(Math.max(p.x, 48), width - 48);
+    var y = Math.min(Math.max(p.y, 48), Math.max(48, visibleBottom - 24));
+    map.panBy([p.x - x, p.y - y], { duration: 500 });
   }
 
   function buildCard(it) {

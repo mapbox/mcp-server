@@ -2991,23 +2991,41 @@ describe('mapAppHtml results carousel: selecting a place', () => {
 
   it('pans to a hidden pin when its card is picked, but not to a visible one', async () => {
     const { cards, map, mapEl } = await threePlaces();
-    const easeTo = vi.fn();
+    const panBy = vi.fn();
     const m = map as unknown as Record<string, unknown>;
-    m.easeTo = easeTo;
+    m.panBy = panBy;
     (mapEl as { clientHeight?: number }).clientHeight = 500;
     mapEl.clientWidth = 600;
 
     // In view, above the carousel.
     m.project = () => ({ x: 300, y: 200 });
     cards[1].__fireClick();
-    expect(easeTo).not.toHaveBeenCalled();
+    expect(panBy).not.toHaveBeenCalled();
 
     // Behind the carousel.
     m.project = () => ({ x: 300, y: 450 });
     cards[2].__fireClick();
-    expect(easeTo).toHaveBeenCalledWith(
-      expect.objectContaining({ center: { lng: 1, lat: 2 } })
-    );
+    // Carousel top is 364, so the pin goes to 364 - 52 - 24 = 288.
+    expect(panBy).toHaveBeenCalledWith([0, 162], { duration: 500 });
+  });
+
+  it('pans when only the name label would sit behind the carousel', async () => {
+    const { cards, pins, map, mapEl } = await threePlaces();
+    const panBy = vi.fn();
+    const m = map as unknown as Record<string, unknown>;
+    m.panBy = panBy;
+    (mapEl as { clientHeight?: number }).clientHeight = 500;
+    mapEl.clientWidth = 600;
+
+    // The carousel starts at 500 - 136 = 364; the pin is above it, but
+    // its label isn't.
+    m.project = () => ({ x: 300, y: 330 });
+    cards[1].__fireClick();
+    expect(panBy).toHaveBeenCalledTimes(1);
+
+    // Clicking a pin in the same spot pans too.
+    pins[2].__fireClick();
+    expect(panBy).toHaveBeenCalledTimes(2);
   });
 });
 
