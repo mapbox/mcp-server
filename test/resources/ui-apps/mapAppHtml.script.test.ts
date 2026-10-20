@@ -129,8 +129,13 @@ function loadScriptSandbox(options?: {
   const markerConstructorCalls: Array<Record<string, unknown>> = [];
   const setStyleCalls: string[] = [];
   const fitBoundsCalls: Array<{ padding: Record<string, number> }> = [];
+  const topLeftCorner = fakeElement();
   const fakeMapInstance = {
     addControl: () => {},
+    getContainer: () => ({
+      querySelector: (selector: string) =>
+        selector === '.mapboxgl-ctrl-top-left' ? topLeftCorner : null
+    }),
     on: (event: string, cb: () => void) => {
       if (event === 'load') cb();
     },
@@ -291,6 +296,7 @@ function loadScriptSandbox(options?: {
     setStyleCalls,
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
+    topLeftCorner,
     carouselEl: getElementById('carousel'),
     legendEl: getElementById('legend'),
     mapEl: getElementById('map') as unknown as { clientWidth?: number },
@@ -315,6 +321,24 @@ interface PanelItem {
   category?: string;
   distanceMeters?: number;
 }
+
+describe('mapAppHtml summary chip', () => {
+  it('moves the top-left controls below the summary chip while it shows', () => {
+    const sandbox = loadScriptSandbox();
+    (sandbox.summaryEl as unknown as { offsetHeight: number }).offsetHeight =
+      30;
+    const send = (payload: Record<string, unknown>) =>
+      sandbox.sendToolResult({
+        structuredContent: { mapboxRender: { layers: [], ...payload } }
+      });
+
+    send({ summary: '6 results for "coffee"' });
+    expect(sandbox.topLeftCorner.style.top).toBe('38px');
+
+    send({ markers: [{ coordinates: [-122.4, 37.8] }] });
+    expect(sandbox.topLeftCorner.style.top).toBe('');
+  });
+});
 
 describe('mapAppHtml inline-payload-first tool-result handling', () => {
   it('renders directly from an inline payload without ever calling resources/read', () => {

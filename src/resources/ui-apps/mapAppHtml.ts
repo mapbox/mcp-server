@@ -430,6 +430,7 @@ ${initialDataScript}
     } else {
       summaryEl.style.display = 'none';
     }
+    placeTopLeftControls();
     if (!map) { loadingEl.style.display = 'none'; return; }
     if (mapLoaded) render(payload);
     else pendingPayload = payload;
@@ -632,6 +633,20 @@ ${initialDataScript}
     return n > 0 && String(n) === String(label);
   }
 
+  // The summary chip covers GL JS's top-left control corner, so move the
+  // zoom and layer buttons below it while it's shown.
+  function placeTopLeftControls() {
+    if (!map || typeof map.getContainer !== 'function') return;
+    var container = map.getContainer();
+    var corner = container && typeof container.querySelector === 'function'
+      ? container.querySelector('.mapboxgl-ctrl-top-left')
+      : null;
+    if (!corner) return;
+    corner.style.top = summaryEl.style.display === 'block'
+      ? (summaryEl.offsetHeight + 8) + 'px'
+      : '';
+  }
+
   // Bottom padding that keeps fitted data out from under the carousel and
   // the legend above it, unless the map is too short to spare the room.
   function bottomPadding() {
@@ -690,6 +705,7 @@ ${initialDataScript}
     if (payload.summary && summaryEl.style.display === 'none') {
       summaryEl.textContent = payload.summary;
       summaryEl.style.display = 'block';
+      placeTopLeftControls();
     }
     maybeShowSidePanel(markers);
     var bounds = bbox.bounds();
