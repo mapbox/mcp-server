@@ -45,23 +45,48 @@ export function renderMapAppHtml(params: {
 <link href="https://api.mapbox.com/mapbox-gl-js/v${glVersion}/mapbox-gl.css" rel="stylesheet">
 <script src="https://api.mapbox.com/mapbox-gl-js/v${glVersion}/mapbox-gl.js"></script>
 <style>
+  /* Light and dark, following the host's theme (see applyHostContext), or
+     the system's when the host sends none. Colors come from the host's own
+     style variables (MCP Apps hostContext.styles) when it sends them, so
+     the cards match the chat around them; the fallbacks are used
+     otherwise. The map, its pins and their name labels stay as they are. */
+  :root {
+    color-scheme: light;
+    --ui-surface: var(--color-background-primary, #ffffff);
+    --ui-surface-muted: var(--color-background-secondary, #f1f5f9);
+    --ui-text: var(--color-text-primary, #0f172a);
+    --ui-text-muted: var(--color-text-secondary, #475569);
+    --ui-icon-muted: #64748b;
+    --ui-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+    --ui-error-bg: #ffebee; --ui-error-text: #b71c1c;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ui-surface: var(--color-background-primary, #0f172a);
+    --ui-surface-muted: var(--color-background-secondary, #1e293b);
+    --ui-text: var(--color-text-primary, #f1f5f9);
+    --ui-text-muted: var(--color-text-secondary, #cbd5e1);
+    --ui-icon-muted: #94a3b8;
+    --ui-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    --ui-error-bg: #3b1214; --ui-error-text: #fca5a5;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   #map { position: absolute; inset: 0; }
   #summary {
     position: absolute; top: 12px; left: 12px; z-index: 10;
-    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
+    background: var(--ui-surface); color: var(--ui-text);
     padding: 8px 12px; border-radius: 6px;
     font-size: 13px; font-weight: 500;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: var(--ui-shadow);
     max-width: calc(100% - 24px); white-space: pre-line;
   }
   #legend {
     position: absolute; bottom: 12px; left: 12px; z-index: 10;
-    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
+    background: var(--ui-surface); color: var(--ui-text);
     padding: 8px 12px; border-radius: 6px;
-    font-size: 11px;
+    font-size: 11px; box-shadow: var(--ui-shadow);
   }
   #legend .row { display: flex; align-items: center; margin: 2px 0; }
   #legend .swatch {
@@ -70,11 +95,11 @@ export function renderMapAppHtml(params: {
   }
   #loading {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: #666; font-size: 16px; z-index: 10; pointer-events: none;
+    color: var(--ui-text-muted); font-size: 16px; z-index: 10; pointer-events: none;
   }
   #error {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: #d32f2f; background: #ffebee; border-radius: 8px;
+    color: var(--ui-error-text); background: var(--ui-error-bg); border-radius: 8px;
     padding: 20px; max-width: 400px; text-align: center; z-index: 10;
   }
   .marker-badge {
@@ -122,11 +147,11 @@ export function renderMapAppHtml(params: {
     flex: 0 0 auto; width: 300px; max-width: calc(100vw - 64px); min-height: 84px;
     scroll-snap-align: center;
     display: flex; align-items: center; gap: 10px; padding: 10px;
-    background: rgba(15, 23, 42, 0.92); color: #f1f5f9;
+    background: var(--ui-surface); color: var(--ui-text);
     border: 2px solid transparent; border-radius: 14px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.35); cursor: pointer;
+    box-shadow: var(--ui-shadow); cursor: pointer;
   }
-  #carousel .card.active { border-color: #f8fafc; }
+  #carousel .card.active { border-color: var(--ui-text); }
   /* Added once a photo loads (see loadPanelPhoto), after the text in the
      DOM but shown first. */
   #carousel .card-thumb {
@@ -136,7 +161,7 @@ export function renderMapAppHtml(params: {
   /* Until a photo loads, or when the place has none: the place's icon
      on a muted tile, so every card has a picture. */
   #carousel .card-thumb.empty {
-    background: #1e293b; color: #94a3b8;
+    background: var(--ui-surface-muted); color: var(--ui-icon-muted);
     display: flex; align-items: center; justify-content: center;
   }
   #carousel .card-thumb.empty svg { width: 28px; height: 28px; display: block; }
@@ -153,7 +178,7 @@ export function renderMapAppHtml(params: {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   #carousel .card-meta, #carousel .card-extra {
-    font-size: 12px; color: #cbd5e1; margin-top: 3px;
+    font-size: 12px; color: var(--ui-text-muted); margin-top: 3px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 </style>
@@ -246,11 +271,55 @@ ${initialDataScript}
       handleToolResult(message.params);
     }
     if (message.method === 'ui/notifications/host-context-changed' &&
-        message.params && message.params.displayMode) {
-      currentDisplayMode = message.params.displayMode;
-      if (map) setTimeout(function() { map.resize(); }, 100);
+        message.params) {
+      // Partial updates: only the fields that changed are sent.
+      applyHostContext(message.params);
+      if (message.params.displayMode) {
+        currentDisplayMode = message.params.displayMode;
+        if (map) setTimeout(function() { map.resize(); }, 100);
+      }
     }
   });
+
+  // --- Light/dark theme -----------------------------------------------------
+  var rootEl = document.documentElement;
+  var hostTheme = null;
+
+  function applyTheme(theme) {
+    if ((theme !== 'light' && theme !== 'dark') || !rootEl) return;
+    rootEl.setAttribute('data-theme', theme);
+  }
+
+  // The host's theme wins over the system's; its style variables
+  // (--color-background-primary and so on) feed the --ui-* colors.
+  function applyHostContext(ctx) {
+    if (!ctx || typeof ctx !== 'object') return;
+    if (ctx.theme === 'light' || ctx.theme === 'dark') {
+      hostTheme = ctx.theme;
+      applyTheme(hostTheme);
+    }
+    var vars = ctx.styles && ctx.styles.variables;
+    if (vars && typeof vars === 'object' && rootEl && rootEl.style &&
+        typeof rootEl.style.setProperty === 'function') {
+      Object.keys(vars).forEach(function(name) {
+        if (/^--[a-z0-9-]+$/i.test(name) && typeof vars[name] === 'string') {
+          rootEl.style.setProperty(name, vars[name]);
+        }
+      });
+    }
+  }
+  window.__applyHostContext = applyHostContext;
+
+  var darkQuery = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null;
+  function followSystemTheme() {
+    if (!hostTheme && darkQuery) applyTheme(darkQuery.matches ? 'dark' : 'light');
+  }
+  followSystemTheme();
+  if (darkQuery && typeof darkQuery.addEventListener === 'function') {
+    darkQuery.addEventListener('change', followSystemTheme);
+  }
 
   // Set once a host answers ui/initialize, even with an error. A page from
   // export_map_html_tool framed by some other site never gets an answer.
@@ -260,8 +329,9 @@ ${initialDataScript}
     appCapabilities: {},
     appInfo: { name: 'Mapbox Map', version: '1.0.0' }
   }).then(
-    function() {
+    function(result) {
       hostAnswered = true;
+      if (result) applyHostContext(result.hostContext);
       sendNotification('ui/notifications/initialized', {});
     },
     function() {

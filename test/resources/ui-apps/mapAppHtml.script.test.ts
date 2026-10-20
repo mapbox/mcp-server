@@ -37,6 +37,10 @@ function loadScriptSandbox(options?: {
   topLevel?: boolean;
   /** Framed by a page that isn't an MCP host, so ui/initialize gets no answer. */
   noHost?: boolean;
+  /** hostContext the host answers ui/initialize with. */
+  hostContext?: Record<string, unknown>;
+  /** The system's prefers-color-scheme: dark, when set. */
+  systemDark?: boolean;
 }) {
   const html = renderMapAppHtml({ publicToken: 'pk.test-token' });
   const scriptMatch = html.match(
@@ -192,6 +196,19 @@ function loadScriptSandbox(options?: {
   // is shared across every `new mapboxgl.Marker()` call).
   let lastPopupText: string | undefined;
 
+  // <html>: the theme lands in its data-theme attribute and its style.
+  const rootEl = {
+    attributes: {} as Record<string, string>,
+    cssVars: {} as Record<string, string>,
+    setAttribute(name: string, value: string) {
+      this.attributes[name] = value;
+    },
+    style: {
+      setProperty: (name: string, value: string) => {
+        rootEl.cssVars[name] = value;
+      }
+    }
+  };
   const sandbox: Record<string, unknown> = {
     window: {
       addEventListener: (event: string, cb: typeof messageListener) => {
@@ -205,7 +222,8 @@ function loadScriptSandbox(options?: {
     },
     document: {
       getElementById: getElementById,
-      createElement: () => fakeElement()
+      createElement: () => fakeElement(),
+      documentElement: rootEl
     },
     mapboxgl: {
       accessToken: '',
@@ -240,6 +258,12 @@ function loadScriptSandbox(options?: {
     win.postMessage = (win.parent as { postMessage: unknown }).postMessage;
     win.parent = win;
   }
+  if (options?.systemDark !== undefined) {
+    (sandbox.window as Record<string, unknown>).matchMedia = (q: string) => ({
+      matches: q === '(prefers-color-scheme: dark)' && options.systemDark,
+      addEventListener: () => {}
+    });
+  }
   if (options?.topLevel || options?.noHost) {
     // Loads any image whose URL doesn't contain "403"; never fires onerror.
     sandbox.Image = class {
@@ -257,7 +281,13 @@ function loadScriptSandbox(options?: {
   const initId = postMessageCalls.find((m) => m.method === 'ui/initialize')
     ?.id as number | undefined;
   if (initId !== undefined && messageListener && !options?.noHost) {
-    messageListener({ data: { jsonrpc: '2.0', id: initId, result: {} } });
+    messageListener({
+      data: {
+        jsonrpc: '2.0',
+        id: initId,
+        result: options?.hostContext ? { hostContext: options.hostContext } : {}
+      }
+    });
   }
 
   return {
@@ -288,6 +318,16 @@ function loadScriptSandbox(options?: {
       fetchImpl = impl;
     },
     getLastPopupText: () => lastPopupText,
+    rootEl,
+    sendHostContext: (params: Record<string, unknown>) => {
+      messageListener?.({
+        data: {
+          jsonrpc: '2.0',
+          method: 'ui/notifications/host-context-changed',
+          params
+        }
+      });
+    },
     postMessageCalls,
     map: fakeMapInstance,
     marker: fakeMarkerInstance,
@@ -345,6 +385,52 @@ describe('mapAppHtml summary chip', () => {
 
     send({ markers: [{ coordinates: [-122.4, 37.8] }] });
     expect(sandbox.topLeftCorner.style.top).toBe('');
+  });
+});
+
+describe('mapAppHtml light and dark theme', () => {
+  it('follows the system when the host sends no theme', () => {
+    expect(
+      loadScriptSandbox({ systemDark: true }).rootEl.attributes['data-theme']
+    ).toBe('dark');
+    expect(
+      loadScriptSandbox({ systemDark: false }).rootEl.attributes['data-theme']
+    ).toBe('light');
+  });
+
+  it("uses the host's theme and style variables over the system's", async () => {
+    const { rootEl } = loadScriptSandbox({
+      systemDark: true,
+      hostContext: {
+        theme: 'light',
+        styles: {
+          variables: {
+            '--color-background-primary': '#fafafa',
+            'not-a-variable': 'red'
+          }
+        }
+      }
+    });
+    await Promise.resolve();
+
+    expect(rootEl.attributes['data-theme']).toBe('light');
+    expect(rootEl.cssVars).toEqual({ '--color-background-primary': '#fafafa' });
+  });
+
+  it('switches when the host changes theme, ignoring other updates', async () => {
+    const { rootEl, sendHostContext } = loadScriptSandbox({
+      hostContext: { theme: 'light' }
+    });
+
+    await Promise.resolve();
+    expect(rootEl.attributes['data-theme']).toBe('light');
+
+    sendHostContext({ theme: 'dark' });
+    expect(rootEl.attributes['data-theme']).toBe('dark');
+
+    sendHostContext({ displayMode: 'fullscreen' });
+    sendHostContext({ theme: 'sepia' });
+    expect(rootEl.attributes['data-theme']).toBe('dark');
   });
 });
 
