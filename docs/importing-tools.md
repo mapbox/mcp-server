@@ -122,6 +122,7 @@ import {
   // API tools (HTTP pre-configured)
   categorySearch,
   directions,
+  feedback,
   isochrone,
   mapMatching,
   matrix,
