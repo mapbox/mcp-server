@@ -67,7 +67,7 @@ const markerSchema = z.object({
     .string()
     .optional()
     .describe(
-      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results carousel card (popularity score, photo and today\'s hours when available, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Omit for non-POI markers (route endpoints, waypoints, etc.).'
+      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results carousel card (popularity score, photo and today\'s hours when available, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Leave `style` and `label` unset for such a place: it is drawn as a white pin with an icon for its category, like search results. Set `style: "numbered"` with a `label` only when the number means something, such as a visit order. Omit `id` for non-POI markers (route endpoints, waypoints, etc.).'
     ),
   name: z
     .string()
@@ -79,7 +79,7 @@ const markerSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Category shown on the results carousel card (e.g. "Coffee Shop"). Only used when `id` is also set.'
+      'Category shown on the results carousel card (e.g. "Coffee Shop"), also used to pick the pin\'s icon. Only used when `id` is also set.'
     ),
   distanceMeters: z
     .number()

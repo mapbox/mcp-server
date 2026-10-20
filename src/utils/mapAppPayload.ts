@@ -125,12 +125,15 @@ export interface MapAppMarker {
    * with a popularity score and photo via a batched Place Details lookup
    * (see mapAppHtml.ts's maybeShowSidePanel/fetchPlaceDetailsBatch) — the
    * same card search/category-search results already get automatically,
-   * now also available for hand-composed markers.
+   * now also available for hand-composed markers. With no `style`/`label`
+   * of its own, such a marker is drawn as a white place pin with a Maki
+   * icon picked from `category` (self-fetched search results use the
+   * Maki name Search Box gives each result).
    */
   id?: string;
   /** Display name for the results carousel card. Only used when `id` is also set; falls back to "Result N" if omitted. */
   name?: string;
-  /** Category shown in the results carousel card (e.g. "Coffee Shop"). Only used when `id` is also set. */
+  /** Category shown in the results carousel card (e.g. "Coffee Shop"), also used to pick the pin's icon. Only used when `id` is also set. */
   category?: string;
   /** Distance in meters, shown in the results carousel card. Only used when `id` is also set. */
   distanceMeters?: number;

@@ -301,6 +301,11 @@ function loadScriptSandbox(options?: {
     legendEl: getElementById('legend'),
     mapEl: getElementById('map') as unknown as { clientWidth?: number },
     fitBoundsCalls,
+    placeIcon: (
+      sandbox.window as {
+        __placeIcon?: (maki: unknown, category: unknown) => string;
+      }
+    ).__placeIcon as (maki: unknown, category: unknown) => string,
     badgeTextColor: (
       sandbox.window as { __badgeTextColor?: (color: unknown) => string }
     ).__badgeTextColor as (color: unknown) => string,
@@ -1661,8 +1666,9 @@ describe('mapAppHtml ground location self-fetch', () => {
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
     expect(carouselEl.style.display).toBe('block');
-    const [badge, body] = carouselEl.children[0].children[0].children;
-    expect(badge.textContent).toBe('1');
+    // A place card has no number, just the place's icon until a photo loads.
+    const [body, thumb] = carouselEl.children[0].children[0].children;
+    expect(thumb.className).toBe('card-thumb empty');
     expect(body.children[0].textContent).toBe('Four Barrel Coffee');
     expect(body.children[1].textContent).toBe('cafe · 120 m · 65% popularity');
   });
@@ -1847,7 +1853,7 @@ describe('mapAppHtml ground location self-fetch', () => {
 });
 
 describe('mapAppHtml results side panel: derivePanelItems', () => {
-  it('keeps only markers with an id, preferring a numeric label as the panel number', () => {
+  it('keeps only markers with an id, using a label as the card number and picking an icon', () => {
     const { derivePanelItems } = loadScriptSandbox();
 
     const items = derivePanelItems?.([
@@ -1861,19 +1867,20 @@ describe('mapAppHtml results side panel: derivePanelItems', () => {
       // No id (e.g. a route waypoint marker) — must be dropped, not just
       // rendered without enrichment.
       { label: '1', name: 'No id' },
-      // No label — falls back to positional numbering among id-bearing markers.
-      { id: 'b', name: 'Beta' }
+      // No label: a place pin, so its card has no number either.
+      { id: 'b', name: 'Beta', maki: 'bar' }
     ]);
 
     expect(items).toEqual([
       {
         id: 'a',
         number: 3,
+        icon: 'cafe',
         name: 'Alpha',
         category: 'Cafe',
         distanceMeters: 120
       },
-      { id: 'b', number: 2, name: 'Beta' }
+      { id: 'b', number: null, icon: 'bar', name: 'Beta' }
     ]);
   });
 
@@ -1967,10 +1974,10 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(list.className).toBe('card-list');
     expect(list.children).toHaveLength(1);
     const card = list.children[0];
-    const [badge, body] = card.children;
+    const [body, thumb] = card.children;
     const [name, meta, extra] = body.children;
 
-    expect(badge.textContent).toBe('1');
+    expect(thumb.className).toBe('card-thumb empty');
     expect(name.textContent).toBe('Cafe Reveille');
     expect(meta.textContent).toBe('cafe · 120 m · 80% popularity');
     // Hours and phone go on a second line of the card.
@@ -2067,7 +2074,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     expect(carouselEl.style.display).toBe('block');
     const row = carouselEl.children[0].children[0];
-    expect(row.children[0].className).toBe('card-badge');
+    expect(row.children[0].className).toBe('card-body');
     expect(errorEl?.style.display).not.toBe('block');
   });
 
@@ -2128,7 +2135,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     expect(bodies).toEqual([{ ids: [goodId] }]);
     const rows = carouselEl.children[0].children;
-    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
+    expect(rows[1].children[0].children[1].textContent).toBe('50% popularity');
   });
 
   it('drops the id a 422 names and retries the batch once', async () => {
@@ -2165,7 +2172,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     expect(bodies.map((b) => b.ids)).toEqual([[rejectedId, goodId], [goodId]]);
     const rows = carouselEl.children[0].children;
-    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
+    expect(rows[1].children[0].children[1].textContent).toBe('50% popularity');
   });
 
   it('filters out OSM-sourced ids before the batch call, so one incompatible id does not zero out enrichment for the rest', async () => {
@@ -2228,14 +2235,14 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     // Both rows still render — only enrichment eligibility differs.
     const rows = carouselEl.children[0].children;
     expect(rows).toHaveLength(2);
-    expect(rows[0].children[1].children[0].textContent).toBe('OSM Cafe');
+    expect(rows[0].children[0].children[0].textContent).toBe('OSM Cafe');
     // Never enriched (filtered out before the batch call).
-    expect(rows[0].children[1].children[1].textContent).not.toContain(
+    expect(rows[0].children[0].children[1].textContent).not.toContain(
       'popularity'
     );
 
-    expect(rows[1].children[1].children[0].textContent).toBe('Native Cafe');
-    expect(rows[1].children[1].children[1].textContent).toBe('50% popularity');
+    expect(rows[1].children[0].children[0].textContent).toBe('Native Cafe');
+    expect(rows[1].children[0].children[1].textContent).toBe('50% popularity');
   });
 
   // Place Details photos are hosted on third-party CDNs (e.g.
@@ -2304,21 +2311,21 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     // The CDN URL is never used directly. Until the photo arrives the
     // card shows the placeholder, labeled with the place's name.
     const row = carouselEl.children[0].children[0];
-    expect(row.children[2].className).toBe('card-thumb empty');
+    expect(row.children[1].className).toBe('card-thumb empty');
 
     resolveResourcesRead({
       contents: [{ uri: 'x', mimeType: 'image/jpeg', blob: 'QUJD' }]
     });
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
-    // The placeholder becomes the photo; badge and name stay where they were.
-    expect(row.children).toHaveLength(3);
-    const [badge, body, thumb] = row.children;
+    // The placeholder becomes the photo, and its icon goes.
+    expect(row.children).toHaveLength(2);
+    const [body, thumb] = row.children;
     expect(thumb.className).toBe('card-thumb');
+    expect(thumb.innerHTML).toBe('');
     expect(thumb.style.backgroundImage).toBe(
       'url("data:image/jpeg;base64,QUJD")'
     );
-    expect(badge.textContent).toBe('1');
     expect(body.children[1].textContent).toBe('42% popularity');
     expect(JSON.stringify(row)).not.toContain('mktgcdn');
   });
@@ -2335,7 +2342,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     });
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
-    const [, , thumb] = carouselEl.children[0].children[0].children;
+    const [, thumb] = carouselEl.children[0].children[0].children;
     expect(thumb.className).toBe('card-thumb empty');
     expect(thumb.style.backgroundImage).toBeUndefined();
   });
@@ -2351,7 +2358,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(postMessageCalls.some((m) => m.method === 'resources/read')).toBe(
       false
     );
-    const [, , thumb] = carouselEl.children[0].children[0].children;
+    const [, thumb] = carouselEl.children[0].children[0].children;
     expect(thumb.className).toBe('card-thumb');
     expect(thumb.style.backgroundImage).toBe(
       'url("https://dyn.mktgcdn.com/p/photo.jpg")'
@@ -2382,7 +2389,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     sendToolResult(searchResult);
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    const [, , thumb] = carouselEl.children[0].children[0].children;
+    const [, thumb] = carouselEl.children[0].children[0].children;
     expect(thumb.className).toBe('card-thumb empty');
   });
 });
@@ -2434,7 +2441,7 @@ describe('mapAppHtml results side panel: inline markers', () => {
     );
   });
 
-  it('auto-promotes an id-bearing marker with no explicit style/label to a numbered badge, matching its panel row', async () => {
+  it('turns an id-bearing marker with no explicit style/label into a place pin, with no number on it or its card', async () => {
     // Observed live: Claude built inline POI markers as plain unlabeled
     // pins (default style, no label), so the map showed generic blue dots
     // with no way to tell which one corresponded to which panel row. The
@@ -2469,25 +2476,21 @@ describe('mapAppHtml results side panel: inline markers', () => {
     });
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
-    // Both markers got promoted to the numbered-badge element path
-    // (buildBadgeElement), not the default plain-color pin path.
+    // Both markers became place pins (buildPlaceElement), not the default
+    // plain-color pin path, and neither got a number.
     expect(markerConstructorCalls).toHaveLength(2);
-    const el1 = markerConstructorCalls[0].element as {
-      textContent: string;
-      style: Record<string, string>;
-    };
-    const el2 = markerConstructorCalls[1].element as {
-      textContent: string;
-      style: Record<string, string>;
-    };
-    expect(el1.textContent).toBe('1');
-    expect(el1.style.background).toBe('#f97316');
-    expect(el2.textContent).toBe('2');
+    const els = markerConstructorCalls.map(
+      (c) => c.element as { className: string; innerHTML: string }
+    );
+    for (const el of els) {
+      expect(el.className.split(' ')).toContain('place');
+      expect(el.innerHTML).toContain('<svg viewBox="0 0 15 15"');
+    }
 
-    // And the panel's badges show the exact same numbers.
+    // And their cards have no number badge either.
     const rows = carouselEl.children[0].children;
-    expect(rows[0].children[0].textContent).toBe('1');
-    expect(rows[1].children[0].textContent).toBe('2');
+    expect(rows[0].children[0].className).toBe('card-body');
+    expect(rows[1].children[0].className).toBe('card-body');
   });
 
   it('never renders a panel when no inline marker carries an id', () => {
@@ -2563,12 +2566,19 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     (
       panel.children[0] as unknown as {
         children: Array<{
-          children: Array<{ children: Array<{ textContent: string }> }>;
+          children: Array<{
+            className: string;
+            children: Array<{ textContent: string }>;
+          }>;
         }>;
       }
-    ).children.map((row) => row.children[1].children[0].textContent);
+    ).children.map(
+      (row) =>
+        row.children.find((c) => c.className === 'card-body')?.children[0]
+          .textContent
+    );
 
-  it('numbers inline markers and merged search results as one list', async () => {
+  it('keeps inline numbers and adds merged search results as place pins, in one list', async () => {
     const { sendToolResult, setFetchImpl, carouselEl, markerConstructorCalls } =
       loadScriptSandbox();
     const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((x) =>
@@ -2626,7 +2636,16 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     });
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    expect(labelsDrawn(markerConstructorCalls)).toEqual(['1', '2', '3', '4']);
+    // The caller's numbered pins keep their numbers; the search results
+    // that join them are place pins (the search center is a plain pin).
+    expect(labelsDrawn(markerConstructorCalls)).toEqual(['1', '2']);
+    expect(
+      markerConstructorCalls.filter((c) =>
+        (c.element as { className?: string } | undefined)?.className
+          ?.split(' ')
+          .includes('place')
+      )
+    ).toHaveLength(2);
     expect(rowNames(carouselEl)).toEqual(['A', 'B', 'C', 'D']);
     // Each place is looked up once.
     expect(detailsBodies).toEqual([
@@ -2680,7 +2699,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
         }>;
       }
     ).children[0];
-    expect(row.children[1].children[1].textContent).toBe('45% popularity');
+    expect(row.children[0].children[1].textContent).toBe('45% popularity');
   });
 
   it('fits the map above the carousel, and moves the legend up above it', async () => {
@@ -2742,8 +2761,9 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     expect(legendEl.style.bottom).toBe('');
   });
 
-  it("colors a row's badge like its pin when the caller set a color", async () => {
-    const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
+  it("tints a place pin's icon with the caller's color", async () => {
+    const { sendToolResult, setFetchImpl, markerConstructorCalls } =
+      loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
       json: async () => ({ results: [] })
@@ -2765,12 +2785,6 @@ describe('mapAppHtml results side panel: one panel per render', () => {
               coordinates: at(-122.42),
               id: mockPoiId('color-2'),
               name: 'Default'
-            },
-            {
-              coordinates: at(-122.43),
-              id: mockPoiId('color-3'),
-              name: 'Bad',
-              color: 'red;x:y'
             }
           ]
         }
@@ -2778,12 +2792,10 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     });
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
-    const badges = (
-      carouselEl.children[0] as unknown as {
-        children: Array<{ children: Array<{ style: Record<string, string> }> }>;
-      }
-    ).children.map((row) => row.children[0].style.background);
-    expect(badges).toEqual(['#6b7280', undefined, undefined]);
+    const colors = markerConstructorCalls.map(
+      (c) => (c.element as { style: Record<string, string> }).style.color
+    );
+    expect(colors).toEqual(['#6b7280', undefined]);
   });
 });
 
@@ -2792,13 +2804,24 @@ describe('mapAppHtml results side panel: caller labels', () => {
   const badges = (panel: { children: unknown[] }) =>
     (
       panel.children[0] as {
-        children: Array<{ children: Array<{ textContent: string }> }>;
+        children: Array<{
+          children: Array<{ className: string; textContent: string }>;
+        }>;
       }
-    ).children.map((row) => row.children[0].textContent);
-  const labelsDrawn = (calls: Array<Record<string, unknown>>) =>
-    calls.map(
-      (c) => (c.element as { textContent?: string } | undefined)?.textContent
+    ).children.map(
+      (row) =>
+        row.children.find((c) => c.className === 'card-badge')?.textContent
     );
+  // A numbered pin's label, or undefined for a place pin (icon only).
+  const labelsDrawn = (calls: Array<Record<string, unknown>>) =>
+    calls.map((c) => {
+      const el = c.element as
+        | { className?: string; textContent?: string }
+        | undefined;
+      return el?.className?.split(' ').includes('place')
+        ? undefined
+        : el?.textContent;
+    });
   const render = (markers: Array<Record<string, unknown>>) => ({
     structuredContent: {
       mapboxRender: { ref: 'mapbox://inline/x', layers: [], markers }
@@ -2851,7 +2874,7 @@ describe('mapAppHtml results side panel: caller labels', () => {
     expect(badges(carouselEl)).toEqual(['1', '2', '3']);
   });
 
-  it('shows a letter label in the panel row, as on its pin', async () => {
+  it('shows a letter label on the card, as on its pin', async () => {
     const { sendToolResult, setFetchImpl, carouselEl, markerConstructorCalls } =
       loadScriptSandbox();
     setFetchImpl(noDetails);
@@ -2869,8 +2892,9 @@ describe('mapAppHtml results side panel: caller labels', () => {
     );
     for (let i = 0; i < 10; i++) await Promise.resolve();
 
-    expect(labelsDrawn(markerConstructorCalls)).toEqual(['A', '1']);
-    expect(badges(carouselEl)).toEqual(['A', '1']);
+    // The unlabeled place is a place pin, with no number on its card.
+    expect(labelsDrawn(markerConstructorCalls)).toEqual(['A', undefined]);
+    expect(badges(carouselEl)).toEqual(['A', undefined]);
   });
 });
 
@@ -2914,8 +2938,8 @@ describe('mapAppHtml results side panel: photos without an MCP host', () => {
         }>;
       }
     ).children[0];
-    expect(row.children[2].className).toBe('card-thumb');
-    expect(row.children[2].style.backgroundImage).toBe(
+    expect(row.children[1].className).toBe('card-thumb');
+    expect(row.children[1].style.backgroundImage).toBe(
       'url("https://example.com/a.jpg")'
     );
   });
@@ -2967,7 +2991,7 @@ describe('mapAppHtml results carousel: selecting a place', () => {
 
     expect(active(cards)).toEqual([true, false, false]);
     expect(active(pins)).toEqual([true, false, false]);
-    expect(pins[0].className).toBe('marker-badge active');
+    expect(pins[0].className).toBe('marker-badge place active');
     expect(pins[0].style.zIndex).toBe('2');
     const label = pins[0].children[0] as unknown as {
       className: string;
@@ -3058,6 +3082,22 @@ describe('mapAppHtml results carousel: selecting a place', () => {
     // Clicking a pin in the same spot pans too.
     pins[2].__fireClick();
     expect(panBy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('mapAppHtml place pin icons', () => {
+  const { placeIcon } = loadScriptSandbox();
+
+  it.each([
+    ['cafe', undefined, 'cafe'], // the result's own maki
+    ['rocket', 'Coffee Shop', 'cafe'], // a maki we don't carry falls to the category
+    [undefined, 'Pizza Restaurant', 'restaurant-pizza'], // checked before "restaurant"
+    [undefined, 'café', 'cafe'],
+    [undefined, 'Barber Shop', 'shop'], // whole words, so not "bar"
+    [undefined, 'Space Center', 'marker'],
+    [undefined, undefined, 'marker']
+  ])('maki %s, category %s -> %s', (maki, category, icon) => {
+    expect(placeIcon(maki, category)).toBe(icon);
   });
 });
 

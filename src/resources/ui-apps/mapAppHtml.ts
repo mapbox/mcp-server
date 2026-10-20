@@ -98,6 +98,17 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;
   }
   .marker-badge.active .marker-name { display: block; }
+  /* A place pin (search results and other places in the carousel): a
+     white disc with the place's Maki icon, black when selected. Numbered
+     badges stay for markers whose number means something (visit order). */
+  .marker-badge.place {
+    width: 30px; height: 30px; background: #fff; color: #0f172a;
+    border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  }
+  .marker-badge.place svg { width: 16px; height: 16px; display: block; }
+  .marker-badge.place.active {
+    background: #0f172a !important; color: #fff !important;
+  }
   /* Results carousel. Sits above the Mapbox logo and attribution, which
      must stay visible; the legend moves up above it (see showCarousel). */
   #carousel { position: absolute; left: 0; right: 0; bottom: 36px; z-index: 10; }
@@ -122,11 +133,13 @@ export function renderMapAppHtml(params: {
     order: -1; flex: 0 0 auto; width: 64px; height: 64px; border-radius: 10px;
     background-size: cover; background-position: center;
   }
-  /* Until a photo loads, or when the place has none: Assembly's marker
-     icon on a muted tile, so every card has a picture. */
+  /* Until a photo loads, or when the place has none: the place's icon
+     on a muted tile, so every card has a picture. */
   #carousel .card-thumb.empty {
-    background: #1e293b url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'><path fill='%2394a3b8' d='M4 7C4 4.23857 6.23858 2 9 2C11.7614 2 14 4.23858 14 7C14 10.0254 10.7195 13.7128 9 16C7.28045 13.7128 4 10.0254 4 7Z'/></svg>") center / 28px no-repeat;
+    background: #1e293b; color: #94a3b8;
+    display: flex; align-items: center; justify-content: center;
   }
+  #carousel .card-thumb.empty svg { width: 28px; height: 28px; display: block; }
   /* Matches the numbered pin. */
   #carousel .card-badge {
     flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
@@ -497,6 +510,83 @@ ${initialDataScript}
     end: { color: '#ef4444' }
   };
 
+  // Maki icons (https://github.com/mapbox/maki, CC0), 15x15 path data, for
+  // the categories search results most often have. Anything else gets
+  // the plain marker.
+  var MAKI = {
+    'attraction': 'M6,2C5.446,2,5.2478,2.5045,5,3L4.5,4h-2C1.669,4,1,4.669,1,5.5v5C1,11.331,1.669,12,2.5,12h10 c0.831,0,1.5-0.669,1.5-1.5v-5C14,4.669,13.331,4,12.5,4h-2L10,3C9.75,2.5,9.554,2,9,2H6z M2.5,5C2.7761,5,3,5.2239,3,5.5 S2.7761,6,2.5,6S2,5.7761,2,5.5S2.2239,5,2.5,5z M7.5,5c1.6569,0,3,1.3431,3,3s-1.3431,3-3,3s-3-1.3431-3-3S5.8431,5,7.5,5z M7.5,6.5C6.6716,6.5,6,7.1716,6,8l0,0c0,0.8284,0.6716,1.5,1.5,1.5l0,0C8.3284,9.5,9,8.8284,9,8l0,0C9,7.1716,8.3284,6.5,7.5,6.5 L7.5,6.5z',
+    'bakery': 'M5.294,4.382,6,9.5a.979.979,0,0,0,1,1H8a.979.979,0,0,0,1-1l.706-5.118C9.706,3,7.5,3,7.5,3S5.291,3,5.294,4.382ZM3.5,5C2,5,2,6,2,6l1,4H4.5a.793.793,0,0,0,.794-.765L4.5,5Zm-2,2.5a1.533,1.533,0,0,0-1.059.412A1.366,1.366,0,0,0,0,8.794V11H.882A1.02,1.02,0,0,0,2,10ZM11.5,5C13,5,13,6,13,6l-1,4H10.5a.793.793,0,0,1-.794-.765L10.5,5Zm2,2.5a1.533,1.533,0,0,1,1.059.412A1.366,1.366,0,0,1,15,8.794V11h-.882A1.02,1.02,0,0,1,13,10Z',
+    'bank': 'M1,3C0.446,3,0,3.446,0,4v7c0,0.554,0.446,1,1,1h13c0.554,0,1-0.446,1-1V4c0-0.554-0.446-1-1-1H1z M1,4h1.5 C2.7761,4,3,4.2239,3,4.5S2.7761,5,2.5,5S2,4.7761,2,4.5L1.5,5C1.7761,5,2,5.2239,2,5.5S1.7761,6,1.5,6S1,5.7761,1,5.5V4z M7.5,4 C8.8807,4,10,5.567,10,7.5l0,0C10,9.433,8.8807,11,7.5,11S5,9.433,5,7.5S6.1193,4,7.5,4z M12.5,4H14v1.5C14,5.7761,13.7761,6,13.5,6 S13,5.7761,13,5.5S13.2239,5,13.5,5L13,4.5C13,4.7761,12.7761,5,12.5,5S12,4.7761,12,4.5S12.2239,4,12.5,4z M7.5,5.5 c-0.323,0-0.5336,0.1088-0.6816,0.25h1.3633C8.0336,5.6088,7.823,5.5,7.5,5.5z M6.625,6C6.5795,6.091,6.5633,6.1711,6.5449,6.25 h1.9102C8.4367,6.1711,8.4205,6.091,8.375,6H6.625z M6.5,6.5v0.25h2V6.5H6.5z M6.5,7v0.25h2V7H6.5z M6.5,7.5v0.25h2V7.5H6.5z M6.5,8 L6.25,8.25h2L8.5,8H6.5z M6,8.5c0,0,0.0353,0.1024,0.1016,0.25H8.375L8,8.5H6z M1.5,9C1.7761,9,2,9.2239,2,9.5S1.7761,10,1.5,10 L2,10.5C2,10.2239,2.2239,10,2.5,10S3,10.2239,3,10.5S2.7761,11,2.5,11H1V9.5C1,9.2239,1.2239,9,1.5,9z M6.2383,9 C6.2842,9.0856,6.3144,9.159,6.375,9.25h2.2676C8.7092,9.1121,8.75,9,8.75,9H6.2383z M13.5,9C13.7761,9,14,9.2239,14,9.5V11h-1.5 c-0.2761,0-0.5-0.2239-0.5-0.5s0.2239-0.5,0.5-0.5s0.5,0.2239,0.5,0.5l0.5-0.5C13.2239,10,13,9.7761,13,9.5S13.2239,9,13.5,9z M6.5664,9.5c0.0786,0.0912,0.1647,0.1763,0.2598,0.25h1.4199C8.3462,9.6727,8.4338,9.5883,8.5,9.5H6.5664z',
+    'bar': 'M7.5,1c-2,0-7,0.25-6.5,0.75L7,8v4 c0,1-3,0.5-3,2h7c0-1.5-3-1-3-2V8l6-6.25C14.5,1.25,9.5,1,7.5,1z M7.5,2c2.5,0,4.75,0.25,4.75,0.25L11.5,3h-8L2.75,2.25 C2.75,2.25,5,2,7.5,2z',
+    'beer': 'M12,5V2c0,0-1-1-4.5-1S3,2,3,2v3c0.0288,1.3915,0.3706,2.7586,1,4c0.6255,1.4348,0.6255,3.0652,0,4.5c0,0,0,1,3.5,1 s3.5-1,3.5-1c-0.6255-1.4348-0.6255-3.0652,0-4.5C11.6294,7.7586,11.9712,6.3915,12,5z M7.5,13.5 c-0.7966,0.035-1.5937-0.0596-2.36-0.28c0.203-0.7224,0.304-1.4696,0.3-2.22h4.12c-0.004,0.7504,0.097,1.4976,0.3,2.22 C9.0937,13.4404,8.2966,13.535,7.5,13.5z M7.5,5C6.3136,5.0299,5.1306,4.8609,4,4.5v-2C5.131,2.1411,6.3137,1.9722,7.5,2 C8.6863,1.9722,9.869,2.1411,11,2.5v2C9.8694,4.8609,8.6864,5.0299,7.5,5z',
+    'cafe': 'M12,5h-2V3H2v4c0.0133,2.2091,1.8149,3.9891,4.024,3.9758C7.4345,10.9673,8.7362,10.2166,9.45,9H12c1.1046,0,2-0.8954,2-2 S13.1046,5,12,5z M12,8H9.86C9.9487,7.6739,9.9958,7.3379,10,7V6h2c0.5523,0,1,0.4477,1,1S12.5523,8,12,8z M10,12.5 c0,0.2761-0.2239,0.5-0.5,0.5h-7C2.2239,13,2,12.7761,2,12.5S2.2239,12,2.5,12h7C9.7761,12,10,12.2239,10,12.5z',
+    'cinema': 'M14,7.5v2c0,0.2761-0.2239,0.5-0.5,0.5S13,9.7761,13,9.5c0,0,0.06-0.5-1-0.5h-1v2.5c0,0.2761-0.2239,0.5-0.5,0.5h-8 C2.2239,12,2,11.7761,2,11.5v-4C2,7.2239,2.2239,7,2.5,7h8C10.7761,7,11,7.2239,11,7.5V8h1c1.06,0,1-0.5,1-0.5 C13,7.2239,13.2239,7,13.5,7S14,7.2239,14,7.5z M4,3C2.8954,3,2,3.8954,2,5s0.8954,2,2,2s2-0.8954,2-2S5.1046,3,4,3z M4,6 C3.4477,6,3,5.5523,3,5s0.4477-1,1-1s1,0.4477,1,1S4.5523,6,4,6z M8.5,2C7.1193,2,6,3.1193,6,4.5S7.1193,7,8.5,7S11,5.8807,11,4.5 S9.8807,2,8.5,2z M8.5,6C7.6716,6,7,5.3284,7,4.5S7.6716,3,8.5,3S10,3.6716,10,4.5S9.3284,6,8.5,6z',
+    'convenience': 'M2.9982,3.0687s.1875-1.062,1-1.062H5.0043V1.7276a.5.5,0,0,1,.5-.5H9.4882a.5.5,0,0,1,.5.5v.2791h1.01a.8324.8324,0,0,1,.6373.2937,1.7589,1.7589,0,0,1,.3627.7683s.3108,1.5719.5921,2.9181h-.938L11,3,3.982,2.9956,3.3336,5.9868H2.382Zm11,4.9144a1,1,0,0,1-.9992,1l-1.0008,3.973s-.1875,1.0417-1,1.0417h-7c-.8125,0-1-1.0417-1-1.0417L1.9822,8.98a.9985.9985,0,0,1,.016-1.9968h11A1,1,0,0,1,13.9982,7.9831ZM5.0327,12.13,5.03,11.0051,4.6392,9.4686a.5373.5373,0,1,0-1.0649.1445L3.78,11.0075l.1874,1.2672A.5373.5373,0,1,0,5.0327,12.13Zm2-2.5967A.5332.5332,0,0,0,6.4994,9l-.0039.0008L6.4886,9a.4992.4992,0,0,0-.3575.1509.529.529,0,0,0-.1648.3828v2.68a.5332.5332,0,1,0,1.0663,0Zm1.998,0A.5314.5314,0,0,0,8.694,9.04a.4992.4992,0,0,0-.393,0,.5312.5312,0,0,0-.3366.4934v2.68a.5331.5331,0,1,0,1.0662,0Zm2.3857.08a.5373.5373,0,1,0-1.0649-.1445L9.96,10.9938,9.9579,12.13a.5373.5373,0,1,0,1.0649.1446Z',
+    'fast-food': 'M14,8c0,0.5523-0.4477,1-1,1H2C1.4477,9,1,8.5523,1,8s0.4477-1,1-1h11C13.5523,7,14,7.4477,14,8z M3.5,10H2 c0,1.6569,1.3431,3,3,3h5c1.6569,0,3-1.3431,3-3H3.5z M3,6H2V4c0-1.1046,0.8954-2,2-2h7c1.1046,0,2,0.8954,2,2v2H3z M11,4.5 C11,4.7761,11.2239,5,11.5,5S12,4.7761,12,4.5S11.7761,4,11.5,4S11,4.2239,11,4.5z M9,3.5C9,3.7761,9.2239,4,9.5,4S10,3.7761,10,3.5 S9.7761,3,9.5,3S9,3.2239,9,3.5z M7,4.5C7,4.7761,7.2239,5,7.5,5S8,4.7761,8,4.5S7.7761,4,7.5,4S7,4.2239,7,4.5z M5,3.5 C5,3.7761,5.2239,4,5.5,4S6,3.7761,6,3.5S5.7761,3,5.5,3S5,3.2239,5,3.5z M3,4.5C3,4.7761,3.2239,5,3.5,5S4,4.7761,4,4.5 S3.7761,4,3.5,4S3,4.2239,3,4.5z',
+    'fuel': 'm14 6v5.5c0 .2761-.2239.5-.5.5s-.5-.2239-.5-.5v-2c0-.8284-.6716-1.5-1.5-1.5h-1.5v-6c0-.5523-.4477-1-1-1h-6c-.5523 0-1 .4477-1 1v11c0 .5523.4477 1 1 1h6c.5523 0 1-.4477 1-1v-4h1.5c.2761 0 .5.2239.5.5v2c0 .8284.6716 1.5 1.5 1.5s1.5-.6716 1.5-1.5v-6.5c0-.5523-.4477-1-1-1v-1.51c-.0054-.2722-.2277-.4901-.5-.49-.2816.0047-.5062.2367-.5015.5184.0002.0105.0007.0211.0015.0316v2.45c0 .5523.4477 1 1 1s1-.4477 1-1-.4477-1-1-1zm-5 .5c0 .2761-.2239.5-.5.5h-5c-.2761 0-.5-.2239-.5-.5v-3c0-.2761.2239-.5.5-.5h5c.2761 0 .5.2239.5.5z',
+    'grocery': 'M 13.199219 1.5 C 13.199219 1.5 11.808806 1.4588 11.253906 2 C 10.720406 2.5202 10.5 2.9177 10.5 4 L 1.1992188 4 L 2.59375 8.8144531 C 2.59725 8.8217531 2.6036219 8.8287375 2.6074219 8.8359375 C 2.8418219 9.4932375 3.4545469 9.9666406 4.1855469 9.9941406 C 4.1885469 9.9954406 4.1992187 10 4.1992188 10 L 10.699219 10 L 10.699219 10.199219 C 10.699219 10.199219 10.7 10.500391 10.5 10.900391 C 10.3 11.300391 10.200391 11.5 9.4003906 11.5 L 2.9003906 11.5 C 1.9003906 11.5 1.9003906 13 2.9003906 13 L 4.0996094 13 L 4.1992188 13 L 9.0996094 13 L 9.1992188 13 L 9.3007812 13 C 10.500781 13 11.399219 12.299609 11.699219 11.599609 C 11.999219 10.899609 12 10.300781 12 10.300781 L 12 10 L 12 4 C 12 3.4764 12.228619 3 12.699219 3 L 13.25 3 C 13.6642 3 14 2.6642 14 2.25 C 14 1.8358 13.6642 1.5 13.25 1.5 L 13.199219 1.5 z M 9.1992188 13 C 8.5992188 13 8.1992188 13.4 8.1992188 14 C 8.1992188 14.6 8.5992187 15 9.1992188 15 C 9.7992187 15 10.199219 14.6 10.199219 14 C 10.199219 13.4 9.7992188 13 9.1992188 13 z M 4.1992188 13 C 3.5992188 13 3.1992188 13.4 3.1992188 14 C 3.1992188 14.6 3.5992187 15 4.1992188 15 C 4.7992188 15 5.1992188 14.6 5.1992188 14 C 5.1992188 13.4 4.7992187 13 4.1992188 13 z',
+    'hospital': 'M7,1C6.4,1,6,1.4,6,2v4H2C1.4,6,1,6.4,1,7v1 c0,0.6,0.4,1,1,1h4v4c0,0.6,0.4,1,1,1h1c0.6,0,1-0.4,1-1V9h4c0.6,0,1-0.4,1-1V7c0-0.6-0.4-1-1-1H9V2c0-0.6-0.4-1-1-1H7z',
+    'ice-cream': 'M5.44,8.17a3.473,3.473,0,0,0,2-.63A3.5,3.5,0,0,0,9,8.14h.44L8,13.7a.5.5,0,0,1-.92,0Zm6-3.473a2,2,0,0,1-4,0h0a2,2,0,1,1-2-2h.12a2,2,0,1,1,3.75,0h.13A2,2,0,0,1,11.439,4.7Z',
+    'lodging': 'M0.5,2.5C0.2,2.5,0,2.7,0,3v7.5v2C0,12.8,0.2,13,0.5,13S1,12.8,1,12.5V11h13v1.5 c0,0.3,0.2,0.5,0.5,0.5s0.5-0.2,0.5-0.5v-2c0-0.3-0.2-0.5-0.5-0.5H1V3C1,2.7,0.8,2.5,0.5,2.5z M3.5,3C2.7,3,2,3.7,2,4.5l0,0 C2,5.3,2.7,6,3.5,6l0,0C4.3,6,5,5.3,5,4.5l0,0C5,3.7,4.3,3,3.5,3L3.5,3z M7,4C5.5,4,5.5,5.5,5.5,5.5V7h-3C2.2,7,2,7.2,2,7.5v1 C2,8.8,2.2,9,2.5,9H6h9V6.5C15,4,12.5,4,12.5,4H7z',
+    'marker': 'M7.5 1C5.42312 1 3 2.2883 3 5.56759C3 7.79276 6.46156 12.7117 7.5 14C8.42309 12.7117 12 7.90993 12 5.56759C12 2.2883 9.57688 1 7.5 1Z',
+    'museum': 'M7.5,0L1,3.5V4h13V3.5L7.5,0z M2,5v5l-1,1.6V13h13v-1.4L13,10V5H2z M4,6h1v5.5H4V6z M7,6h1v5.5H7V6z M10,6h1 v5.5h-1V6z',
+    'park': 'M14,5.75c0.0113-0.6863-0.3798-1.3159-1-1.61C12.9475,3.4906,12.4014,2.9926,11.75,3 c-0.0988,0.0079-0.1962,0.0281-0.29,0.06c-0.0607-0.66-0.6449-1.1458-1.3048-1.0851C9.8965,1.9987,9.6526,2.1058,9.46,2.28l0,0 c0-0.6904-0.5596-1.25-1.25-1.25S6.96,1.5896,6.96,2.28C6.96,2.28,7,2.3,7,2.33C6.4886,1.8913,5.7184,1.9503,5.2797,2.4618 C5.1316,2.6345,5.0347,2.8451,5,3.07C4.8417,3.0195,4.6761,2.9959,4.51,3C3.6816,2.9931,3.0044,3.659,2.9975,4.4874 C2.9958,4.6872,3.0341,4.8852,3.11,5.07C2.3175,5.2915,1.8546,6.1136,2.0761,6.9061C2.2163,7.4078,2.6083,7.7998,3.11,7.94 c0.2533,0.7829,1.0934,1.2123,1.8763,0.959C5.5216,8.7258,5.9137,8.2659,6,7.71C6.183,7.8691,6.4093,7.9701,6.65,8v5L5,14h5l-1.6-1 v-2c0.7381-0.8915,1.6915-1.5799,2.77-2c0.8012,0.1879,1.603-0.3092,1.7909-1.1103C12.9893,7.7686,13.0025,7.6444,13,7.52 c0.0029-0.0533,0.0029-0.1067,0-0.16C13.6202,7.0659,14.0113,6.4363,14,5.75z M8.4,10.26V6.82C8.6703,7.3007,9.1785,7.5987,9.73,7.6 h0.28c0.0156,0.4391,0.2242,0.849,0.57,1.12C9.7643,9.094,9.0251,9.6162,8.4,10.26z',
+    'parking': 'M4 2V13H6V9H8.5C10.433 9 12 7.433 12 5.5C12 3.567 10.433 2 8.5 2H4ZM6 7V4H8.5C9.32843 4 10 4.67157 10 5.5C10 6.32843 9.32843 7 8.5 7H6Z',
+    'pharmacy': 'M9.5,4l1.07-1.54c0.0599,0.0046,0.1201,0.0046,0.18,0c0.6904-0.0004,1.2497-0.5603,1.2494-1.2506 C11.999,0.519,11.4391-0.0404,10.7487-0.04C10.0584-0.0396,9.499,0.5203,9.4994,1.2106c0,0.0131,0.0002,0.0262,0.0006,0.0394 c0,0,0,0.07,0,0.1L7,4H9.5z M12,6V5H3v1l1.5,3.5L3,13v1h9v-1l-1-3.5L12,6z M10,10H8v2H7v-2H5V9h2V7h1v2h2V10z',
+    'restaurant-pizza': 'M1.393 7.931.025 7.315A14.05 14.05 0 0 1 7.764-.001l.027.07.511 1.331-.003.001a12.613 12.613 0 0 0-6.906 6.53Zm10.963 4.96L2.42 8.414a11.604 11.604 0 0 1 6.354-6.009l.003-.001.817 2.122c-.028-.002-.052-.016-.081-.016a1.062 1.062 0 1 0 .764 1.793l2.413 6.273a.249.249 0 0 1-.334.316ZM7.426 7.52a.925.925 0 1 0-1.849 0 .925.925 0 0 0 1.849 0Zm3.017 2.03a.925.925 0 1 0-.07.353.924.924 0 0 0 .07-.354Z',
+    'restaurant': 'M3.5,0l-1,5.5c-0.1464,0.805,1.7815,1.181,1.75,2L4,14c-0.0384,0.9993,1,1,1,1s1.0384-0.0007,1-1L5.75,7.5 c-0.0314-0.8176,1.7334-1.1808,1.75-2L6.5,0H6l0.25,4L5.5,4.5L5.25,0h-0.5L4.5,4.5L3.75,4L4,0H3.5z M12,0 c-0.7364,0-1.9642,0.6549-2.4551,1.6367C9.1358,2.3731,9,4.0182,9,5v2.5c0,0.8182,1.0909,1,1.5,1L10,14c-0.0905,0.9959,1,1,1,1 s1,0,1-1V0z',
+    'shop': 'm13.33 5h-1.83l-.39-2.33c-.1601-.7182-.7017-1.2905-1.41-1.49-.3493-.1124-.7131-.173-1.08-.18h-2.24c-.3669.007-.7307.0676-1.08.18-.7083.1995-1.2499.7718-1.41 1.49l-.39 2.33h-1.83c-.2761-.0017-.5013.2208-.503.497-.0003.0519.0074.1035.023.153l1.88 6.3c.1964.6246.7753 1.0496 1.43 1.05h6c.651-.0047 1.2247-.4289 1.42-1.05l1.88-6.3c.0829-.2634-.0635-.5441-.3269-.627-.0463-.0146-.0945-.0223-.1431-.023zm-8.81 0 .36-2.17c.0807-.3625.3736-.6395.74-.7.2463-.0776.5019-.1213.76-.13h2.24c.2614.0078.5205.0515.77.13.3664.0605.6593.3375.74.7l.35 2.17h-6z',
+    'theatre': 'M2,1c0,0-1,0-1,1v5.1582C1,8.8885,1.354,11,4.5,11H5V8L2.5,9c0,0,0-2.5,2.5-2.5V5 c0-0.7078,0.0868-1.3209,0.5-1.7754C5.8815,2.805,6.5046,1.9674,8.1562,2.7539L9,3.3027V2c0,0,0-1-1-1C7.2922,1,6.0224,2,5,2 S2.7865,1,2,1z M3,3c0.5523,0,1,0.4477,1,1S3.5523,5,3,5S2,4.5523,2,4S2.4477,3,3,3z M7,4c0,0-1,0-1,1v5c0,2,1,4,4,4s4-2,4-4V5 c0-1-1-1-1-1c-0.7078,0-1.9776,1-3,1S7.7865,4,7,4z M8,6c0.5523,0,1,0.4477,1,1S8.5523,8,8,8S7,7.5523,7,7S7.4477,6,8,6z M12,6 c0.5523,0,1,0.4477,1,1s-0.4477,1-1,1s-1-0.4477-1-1S11.4477,6,12,6z M7.5,10H10h2.5c0,0,0,2.5-2.5,2.5S7.5,10,7.5,10z'
+  };
+  // Category words (Search Box poi_category, or a caller's category) to
+  // Maki names, checked in order, so "pizza restaurant" is a pizza.
+  var CATEGORY_ICONS = [
+    ['pizza', 'restaurant-pizza'], ['coffee', 'cafe'], ['cafe', 'cafe'],
+    ['café', 'cafe'], ['bakery', 'bakery'], ['ice cream', 'ice-cream'],
+    ['brewery', 'beer'], ['beer', 'beer'], ['pub', 'beer'],
+    ['bar', 'bar'], ['nightclub', 'bar'], ['wine', 'bar'],
+    ['fast food', 'fast-food'], ['burger', 'fast-food'],
+    ['restaurant', 'restaurant'], ['food', 'restaurant'], ['diner', 'restaurant'],
+    ['hotel', 'lodging'], ['motel', 'lodging'], ['hostel', 'lodging'], ['lodging', 'lodging'],
+    ['grocery', 'grocery'], ['supermarket', 'grocery'], ['convenience', 'convenience'],
+    ['gas', 'fuel'], ['fuel', 'fuel'], ['parking', 'parking'],
+    ['hospital', 'hospital'], ['clinic', 'hospital'], ['pharmacy', 'pharmacy'],
+    ['park', 'park'], ['garden', 'park'], ['museum', 'museum'], ['gallery', 'museum'],
+    ['theater', 'theatre'], ['theatre', 'theatre'], ['cinema', 'cinema'], ['movie', 'cinema'],
+    ['bank', 'bank'], ['atm', 'bank'],
+    ['shop', 'shop'], ['store', 'shop'], ['boutique', 'shop'],
+    ['attraction', 'attraction'], ['landmark', 'attraction']
+  ];
+
+  // The Maki name for a marker or card: its own maki when we have that
+  // icon, else one matched from its category, else the plain marker.
+  function placeIcon(maki, category) {
+    if (typeof maki === 'string' && MAKI.hasOwnProperty(maki)) return maki;
+    if (typeof category === 'string') {
+      var words = ' ' + category.toLowerCase().split(/[^a-zà-ÿ]+/).join(' ') + ' ';
+      for (var i = 0; i < CATEGORY_ICONS.length; i++) {
+        if (words.indexOf(' ' + CATEGORY_ICONS[i][0] + ' ') !== -1) return CATEGORY_ICONS[i][1];
+      }
+    }
+    return 'marker';
+  }
+  window.__placeIcon = placeIcon;
+
+  // Only ever called with a key of MAKI, so the markup is all ours.
+  function iconSvg(name) {
+    var d = MAKI[MAKI.hasOwnProperty(name) ? name : 'marker'];
+    return '<svg viewBox="0 0 15 15" aria-hidden="true"><path fill="currentColor" d="' + d + '"/></svg>';
+  }
+
+  function buildPlaceElement(icon, color) {
+    var el = document.createElement('div');
+    el.className = 'marker-badge place';
+    // A caller's color (gray for "other results", say) tints the icon.
+    if (color) el.style.color = color;
+    el.innerHTML = iconSvg(icon);
+    return el;
+  }
+
   // Dark or white, whichever reads better on the badge color (WCAG
   // contrast), so numbers stay legible on orange, green or gray pins.
   var BADGE_DARK_TEXT = '#1a0f04';
@@ -560,7 +650,9 @@ ${initialDataScript}
     var color = m.color ||
       (STYLE_DEFAULTS[style] && STYLE_DEFAULTS[style].color) || '#3b82f6';
     var marker;
-    if (style === 'numbered' || style === 'start' || style === 'end') {
+    if (style === 'place') {
+      marker = new mapboxgl.Marker({ element: buildPlaceElement(placeIcon(m.maki, m.category), m.color) });
+    } else if (style === 'numbered' || style === 'start' || style === 'end') {
       var label = m.label || (style === 'start' ? 'S' : style === 'end' ? 'E' : '');
       marker = new mapboxgl.Marker({ element: buildBadgeElement(label, color) });
     } else {
@@ -636,12 +728,17 @@ ${initialDataScript}
     fresh.forEach(function(m) {
       if (!m || !m.id) return;
       if (m.label && (keep || !isWholeNumber(m.label))) return;
+      // A place with no number of its own gets an icon pin, not a number:
+      // the selected pin and card light up together, which is enough to
+      // tell them apart.
+      if (!m.label && m.style !== 'start' && m.style !== 'end') {
+        m.style = 'place';
+        return;
+      }
+      // Otherwise a numbered pin, or a start/end pin, takes the next number.
       panelCount += 1;
       var n = String(panelCount);
-      if (!m.label) {
-        if (m.style !== 'start' && m.style !== 'end') m.style = 'numbered';
-        if (!m.color) m.color = '#f97316';
-      } else if (typeof m.popup === 'string' && m.popup.indexOf(m.label + '. ') === 0) {
+      if (m.label && typeof m.popup === 'string' && m.popup.indexOf(m.label + '. ') === 0) {
         // Search popups start with the old number ("3. Name").
         m.popup = n + '. ' + m.popup.slice(String(m.label).length + 2);
       }
@@ -1480,7 +1577,7 @@ ${initialDataScript}
     var features = [];
     points.forEach(function(f, i) {
       var props = f.properties || {};
-      var popupParts = [(i + 1) + '. ' + (props.name || 'Result')];
+      var popupParts = [props.name || 'Result'];
       var addr = props.full_address || props.place_formatted;
       if (addr) popupParts.push(addr);
       if (typeof props.distance === 'number') {
@@ -1496,9 +1593,8 @@ ${initialDataScript}
       markers.push({
         id: props.mapbox_id,
         coordinates: coords,
-        style: 'numbered',
-        label: String(i + 1),
-        color: '#f97316',
+        style: 'place',
+        maki: props.maki,
         popup: popupParts.join(' — '),
         name: props.name || ('Result ' + (i + 1)),
         category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
@@ -1522,11 +1618,11 @@ ${initialDataScript}
         data: { type: 'FeatureCollection', features: features },
         paint: {
           'circle-radius': 6,
-          'circle-color': '#f97316',
-          'circle-opacity': 0.15,
+          'circle-color': '#0f172a',
+          'circle-opacity': 0.1,
           'circle-stroke-width': 1,
-          'circle-stroke-color': '#f97316',
-          'circle-stroke-opacity': 0.4
+          'circle-stroke-color': '#0f172a',
+          'circle-stroke-opacity': 0.25
         }
       }
     ] : [];
@@ -1548,11 +1644,13 @@ ${initialDataScript}
     markers.forEach(function(m) {
       if (!m || !m.id) return;
       // The pin's own label, so a card reads the same as its pin ("A" too).
+      // A place pin has none, and neither does its card.
       var badge = isWholeNumber(m.label) ? parseInt(m.label, 10)
-        : (m.label ? String(m.label) : items.length + 1);
+        : (m.label ? String(m.label) : null);
       items.push({
         id: m.id,
         number: badge,
+        icon: placeIcon(m.maki, m.category),
         name: m.name || ('Result ' + (items.length + 1)),
         category: m.category,
         distanceMeters: typeof m.distanceMeters === 'number' ? m.distanceMeters : undefined,
@@ -1674,12 +1772,15 @@ ${initialDataScript}
     var li = document.createElement('li');
     li.className = 'card';
 
-    var badge = document.createElement('span');
-    badge.className = 'card-badge';
-    badge.textContent = String(it.number);
+    var badge = null;
+    if (it.number !== null && it.number !== undefined) {
+      badge = document.createElement('span');
+      badge.className = 'card-badge';
+      badge.textContent = String(it.number);
+    }
     // Match the pin when the caller colored it (e.g. gray for "other
     // results" next to a legend); the default orange is in the CSS.
-    if (typeof it.color === 'string' && it.color.toLowerCase() !== '#f97316' &&
+    if (badge && typeof it.color === 'string' && it.color.toLowerCase() !== '#f97316' &&
         (/^#[0-9a-f]{3,8}$/i).test(it.color)) {
       badge.style.background = it.color;
       badge.style.color = badgeTextColor(it.color);
@@ -1706,11 +1807,12 @@ ${initialDataScript}
     // loadPanelPhoto). Shown first by CSS order.
     var thumb = document.createElement('span');
     thumb.className = 'card-thumb empty';
+    thumb.innerHTML = iconSvg(it.icon);
     if (typeof thumb.setAttribute === 'function') {
       thumb.setAttribute('role', 'img');
       thumb.setAttribute('aria-label', it.name);
     }
-    li.appendChild(badge);
+    if (badge) li.appendChild(badge);
     li.appendChild(body);
     li.appendChild(thumb);
 
@@ -1909,6 +2011,7 @@ ${initialDataScript}
       // A later render may have replaced the carousel while this loaded.
       if (panelRowsById[id] !== row) return;
       row.thumb.className = 'card-thumb';
+      row.thumb.innerHTML = '';
       row.thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
     };
     if (!EMBEDDED || !hostAnswered) {
@@ -2274,7 +2377,7 @@ ${initialDataScript}
 
   // Mirrors the deleted server-side buildGroundLocationPayload (now
   // client-only since the map preview self-fetches): a dark origin pin plus
-  // numbered orange POI markers. Isochrone contours aren't drawn here either
+  // place pins for the POIs. Isochrone contours aren't drawn here either
   // — the original never rendered them, only a contour-minutes summary.
   function buildGroundLocationMiniPayload(place, longitude, latitude, pois) {
     var markers = [
@@ -2286,7 +2389,7 @@ ${initialDataScript}
       }
     ];
     (pois || []).forEach(function(poi, i) {
-      var parts = [(i + 1) + '. ' + poi.name];
+      var parts = [poi.name];
       if (poi.address) parts.push(poi.address);
       if (typeof poi.distance_meters === 'number') {
         parts.push(Math.round(poi.distance_meters) + ' m');
@@ -2294,9 +2397,7 @@ ${initialDataScript}
       markers.push({
         id: poi.id,
         coordinates: [poi.longitude, poi.latitude],
-        style: 'numbered',
-        label: String(i + 1),
-        color: '#f97316',
+        style: 'place',
         popup: parts.join(' — '),
         name: poi.name,
         category: poi.category,
