@@ -301,6 +301,9 @@ function loadScriptSandbox(options?: {
     legendEl: getElementById('legend'),
     mapEl: getElementById('map') as unknown as { clientWidth?: number },
     fitBoundsCalls,
+    badgeTextColor: (
+      sandbox.window as { __badgeTextColor?: (color: unknown) => string }
+    ).__badgeTextColor as (color: unknown) => string,
     hoursToday: (
       sandbox.window as {
         __hoursToday?: (spec: unknown, now: Date) => string | null;
@@ -2298,16 +2301,18 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(reads[0].params).toEqual({
       uri: 'mapbox://place-photo/' + encodeURIComponent(id)
     });
-    // The CDN URL is never used directly.
+    // The CDN URL is never used directly. Until the photo arrives the
+    // card shows the placeholder, labeled with the place's name.
     const row = carouselEl.children[0].children[0];
-    expect(row.children).toHaveLength(2);
+    expect(row.children[2].className).toBe('card-thumb empty');
 
     resolveResourcesRead({
       contents: [{ uri: 'x', mimeType: 'image/jpeg', blob: 'QUJD' }]
     });
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
-    // At the end of the row, so badge and name stay where they were.
+    // The placeholder becomes the photo; badge and name stay where they were.
+    expect(row.children).toHaveLength(3);
     const [badge, body, thumb] = row.children;
     expect(thumb.className).toBe('card-thumb');
     expect(thumb.style.backgroundImage).toBe(
@@ -2318,7 +2323,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(JSON.stringify(row)).not.toContain('mktgcdn');
   });
 
-  it('adds no thumbnail when the server has no photo', async () => {
+  it('keeps the placeholder when the server has no photo', async () => {
     const { sendToolResult, setFetchImpl, carouselEl, resolveResourcesRead } =
       loadScriptSandbox();
     setFetchImpl(photoFetch(mockPoiId('photo-poi')));
@@ -2330,7 +2335,9 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     });
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
-    expect(carouselEl.children[0].children[0].children).toHaveLength(2);
+    const [, , thumb] = carouselEl.children[0].children[0].children;
+    expect(thumb.className).toBe('card-thumb empty');
+    expect(thumb.style.backgroundImage).toBeUndefined();
   });
 
   it('loads the photo URL directly on a standalone page, which has no host or CSP', async () => {
@@ -2351,7 +2358,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     );
   });
 
-  it('adds no thumbnail on a standalone page when the photo fails to load', async () => {
+  it('keeps the placeholder on a standalone page when the photo fails to load', async () => {
     const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox({
       topLevel: true
     });
@@ -2375,7 +2382,8 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     sendToolResult(searchResult);
     for (let i = 0; i < 20; i++) await Promise.resolve();
 
-    expect(carouselEl.children[0].children[0].children).toHaveLength(2);
+    const [, , thumb] = carouselEl.children[0].children[0].children;
+    expect(thumb.className).toBe('card-thumb empty');
   });
 });
 
@@ -3050,6 +3058,22 @@ describe('mapAppHtml results carousel: selecting a place', () => {
     // Clicking a pin in the same spot pans too.
     pins[2].__fireClick();
     expect(panBy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('mapAppHtml badge text color', () => {
+  const { badgeTextColor } = loadScriptSandbox();
+
+  it.each([
+    ['#f97316', '#1a0f04'], // default orange: white is only 2.8:1
+    ['#22c55e', '#1a0f04'], // start green
+    ['#2563eb', '#fff'], // numbered blue
+    ['#ef4444', '#1a0f04'], // end red
+    ['#0f172a', '#fff'],
+    ['#fff', '#1a0f04'],
+    ['not-a-color', '#fff']
+  ])('%s gets %s numbers', (bg, text) => {
+    expect(badgeTextColor(bg)).toBe(text);
   });
 });
 

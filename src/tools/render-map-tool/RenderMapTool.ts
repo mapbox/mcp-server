@@ -77,7 +77,10 @@ export class RenderMapTool extends BaseTool<
     'Every call is a fresh render — it does not accumulate state — so to ' +
     'restyle an already-drawn map without losing its content, re-pass the ' +
     'same `payload_refs`/`layers` alongside `baseMapConfig`/`baseStyle` rather ' +
-    'than sending them alone.';
+    'than sending them alone. ' +
+    "After rendering places, don't list them again in your reply: the map's " +
+    'cards already show each name, category, distance, hours and phone. ' +
+    'Answer the question or add what the cards leave out instead.';
 
   readonly annotations = {
     title: 'Render Map',

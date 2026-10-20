@@ -88,7 +88,7 @@ export function renderMapAppHtml(params: {
   /* Selected place (see selectPlace): the pin inverts and shows its name,
      like the card it matches. */
   .marker-badge.active {
-    background: #fff !important; color: #0f172a;
+    background: #fff !important; color: #0f172a !important;
     transform: scale(1.18); box-shadow: 0 3px 10px rgba(0,0,0,0.5);
   }
   .marker-badge .marker-name {
@@ -121,6 +121,11 @@ export function renderMapAppHtml(params: {
   #carousel .card-thumb {
     order: -1; flex: 0 0 auto; width: 64px; height: 64px; border-radius: 10px;
     background-size: cover; background-position: center;
+  }
+  /* Until a photo loads, or when the place has none: Assembly's marker
+     icon on a muted tile, so every card has a picture. */
+  #carousel .card-thumb.empty {
+    background: #1e293b url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'><path fill='%2394a3b8' d='M4 7C4 4.23857 6.23858 2 9 2C11.7614 2 14 4.23858 14 7C14 10.0254 10.7195 13.7128 9 16C7.28045 13.7128 4 10.0254 4 7Z'/></svg>") center / 28px no-repeat;
   }
   /* Matches the numbered pin. */
   #carousel .card-badge {
@@ -492,10 +497,28 @@ ${initialDataScript}
     end: { color: '#ef4444' }
   };
 
+  // Dark or white, whichever reads better on the badge color (WCAG
+  // contrast), so numbers stay legible on orange, green or gray pins.
+  var BADGE_DARK_TEXT = '#1a0f04';
+  function badgeTextColor(color) {
+    var hex = typeof color === 'string' ? color.replace('#', '') : '';
+    if (hex.length === 3) hex = hex.split('').map(function(c) { return c + c; }).join('');
+    if (!/^[0-9a-f]{6}/i.test(hex)) return '#fff';
+    var lum = [0, 2, 4].map(function(i) {
+      var c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    var l = 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
+    // Against white (L=1) vs. against the dark text (L about 0.0055).
+    return (1.05 / (l + 0.05)) >= ((l + 0.05) / 0.0555) ? '#fff' : BADGE_DARK_TEXT;
+  }
+  window.__badgeTextColor = badgeTextColor;
+
   function buildBadgeElement(label, color) {
     var el = document.createElement('div');
     el.className = 'marker-badge';
     el.style.background = color;
+    el.style.color = badgeTextColor(color);
     el.textContent = label;
     return el;
   }
@@ -1659,7 +1682,7 @@ ${initialDataScript}
     if (typeof it.color === 'string' && it.color.toLowerCase() !== '#f97316' &&
         (/^#[0-9a-f]{3,8}$/i).test(it.color)) {
       badge.style.background = it.color;
-      badge.style.color = '#fff';
+      badge.style.color = badgeTextColor(it.color);
     }
 
     var name = document.createElement('div');
@@ -1679,14 +1702,23 @@ ${initialDataScript}
     body.className = 'card-body';
     body.appendChild(name);
     body.appendChild(meta);
+    // Placeholder picture, replaced by the photo if one loads (see
+    // loadPanelPhoto). Shown first by CSS order.
+    var thumb = document.createElement('span');
+    thumb.className = 'card-thumb empty';
+    if (typeof thumb.setAttribute === 'function') {
+      thumb.setAttribute('role', 'img');
+      thumb.setAttribute('aria-label', it.name);
+    }
     li.appendChild(badge);
     li.appendChild(body);
+    li.appendChild(thumb);
 
     li.addEventListener('click', function() {
       selectPlace(it.id, { scrollCard: true, panTo: true });
     });
 
-    panelRowsById[it.id] = { li: li, meta: meta, body: body };
+    panelRowsById[it.id] = { li: li, meta: meta, body: body, thumb: thumb };
     return li;
   }
 
@@ -1876,10 +1908,8 @@ ${initialDataScript}
     var show = function(src) {
       // A later render may have replaced the carousel while this loaded.
       if (panelRowsById[id] !== row) return;
-      var thumb = document.createElement('span');
-      thumb.className = 'card-thumb';
-      thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
-      row.li.appendChild(thumb);
+      row.thumb.className = 'card-thumb';
+      row.thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
     };
     if (!EMBEDDED || !hostAnswered) {
       // No MCP host (a standalone or framed page), so no CSP of ours
