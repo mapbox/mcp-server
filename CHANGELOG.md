@@ -10,6 +10,10 @@
   - **Token scope:** it needs `user-feedback:write` to send, and `user-feedback:read` for the duplicate check. On a 401 or 403 when sending, the error says so. Without the read scope, or if the list call fails, the report is sent unchecked and the result says why. `--disable-tools feedback_tool` leaves it out.
   - Annotated `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`. The location goes as top-level `lat`/`lon`; the optional GeoJSON `feature` and `screenshot` fields aren't sent yet, since the docs give `feature` coordinates as `[latitude, longitude]` and that needs checking first.
 
+### Bug Fixes
+
+- **`static_map_image_tool`: custom-marker URLs with several trailing dots are now checked like the plain hostname.** The URL check stripped only one trailing root-label dot, so `https://localhost../x.png` was compared as `localhost.` and passed, as did `app.localhost..` and dotless hosts such as `intranet..`. It now strips them all. Public hosts with a trailing dot (`example.com.`) are still accepted.
+
 ## 0.16.1-dev - 2026-10-16
 
 ## 0.16.0 - 2026-10-15

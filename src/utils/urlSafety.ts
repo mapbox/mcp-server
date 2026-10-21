@@ -52,14 +52,15 @@ export function parseSafeExternalUrl(rawUrl: string): URL | null {
     return null;
   }
 
-  // Strip optional surrounding brackets from IPv6 literals and a trailing
-  // root-label dot (e.g. "localhost." is equivalent to "localhost"). The
+  // Strip optional surrounding brackets from IPv6 literals and trailing
+  // root-label dots (e.g. "localhost." and "localhost.." both mean
+  // "localhost"; stripping only one left "localhost." to slip through). The
   // dotless-hostname check further below relies on this running first —
   // without it, "intranet." would still contain a dot and slip past that
   // check.
   const host = parsed.hostname
     .replace(/^\[|\]$/g, '')
-    .replace(/\.$/, '')
+    .replace(/\.+$/, '')
     .toLowerCase();
 
   if (host.length === 0) {
