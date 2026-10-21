@@ -10,7 +10,7 @@ import {
   MidpointOutputSchema,
   type MidpointOutput
 } from './MidpointTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * MidpointTool - Calculate the geographic midpoint between two coordinates

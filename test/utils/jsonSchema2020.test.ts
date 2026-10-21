@@ -2,12 +2,10 @@
 // Licensed under the MIT License.
 
 import { describe, it, expect } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client } from '@modelcontextprotocol/client';
+import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server';
 import {
   JSON_SCHEMA_2020_12,
-  publishJsonSchema2020,
   toJsonSchema2020
 } from '../../src/utils/jsonSchema2020.js';
 import { getAllTools } from '../../src/tools/toolRegistry.js';
@@ -138,10 +136,9 @@ describe('toJsonSchema2020', () => {
   });
 });
 
-describe('publishJsonSchema2020', () => {
-  async function listTools(publish: boolean) {
+describe('tools/list schemas', () => {
+  async function listTools() {
     const server = new McpServer({ name: 'test', version: '0.0.0' });
-    if (publish) publishJsonSchema2020(server);
     for (const tool of getAllTools()) tool.installTo(server);
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
@@ -157,9 +154,10 @@ describe('publishJsonSchema2020', () => {
 
   // Regression: Claude Desktop rejected every tool call with "Tool
   // 'search_and_geocode_tool' has an invalid outputSchema: JSON Schema
-  // declares an unsupported dialect" because the SDK emits draft-07.
+  // declares an unsupported dialect" because SDK v1 emitted draft-07. SDK v2
+  // publishes 2020-12 itself; this guards against that regressing.
   it('publishes every tool schema as JSON Schema 2020-12', async () => {
-    const tools = await listTools(true);
+    const tools = await listTools();
     expect(tools.length).toBe(getAllTools().length);
     for (const tool of tools) {
       expect(tool.inputSchema.$schema, tool.name).toBe(JSON_SCHEMA_2020_12);
@@ -171,19 +169,8 @@ describe('publishJsonSchema2020', () => {
     }
   });
 
-  it('is needed: the SDK alone publishes draft-07 with tuple items', async () => {
-    const tools = await listTools(false);
-    const leftovers = tools.flatMap((t) => [
-      ...draft07Leftovers(t.inputSchema),
-      ...draft07Leftovers(t.outputSchema)
-    ]);
-    expect(leftovers.some((l) => l.endsWith('.$schema'))).toBe(true);
-    expect(leftovers.some((l) => l.endsWith('.items[]'))).toBe(true);
-  });
-
   it('keeps tool calls working with structured output validation', async () => {
     const server = new McpServer({ name: 'test', version: '0.0.0' });
-    publishJsonSchema2020(server);
     const bbox = getAllTools().find((t) => t.name === 'bbox_tool')!;
     bbox.installTo(server);
     const [clientTransport, serverTransport] =

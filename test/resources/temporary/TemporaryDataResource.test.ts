@@ -41,7 +41,7 @@ function forgedTokenFor(username: string): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extraFor(token?: string): any {
-  return token ? { authInfo: { token } } : {};
+  return token ? { http: { authInfo: { token } } } : {};
 }
 
 const NOT_FOUND =

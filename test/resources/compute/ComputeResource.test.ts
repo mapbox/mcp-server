@@ -88,7 +88,7 @@ describe('ComputeResource', () => {
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const asAccountB = { authInfo: { token: 'irrelevant' } } as any;
+    const asAccountB = { http: { authInfo: { token: 'irrelevant' } } } as any;
     const result = await resource.read(ref, asAccountB);
     const payload = JSON.parse(result.contents[0].text as string);
     expect(payload.summary).toBe('Intersection of two polygons');
