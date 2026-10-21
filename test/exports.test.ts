@@ -45,6 +45,23 @@ describe('Package exports', () => {
     });
   });
 
+  describe('skills subpath', () => {
+    it('should export the skills and the extension helpers', async () => {
+      const {
+        ALL_SKILLS,
+        SKILLS_EXTENSION_ID,
+        getSkillsForTools,
+        installSkillsTo,
+        mapDisplaySkill
+      } = await import('../src/skills/index.js');
+
+      expect(SKILLS_EXTENSION_ID).toBe('io.modelcontextprotocol/skills');
+      expect(ALL_SKILLS).toContain(mapDisplaySkill);
+      expect(typeof getSkillsForTools).toBe('function');
+      expect(typeof installSkillsTo).toBe('function');
+    });
+  });
+
   describe('resources subpath', () => {
     it('should export pre-configured resource instances', async () => {
       const { categoryList } = await import('../src/resources/index.js');

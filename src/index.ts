@@ -28,6 +28,11 @@ import {
 } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
+import { getSkillsForTools } from './skills/skillRegistry.js';
+import {
+  SKILLS_EXTENSION_ID,
+  installSkillsTo
+} from './skills/skillsExtension.js';
 import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import { publishJsonSchema2020 } from './utils/jsonSchema2020.js';
@@ -96,6 +101,15 @@ const enabledResourceFallbackTools = filterTools(resourceFallbackTools, config);
 // Get all resources
 const allResources = getAllResources();
 
+const enabledToolNames = [
+  ...enabledCoreTools,
+  ...enabledElicitationTools,
+  ...enabledResourceFallbackTools
+].map((tool) => tool.name);
+
+// Skills whose tools are all enabled (MCP Skills extension, SEP-2640)
+const enabledSkills = getSkillsForTools(enabledToolNames);
+
 // Create an MCP server
 const server = new McpServer(
   {
@@ -117,13 +131,7 @@ const server = new McpServer(
     ]
   },
   {
-    instructions: buildServerInstructions(
-      [
-        ...enabledCoreTools,
-        ...enabledElicitationTools,
-        ...enabledResourceFallbackTools
-      ].map((tool) => tool.name)
-    ),
+    instructions: buildServerInstructions(enabledToolNames),
     capabilities: {
       tools: {
         listChanged: true // Advertise support for dynamic tool registration (ready for future capability-dependent tools)
@@ -131,7 +139,10 @@ const server = new McpServer(
       completions: {},
       resources: {},
       prompts: {},
-      logging: {}
+      logging: {},
+      ...(enabledSkills.length > 0 && {
+        extensions: { [SKILLS_EXTENSION_ID]: {} }
+      })
     }
   }
 );
@@ -171,6 +182,10 @@ uiResources.forEach((resource) => {
 regularResources.forEach((resource) => {
   resource.installTo(server);
 });
+
+if (enabledSkills.length > 0) {
+  installSkillsTo(server, enabledSkills);
+}
 
 // Register prompt handlers
 server.server.setRequestHandler(ListPromptsRequestSchema, async () => {

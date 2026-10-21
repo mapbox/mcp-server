@@ -110,6 +110,7 @@
       "./tools": "./src/tools/index.ts",
       "./resources": "./src/resources/index.ts",
       "./prompts": "./src/prompts/index.ts",
+      "./skills": "./src/skills/index.ts",
       "./utils": "./src/utils/index.ts"
     },
     "dialects": [
@@ -157,6 +158,16 @@
       "require": {
         "types": "./dist/commonjs/prompts/index.d.ts",
         "default": "./dist/commonjs/prompts/index.js"
+      }
+    },
+    "./skills": {
+      "import": {
+        "types": "./dist/esm/skills/index.d.ts",
+        "default": "./dist/esm/skills/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/skills/index.d.ts",
+        "default": "./dist/commonjs/skills/index.js"
       }
     },
     "./utils": {
