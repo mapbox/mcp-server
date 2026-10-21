@@ -12,7 +12,7 @@
 
 ### Bug Fixes
 
-- **`static_map_image_tool`: custom-marker URLs with several trailing dots are now checked like the plain hostname.** The URL check stripped only one trailing root-label dot, so `https://localhost../x.png` was compared as `localhost.` and passed, as did `app.localhost..` and dotless hosts such as `intranet..`. It now strips them all. Public hosts with a trailing dot (`example.com.`) are still accepted.
+- **`static_map_image_tool` and place photos: URLs with several trailing dots are now checked like the plain hostname.** The URL check stripped only one trailing root-label dot, so `https://localhost../x.png` was compared as `localhost.` and passed, as did `app.localhost..`, dotless hosts such as `intranet..`, and IP literals such as `127.0.0.1..` and `169.254.169.254..`. It now strips them all. This covers custom-marker URLs in `static_map_image_tool` and photo URLs in `PlacePhotoResource`. Public hosts with a trailing dot (`example.com.`) are still accepted.
 
 ## 0.16.1-dev - 2026-10-16
 

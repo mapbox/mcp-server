@@ -53,6 +53,13 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://intranet../x.png')).toBe(false);
   });
 
+  it('rejects IP literals written with several trailing dots', () => {
+    expect(isSafeExternalUrl('https://127.0.0.1../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://169.254.169.254../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://10.0.0.1../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://0x7f000001../x.png')).toBe(false);
+  });
+
   it('allows public hostnames written with a trailing root-label dot', () => {
     expect(isSafeExternalUrl('https://example.com./marker.png')).toBe(true);
   });
