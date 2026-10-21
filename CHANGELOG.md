@@ -16,7 +16,7 @@
 
 ### Maintenance
 
-- **Removed build output committed under `src/` (#PR).** `src/utils/versionUtils-cjs.cjs`, `.d.cts` and their source maps were compiled output from a `tsc` run that wrote next to the sources, committed back in #96. Only `versionUtils-cjs.cts` is source: tshy swaps it in for `versionUtils.ts` in the CommonJS build. `.gitignore` now keeps `.js`, `.cjs`, `.mjs`, `.d.*ts` and `.map` files out of `src/` and `test/`.
+- **Removed build output committed under `src/` (#297).** `src/utils/versionUtils-cjs.cjs`, `.d.cts` and their source maps were compiled output from a `tsc` run that wrote next to the sources, committed back in #96. Only `versionUtils-cjs.cts` is source: tshy swaps it in for `versionUtils.ts` in the CommonJS build. `.gitignore` now keeps `.js`, `.cjs`, `.mjs`, `.d.*ts` and `.map` files out of `src/` and `test/`.
 
 ## 0.16.1-dev - 2026-10-16
 
