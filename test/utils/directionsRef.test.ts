@@ -7,6 +7,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { DirectionsTool } from '../../src/tools/directions-tool/DirectionsTool.js';
 import { directionsRequestFromRef } from '../../src/utils/directionsRef.js';
 import { buildSelfFetchRef } from '../../src/utils/selfFetchRef.js';
+import type { HttpRequest } from '../../src/utils/types.js';
 
 const coordinates = [
   { longitude: -122.4194, latitude: 37.7749 },
@@ -35,7 +36,8 @@ function longRoute() {
 
 async function runDirections(input: Record<string, unknown>) {
   const urls: string[] = [];
-  const httpRequest = vi.fn(async (url: string) => {
+  const httpRequest = vi.fn<HttpRequest>(async (input) => {
+    const url = String(input);
     urls.push(url);
     return new Response(JSON.stringify(longRoute()), {
       headers: { 'content-type': 'application/json' }

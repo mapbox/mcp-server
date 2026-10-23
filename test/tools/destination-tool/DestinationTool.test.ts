@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { DestinationTool } from '../../../src/tools/destination-tool/DestinationTool.js';
+import type { DestinationOutput } from '../../../src/tools/destination-tool/DestinationTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('DestinationTool', () => {
   const tool = new DestinationTool();
@@ -17,8 +19,12 @@ describe('DestinationTool', () => {
 
     expect(result.isError).toBe(false);
     // Should end up roughly 1 degree north
-    expect(result.structuredContent?.destination.latitude).toBeCloseTo(1, 0);
-    expect(result.structuredContent?.destination.longitude).toBeCloseTo(0, 1);
+    expect(
+      structuredOf<DestinationOutput>(result).destination.latitude
+    ).toBeCloseTo(1, 0);
+    expect(
+      structuredOf<DestinationOutput>(result).destination.longitude
+    ).toBeCloseTo(0, 1);
   });
 
   it('calculates destination heading east', async () => {
@@ -30,8 +36,12 @@ describe('DestinationTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.destination.longitude).toBeGreaterThan(0);
-    expect(result.structuredContent?.destination.latitude).toBeCloseTo(0, 1);
+    expect(
+      structuredOf<DestinationOutput>(result).destination.longitude
+    ).toBeGreaterThan(0);
+    expect(
+      structuredOf<DestinationOutput>(result).destination.latitude
+    ).toBeCloseTo(0, 1);
   });
 
   it('calculates destination in kilometers', async () => {
@@ -44,10 +54,12 @@ describe('DestinationTool', () => {
 
     expect(result.isError).toBe(false);
     // 100km north should increase latitude by ~0.9 degrees
-    expect(result.structuredContent?.destination.latitude).toBeGreaterThan(38);
-    expect(result.structuredContent?.units).toBe('kilometers');
-    expect(result.structuredContent?.distance).toBe(100);
-    expect(result.structuredContent?.bearing).toBe(0);
+    expect(
+      structuredOf<DestinationOutput>(result).destination.latitude
+    ).toBeGreaterThan(38);
+    expect(structuredOf<DestinationOutput>(result).units).toBe('kilometers');
+    expect(structuredOf<DestinationOutput>(result).distance).toBe(100);
+    expect(structuredOf<DestinationOutput>(result).bearing).toBe(0);
   });
 
   it('defaults to meters units', async () => {
@@ -58,7 +70,7 @@ describe('DestinationTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('meters');
+    expect(structuredOf<DestinationOutput>(result).units).toBe('meters');
   });
 
   it('calculates destination heading south (negative bearing)', async () => {
@@ -71,7 +83,9 @@ describe('DestinationTool', () => {
 
     expect(result.isError).toBe(false);
     // Heading south should decrease latitude
-    expect(result.structuredContent?.destination.latitude).toBeLessThan(10);
+    expect(
+      structuredOf<DestinationOutput>(result).destination.latitude
+    ).toBeLessThan(10);
   });
 
   it('rejects bearing out of range', async () => {

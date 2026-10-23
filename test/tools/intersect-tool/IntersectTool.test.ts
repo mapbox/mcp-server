@@ -3,7 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { IntersectTool } from '../../../src/tools/intersect-tool/IntersectTool.js';
-import { tokenFor } from '../../utils/tokenTestUtils.js';
+import type { IntersectOutput } from '../../../src/tools/intersect-tool/IntersectTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('IntersectTool', () => {
   const tool = new IntersectTool();
@@ -31,8 +32,8 @@ describe('IntersectTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.intersects).toBe(true);
-    expect(result.structuredContent?.geometry).not.toBeNull();
+    expect(structuredOf<IntersectOutput>(result).intersects).toBe(true);
+    expect(structuredOf<IntersectOutput>(result).geometry).not.toBeNull();
   });
 
   it('returns intersects=false for non-overlapping polygons', async () => {
@@ -58,8 +59,8 @@ describe('IntersectTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.intersects).toBe(false);
-    expect(result.structuredContent?.geometry).toBeNull();
+    expect(structuredOf<IntersectOutput>(result).intersects).toBe(false);
+    expect(structuredOf<IntersectOutput>(result).geometry).toBeNull();
   });
 
   it('returns intersection for one polygon fully inside another', async () => {
@@ -85,9 +86,9 @@ describe('IntersectTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.intersects).toBe(true);
+    expect(structuredOf<IntersectOutput>(result).intersects).toBe(true);
     // Intersection should equal the smaller polygon
-    expect(result.structuredContent?.geometry).not.toBeNull();
+    expect(structuredOf<IntersectOutput>(result).geometry).not.toBeNull();
   });
 
   it('respects holes when computing intersection', async () => {
@@ -126,7 +127,7 @@ describe('IntersectTool', () => {
 
     expect(result.isError).toBe(false);
     // The hole excludes that area from polygon1, so no shared area
-    expect(result.structuredContent?.intersects).toBe(false);
+    expect(structuredOf<IntersectOutput>(result).intersects).toBe(false);
   });
 
   it('text content describes intersection result', async () => {
@@ -180,31 +181,26 @@ describe('IntersectTool', () => {
   });
 
   it('stores a mapboxRender payload with input fills + intersection result', async () => {
-    const token = tokenFor('account-test-intersect');
-    const result = await tool.run(
-      {
-        polygon1: [
-          [
-            [0, 0],
-            [2, 0],
-            [2, 2],
-            [0, 2],
-            [0, 0]
-          ]
-        ],
-        polygon2: [
-          [
-            [1, 1],
-            [3, 1],
-            [3, 3],
-            [1, 3],
-            [1, 1]
-          ]
+    const result = await tool.run({
+      polygon1: [
+        [
+          [0, 0],
+          [2, 0],
+          [2, 2],
+          [0, 2],
+          [0, 0]
         ]
-      },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { http: { authInfo: { token } } } as any
-    );
+      ],
+      polygon2: [
+        [
+          [1, 1],
+          [3, 1],
+          [3, 3],
+          [1, 3],
+          [1, 1]
+        ]
+      ]
+    });
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
