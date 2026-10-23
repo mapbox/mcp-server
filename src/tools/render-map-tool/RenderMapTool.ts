@@ -74,6 +74,9 @@ export class RenderMapTool extends BaseTool<
     'To restyle the base map itself (e.g. "make the water red", switch to night ' +
     'lighting, hide POI labels) pass `baseMapConfig`. To switch to satellite ' +
     'imagery, pass `baseStyle: "standard-satellite"` (defaults to "standard"). ' +
+    'To show live traffic congestion on the roads in view, pass ' +
+    '`showTraffic: true`. The map also has Satellite and Traffic buttons ' +
+    'users can toggle themselves. ' +
     'Every call is a fresh render — it does not accumulate state — so to ' +
     'restyle an already-drawn map without losing its content, re-pass the ' +
     'same `payload_refs`/`layers` alongside `baseMapConfig`/`baseStyle` rather ' +
@@ -186,7 +189,9 @@ export class RenderMapTool extends BaseTool<
               : '';
 
           const baseMapConfigNote =
-            payload.baseMapConfig || payload.baseStyle
+            payload.baseMapConfig ||
+            payload.baseStyle ||
+            payload.showTraffic !== undefined
               ? ' Updated the base map style.'
               : '';
 
@@ -314,33 +319,36 @@ export class RenderMapTool extends BaseTool<
       camera: input.camera as MapAppPayload['camera'],
       summary: input.summary,
       baseMapConfig: input.baseMapConfig,
-      baseStyle: input.baseStyle
+      baseStyle: input.baseStyle,
+      showTraffic: input.showTraffic
     };
     const hasInlineContent =
       (inline.layers && inline.layers.length > 0) ||
       (inline.markers && inline.markers.length > 0);
 
     const all: MapAppPayload[] = [...fromRefs];
-    // baseMapConfig/baseStyle-only calls (e.g. "now turn the water red" or
-    // "switch to satellite" with no new data) are renderable on their own —
-    // treated like summary/legend.
+    // baseMapConfig/baseStyle/showTraffic-only calls (e.g. "now turn the
+    // water red", "switch to satellite" or "show traffic" with no new data)
+    // are renderable on their own — treated like summary/legend.
     if (
       hasInlineContent ||
       inline.summary ||
       inline.legend ||
       inline.baseMapConfig ||
-      inline.baseStyle
+      inline.baseStyle ||
+      inline.showTraffic !== undefined
     )
       all.push(inline);
     if (all.length === 0) return { payload: null, unresolvedRefs };
 
     const merged = mergeMapPayloads(all);
-    // Inline summary/camera/legend/baseMapConfig/baseStyle take precedence when provided.
+    // Inline summary/camera/legend/baseMapConfig/baseStyle/showTraffic take precedence when provided.
     if (input.summary) merged.summary = input.summary;
     if (input.camera) merged.camera = inline.camera;
     if (input.legend) merged.legend = input.legend;
     if (input.baseMapConfig) merged.baseMapConfig = input.baseMapConfig;
     if (input.baseStyle) merged.baseStyle = input.baseStyle;
+    if (input.showTraffic !== undefined) merged.showTraffic = input.showTraffic;
     return { payload: merged, unresolvedRefs };
   }
 }
