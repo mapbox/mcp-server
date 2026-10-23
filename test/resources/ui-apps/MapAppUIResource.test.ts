@@ -49,7 +49,7 @@ describe('MapAppUIResource', () => {
 
     const result = await resource.read('ui://mapbox/map-app/index.html', {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      authInfo: { token: SK_TOKEN } as any
+      http: { authInfo: { token: SK_TOKEN } as any }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
@@ -82,7 +82,7 @@ describe('MapAppUIResource', () => {
 
     const result = await resource.read('ui://mapbox/map-app/index.html', {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      authInfo: { token: SK_TOKEN } as any
+      http: { authInfo: { token: SK_TOKEN } as any }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 

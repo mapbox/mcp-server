@@ -16,7 +16,7 @@ import {
   BoundingBoxOutputSchema,
   type BoundingBoxOutput
 } from './BoundingBoxTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * BoundingBoxTool - Calculate the bounding box of a geometry

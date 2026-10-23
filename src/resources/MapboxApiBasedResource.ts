@@ -1,12 +1,10 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
-  ServerRequest,
-  ServerNotification,
-  ReadResourceResult
-} from '@modelcontextprotocol/sdk/types.js';
+  ReadResourceResult,
+  ServerContext
+} from '@modelcontextprotocol/server';
 import { BaseResource } from './BaseResource.js';
 import type { HttpRequest } from '../utils/types.js';
 import { context, trace, SpanStatusCode } from '@opentelemetry/api';
@@ -54,12 +52,9 @@ export abstract class MapboxApiBasedResource extends BaseResource {
   /**
    * Validates and reads the resource.
    */
-  async read(
-    uri: string,
-    extra?: RequestHandlerExtra<ServerRequest, ServerNotification>
-  ): Promise<ReadResourceResult> {
+  async read(uri: string, extra?: ServerContext): Promise<ReadResourceResult> {
     // First check if token is provided via authentication context
-    const authToken = extra?.authInfo?.token;
+    const authToken = extra?.http?.authInfo?.token;
     const accessToken = authToken || MapboxApiBasedResource.mapboxAccessToken;
 
     if (!accessToken) {

@@ -10,7 +10,7 @@ import {
   BufferOutputSchema,
   type BufferOutput
 } from './BufferTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * BufferTool - Create a buffer zone around a geometry

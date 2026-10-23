@@ -1,13 +1,13 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { ZodTypeAny } from 'zod';
-import { BaseTool } from './BaseTool.js';
 import type {
   CallToolResult,
-  ToolAnnotations
-} from '@modelcontextprotocol/sdk/types.js';
+  ToolAnnotations,
+  ServerContext
+} from '@modelcontextprotocol/server';
+import type { ZodTypeAny } from 'zod';
+import { BaseTool } from './BaseTool.js';
 import type { HttpRequest } from '../utils/types.js';
 import { context, trace, SpanStatusCode } from '@opentelemetry/api';
 import type { ToolExecutionContext } from '../utils/tracing.js';
@@ -80,14 +80,14 @@ export abstract class MapboxApiBasedTool<
    */
   async run(
     rawInput: unknown,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    extra?: RequestHandlerExtra<any, any>
+
+    extra?: ServerContext
   ): Promise<CallToolResult> {
     // First check if token is provided via authentication context
     // Check both standard token field and accessToken in extra for compatibility
     // In the streamableHttp, the authInfo is injected into extra from `req.auth`
     // https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/server/streamableHttp.ts#L405
-    const authToken = extra?.authInfo?.token;
+    const authToken = extra?.http?.authInfo?.token;
     const accessToken = authToken || MapboxApiBasedTool.mapboxAccessToken;
     if (!accessToken) {
       const errorMessage =

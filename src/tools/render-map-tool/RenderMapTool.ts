@@ -2,14 +2,16 @@
 // Licensed under the MIT License.
 
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  CallToolResult,
+  ServerContext
+} from '@modelcontextprotocol/server';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import {
   mapAppCsp,
   type MapAppCsp
 } from '../../resources/ui-apps/mapAppCsp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   RenderMapInputSchema,
   type RenderMapInput
@@ -114,11 +116,11 @@ export class RenderMapTool extends BaseTool<
 
   async run(
     rawInput: unknown,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    extra?: RequestHandlerExtra<any, any>
+
+    extra?: ServerContext
   ): Promise<CallToolResult> {
     const accessToken =
-      extra?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
+      extra?.http?.authInfo?.token || process.env.MAPBOX_ACCESS_TOKEN;
     const owner = getOwnerKeyFromToken(accessToken);
     const toolContext = createLocalToolExecutionContext(this.name, 0);
     return await context.with(

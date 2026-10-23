@@ -3,7 +3,7 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { cleanResponseData } from './cleanResponseData.js';
 import { buildDirectionsRequestUrl } from './buildDirectionsRequestUrl.js';
 import { DirectionsInputSchema } from './DirectionsTool.input.schema.js';

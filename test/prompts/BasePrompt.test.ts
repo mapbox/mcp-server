@@ -6,7 +6,7 @@ import { BasePrompt } from '../../src/prompts/BasePrompt.js';
 import type {
   PromptArgument,
   PromptMessage
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 
 // Create a concrete test implementation of BasePrompt
 class TestPrompt extends BasePrompt {

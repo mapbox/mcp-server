@@ -58,8 +58,8 @@ export type { VersionInfo } from './versionUtils.js';
 
 // Export server setup helpers for consumers building their own McpServer
 // (e.g. a hosted deployment) rather than running this package's entry point.
-// Call publishJsonSchema2020(server) before installing any tool, and pass
-// buildServerInstructions(<enabled tool names>) as the server's instructions.
+// Pass buildServerInstructions(<enabled tool names>) as the server's
+// instructions. publishJsonSchema2020 is a deprecated no-op on SDK v2.
 export { publishJsonSchema2020, toJsonSchema2020 } from './jsonSchema2020.js';
 export { buildServerInstructions } from './serverInstructions.js';
 

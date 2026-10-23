@@ -1185,7 +1185,7 @@ describe('DirectionsTool', () => {
           geometries: 'geojson'
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { authInfo: { token } } as any
+        { http: { authInfo: { token } } } as any
       );
 
       expect(result.isError).toBe(false);
@@ -1237,7 +1237,7 @@ describe('DirectionsTool', () => {
           geometries: 'none'
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { authInfo: { token } } as any
+        { http: { authInfo: { token } } } as any
       );
 
       expect(result.isError).toBe(false);
@@ -1288,7 +1288,7 @@ describe('DirectionsTool', () => {
           geometries: 'geojson'
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { authInfo: { token } } as any
+        { http: { authInfo: { token } } } as any
       );
 
       expect(result.isError).toBe(false);
