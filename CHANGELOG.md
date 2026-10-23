@@ -14,6 +14,10 @@
 
 - **`static_map_image_tool` and place photos: URLs with several trailing dots are now checked like the plain hostname.** The URL check stripped only one trailing root-label dot, so `https://localhost../x.png` was compared as `localhost.` and passed, as did `app.localhost..`, dotless hosts such as `intranet..`, and IP literals such as `127.0.0.1..` and `169.254.169.254..`. It now strips them all. This covers custom-marker URLs in `static_map_image_tool` and photo URLs in `PlacePhotoResource`. Public hosts with a trailing dot (`example.com.`) are still accepted.
 
+### Maintenance
+
+- **Removed build output committed under `src/` (#297).** `src/utils/versionUtils-cjs.cjs`, `.d.cts` and their source maps were compiled output from a `tsc` run that wrote next to the sources, committed back in #96. Only `versionUtils-cjs.cts` is source: tshy swaps it in for `versionUtils.ts` in the CommonJS build. `.gitignore` now keeps `.js`, `.cjs`, `.mjs`, `.d.*ts` and `.map` files out of `src/` and `test/`.
+
 ## 0.16.1-dev - 2026-10-16
 
 ## 0.16.0 - 2026-10-15
