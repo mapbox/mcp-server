@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { PointsWithinPolygonTool } from '../../../src/tools/points-within-polygon-tool/PointsWithinPolygonTool.js';
+import type { PointsWithinPolygonOutput } from '../../../src/tools/points-within-polygon-tool/PointsWithinPolygonTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 // Simple unit square polygon [0,0] → [1,1]
 const SQUARE = [
@@ -26,11 +28,12 @@ describe('PointsWithinPolygonTool', () => {
       ],
       polygon: SQUARE
     });
+    const data = structuredOf<PointsWithinPolygonOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.count).toBe(1);
-    expect(result.structuredContent?.total).toBe(2);
-    expect(result.structuredContent?.points_within[0]).toMatchObject({
+    expect(data.count).toBe(1);
+    expect(data.total).toBe(2);
+    expect(data.points_within[0]).toMatchObject({
       longitude: 0.5,
       latitude: 0.5
     });
@@ -45,10 +48,11 @@ describe('PointsWithinPolygonTool', () => {
       ],
       polygon: SQUARE
     });
+    const data = structuredOf<PointsWithinPolygonOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.count).toBe(3);
-    expect(result.structuredContent?.total).toBe(3);
+    expect(data.count).toBe(3);
+    expect(data.total).toBe(3);
   });
 
   it('returns empty when no points are inside', async () => {
@@ -59,11 +63,12 @@ describe('PointsWithinPolygonTool', () => {
       ],
       polygon: SQUARE
     });
+    const data = structuredOf<PointsWithinPolygonOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.count).toBe(0);
-    expect(result.structuredContent?.total).toBe(2);
-    expect(result.structuredContent?.points_within).toHaveLength(0);
+    expect(data.count).toBe(0);
+    expect(data.total).toBe(2);
+    expect(data.points_within).toHaveLength(0);
   });
 
   it('handles a single point inside', async () => {
@@ -71,9 +76,10 @@ describe('PointsWithinPolygonTool', () => {
       points: [{ longitude: 0.5, latitude: 0.5 }],
       polygon: SQUARE
     });
+    const data = structuredOf<PointsWithinPolygonOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.count).toBe(1);
+    expect(data.count).toBe(1);
   });
 
   it('works with a real-world polygon', async () => {
@@ -95,9 +101,10 @@ describe('PointsWithinPolygonTool', () => {
       ],
       polygon: manhattan
     });
+    const data = structuredOf<PointsWithinPolygonOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.count).toBe(1);
+    expect(data.count).toBe(1);
   });
 
   it('excludes points that fall inside a hole', async () => {
@@ -127,14 +134,13 @@ describe('PointsWithinPolygonTool', () => {
       ],
       polygon: polygonWithHole
     });
+    const data = structuredOf<PointsWithinPolygonOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.count).toBe(2);
-    expect(result.structuredContent?.total).toBe(3);
+    expect(data.count).toBe(2);
+    expect(data.total).toBe(3);
     // The hole point (2,2) should not be returned
-    const lngs = result.structuredContent?.points_within.map(
-      (p) => p.longitude
-    );
+    const lngs = data.points_within.map((p) => p.longitude);
     expect(lngs).not.toContain(2);
   });
 

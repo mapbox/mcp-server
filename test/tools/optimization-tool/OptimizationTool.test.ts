@@ -9,6 +9,7 @@ import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 
 import { OptimizationTool } from '../../../src/tools/optimization-tool/OptimizationTool.js';
 import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { textOf } from '../../utils/resultTestUtils.js';
 
 // Sample V1 API response
 const sampleV1Response = {
@@ -178,9 +179,7 @@ describe('OptimizationTool V1 API', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'At least 2 coordinates are required'
-    );
+    expect(textOf(result)).toContain('At least 2 coordinates are required');
   });
 
   it('should validate maximum coordinates (12)', async () => {
@@ -199,7 +198,7 @@ describe('OptimizationTool V1 API', () => {
     const result = await tool.run({ coordinates: coords });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Maximum 12 coordinates allowed');
+    expect(textOf(result)).toContain('Maximum 12 coordinates allowed');
   });
 
   it('should handle API errors gracefully', async () => {
@@ -222,8 +221,8 @@ describe('OptimizationTool V1 API', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Optimization API error');
-    expect(result.content[0].text).toContain('Invalid coordinates');
+    expect(textOf(result)).toContain('Optimization API error');
+    expect(textOf(result)).toContain('Invalid coordinates');
   });
 
   it('should handle API error codes in response', async () => {
@@ -245,7 +244,7 @@ describe('OptimizationTool V1 API', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('No route found');
+    expect(textOf(result)).toContain('No route found');
   });
 
   it('should format output text with duration and distance', async () => {
@@ -265,7 +264,7 @@ describe('OptimizationTool V1 API', () => {
     });
 
     expect(result.isError).toBe(false);
-    const text = result.content[0].text;
+    const text = textOf(result);
     expect(text).toContain('Optimized route');
     expect(text).toContain('3 waypoints');
     expect(text).toContain('minutes');
@@ -301,7 +300,7 @@ describe('OptimizationTool V1 API', () => {
       /^mapbox:\/\/selffetch\/optimization\?data=/
     );
 
-    const text = (result.content[0] as { text: string }).text;
+    const text = textOf(result);
     expect(text).toContain('render_map_tool');
     expect(text).toContain(sc.mapboxRender!.ref!);
 

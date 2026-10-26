@@ -28,6 +28,9 @@
 ### Maintenance
 
 - **Removed build output committed under `src/` (#297).** `src/utils/versionUtils-cjs.cjs`, `.d.cts` and their source maps were compiled output from a `tsc` run that wrote next to the sources, committed back in #96. Only `versionUtils-cjs.cts` is source: tshy swaps it in for `versionUtils.ts` in the CommonJS build. `.gitignore` now keeps `.js`, `.cjs`, `.mjs`, `.d.*ts` and `.map` files out of `src/` and `test/`.
+- **Tests are typechecked in CI (#298).** `tsconfig.test.json` covers `src/` and `test/`, but nothing ran it, so test type errors piled up: about 200 on main, plus about 250 more from SDK v2 typing `structuredContent` as an open object (#296). They're all fixed, and `npm run typecheck` now runs in CI before the tests. `tsconfig.test.json` also gets `noEmit`, since running it without that writes `.js` files next to the sources (see #297).
+  - **New helpers** in `test/utils/resultTestUtils.ts`: `structuredOf<ToolOutput>(result)` reads structured content as the tool's own output type, so a test that checks a field the schema doesn't have fails to compile. `textOf` and `resourceTextOf` read text content and throw on the wrong content type.
+  - **Tests that were wrong:** the tuple check in `input-schema-validation.test.ts` never looked inside arrays under zod 4 (`ZodArray._def.type` is now the string `'array'`), so a tuple nested in an array would have passed. It uses zod 4's accessors now and covers that case. `structured-content.test.ts` imported a file that never existed. `cleanResponseData.test.ts` used an old directions input shape and now builds it with `DirectionsInputSchema.parse`. A `|| Infinity` fallback in a SimplifyTool test meant one comparison could never fail.
 
 ## 0.16.1-dev - 2026-10-16
 

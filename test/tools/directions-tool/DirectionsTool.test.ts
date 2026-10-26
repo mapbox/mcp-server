@@ -13,6 +13,7 @@ import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanRe
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 import { tokenFor } from '../../utils/tokenTestUtils.js';
 import { resolveResponseRef } from '../../../src/utils/responseRef.js';
+import type { HttpRequest } from '../../../src/utils/types.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
@@ -1157,8 +1158,8 @@ describe('DirectionsTool', () => {
         )
       };
 
-      return vi.fn(async (url: string) => {
-        const response = url.includes('geometries=geojson')
+      return vi.fn<HttpRequest>(async (input) => {
+        const response = String(input).includes('geometries=geojson')
           ? withGeometry
           : withoutGeometry;
         return {
