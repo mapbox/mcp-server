@@ -49,15 +49,18 @@ describe('Package exports', () => {
     it('should export the skills and the extension helpers', async () => {
       const {
         ALL_SKILLS,
+        AGENT_SKILLS_SOURCE,
         SKILLS_EXTENSION_ID,
         getSkillsForTools,
         installSkillsTo,
-        loadSkills,
-        mapDisplaySkill
+        loadSkills
       } = await import('../src/skills/index.js');
 
       expect(SKILLS_EXTENSION_ID).toBe('io.modelcontextprotocol/skills');
-      expect(ALL_SKILLS).toContain(mapDisplaySkill);
+      expect(ALL_SKILLS.map((s) => s.name)).toContain('mapbox-map-display');
+      expect(AGENT_SKILLS_SOURCE).toMatch(
+        /^mapbox\/mapbox-agent-skills@[0-9a-f]{40}$/
+      );
       expect(typeof getSkillsForTools).toBe('function');
       expect(typeof installSkillsTo).toBe('function');
       expect(typeof loadSkills).toBe('function');

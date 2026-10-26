@@ -1,0 +1,2 @@
+# Generated from mapbox/mapbox-agent-skills (scripts/fetch-agent-skills.mjs)
+src/skills/agentSkills.generated.ts

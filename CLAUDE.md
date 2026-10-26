@@ -50,6 +50,13 @@ test/                           # Mirrors src/ structure
 - Resources use URI pattern: `mapbox://resource-name`
 - Example: category list at `mapbox://categories` or `mapbox://categories/{language}`
 
+### Skills
+
+- Skills served over the MCP Skills extension (src/skills/) come from mapbox/mapbox-agent-skills, never from this repo
+- `agent-skills.json` pins the commit (full SHA) and maps each served skill to the tools it needs
+- `npm run fetch-skills` (also run by `npm run prepare`, `npm ci` and `npm run build`) generates the gitignored `src/skills/agentSkills.generated.ts`
+- To change a skill: edit it in mapbox-agent-skills, then bump `ref` here; tests fail if a skill names a tool this server doesn't have
+
 ## Essential Workflows
 
 ### Development

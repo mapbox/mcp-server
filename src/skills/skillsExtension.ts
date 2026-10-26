@@ -15,30 +15,12 @@ import type { Skill } from './Skill.js';
  *
  * The SDK serves it (`@modelcontextprotocol/server/ext/skills`): skills/list,
  * skills/get, the skill:// resources and the capability. This file only
- * turns our `Skill` objects into the files it reads.
+ * hands it our `Skill` files.
  */
 export { SKILLS_EXTENSION_ID } from '@modelcontextprotocol/server/ext/skills';
 
 /** Skills are static per server version, so clients can cache them a while. */
 const SKILL_TTL_MS = 60 * 60 * 1000;
-
-/**
- * SKILL.md text: YAML frontmatter, then the instructions. Values are written
- * as JSON strings, which YAML reads as double-quoted scalars, so a colon or
- * quote in a description can't break the frontmatter.
- */
-export function skillMarkdown(skill: Skill): string {
-  const body = skill.instructions.endsWith('\n')
-    ? skill.instructions
-    : `${skill.instructions}\n`;
-  return (
-    '---\n' +
-    `name: ${JSON.stringify(skill.name)}\n` +
-    `description: ${JSON.stringify(skill.description)}\n` +
-    '---\n\n' +
-    body
-  );
-}
 
 /**
  * Builds the catalog for `skills`, served at skill://<name>/SKILL.md plus
@@ -49,8 +31,7 @@ export function skillMarkdown(skill: Skill): string {
 export function loadSkills(skills: readonly Skill[]): Promise<SkillCatalog> {
   const files: Record<string, string> = {};
   for (const skill of skills) {
-    files[`${skill.name}/SKILL.md`] = skillMarkdown(skill);
-    for (const [path, text] of Object.entries(skill.files ?? {})) {
+    for (const [path, text] of Object.entries(skill.files)) {
       files[`${skill.name}/${path}`] = text;
     }
   }

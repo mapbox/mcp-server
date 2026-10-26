@@ -251,7 +251,7 @@ const server = new McpServer({ name: 'my-server', version: '1.0.0' });
 await installSkillsTo(server, skills);
 ```
 
-This declares the extension and serves `skills/list`, `skills/get` and the `skill://<name>/SKILL.md` files. If you create a server per request, build the catalog once with `loadSkills(skills)` and call `catalog.attach(server)` on each one instead. Available skills: `mapDisplaySkill` (`mapbox-map-display`) and `reachabilityAnalysisSkill` (`mapbox-reachability-analysis`).
+This declares the extension and serves `skills/list`, `skills/get` and the `skill://<name>/SKILL.md` files. If you create a server per request, build the catalog once with `loadSkills(skills)` and call `catalog.attach(server)` on each one instead. `ALL_SKILLS` has every skill this package serves, taken from [mapbox/mapbox-agent-skills](https://github.com/mapbox/mapbox-agent-skills) at the commit `AGENT_SKILLS_SOURCE` names.
 
 ## HTTP Pipeline Utilities
 

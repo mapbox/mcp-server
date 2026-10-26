@@ -1,6 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server';
 import { Client } from '@modelcontextprotocol/client';
@@ -8,35 +9,25 @@ import { SkillsClient } from '@modelcontextprotocol/client/ext/skills';
 import {
   SKILLS_EXTENSION_ID,
   installSkillsTo,
-  loadSkills,
-  skillMarkdown
+  loadSkills
 } from '../../src/skills/skillsExtension.js';
 import {
   ALL_SKILLS,
   getSkillsForTools
 } from '../../src/skills/skillRegistry.js';
+import { AGENT_SKILLS_SOURCE } from '../../src/skills/agentSkills.generated.js';
 import type { Skill } from '../../src/skills/Skill.js';
 import { getAllTools } from '../../src/tools/toolRegistry.js';
 
 const testSkill: Skill = {
   name: 'test-skill',
-  description: 'Has a colon: and "quotes" in it',
   tools: ['render_map_tool'],
-  instructions: '# Test\n\nRead `references/notes.md`.',
-  files: { 'references/notes.md': 'Notes with a café\n' }
+  files: {
+    'SKILL.md':
+      '---\nname: test-skill\ndescription: "Has a colon: and \\"quotes\\" in it"\n---\n\n# Test\n\nRead `references/notes.md`.\n',
+    'references/notes.md': 'Notes with a café\n'
+  }
 };
-
-/** Frontmatter values are JSON strings, so JSON.parse reads them back. */
-function parseFrontmatter(markdown: string): Record<string, string> {
-  const match = /^---\n([\s\S]*?)\n---\n/.exec(markdown);
-  if (!match) throw new Error('No frontmatter');
-  return Object.fromEntries(
-    match[1].split('\n').map((line) => {
-      const i = line.indexOf(': ');
-      return [line.slice(0, i), JSON.parse(line.slice(i + 2))];
-    })
-  );
-}
 
 async function connect(skills: readonly Skill[]) {
   const server = new McpServer(
@@ -55,15 +46,6 @@ async function connect(skills: readonly Skill[]) {
 }
 
 describe('skills extension', () => {
-  it('writes frontmatter that reads back as the skill name and description', () => {
-    const markdown = skillMarkdown(testSkill);
-    expect(parseFrontmatter(markdown)).toEqual({
-      name: 'test-skill',
-      description: 'Has a colon: and "quotes" in it'
-    });
-    expect(markdown.endsWith('`references/notes.md`.\n')).toBe(true);
-  });
-
   // SkillsClient is the SDK's own client side: it checks every file's size
   // and digest against the listing and SKILL.md's frontmatter against the
   // entry, the same checks hosts make before trusting a skill.
@@ -88,9 +70,10 @@ describe('skills extension', () => {
     expect(skillMd.verified).toBe(true);
     expect(skillMd.frontmatter).toEqual({
       name: 'test-skill',
-      description: testSkill.description
+      // The colon and quotes survive the YAML round trip.
+      description: 'Has a colon: and "quotes" in it'
     });
-    expect(skillMd.text).toBe(skillMarkdown(testSkill));
+    expect(skillMd.text).toBe(testSkill.files['SKILL.md']);
 
     const notes = await skills.read(entry, 'references/notes.md');
     expect(notes.verified).toBe(true);
@@ -138,30 +121,55 @@ describe('skills extension', () => {
 describe('skill registry', () => {
   const toolNames = getAllTools().map((tool) => tool.name);
 
+  it('was generated from the commit agent-skills.json pins', () => {
+    // A stale generated file means `npm run fetch-skills` wasn't run.
+    const config = JSON.parse(
+      readFileSync(new URL('../../agent-skills.json', import.meta.url), 'utf8')
+    );
+    expect(AGENT_SKILLS_SOURCE).toBe(`${config.repo}@${config.ref}`);
+    expect(ALL_SKILLS.map((s) => s.name)).toEqual(Object.keys(config.skills));
+  });
+
+  it('stays within ChatGPT import limit of 5 skills', () => {
+    expect(ALL_SKILLS.length).toBeGreaterThan(0);
+    expect(ALL_SKILLS.length).toBeLessThanOrEqual(5);
+  });
+
   it('only serves skills whose tools are all enabled', () => {
     expect(getSkillsForTools(toolNames)).toEqual(ALL_SKILLS);
     const withoutIsochrone = getSkillsForTools(
       toolNames.filter((name) => name !== 'isochrone_tool')
     );
-    expect(withoutIsochrone.map((s) => s.name)).toEqual(['mapbox-map-display']);
+    expect(withoutIsochrone.map((s) => s.name)).toEqual(
+      ALL_SKILLS.filter((s) => !s.tools.includes('isochrone_tool')).map(
+        (s) => s.name
+      )
+    );
+    expect(withoutIsochrone.length).toBeLessThan(ALL_SKILLS.length);
     expect(getSkillsForTools([])).toEqual([]);
   });
 
+  it('loads every skill under the SDK strict rules', async () => {
+    const catalog = await loadSkills(ALL_SKILLS);
+    expect(catalog.entries).toHaveLength(ALL_SKILLS.length);
+  });
+
   it.each(ALL_SKILLS.map((skill) => [skill.name, skill] as const))(
-    '%s is a valid Agent Skill that names only real tools',
+    '%s names only tools this server has',
     (_name, skill) => {
-      // Agent Skills spec limits.
-      expect(skill.name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
-      expect(skill.name.length).toBeLessThanOrEqual(64);
-      expect(skill.description.length).toBeLessThanOrEqual(1024);
       // ChatGPT's import limit for SKILL.md.
       expect(
-        Buffer.byteLength(skillMarkdown(skill), 'utf8')
+        Buffer.byteLength(skill.files['SKILL.md'], 'utf8')
       ).toBeLessThanOrEqual(256 * 1024);
 
       for (const tool of skill.tools) expect(toolNames).toContain(tool);
-      const mentioned = skill.instructions.match(/\b[a-z_]+_tool\b/g) ?? [];
-      for (const tool of mentioned) expect(toolNames).toContain(tool);
+      // Every file the model can read, so a skill never sends it to a tool
+      // that doesn't exist here.
+      for (const [path, text] of Object.entries(skill.files)) {
+        for (const tool of text.match(/\b[a-z_]+_tool\b/g) ?? []) {
+          expect(toolNames, `${skill.name}/${path}`).toContain(tool);
+        }
+      }
     }
   );
 });

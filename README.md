@@ -155,6 +155,10 @@ The server also serves **skills**: workflow instructions a client can load when 
 
 - **`mapbox-map-display`**: showing tool results with `render_map_tool`, combining several results on one map, hand-placed markers, and when a static image is right instead.
 - **`mapbox-reachability-analysis`**: finding places within a travel time or distance (coffee within a 10 minute walk) and mapping them with the reachable area.
+- **`mapbox-location-grounding`**: answering location questions from live Mapbox data with citations, instead of from training data.
+- **`mapbox-search-patterns`**: choosing the right search tool and parameters for geocoding and POI search.
+
+The skills come from [mapbox/mapbox-agent-skills](https://github.com/mapbox/mapbox-agent-skills), the same skills you can install in Claude Code, Cursor and other assistants. `agent-skills.json` pins the commit and lists which skills this server serves; they're bundled into the package at build time, so nothing is fetched at runtime.
 
 A skill is only served when all the tools it uses are enabled. Client support is still early: ChatGPT imports skills when an app is submitted, and fast-agent and MCP Inspector can read them. Clients without support can still read the `skill://` files as ordinary resources.
 
