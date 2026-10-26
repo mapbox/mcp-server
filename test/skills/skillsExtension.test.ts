@@ -1,19 +1,15 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server';
+import { Client } from '@modelcontextprotocol/client';
+import { SkillsClient } from '@modelcontextprotocol/client/ext/skills';
 import {
   SKILLS_EXTENSION_ID,
   installSkillsTo,
-  serveSkill,
-  skillMarkdown,
-  type SkillEntry
+  loadSkills,
+  skillMarkdown
 } from '../../src/skills/skillsExtension.js';
 import {
   ALL_SKILLS,
@@ -42,22 +38,12 @@ function parseFrontmatter(markdown: string): Record<string, string> {
   );
 }
 
-const listResult = z
-  .object({ skills: z.array(z.custom<SkillEntry>()) })
-  .passthrough();
-const getResult = z.object({ skill: z.custom<SkillEntry>() }).passthrough();
-
 async function connect(skills: readonly Skill[]) {
   const server = new McpServer(
     { name: 'test', version: '0.0.0' },
-    {
-      capabilities: {
-        resources: {},
-        extensions: { [SKILLS_EXTENSION_ID]: {} }
-      }
-    }
+    { capabilities: { resources: {} } }
   );
-  installSkillsTo(server, skills);
+  await installSkillsTo(server, skills);
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test-client', version: '0.0.0' });
@@ -78,79 +64,74 @@ describe('skills extension', () => {
     expect(markdown.endsWith('`references/notes.md`.\n')).toBe(true);
   });
 
-  it('lists every file with the digest and byte size of what is served', () => {
-    const { entry, files } = serveSkill(testSkill);
-    expect(entry.uri).toBe('skill://test-skill/SKILL.md');
-    expect(entry.resources.map((r) => r.uri)).toEqual([
-      'skill://test-skill/SKILL.md',
-      'skill://test-skill/references/notes.md'
-    ]);
-    for (const resource of entry.resources) {
-      const bytes = Buffer.from(files.get(resource.uri) as string, 'utf8');
-      expect(resource.size).toBe(bytes.byteLength);
-      expect(resource.digest).toBe(
-        `sha256:${createHash('sha256').update(bytes).digest('hex')}`
-      );
-    }
-    // The é is two bytes, so size counts bytes, not characters.
-    const notes = entry.resources[1];
-    expect(notes.size).toBe('Notes with a café\n'.length + 1);
-  });
-
-  it('serves skills/list, skills/get and the files over MCP', async () => {
+  // SkillsClient is the SDK's own client side: it checks every file's size
+  // and digest against the listing and SKILL.md's frontmatter against the
+  // entry, the same checks hosts make before trusting a skill.
+  it('serves skills that the SDK client lists, gets and verifies', async () => {
     const client = await connect([testSkill]);
-
     expect(
       client.getServerCapabilities()?.extensions?.[SKILLS_EXTENSION_ID]
-    ).toEqual({});
+    ).toBeDefined();
 
-    const list = await client.request({ method: 'skills/list' }, listResult);
-    expect(list).toMatchObject({
-      resultType: 'complete',
-      cacheScope: 'public'
-    });
+    const skills = new SkillsClient(client);
+    expect(skills.supported).toBe(true);
+
+    const list = await skills.list();
+    expect(list.invalid).toEqual([]);
     expect(list.skills).toHaveLength(1);
     const [entry] = list.skills;
-    expect(entry.frontmatter).toEqual({
+    expect(entry.uri).toBe('skill://test-skill/SKILL.md');
+
+    expect((await skills.get(entry.uri)).skill).toEqual(entry);
+
+    const skillMd = await skills.read(entry);
+    expect(skillMd.verified).toBe(true);
+    expect(skillMd.frontmatter).toEqual({
       name: 'test-skill',
       description: testSkill.description
     });
+    expect(skillMd.text).toBe(skillMarkdown(testSkill));
 
-    const got = await client.request(
-      { method: 'skills/get', params: { uri: entry.uri } },
-      getResult
-    );
-    expect(got.skill).toEqual(entry);
-
-    // What resources/read returns matches the manifest, as hosts verify.
-    for (const resource of entry.resources) {
-      const read = await client.readResource({ uri: resource.uri });
-      const text = (read.contents[0] as { text: string }).text;
-      const bytes = Buffer.from(text, 'utf8');
-      expect(bytes.byteLength).toBe(resource.size);
-      expect(`sha256:${createHash('sha256').update(bytes).digest('hex')}`).toBe(
-        resource.digest
-      );
-    }
-    const skillMd = await client.readResource({ uri: entry.uri });
-    expect(
-      parseFrontmatter((skillMd.contents[0] as { text: string }).text)
-    ).toEqual(entry.frontmatter);
+    const notes = await skills.read(entry, 'references/notes.md');
+    expect(notes.verified).toBe(true);
+    expect(notes.text).toBe('Notes with a café\n');
 
     await client.close();
   });
 
-  it('answers an unknown skill with invalid params', async () => {
+  it('answers an unknown skill with an error', async () => {
     const client = await connect([testSkill]);
-    const error = await client
-      .request(
-        { method: 'skills/get', params: { uri: 'skill://nope/SKILL.md' } },
-        getResult
-      )
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(McpError);
-    expect((error as McpError).code).toBe(-32602);
+    await expect(
+      new SkillsClient(client).get('skill://nope/SKILL.md')
+    ).rejects.toThrow();
     await client.close();
+  });
+
+  it('builds one catalog that serves several servers', async () => {
+    const catalog = await loadSkills(ALL_SKILLS);
+    expect(catalog.entries.map((e) => e.uri)).toEqual(
+      ALL_SKILLS.map((s) => `skill://${s.name}/SKILL.md`).sort()
+    );
+    for (let i = 0; i < 2; i++) {
+      const server = new McpServer({ name: 'test', version: '0.0.0' });
+      catalog.attach(server);
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'test-client', version: '0.0.0' });
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport)
+      ]);
+      const list = await new SkillsClient(client).list();
+      expect(list.skills).toHaveLength(ALL_SKILLS.length);
+      await client.close();
+    }
+  });
+
+  it('rejects a skill that breaks the format instead of serving it', async () => {
+    await expect(
+      loadSkills([{ ...testSkill, name: 'Not A Valid Name' }])
+    ).rejects.toThrow();
   });
 });
 

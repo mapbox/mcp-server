@@ -238,32 +238,20 @@ const prompt = new GetDirectionsPrompt();
 
 ## Skills
 
-Skills are workflow instructions served over the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview) (SEP-2640). To serve the same skills from your own server, declare the extension when you create it, then install them:
+Skills are workflow instructions served over the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview) (SEP-2640), using the SDK's own support for it (`@modelcontextprotocol/server/ext/skills`). To serve the same skills from your own server, install them before connecting:
 
 ```typescript
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import {
-  SKILLS_EXTENSION_ID,
-  getSkillsForTools,
-  installSkillsTo
-} from '@mapbox/mcp-server/skills';
+import { McpServer } from '@modelcontextprotocol/server';
+import { getSkillsForTools, installSkillsTo } from '@mapbox/mcp-server/skills';
 
 // Only the skills whose tools you've installed.
 const skills = getSkillsForTools(['isochrone_tool', 'render_map_tool' /* … */]);
 
-const server = new McpServer(
-  { name: 'my-server', version: '1.0.0' },
-  {
-    capabilities: {
-      resources: {},
-      extensions: { [SKILLS_EXTENSION_ID]: {} }
-    }
-  }
-);
-installSkillsTo(server, skills);
+const server = new McpServer({ name: 'my-server', version: '1.0.0' });
+await installSkillsTo(server, skills);
 ```
 
-This registers `skills/list`, `skills/get` and a `skill://<name>/SKILL.md` resource per skill. Available skills: `mapDisplaySkill` (`mapbox-map-display`) and `reachabilityAnalysisSkill` (`mapbox-reachability-analysis`).
+This declares the extension and serves `skills/list`, `skills/get` and the `skill://<name>/SKILL.md` files. If you create a server per request, build the catalog once with `loadSkills(skills)` and call `catalog.attach(server)` on each one instead. Available skills: `mapDisplaySkill` (`mapbox-map-display`) and `reachabilityAnalysisSkill` (`mapbox-reachability-analysis`).
 
 ## HTTP Pipeline Utilities
 

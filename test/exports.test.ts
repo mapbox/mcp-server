@@ -52,6 +52,7 @@ describe('Package exports', () => {
         SKILLS_EXTENSION_ID,
         getSkillsForTools,
         installSkillsTo,
+        loadSkills,
         mapDisplaySkill
       } = await import('../src/skills/index.js');
 
@@ -59,6 +60,7 @@ describe('Package exports', () => {
       expect(ALL_SKILLS).toContain(mapDisplaySkill);
       expect(typeof getSkillsForTools).toBe('function');
       expect(typeof installSkillsTo).toBe('function');
+      expect(typeof loadSkills).toBe('function');
     });
   });
 

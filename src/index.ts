@@ -23,10 +23,7 @@ import {
 import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
 import { getSkillsForTools } from './skills/skillRegistry.js';
-import {
-  SKILLS_EXTENSION_ID,
-  installSkillsTo
-} from './skills/skillsExtension.js';
+import { installSkillsTo } from './skills/skillsExtension.js';
 import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import { buildServerInstructions } from './utils/serverInstructions.js';
@@ -132,10 +129,7 @@ const server = new McpServer(
       completions: {},
       resources: {},
       prompts: {},
-      logging: {},
-      ...(enabledSkills.length > 0 && {
-        extensions: { [SKILLS_EXTENSION_ID]: {} }
-      })
+      logging: {}
     }
   }
 );
@@ -176,10 +170,6 @@ uiResources.forEach((resource) => {
 regularResources.forEach((resource) => {
   resource.installTo(server);
 });
-
-if (enabledSkills.length > 0) {
-  installSkillsTo(server, enabledSkills);
-}
 
 // Register prompt handlers
 server.server.setRequestHandler('prompts/list', async () => {
@@ -298,6 +288,13 @@ async function main() {
       });
     });
   };
+
+  // Skills (MCP Skills extension, SEP-2640). Loading is async, so it
+  // happens here rather than with the other registrations, but still
+  // before connect(), which the extension requires.
+  if (enabledSkills.length > 0) {
+    await installSkillsTo(server, enabledSkills);
+  }
 
   // Start receiving messages on stdin and sending messages on stdout
   const transport = new StdioServerTransport();
