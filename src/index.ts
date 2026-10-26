@@ -8,18 +8,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { SpanStatusCode } from '@opentelemetry/api';
-
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { McpServer } from '@modelcontextprotocol/server';
 import {
   registerAppResource,
   RESOURCE_MIME_TYPE
 } from '@modelcontextprotocol/ext-apps/server';
-import {
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  CompleteRequestSchema
-} from '@modelcontextprotocol/sdk/types.js';
 import { parseToolConfigFromArgs, filterTools } from './config/toolConfig.js';
 import {
   getCoreTools,
@@ -35,7 +29,6 @@ import {
 } from './skills/skillsExtension.js';
 import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
-import { publishJsonSchema2020 } from './utils/jsonSchema2020.js';
 import { buildServerInstructions } from './utils/serverInstructions.js';
 import { handleCliMetadataArgs } from './cli.js';
 import {
@@ -147,9 +140,6 @@ const server = new McpServer(
   }
 );
 
-// Must run before the first tool is registered — see jsonSchema2020.ts.
-publishJsonSchema2020(server);
-
 // Register only core tools before connection
 // Capability-dependent tools will be registered dynamically after connection
 enabledCoreTools.forEach((tool) => {
@@ -163,6 +153,10 @@ const regularResources = allResources.filter((r) => !r.uri.startsWith('ui://'));
 // Register MCP Apps UI resources using registerAppResource
 // IMPORTANT: Use RESOURCE_MIME_TYPE which is "text/html;profile=mcp-app"
 // This tells clients (like Claude Desktop) that this is an MCP App
+//
+// The casts are for the CommonJS build: there, ext-apps' declarations resolve
+// McpServer from the SDK's ESM types and ours from its CJS types, so the
+// same class doesn't type-check against itself.
 uiResources.forEach((resource) => {
   registerAppResource(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -188,7 +182,7 @@ if (enabledSkills.length > 0) {
 }
 
 // Register prompt handlers
-server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+server.server.setRequestHandler('prompts/list', async () => {
   const allPrompts = getAllPrompts();
   return {
     prompts: allPrompts.map((prompt) => prompt.getMetadata())
@@ -200,7 +194,7 @@ server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
 // TODO: Remove this workaround when SDK fixes their type definitions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (server.server as any).setRequestHandler(
-  GetPromptRequestSchema,
+  'prompts/get',
   async (request: any) => {
     const { name, arguments: args } = request.params;
 
@@ -228,7 +222,7 @@ server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
 // Register completion handler
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (server.server as any).setRequestHandler(
-  CompleteRequestSchema,
+  'completion/complete',
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async (request: any) => {
     const { ref, argument } = request.params;

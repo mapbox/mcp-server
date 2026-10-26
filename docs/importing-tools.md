@@ -362,15 +362,12 @@ import type { PromptInstance } from '@mapbox/mcp-server/prompts';
 Here's how you might use these exports to build your own MCP server with a subset of tools. Each tool and resource registers itself with `installTo(server)`:
 
 ```typescript
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 
 import { getAllTools } from '@mapbox/mcp-server/tools';
 import { getAllResources } from '@mapbox/mcp-server/resources';
-import {
-  buildServerInstructions,
-  publishJsonSchema2020
-} from '@mapbox/mcp-server/utils';
+import { buildServerInstructions } from '@mapbox/mcp-server/utils';
 
 // Pick only the tools you need. render_map_tool is only available through
 // the registry, and it needs the map UI resource from getAllResources().
@@ -393,11 +390,6 @@ const server = new McpServer(
   }
 );
 
-// Publish tool schemas as JSON Schema 2020-12 instead of the SDK's draft-07.
-// Some clients (e.g. Claude Desktop) reject draft-07 output schemas.
-// Must be called before the first tool is installed.
-publishJsonSchema2020(server);
-
 tools.forEach((tool) => tool.installTo(server));
 getAllResources().forEach((resource) => resource.installTo(server));
 
@@ -408,9 +400,11 @@ await server.connect(transport);
 
 ### Server setup helpers
 
-- `publishJsonSchema2020(server)`: converts every tool's `inputSchema`/`outputSchema` in `tools/list` from draft-07 to JSON Schema 2020-12. Call it on the `McpServer` before installing any tool.
 - `buildServerInstructions(toolNames)`: returns the server `instructions` text for the given enabled tool names, or `undefined` when `render_map_tool` isn't among them.
-- `toJsonSchema2020(schema)`: the converter behind `publishJsonSchema2020`, for converting a single schema.
+- `toJsonSchema2020(schema)`: converts a single draft-07 JSON Schema to JSON Schema 2020-12.
+- `publishJsonSchema2020(server)`: deprecated no-op. MCP SDK v1 published tool schemas as draft-07 and this converted them; SDK v2 publishes 2020-12 itself, so the call can be removed.
+
+The tools and resources are built against MCP TypeScript SDK v2 (`@modelcontextprotocol/server`), so `installTo` needs a v2 `McpServer`. A v1 `McpServer` from `@modelcontextprotocol/sdk` won't work.
 
 ### Directions routes by reference
 

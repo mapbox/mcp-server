@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { AreaTool } from '../../../src/tools/area-tool/AreaTool.js';
+import type { AreaOutput } from '../../../src/tools/area-tool/AreaTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('AreaTool', () => {
   const tool = new AreaTool();
@@ -20,12 +22,13 @@ describe('AreaTool', () => {
         ]
       ]
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('meters');
+    expect(data.units).toBe('meters');
     // Should be approximately 1,237,000 square meters (varies by latitude)
-    expect(result.structuredContent?.area).toBeGreaterThan(1000000);
-    expect(result.structuredContent?.area).toBeLessThan(1500000);
+    expect(data.area).toBeGreaterThan(1000000);
+    expect(data.area).toBeLessThan(1500000);
   });
 
   it('should calculate area in square kilometers', async () => {
@@ -41,12 +44,13 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('kilometers');
+    expect(data.units).toBe('kilometers');
     // Should be approximately 1.2 square kilometers
-    expect(result.structuredContent?.area).toBeGreaterThan(1);
-    expect(result.structuredContent?.area).toBeLessThan(1.5);
+    expect(data.area).toBeGreaterThan(1);
+    expect(data.area).toBeLessThan(1.5);
   });
 
   it('should calculate area in square feet', async () => {
@@ -62,10 +66,11 @@ describe('AreaTool', () => {
       ],
       units: 'feet'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('feet');
-    expect(result.structuredContent?.area).toBeGreaterThan(100000);
+    expect(data.units).toBe('feet');
+    expect(data.area).toBeGreaterThan(100000);
   });
 
   it('should calculate area in square miles', async () => {
@@ -81,12 +86,13 @@ describe('AreaTool', () => {
       ],
       units: 'miles'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('miles');
+    expect(data.units).toBe('miles');
     // Should be roughly 47 square miles
-    expect(result.structuredContent?.area).toBeGreaterThan(40);
-    expect(result.structuredContent?.area).toBeLessThan(50);
+    expect(data.area).toBeGreaterThan(40);
+    expect(data.area).toBeLessThan(50);
   });
 
   it('should calculate area in acres', async () => {
@@ -102,12 +108,13 @@ describe('AreaTool', () => {
       ],
       units: 'acres'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('acres');
+    expect(data.units).toBe('acres');
     // Should be approximately 305 acres
-    expect(result.structuredContent?.area).toBeGreaterThan(250);
-    expect(result.structuredContent?.area).toBeLessThan(350);
+    expect(data.area).toBeGreaterThan(250);
+    expect(data.area).toBeLessThan(350);
   });
 
   it('should calculate area in hectares', async () => {
@@ -123,12 +130,13 @@ describe('AreaTool', () => {
       ],
       units: 'hectares'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('hectares');
+    expect(data.units).toBe('hectares');
     // Should be approximately 124 hectares
-    expect(result.structuredContent?.area).toBeGreaterThan(100);
-    expect(result.structuredContent?.area).toBeLessThan(150);
+    expect(data.area).toBeGreaterThan(100);
+    expect(data.area).toBeLessThan(150);
   });
 
   it('should calculate area of triangle', async () => {
@@ -143,11 +151,12 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
     // Triangle should have roughly half the area of the rectangle
-    expect(result.structuredContent?.area).toBeGreaterThan(0.5);
-    expect(result.structuredContent?.area).toBeLessThan(1);
+    expect(data.area).toBeGreaterThan(0.5);
+    expect(data.area).toBeLessThan(1);
   });
 
   it('should calculate area of polygon with hole', async () => {
@@ -172,11 +181,12 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
     // Area should be outer minus inner (roughly 4 - 1 = 3 km²)
-    expect(result.structuredContent?.area).toBeGreaterThan(2.5);
-    expect(result.structuredContent?.area).toBeLessThan(4);
+    expect(data.area).toBeGreaterThan(2.5);
+    expect(data.area).toBeLessThan(4);
   });
 
   it('should calculate area of multipolygon', async () => {
@@ -205,11 +215,12 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
     // Total area should be roughly 2.4 km²
-    expect(result.structuredContent?.area).toBeGreaterThan(2);
-    expect(result.structuredContent?.area).toBeLessThan(3);
+    expect(data.area).toBeGreaterThan(2);
+    expect(data.area).toBeLessThan(3);
   });
 
   it('should calculate area of irregular polygon', async () => {
@@ -227,10 +238,11 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.area).toBeGreaterThan(3);
-    expect(result.structuredContent?.area).toBeLessThan(7);
+    expect(data.area).toBeGreaterThan(3);
+    expect(data.area).toBeLessThan(7);
   });
 
   it('should round area to 3 decimal places', async () => {
@@ -246,9 +258,10 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    const area = result.structuredContent?.area as number;
+    const area = data.area as number;
     const decimalPlaces = (area.toString().split('.')[1] || '').length;
     expect(decimalPlaces).toBeLessThanOrEqual(3);
   });
@@ -266,11 +279,12 @@ describe('AreaTool', () => {
       ],
       units: 'meters'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
     // Should be roughly 123 square meters
-    expect(result.structuredContent?.area).toBeGreaterThan(100);
-    expect(result.structuredContent?.area).toBeLessThan(200);
+    expect(data.area).toBeGreaterThan(100);
+    expect(data.area).toBeLessThan(200);
   });
 
   it('should handle large polygons', async () => {
@@ -287,10 +301,11 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
     // Should be hundreds of thousands of square kilometers
-    expect(result.structuredContent?.area).toBeGreaterThan(500000);
+    expect(data.area).toBeGreaterThan(500000);
   });
 
   it('should calculate area in southern hemisphere', async () => {
@@ -306,9 +321,10 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.area).toBeGreaterThan(900000);
+    expect(data.area).toBeGreaterThan(900000);
   });
 
   it('should handle polygon near poles', async () => {
@@ -324,11 +340,12 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     expect(result.isError).toBe(false);
     // Area should be much smaller near poles due to convergence of meridians
-    expect(result.structuredContent?.area).toBeGreaterThan(0);
-    expect(result.structuredContent?.area).toBeLessThan(20000);
+    expect(data.area).toBeGreaterThan(0);
+    expect(data.area).toBeLessThan(20000);
   });
 
   it('should calculate zero area for degenerate polygon (line)', async () => {
@@ -342,12 +359,13 @@ describe('AreaTool', () => {
       ],
       units: 'kilometers'
     });
+    const data = structuredOf<AreaOutput>(result);
 
     // Degenerate polygon may error or return 0 area
     if (result.isError) {
       expect(result.isError).toBe(true);
     } else {
-      expect(result.structuredContent?.area).toBe(0);
+      expect(data.area).toBe(0);
     }
   });
 });
