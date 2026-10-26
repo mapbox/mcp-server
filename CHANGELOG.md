@@ -13,7 +13,7 @@
 
 ### New Features
 
-- **`list_public_tokens_tool`: a public token for pages built outside the chat (#PR, part of #281).** An agent building a site or app with a Mapbox map had to ask the user for a token. The tool lists the account's public (`pk.`) tokens with their names, default flag, URL restrictions and scopes, and recommends one.
+- **`list_public_tokens_tool`: a public token for pages built outside the chat (#304, part of #281).** An agent building a site or app with a Mapbox map had to ask the user for a token. The tool lists the account's public (`pk.`) tokens with their names, default flag, URL restrictions and scopes, and recommends one.
   - **Safer token first:** pass `site_url` and it recommends a token restricted to that URL when one exists. Otherwise it recommends the default public token and says a published site should use a URL-restricted one, with the link to create it.
   - **Public tokens only:** it asks the Tokens API for `pk` tokens and drops anything else, so secret and temporary tokens never come back. It can't create tokens (that needs `tokens:write`; DevKit's `create_token_tool` does it).
   - **No new scope:** it needs `tokens:read`, which the in-chat map already uses to find the default public token. With a `pk.` access token, or when listing fails and `MAPBOX_PUBLIC_TOKEN` is set, it returns that token.
