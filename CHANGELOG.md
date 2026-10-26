@@ -27,6 +27,7 @@
 
 ### Maintenance
 
+- **MCP TypeScript SDK 2.4.0 (#PR).** Bumps `@modelcontextprotocol/server`, `/core` and `/client` from 2.3.1 to 2.4.0 and `/node` to 2.1.2. 2.4.0 adds the SDK's Skills extension (`@modelcontextprotocol/server/ext/skills`, SEP-2640), which #295 can use instead of its own `skills/list` and `skills/get` handlers. Its patch changes don't affect our tools: none of our schemas use `$id`, a `$ref` root or `x-mcp-header`.
 - **Removed build output committed under `src/` (#297).** `src/utils/versionUtils-cjs.cjs`, `.d.cts` and their source maps were compiled output from a `tsc` run that wrote next to the sources, committed back in #96. Only `versionUtils-cjs.cts` is source: tshy swaps it in for `versionUtils.ts` in the CommonJS build. `.gitignore` now keeps `.js`, `.cjs`, `.mjs`, `.d.*ts` and `.map` files out of `src/` and `test/`.
 
 ## 0.16.1-dev - 2026-10-16
