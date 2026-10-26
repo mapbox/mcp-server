@@ -10,7 +10,7 @@ import {
   CentroidOutputSchema,
   type CentroidOutput
 } from './CentroidTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * CentroidTool - Calculate the center point (centroid) of a polygon or multipolygon

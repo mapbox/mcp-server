@@ -12,7 +12,7 @@ export const CategoryListInputSchema = z.object({
     .max(100)
     .optional()
     .describe(
-      'Number of categories to return (1-100). WARNING: Only use this parameter if you need to optimize token usage. If using pagination, please make multiple calls to retrieve all categories before proceeding with other tasks. If not specified, returns all categories.'
+      'Number of categories to return (1-100). If not specified, returns all categories.'
     ),
   offset: z
     .number()

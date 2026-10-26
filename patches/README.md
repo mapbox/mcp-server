@@ -1,41 +1,17 @@
-# MCP SDK Patches
+# Dependency Patches
 
-This directory contains patches for npm dependencies that are automatically applied after `npm install`.
+Patches in this directory are applied to npm dependencies after `npm install` by [patch-package](https://github.com/ds300/patch-package) (see the `postinstall` script). There are none at the moment.
 
-## @modelcontextprotocol/sdk
+## History
 
-**File:** `@modelcontextprotocol+sdk+1.21.1.patch`
+### @modelcontextprotocol/sdk (retired)
 
-**Purpose:** Makes MCP output schema validation non-fatal to improve resilience and user experience.
+Until the move to MCP TypeScript SDK v2, a patch to `@modelcontextprotocol/sdk` made output schema validation non-fatal: when a tool's `structuredContent` didn't match its output schema, or a tool with an output schema returned none, the SDK logged a warning instead of failing the tool call.
 
-**Problem:** The MCP SDK enforces strict output schema validation, which causes the entire tool call to fail when there are minor schema mismatches. This creates unnecessary risk and poor user experience - most MCP clients can gracefully handle responses that don't perfectly match the declared schema.
+SDK v2 accepts any [Standard Schema](https://standardschema.dev/) as a tool's `outputSchema`, so the same behavior now comes from `src/tools/lenientOutputSchema.ts` (the published JSON Schema is unchanged, validation only warns) and `BaseTool.installTo` (a missing `structuredContent` is sent as `{}`), with no patch. `test/tools/lenientOutputSchema.test.ts` covers both through a real `tools/call`.
 
-**Solution:** This patch modifies the MCP SDK to log warnings instead of throwing errors when output validation fails. This provides a better balance between:
+## Adding a patch
 
-- **Schema documentation** - Output schemas still serve as documentation for expected response structure
-- **Resilience** - Tools continue working even with minor variations in response format
-- **Observability** - Validation issues are logged for monitoring and debugging
-- **User experience** - Clients receive the actual data instead of an error
-
-**Benefits:**
-
-- Prevents tool failures due to minor schema variations
-- Allows graceful degradation when APIs evolve or return edge cases
-- Maintains backward compatibility while improving reliability
-- Clients that need strict validation can implement it themselves
-
-**Changes:**
-
-- Converts validation errors to console warnings with `[MCP SDK Patch]` prefix
-- Allows tools to return structured content even when it doesn't match the schema exactly
-- Preserves all existing functionality while removing unnecessary strictness
-
-**Maintenance:**
-
-- This patch is automatically applied after `npm install` via the `postinstall` script
-- If the MCP SDK is updated, you may need to recreate this patch:
-  1. Remove the old patch file
-  2. Make the same modifications to the new SDK version
-  3. Run `npx patch-package @modelcontextprotocol/sdk`
-
-**Philosophy:** This patch follows the robustness principle: "Be conservative in what you send, be liberal in what you accept." Output schemas remain valuable for documentation and tooling, but shouldn't cause failures when the real-world data varies slightly from the ideal schema.
+1. Edit the file in `node_modules/<package>/`.
+2. Run `npx patch-package <package>`.
+3. Commit the generated file in this directory and describe it here.

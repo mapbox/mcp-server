@@ -143,14 +143,14 @@ export const DirectionsInputSchema = z.object({
     .default('none')
     .describe(
       'The format of the returned geometry. Options: \n' +
-        '- none (default): no geometry object is returned in the response. The map preview UI ' +
-        'still renders the route on its own; use this whenever you do not need the raw ' +
+        '- none (default): no geometry object is returned in the response. The mapboxRender.ref ' +
+        'works with render_map_tool either way; use this whenever you do not need the raw ' +
         'coordinates yourself.\n' +
         '- geojson: as a GeoJSON LineString, always returned directly in this response — the ' +
         'coordinate count depends on `overview` (see below), not on trip length, so this works ' +
         'the same way for a 2-mile trip and a 400-mile one. Use this whenever you (the caller) ' +
         'need the coordinates yourself, e.g. to draw the route in your own app; not required ' +
-        'for the map preview, which fetches its own full-detail geometry separately.'
+        'for render_map_tool.'
     ),
   overview: z
     .enum(['full', 'simplified'])
@@ -163,8 +163,8 @@ export const DirectionsInputSchema = z.object({
         'otherwise. Pass "full" explicitly for the maximum-precision geometry (every road ' +
         'segment vertex) if you specifically need that; on a long trip this can be tens of ' +
         'thousands of coordinate pairs, at which point the response no longer fits in this ' +
-        'reply and this tool stores it as a `mapbox://temp/` resource instead (see the tool ' +
-        'description). Note: the Directions API cannot return per-segment congestion data ' +
+        'reply and this tool returns a summary and a `mapbox://response/` ref instead (see the ' +
+        'tool description). Note: the Directions API cannot return per-segment congestion data ' +
         '(`congestion_information` in the response) together with anything other than ' +
         '"full" — congestion is only included when the effective overview is "full".'
     ),

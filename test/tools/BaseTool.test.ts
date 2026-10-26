@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { BaseTool } from '../../src/tools/BaseTool.js';
 import { z } from 'zod';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 // Create a concrete test implementation of BaseTool
 class TestTool extends BaseTool<

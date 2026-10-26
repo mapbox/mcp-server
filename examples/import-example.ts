@@ -8,8 +8,8 @@
  * a custom MCP server with a subset of Mapbox tools.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { McpServer } from '@modelcontextprotocol/server';
 
 // Import pre-configured tool instances
 import {
@@ -48,9 +48,9 @@ async function createCustomMcpServer() {
 
 // Advanced usage: Create tools with custom HTTP pipeline
 async function createServerWithCustomPipeline() {
-  const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
+  const { McpServer } = await import('@modelcontextprotocol/server');
   const { StdioServerTransport } =
-    await import('@modelcontextprotocol/sdk/server/stdio.js');
+    await import('@modelcontextprotocol/server/stdio');
   const { DirectionsTool } = await import('@mapbox/mcp-server/tools');
   const { HttpPipeline, UserAgentPolicy, RetryPolicy } =
     await import('@mapbox/mcp-server/utils');
@@ -107,8 +107,7 @@ async function createServerWithCustomPipeline() {
 
 // Selective tool imports: Import only what you need to keep bundle size small
 async function selectiveImports() {
-  const { McpServer: Server } =
-    await import('@modelcontextprotocol/sdk/server/mcp.js');
+  const { McpServer: Server } = await import('@modelcontextprotocol/server');
 
   // Import just the Turf.js geometry tools (no HTTP calls needed)
   const { area, distance, bearing, centroid } =

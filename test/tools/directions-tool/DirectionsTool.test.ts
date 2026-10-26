@@ -12,6 +12,8 @@ import { DirectionsTool } from '../../../src/tools/directions-tool/DirectionsToo
 import * as cleanResponseModule from '../../../src/tools/directions-tool/cleanResponseData.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { resolveResponseRef } from '../../../src/utils/responseRef.js';
+import type { HttpRequest } from '../../../src/utils/types.js';
 
 describe('DirectionsTool', () => {
   beforeEach(() => {
@@ -1159,8 +1161,8 @@ describe('DirectionsTool', () => {
         )
       };
 
-      return vi.fn(async (url: string) => {
-        const response = url.includes('geometries=geojson')
+      return vi.fn<HttpRequest>(async (input) => {
+        const response = String(input).includes('geometries=geojson')
           ? withGeometry
           : withoutGeometry;
         return {
@@ -1187,7 +1189,7 @@ describe('DirectionsTool', () => {
           geometries: 'geojson'
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { authInfo: { token } } as any
+        { http: { authInfo: { token } } } as any
       );
 
       expect(result.isError).toBe(false);
@@ -1239,7 +1241,7 @@ describe('DirectionsTool', () => {
           geometries: 'none'
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { authInfo: { token } } as any
+        { http: { authInfo: { token } } } as any
       );
 
       expect(result.isError).toBe(false);
@@ -1259,8 +1261,8 @@ describe('DirectionsTool', () => {
       );
     });
 
-    it('still attaches a self-fetch mapboxRender ref when the response is large enough to trigger the temp-resource/summary path', async () => {
-      // A geojson response large enough (>50KB) to be stored as a temp resource.
+    it('still attaches a self-fetch mapboxRender ref when the response is large enough to trigger the summary path', async () => {
+      // A geojson response large enough (>50KB) to take the summary path.
       const bigGeometry = {
         type: 'LineString',
         coordinates: Array.from({ length: 4000 }, (_, i) => [
@@ -1290,7 +1292,7 @@ describe('DirectionsTool', () => {
           geometries: 'geojson'
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { authInfo: { token } } as any
+        { http: { authInfo: { token } } } as any
       );
 
       expect(result.isError).toBe(false);
@@ -1300,11 +1302,11 @@ describe('DirectionsTool', () => {
         (c) => (c as { type?: string }).type === 'text'
       ) as { text?: string } | undefined;
       expect(textBlock?.text).toContain('exceeds context limit');
-      expect(textBlock?.text).toMatch(/mapbox:\/\/temp\//);
+      expect(textBlock?.text).toMatch(/mapbox:\/\/response\/directions\?data=/);
 
       // ...and that a self-fetch mapboxRender ref is still attached
-      // alongside it (distinct from the large-response mapbox://temp/
-      // resource above, which holds the full JSON, not the map ref).
+      // alongside it (distinct from the mapbox://response/ ref above,
+      // which reads back the full JSON, not the map).
       const sc = result.structuredContent as
         | { mapboxRender?: { ref?: string } }
         | undefined;
@@ -1618,17 +1620,16 @@ describe('DirectionsTool', () => {
   });
 });
 
-describe('DirectionsTool — temporary resource ownership', () => {
+describe('DirectionsTool — large response ref', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    temporaryResourceManager.clear();
   });
 
-  it('stores the temp resource with owner = the calling account (real token round-trip)', async () => {
-    // A geojson response large enough (>50KB) to be stored as a temp resource.
+  it('gives the model a short ref carrying the inputs, never the route itself', async () => {
+    // A geojson response well over the 50KB threshold.
     const bigGeometry = {
       type: 'LineString',
-      coordinates: Array.from({ length: 4000 }, (_, i) => [
+      coordinates: Array.from({ length: 8000 }, (_, i) => [
         i * 0.001,
         i * 0.001
       ])
@@ -1642,29 +1643,29 @@ describe('DirectionsTool — temporary resource ownership', () => {
       json: async () => largeResponse
     });
 
-    const token = tokenFor('account-zhuwenlong');
-    const result = await new DirectionsTool({ httpRequest }).run(
-      {
-        coordinates: [
-          { longitude: -73.989, latitude: 40.733 },
-          { longitude: -73.979, latitude: 40.743 }
-        ],
-        geometries: 'geojson'
-      },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
-    );
+    const input = {
+      coordinates: [
+        { longitude: -73.989, latitude: 40.733 },
+        { longitude: -73.979, latitude: 40.743 }
+      ],
+      geometries: 'geojson' as const,
+      exclude: 'toll'
+    };
+    const result = await new DirectionsTool({ httpRequest }).run(input);
 
-    // The transcript should point to a temp resource...
     const text = (result.content ?? [])
       .map((c) => (c as { text?: string }).text ?? '')
       .join('\n');
-    const uri = text.match(/mapbox:\/\/temp\/[^\s`]+/)?.[0];
+    expect(text).not.toContain('mapbox://temp/');
+    // The whole text the model sees stays small, unlike the response.
+    expect(text.length).toBeLessThan(4 * 1024);
+    const uri = text.match(/mapbox:\/\/response\/directions\?data=\S+/)?.[0];
     expect(uri).toBeTruthy();
 
-    // ...and that resource must be owned by the account from the token, not
-    // undefined — proving the tool wires `owner` from the real accessToken.
-    const stored = temporaryResourceManager.get(uri as string);
-    expect(stored?.owner).toBe('account-zhuwenlong');
+    const spec = resolveResponseRef(uri as string);
+    expect(spec?.tool).toBe('directions');
+    expect(spec?.input).toMatchObject(input);
+    // No server-side store is involved.
+    expect(temporaryResourceManager.count()).toBe(0);
   });
 });

@@ -179,7 +179,7 @@ describe('IsochroneTool', () => {
         generalize: 1000
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
 
     expect(result.isError).toBe(false);
@@ -210,5 +210,55 @@ describe('IsochroneTool', () => {
         })
       }
     ]);
+  });
+
+  it('returns a short response ref (not mapbox://temp/) when the response is large', async () => {
+    // A response large enough (>50KB) to trigger the fallback.
+    const bigContour = {
+      type: 'Feature',
+      properties: { contour: 10 },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          Array.from({ length: 4000 }, (_, i) => [i * 0.001, i * 0.001])
+        ]
+      }
+    };
+    const largeResponse = {
+      type: 'FeatureCollection',
+      features: [bigContour]
+    };
+    const { httpRequest } = setupHttpRequest({
+      json: async () => largeResponse
+    });
+
+    const result = await new IsochroneTool({ httpRequest }).run({
+      coordinates: { longitude: -74.006, latitude: 40.7128 },
+      profile: 'mapbox/driving',
+      contours_minutes: [10],
+      generalize: 1000
+    });
+
+    expect(result.isError).toBe(false);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('exceeds context limit');
+    expect(text).not.toContain('mapbox://temp/');
+    expect(text).not.toContain('TTL');
+    // The summary stays small; the ref carries the inputs, not the contours.
+    expect(text.length).toBeLessThan(4 * 1024);
+    const uri = text.match(/mapbox:\/\/response\/isochrone\?data=\S+/)?.[0];
+    expect(uri).toBeTruthy();
+    const { resolveResponseRef } =
+      await import('../../../src/utils/responseRef.js');
+    expect(resolveResponseRef(uri as string)).toMatchObject({
+      tool: 'isochrone',
+      input: { profile: 'mapbox/driving', contours_minutes: [10] }
+    });
+
+    // A self-fetch mapboxRender ref is still attached alongside it.
+    const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
+    expect(sc.mapboxRender?.ref).toMatch(
+      /^mapbox:\/\/selffetch\/isochrone\?data=/
+    );
   });
 });

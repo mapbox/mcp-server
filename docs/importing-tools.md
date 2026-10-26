@@ -9,7 +9,7 @@ The Mapbox MCP Server exposes several subpath exports for direct integration:
 - `@mapbox/mcp-server/tools` - Geospatial tools (routing, search, geocoding, etc.)
 - `@mapbox/mcp-server/resources` - Static resources (category lists, etc.)
 - `@mapbox/mcp-server/prompts` - Pre-built prompts for common workflows
-- `@mapbox/mcp-server/utils` - HTTP pipeline utilities
+- `@mapbox/mcp-server/utils` - HTTP pipeline utilities and server setup helpers
 
 All exports support both **ESM** and **CommonJS** via dual builds powered by [tshy](https://github.com/isaacs/tshy).
 
@@ -122,6 +122,7 @@ import {
   // API tools (HTTP pre-configured)
   categorySearch,
   directions,
+  feedback,
   isochrone,
   mapMatching,
   matrix,
@@ -328,59 +329,69 @@ import type { PromptInstance } from '@mapbox/mcp-server/prompts';
 
 ## Example: Building a Custom MCP Server
 
-Here's how you might use these exports to build your own MCP server with a subset of tools:
+Here's how you might use these exports to build your own MCP server with a subset of tools. Each tool and resource registers itself with `installTo(server)`:
 
 ```typescript
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 
-// Import only the tools you need
-import {
-  directions,
-  searchAndGeocode,
-  isochrone
-} from '@mapbox/mcp-server/tools';
+import { getAllTools } from '@mapbox/mcp-server/tools';
+import { getAllResources } from '@mapbox/mcp-server/resources';
+import { buildServerInstructions } from '@mapbox/mcp-server/utils';
 
-const server = new Server(
+// Pick only the tools you need. render_map_tool is only available through
+// the registry, and it needs the map UI resource from getAllResources().
+const wanted = new Set([
+  'directions_tool',
+  'search_and_geocode_tool',
+  'isochrone_tool',
+  'render_map_tool'
+]);
+const tools = getAllTools().filter((tool) => wanted.has(tool.name));
+
+const server = new McpServer(
+  { name: 'my-custom-mcp-server', version: '1.0.0' },
   {
-    name: 'my-custom-mcp-server',
-    version: '1.0.0'
-  },
-  {
-    capabilities: {
-      tools: {}
-    }
+    capabilities: { tools: {}, resources: {} },
+    // Tells the model to show maps with render_map_tool and to pass
+    // mapboxRender refs through unchanged. Hosts that load tools lazily only
+    // see tool names up front, so tool descriptions alone can't do this.
+    instructions: buildServerInstructions(tools.map((tool) => tool.name))
   }
 );
 
-// Register selected tools
-server.setRequestHandler('tools/list', async () => ({
-  tools: [
-    directions.definition,
-    searchAndGeocode.definition,
-    isochrone.definition
-  ]
-}));
-
-server.setRequestHandler('tools/call', async (request) => {
-  const { name, arguments: args } = request.params;
-
-  switch (name) {
-    case 'directions_tool':
-      return await directions.execute(args);
-    case 'search_and_geocode_tool':
-      return await searchAndGeocode.execute(args);
-    case 'isochrone_tool':
-      return await isochrone.execute(args);
-    default:
-      throw new Error(`Unknown tool: ${name}`);
-  }
-});
+tools.forEach((tool) => tool.installTo(server));
+getAllResources().forEach((resource) => resource.installTo(server));
 
 // Start server
 const transport = new StdioServerTransport();
 await server.connect(transport);
 ```
+
+### Server setup helpers
+
+- `buildServerInstructions(toolNames)`: returns the server `instructions` text for the given enabled tool names, or `undefined` when `render_map_tool` isn't among them.
+- `toJsonSchema2020(schema)`: converts a single draft-07 JSON Schema to JSON Schema 2020-12.
+- `publishJsonSchema2020(server)`: deprecated no-op. MCP SDK v1 published tool schemas as draft-07 and this converted them; SDK v2 publishes 2020-12 itself, so the call can be removed.
+
+The tools and resources are built against MCP TypeScript SDK v2 (`@modelcontextprotocol/server`), so `installTo` needs a v2 `McpServer`. A v1 `McpServer` from `@modelcontextprotocol/sdk` won't work.
+
+### Directions routes by reference
+
+Long `directions_tool` routes are too big to hand to a model: above 50 KB the tool returns a summary without the geometry. If your app draws routes itself, pass the model the short ref from `structuredContent.mapboxRender.ref` (a few hundred bytes, in every result) and fetch the full route when you need it:
+
+```typescript
+import { directionsRequestFromRef } from '@mapbox/mcp-server/utils';
+
+const request = directionsRequestFromRef(ref, { accessToken });
+if (request) {
+  const response = await fetch(request.url);
+  const { routes } = await response.json();
+  const route = routes[request.selectedRouteIndex ?? 0]; // GeoJSON geometry
+}
+```
+
+The ref holds only the original call's inputs, so it resolves in any process with no server-side state. The route is fetched again, so with live traffic it can differ slightly from the original call. `resolveSelfFetchRef` decodes any of these refs (directions, isochrone, search and others) to the tool and parameters behind it. To build the request yourself, `buildDirectionsRequestUrl` is the URL builder `directions_tool` and `directionsRequestFromRef` both use, so your request matches the tool's. `directionsRequestFromRef` always asks for `geometries=geojson` and `overview=full`, whatever the original call used, so you get every vertex of the route.
 
 ## Example: Using in a Web Application
 

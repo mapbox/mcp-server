@@ -3,14 +3,13 @@
 
 import type {
   McpServer,
-  RegisteredTool
-} from '@modelcontextprotocol/sdk/server/mcp.js';
-import type {
+  RegisteredTool,
   ToolAnnotations,
-  CallToolResult
-} from '@modelcontextprotocol/sdk/types.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+  CallToolResult,
+  ServerContext
+} from '@modelcontextprotocol/server';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { lenientOutputSchema } from './lenientOutputSchema.js';
 import type { ZodTypeAny } from 'zod';
 import type { z } from 'zod';
 
@@ -31,6 +30,7 @@ export abstract class BaseTool<
         connectDomains?: string[];
         resourceDomains?: string[];
         frameDomains?: string[];
+        workerDomains?: string[];
       };
     };
   };
@@ -87,6 +87,7 @@ export abstract class BaseTool<
             connectDomains?: string[];
             resourceDomains?: string[];
             frameDomains?: string[];
+            workerDomains?: string[];
           };
         };
       };
@@ -99,10 +100,10 @@ export abstract class BaseTool<
     };
 
     // Add outputSchema if provided — pass the full Zod schema (not just .shape)
-    // so that .passthrough() and other schema-level settings are preserved when
-    // the MCP SDK converts it for structured-content validation.
+    // so that .passthrough() and other schema-level settings are preserved in
+    // tools/list. Validation only warns; see lenientOutputSchema.ts.
     if (this.outputSchema) {
-      config.outputSchema = this.outputSchema;
+      config.outputSchema = lenientOutputSchema(this.outputSchema, this.name);
     }
 
     // Add _meta for MCP Apps support if provided (includes CSP configuration)
@@ -114,8 +115,27 @@ export abstract class BaseTool<
       this.name,
       config,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (args: any, extra: any) =>
-        this.invocationServer.run(server, () => this.run(args, extra))
+      async (args: any, ctx: ServerContext) => {
+        const result = await this.invocationServer.run(server, () =>
+          this.run(args, ctx)
+        );
+        // McpServer fails a call to a tool with an output schema that returns
+        // no structuredContent, before validation can let it through. Some
+        // tools fall back to text only (validateAndSanitizeOutput drops
+        // structuredContent that doesn't match), so send an empty object
+        // rather than turn a usable text answer into an error.
+        if (
+          this.outputSchema &&
+          !result.isError &&
+          result.structuredContent === undefined
+        ) {
+          console.warn(
+            `Output validation warning: tool ${this.name} has an output schema but returned no structured content`
+          );
+          return { ...result, structuredContent: {} };
+        }
+        return result;
+      }
     );
   }
 
@@ -124,8 +144,7 @@ export abstract class BaseTool<
    */
   abstract run(
     rawInput: unknown,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    extra?: RequestHandlerExtra<any, any>
+    extra?: ServerContext
   ): Promise<CallToolResult>;
 
   /**

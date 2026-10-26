@@ -25,8 +25,8 @@
  */
 
 import { createServer } from 'node:http';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import {
   registerAppResource,
   RESOURCE_MIME_TYPE
@@ -112,7 +112,7 @@ const httpServer = createServer((req, res) => {
   // manual testing, no session/resumability concerns to worry about.
   void (async () => {
     const server = buildServer();
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined
     });
     try {
