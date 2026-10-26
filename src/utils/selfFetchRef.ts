@@ -38,6 +38,48 @@ export function buildSelfFetchRef(
   return `${SELF_FETCH_URI_PREFIX}${tool}?data=${data}`;
 }
 
+function isNonEmptyNumberArray(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((v) => typeof v === 'number' && Number.isFinite(v))
+  );
+}
+
+/**
+ * Reject refs whose params can't produce a valid API request in the iframe.
+ * A ref minted by the tool itself always passes, but the ref format is easy
+ * for an LLM to hand-write, and a malformed one would otherwise resolve
+ * here, report success to the LLM, and only fail later inside the iframe
+ * (e.g. `contours_minutes: 15` instead of `[15]` is silently dropped from
+ * the Isochrone request, which then 422s with "You must supply one of
+ * contours_meters or contours_minutes"). Failing here routes the ref into
+ * render_map_tool's unresolved-refs path, which tells the LLM to re-run
+ * the source tool.
+ */
+function hasValidSelfFetchParams(
+  tool: SelfFetchTool,
+  params: Record<string, unknown>
+): boolean {
+  if (tool === 'isochrone') {
+    const coords = params.coordinates as
+      | { longitude?: unknown; latitude?: unknown }
+      | undefined;
+    if (
+      !coords ||
+      typeof coords.longitude !== 'number' ||
+      typeof coords.latitude !== 'number'
+    ) {
+      return false;
+    }
+    return (
+      isNonEmptyNumberArray(params.contours_minutes) ||
+      isNonEmptyNumberArray(params.contours_meters)
+    );
+  }
+  return true;
+}
+
 export function isSelfFetchRef(uri: string): boolean {
   return uri.startsWith(SELF_FETCH_URI_PREFIX);
 }
@@ -72,6 +114,7 @@ export function resolveSelfFetchRef(uri: string): MapAppPayload | null {
     return null;
   }
   if (!params || typeof params !== 'object') return null;
+  if (!hasValidSelfFetchParams(tool as SelfFetchTool, params)) return null;
 
   return {
     layers: [],

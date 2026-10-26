@@ -154,6 +154,77 @@ describe('Package exports', () => {
       expect(typeof getVersionInfo).toBe('function');
     });
 
+    it('should export server setup helpers', async () => {
+      const {
+        publishJsonSchema2020,
+        toJsonSchema2020,
+        buildServerInstructions
+      } = await import('../src/utils/index.js');
+
+      expect(typeof publishJsonSchema2020).toBe('function');
+      expect(typeof toJsonSchema2020).toBe('function');
+      expect(typeof buildServerInstructions).toBe('function');
+    });
+
+    it('should export ref helpers', async () => {
+      const {
+        directionsRequestFromRef,
+        resolveSelfFetchRef,
+        isSelfFetchRef,
+        buildDirectionsRequestUrl
+      } = await import('../src/utils/index.js');
+
+      expect(typeof directionsRequestFromRef).toBe('function');
+      expect(typeof resolveSelfFetchRef).toBe('function');
+      expect(typeof isSelfFetchRef).toBe('function');
+      expect(typeof buildDirectionsRequestUrl).toBe('function');
+    });
+
+    // Mirrors how an external deployment (e.g. hosted-mcp-server) builds its
+    // own McpServer from the subpath exports instead of running src/index.ts.
+    it('should give an externally built server 2020-12 schemas and instructions', async () => {
+      const { McpServer } = await import('@modelcontextprotocol/server');
+      const { Client } = await import('@modelcontextprotocol/client');
+      const { InMemoryTransport } =
+        await import('@modelcontextprotocol/server');
+      const { publishJsonSchema2020, buildServerInstructions } =
+        await import('../src/utils/index.js');
+      const { getAllTools } = await import('../src/tools/index.js');
+
+      const tools = getAllTools();
+      const server = new McpServer(
+        { name: 'external', version: '0.0.0' },
+        {
+          capabilities: { tools: {} },
+          instructions: buildServerInstructions(tools.map((t) => t.name))
+        }
+      );
+      publishJsonSchema2020(server);
+      tools.forEach((tool) => tool.installTo(server));
+
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'test', version: '0.0.0' });
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport)
+      ]);
+
+      expect(client.getInstructions()).toContain('use render_map_tool');
+      const listed = (await client.listTools()).tools;
+      for (const tool of listed) {
+        expect(tool.inputSchema.$schema, tool.name).toBe(
+          'https://json-schema.org/draft/2020-12/schema'
+        );
+        if (tool.outputSchema) {
+          expect(tool.outputSchema.$schema, tool.name).toBe(
+            'https://json-schema.org/draft/2020-12/schema'
+          );
+        }
+      }
+      await client.close();
+    });
+
     it('should allow using custom pipeline with tools', async () => {
       const { HttpPipeline, UserAgentPolicy } =
         await import('../src/utils/index.js');

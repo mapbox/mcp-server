@@ -72,6 +72,49 @@ describe('selfFetchRef', () => {
     expect(resolveSelfFetchRef('mapbox://compute/union?data=abc')).toBeNull();
   });
 
+  it('resolves an isochrone ref that carries contours', () => {
+    const coordinates = { longitude: -122.119931, latitude: 47.683984 };
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('isochrone', {
+          coordinates,
+          contours_minutes: [15]
+        })
+      )
+    ).not.toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('isochrone', {
+          coordinates,
+          contours_meters: [5000]
+        })
+      )
+    ).not.toBeNull();
+  });
+
+  // Regression: a hand-written isochrone ref without a usable contours
+  // array used to resolve, so render_map_tool reported success while the
+  // iframe's Isochrone request failed with "You must supply one of
+  // contours_meters or contours_minutes".
+  it.each([
+    ['no contours', {}],
+    ['scalar contours_minutes', { contours_minutes: 15 }],
+    ['empty contours_minutes', { contours_minutes: [] }],
+    ['wrong key name', { contours: [15] }],
+    ['string contours', { contours_minutes: ['15'] }]
+  ])('returns null for an isochrone ref with %s', (_label, extra) => {
+    const ref = buildSelfFetchRef('isochrone', {
+      coordinates: { longitude: -122.119931, latitude: 47.683984 },
+      ...extra
+    });
+    expect(resolveSelfFetchRef(ref)).toBeNull();
+  });
+
+  it('returns null for an isochrone ref without coordinates', () => {
+    const ref = buildSelfFetchRef('isochrone', { contours_minutes: [15] });
+    expect(resolveSelfFetchRef(ref)).toBeNull();
+  });
+
   it('isSelfFetchRef distinguishes self-fetch refs from other schemes', () => {
     expect(isSelfFetchRef('mapbox://selffetch/directions?data=abc')).toBe(true);
     expect(isSelfFetchRef('mapbox://temp/map-payload-abc')).toBe(false);

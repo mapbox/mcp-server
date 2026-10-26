@@ -7,9 +7,9 @@ import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
-import { getUserNameFromToken } from '../../utils/jwtUtils.js';
+import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 
 // Images larger than this threshold are stored as temporary resources instead
 // of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
@@ -37,7 +37,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
 > {
   name = 'static_map_image_tool';
   description =
-    'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns PNG for vector styles, JPEG for raster-only styles.';
+    'Generates a static map image from Mapbox Static Images API. Supports center coordinates, zoom level (0-22), image size (up to 1280x1280), various Mapbox styles, and overlays (markers, paths, GeoJSON). Returns PNG for vector styles, JPEG for raster-only styles. Use only when the user explicitly asks for a static image file — to show a map, use render_map_tool instead, which renders an interactive map.';
   annotations = {
     title: 'Static Map Image Tool',
     readOnlyHint: true,
@@ -156,7 +156,7 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
         data: base64Data,
         metadata: { toolName: this.name, size: buffer.byteLength },
         mimeType,
-        owner: getUserNameFromToken(accessToken)
+        owner: getOwnerKeyFromToken(accessToken)
       });
       content.push({
         type: 'text',

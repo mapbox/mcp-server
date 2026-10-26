@@ -1,6 +1,6 @@
 {
   "name": "@mapbox/mcp-server",
-  "version": "0.14.0",
+  "version": "0.16.1-dev",
   "description": "Mapbox MCP server.",
   "mcpName": "io.github.mapbox/mcp-server",
   "main": "./dist/commonjs/index.js",
@@ -18,6 +18,7 @@
     "inspect:build": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js",
     "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" npx -y tsx src/index.ts",
     "dev:http": "npx -y tsx scripts/dev-http-server.ts",
+    "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\" --fix",
     "postinstall": "patch-package || (cd ../../.. && node ./node_modules/patch-package/index.js --patch-dir ./node_modules/@mapbox/mcp-server/patches) || true",
@@ -27,7 +28,11 @@
     "test": "vitest",
     "tracing:jaeger:start": "docker run --rm -d --name jaeger -p 16686:16686 -p 14250:14250 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest",
     "tracing:jaeger:stop": "docker stop jaeger",
-    "tracing:verify": "node -e \"console.log('🔍 Verifying tracing setup with Jaeger...\\n1. Copy .env.example to .env and add your MAPBOX_ACCESS_TOKEN\\n2. Start Jaeger: npm run tracing:jaeger:start\\n3. Run server: npm run inspect:build\\n4. Check traces at: http://localhost:16686')\""
+    "tracing:verify": "node -e \"console.log('🔍 Verifying tracing setup with Jaeger...\\n1. Copy .env.example to .env and add your MAPBOX_ACCESS_TOKEN\\n2. Start Jaeger: npm run tracing:jaeger:start\\n3. Run server: npm run inspect:build\\n4. Check traces at: http://localhost:16686')\"",
+    "eval:tools": "tsx evals/tool-selection/run-eval.mjs",
+    "eval:tools:report": "node evals/tool-selection/build-report-lite.mjs .claude/hillclimb/tool-selection",
+    "eval:tools:openai": "EVAL_PROVIDER=openai tsx evals/tool-selection/run-eval.mjs --flow .claude/hillclimb/tool-selection-openai",
+    "eval:tools:report:openai": "node evals/tool-selection/build-report-lite.mjs .claude/hillclimb/tool-selection-openai"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --fix",
@@ -36,7 +41,10 @@
   "license": "MIT",
   "homepage": "https://github.com/mapbox/mcp-server#readme",
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@eslint/js": "^9.27.0",
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@modelcontextprotocol/node": "^2.1.1",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.58.2",
     "@typescript-eslint/parser": "^8.58.2",
@@ -50,9 +58,11 @@
     "globals": "^16.3.0",
     "husky": "^9.0.0",
     "lint-staged": "^16.1.0",
+    "openai": "^7.32.0",
     "plop": "^4.0.1",
     "prettier": "^3.0.0",
     "tshy": "^4.1.1",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.2",
     "vitest": "^4.1.4"
@@ -78,8 +88,9 @@
     "mcp"
   ],
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.1.1",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/core": "^2.3.1",
+    "@modelcontextprotocol/ext-apps": "^2.0.3",
+    "@modelcontextprotocol/server": "^2.3.1",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.74.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.216.0",

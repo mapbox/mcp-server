@@ -14,7 +14,7 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { buildSearchAndGeocodeRequestUrl } from './buildSearchAndGeocodeRequestUrl.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';

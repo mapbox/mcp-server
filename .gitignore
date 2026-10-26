@@ -155,3 +155,26 @@ test-results.xml
 # Build artifacts
 *.tsbuildinfo
 PR_DESCRIPTION.md
+
+# Tool-selection eval output (state and case files are committed)
+.claude/hillclimb/*/*/
+.claude/hillclimb/*/report.html
+.claude/hillclimb/*/trajectory/
+
+# Compiled output belongs in dist/. A stray tsc run without the build config
+# writes it next to the sources instead (versionUtils-cjs.cjs was committed
+# that way), so keep it out of src/ and test/.
+/src/**/*.js
+/src/**/*.cjs
+/src/**/*.mjs
+/src/**/*.map
+/src/**/*.d.ts
+/src/**/*.d.cts
+/src/**/*.d.mts
+/test/**/*.js
+/test/**/*.cjs
+/test/**/*.mjs
+/test/**/*.map
+/test/**/*.d.ts
+/test/**/*.d.cts
+/test/**/*.d.mts

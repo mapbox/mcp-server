@@ -117,7 +117,7 @@ Pass multiple refs to merge several tool results onto one map — for example, a
 }
 ```
 
-An LLM using this server is instructed (via each tool's own output) to call `render_map_tool` as the final step whenever a `mapboxRender` field is present — you generally don't need to prompt for this explicitly.
+When someone wants to see a result on a map, the LLM passes the `mapboxRender.ref` from each relevant tool result to `render_map_tool`. Each tool result includes the exact call shape, so the ref is passed unchanged.
 
 ## Payload reference
 
