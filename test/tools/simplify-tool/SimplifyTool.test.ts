@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { SimplifyTool } from '../../../src/tools/simplify-tool/SimplifyTool.js';
+import type { SimplifyOutput } from '../../../src/tools/simplify-tool/SimplifyTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('SimplifyTool', () => {
   const tool = new SimplifyTool();
@@ -26,11 +28,12 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(11);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThan(11);
-    expect(result.structuredContent?.reductionPercentage).toBeGreaterThan(0);
-    expect(result.structuredContent?.simplified).toBeDefined();
-    expect(Array.isArray(result.structuredContent?.simplified)).toBe(true);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(11);
+    expect(data.simplifiedVertexCount).toBeLessThan(11);
+    expect(data.reductionPercentage).toBeGreaterThan(0);
+    expect(data.simplified).toBeDefined();
+    expect(Array.isArray(data.simplified)).toBe(true);
   });
 
   it('should simplify a linestring with custom tolerance', async () => {
@@ -49,8 +52,9 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(6);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThan(6);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(6);
+    expect(data.simplifiedVertexCount).toBeLessThan(6);
   });
 
   it('should simplify more aggressively with higher tolerance', async () => {
@@ -77,10 +81,10 @@ describe('SimplifyTool', () => {
     expect(resultLow.isError).toBe(false);
     expect(resultHigh.isError).toBe(false);
     // Higher tolerance should result in fewer vertices
-    expect(
-      resultHigh.structuredContent?.simplifiedVertexCount
-    ).toBeLessThanOrEqual(
-      resultLow.structuredContent?.simplifiedVertexCount || Infinity
+    const dataHigh = structuredOf<SimplifyOutput>(resultHigh);
+    const dataLow = structuredOf<SimplifyOutput>(resultLow);
+    expect(dataHigh.simplifiedVertexCount).toBeLessThanOrEqual(
+      dataLow.simplifiedVertexCount
     );
   });
 
@@ -103,11 +107,12 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(9);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThan(9);
-    expect(result.structuredContent?.simplified).toBeDefined();
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(9);
+    expect(data.simplifiedVertexCount).toBeLessThan(9);
+    expect(data.simplified).toBeDefined();
     // Result should still be a polygon (array of array of coordinates)
-    expect(Array.isArray(result.structuredContent?.simplified)).toBe(true);
+    expect(Array.isArray(data.simplified)).toBe(true);
   });
 
   it('should use high quality mode', async () => {
@@ -126,12 +131,9 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThanOrEqual(
-      5
-    );
-    expect(
-      result.structuredContent?.simplifiedVertexCount
-    ).toBeGreaterThanOrEqual(2);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.simplifiedVertexCount).toBeLessThanOrEqual(5);
+    expect(data.simplifiedVertexCount).toBeGreaterThanOrEqual(2);
   });
 
   it('should handle straight line (minimal simplification needed)', async () => {
@@ -147,10 +149,11 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(5);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(5);
     // Straight line should simplify to just endpoints
-    expect(result.structuredContent?.simplifiedVertexCount).toBe(2);
-    expect(result.structuredContent?.reductionPercentage).toBe(60);
+    expect(data.simplifiedVertexCount).toBe(2);
+    expect(data.reductionPercentage).toBe(60);
   });
 
   it('should handle complex curved line', async () => {
@@ -166,9 +169,10 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(21);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThan(21);
-    expect(result.structuredContent?.reductionPercentage).toBeGreaterThan(0);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(21);
+    expect(data.simplifiedVertexCount).toBeLessThan(21);
+    expect(data.reductionPercentage).toBeGreaterThan(0);
   });
 
   it('should calculate reduction percentage correctly', async () => {
@@ -184,14 +188,13 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    const original = result.structuredContent?.originalVertexCount || 0;
-    const simplified = result.structuredContent?.simplifiedVertexCount || 0;
+    const data = structuredOf<SimplifyOutput>(result);
+    const original = data.originalVertexCount;
+    const simplified = data.simplifiedVertexCount;
     const expectedReduction = Math.round(
       ((original - simplified) / original) * 100
     );
-    expect(result.structuredContent?.reductionPercentage).toBe(
-      expectedReduction
-    );
+    expect(data.reductionPercentage).toBe(expectedReduction);
   });
 
   it('should preserve first and last points', async () => {
@@ -209,10 +212,8 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    const simplified = result.structuredContent?.simplified as [
-      number,
-      number
-    ][];
+    const data = structuredOf<SimplifyOutput>(result);
+    const simplified = data.simplified as [number, number][];
     expect(simplified[0]).toEqual([0, 0]);
     expect(simplified[simplified.length - 1]).toEqual([4, 0]);
   });
@@ -231,7 +232,8 @@ describe('SimplifyTool', () => {
 
     expect(result.isError).toBe(false);
     // Very small tolerance should preserve most vertices
-    expect(result.structuredContent?.simplifiedVertexCount).toBeGreaterThan(2);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.simplifiedVertexCount).toBeGreaterThan(2);
   });
 
   it('should handle polygon with hole', async () => {
@@ -267,8 +269,9 @@ describe('SimplifyTool', () => {
 
     expect(result.isError).toBe(false);
     // Original: 9 + 9 = 18 vertices
-    expect(result.structuredContent?.originalVertexCount).toBe(18);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThan(18);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(18);
+    expect(data.simplifiedVertexCount).toBeLessThan(18);
   });
 
   it('should handle real world coordinates', async () => {
@@ -284,10 +287,9 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(5);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThanOrEqual(
-      5
-    );
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(5);
+    expect(data.simplifiedVertexCount).toBeLessThanOrEqual(5);
   });
 
   it('should handle square polygon (should simplify to 5 points including closure)', async () => {
@@ -305,10 +307,11 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(5);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(5);
     // Perfect square should not simplify much (all corners are significant)
-    expect(result.structuredContent?.simplifiedVertexCount).toBe(5);
-    expect(result.structuredContent?.reductionPercentage).toBe(0);
+    expect(data.simplifiedVertexCount).toBe(5);
+    expect(data.reductionPercentage).toBe(0);
   });
 
   it('should handle triangle (minimal vertices, no simplification)', async () => {
@@ -325,10 +328,11 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.originalVertexCount).toBe(4);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.originalVertexCount).toBe(4);
     // Triangle should not simplify (all vertices are needed)
-    expect(result.structuredContent?.simplifiedVertexCount).toBe(4);
-    expect(result.structuredContent?.reductionPercentage).toBe(0);
+    expect(data.simplifiedVertexCount).toBe(4);
+    expect(data.reductionPercentage).toBe(0);
   });
 
   it('should handle negative coordinates', async () => {
@@ -344,7 +348,8 @@ describe('SimplifyTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.simplifiedVertexCount).toBeLessThan(5);
+    const data = structuredOf<SimplifyOutput>(result);
+    expect(data.simplifiedVertexCount).toBeLessThan(5);
   });
 
   it('should return simplified geometry in same format as input', async () => {
@@ -358,10 +363,9 @@ describe('SimplifyTool', () => {
     });
 
     expect(lineResult.isError).toBe(false);
-    expect(Array.isArray(lineResult.structuredContent?.simplified)).toBe(true);
-    expect(Array.isArray(lineResult.structuredContent?.simplified[0])).toBe(
-      true
-    );
+    const lineData = structuredOf<SimplifyOutput>(lineResult);
+    expect(Array.isArray(lineData.simplified)).toBe(true);
+    expect(Array.isArray(lineData.simplified[0])).toBe(true);
 
     // Test polygon
     const polyResult = await tool.run({
@@ -377,9 +381,8 @@ describe('SimplifyTool', () => {
     });
 
     expect(polyResult.isError).toBe(false);
-    expect(Array.isArray(polyResult.structuredContent?.simplified)).toBe(true);
-    expect(Array.isArray(polyResult.structuredContent?.simplified[0])).toBe(
-      true
-    );
+    const polyData = structuredOf<SimplifyOutput>(polyResult);
+    expect(Array.isArray(polyData.simplified)).toBe(true);
+    expect(Array.isArray(polyData.simplified[0])).toBe(true);
   });
 });

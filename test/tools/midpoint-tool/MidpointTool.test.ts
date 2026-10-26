@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { MidpointTool } from '../../../src/tools/midpoint-tool/MidpointTool.js';
+import type { MidpointOutput } from '../../../src/tools/midpoint-tool/MidpointTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('MidpointTool', () => {
   const tool = new MidpointTool();
@@ -14,13 +16,14 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.longitude).toBeCloseTo(5, 1);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.from).toEqual({
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeCloseTo(5, 1);
+    expect(data.midpoint.latitude).toBeCloseTo(0, 1);
+    expect(data.from).toEqual({
       longitude: 0,
       latitude: 0
     });
-    expect(result.structuredContent?.to).toEqual({
+    expect(data.to).toEqual({
       longitude: 10,
       latitude: 0
     });
@@ -33,8 +36,9 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.longitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(5, 1);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeCloseTo(0, 1);
+    expect(data.midpoint.latitude).toBeCloseTo(5, 1);
   });
 
   it('should calculate midpoint for diagonal coordinates', async () => {
@@ -44,8 +48,9 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.longitude).toBeCloseTo(5, 1);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(5, 1);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeCloseTo(5, 1);
+    expect(data.midpoint.latitude).toBeCloseTo(5, 1);
   });
 
   it('should calculate midpoint between San Francisco and Los Angeles', async () => {
@@ -56,10 +61,11 @@ describe('MidpointTool', () => {
 
     expect(result.isError).toBe(false);
     // Midpoint should be roughly between the two cities
-    expect(result.structuredContent?.midpoint.longitude).toBeGreaterThan(-121);
-    expect(result.structuredContent?.midpoint.longitude).toBeLessThan(-119);
-    expect(result.structuredContent?.midpoint.latitude).toBeGreaterThan(35);
-    expect(result.structuredContent?.midpoint.latitude).toBeLessThan(37);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeGreaterThan(-121);
+    expect(data.midpoint.longitude).toBeLessThan(-119);
+    expect(data.midpoint.latitude).toBeGreaterThan(35);
+    expect(data.midpoint.latitude).toBeLessThan(37);
   });
 
   it('should calculate midpoint between New York and London', async () => {
@@ -70,10 +76,11 @@ describe('MidpointTool', () => {
 
     expect(result.isError).toBe(false);
     // Midpoint should be somewhere over the Atlantic
-    expect(result.structuredContent?.midpoint.longitude).toBeGreaterThan(-74);
-    expect(result.structuredContent?.midpoint.longitude).toBeLessThan(0);
-    expect(result.structuredContent?.midpoint.latitude).toBeGreaterThan(40);
-    expect(result.structuredContent?.midpoint.latitude).toBeLessThan(60);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeGreaterThan(-74);
+    expect(data.midpoint.longitude).toBeLessThan(0);
+    expect(data.midpoint.latitude).toBeGreaterThan(40);
+    expect(data.midpoint.latitude).toBeLessThan(60);
   });
 
   it('should handle same point as same midpoint', async () => {
@@ -83,8 +90,9 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.longitude).toBe(10);
-    expect(result.structuredContent?.midpoint.latitude).toBe(20);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBe(10);
+    expect(data.midpoint.latitude).toBe(20);
   });
 
   it('should handle midpoint across the antimeridian (180°)', async () => {
@@ -95,10 +103,9 @@ describe('MidpointTool', () => {
 
     expect(result.isError).toBe(false);
     // Midpoint should be near 180° or -180°
-    expect(
-      Math.abs(result.structuredContent?.midpoint.longitude || 0)
-    ).toBeGreaterThan(175);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(0, 1);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(Math.abs(data.midpoint.longitude)).toBeGreaterThan(175);
+    expect(data.midpoint.latitude).toBeCloseTo(0, 1);
   });
 
   it('should handle midpoint near the north pole', async () => {
@@ -108,8 +115,9 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.latitude).toBeGreaterThan(84);
-    expect(result.structuredContent?.midpoint.latitude).toBeLessThan(90);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.latitude).toBeGreaterThan(84);
+    expect(data.midpoint.latitude).toBeLessThan(90);
   });
 
   it('should handle midpoint in southern hemisphere', async () => {
@@ -120,10 +128,11 @@ describe('MidpointTool', () => {
 
     expect(result.isError).toBe(false);
     // Midpoint should be between the two points
-    expect(result.structuredContent?.midpoint.longitude).toBeGreaterThan(-60);
-    expect(result.structuredContent?.midpoint.longitude).toBeLessThan(-50);
-    expect(result.structuredContent?.midpoint.latitude).toBeGreaterThan(-40);
-    expect(result.structuredContent?.midpoint.latitude).toBeLessThan(-30);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeGreaterThan(-60);
+    expect(data.midpoint.longitude).toBeLessThan(-50);
+    expect(data.midpoint.latitude).toBeGreaterThan(-40);
+    expect(data.midpoint.latitude).toBeLessThan(-30);
   });
 
   it('should handle midpoint across hemispheres (N-S)', async () => {
@@ -133,8 +142,9 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.longitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(0, 1);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeCloseTo(0, 1);
+    expect(data.midpoint.latitude).toBeCloseTo(0, 1);
   });
 
   it('should handle midpoint across hemispheres (E-W)', async () => {
@@ -144,8 +154,9 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.longitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(0, 1);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeCloseTo(0, 1);
+    expect(data.midpoint.latitude).toBeCloseTo(0, 1);
   });
 
   it('should round coordinates to 6 decimal places', async () => {
@@ -155,8 +166,9 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    const lon = result.structuredContent?.midpoint.longitude as number;
-    const lat = result.structuredContent?.midpoint.latitude as number;
+    const data = structuredOf<MidpointOutput>(result);
+    const lon = data.midpoint.longitude;
+    const lat = data.midpoint.latitude;
     const lonDecimals = (lon.toString().split('.')[1] || '').length;
     const latDecimals = (lat.toString().split('.')[1] || '').length;
     expect(lonDecimals).toBeLessThanOrEqual(6);
@@ -170,7 +182,8 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(0, 1);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.latitude).toBeCloseTo(0, 1);
   });
 
   it('should be commutative (same midpoint regardless of order)', async () => {
@@ -184,14 +197,10 @@ describe('MidpointTool', () => {
       to: { longitude: 10, latitude: 20 }
     });
 
-    expect(result1.structuredContent?.midpoint.longitude).toBeCloseTo(
-      result2.structuredContent?.midpoint.longitude || 0,
-      5
-    );
-    expect(result1.structuredContent?.midpoint.latitude).toBeCloseTo(
-      result2.structuredContent?.midpoint.latitude || 0,
-      5
-    );
+    const data1 = structuredOf<MidpointOutput>(result1);
+    const data2 = structuredOf<MidpointOutput>(result2);
+    expect(data1.midpoint.longitude).toBeCloseTo(data2.midpoint.longitude, 5);
+    expect(data1.midpoint.latitude).toBeCloseTo(data2.midpoint.latitude, 5);
   });
 
   it('should handle short distances accurately', async () => {
@@ -201,7 +210,8 @@ describe('MidpointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.midpoint.longitude).toBeCloseTo(0.0005, 4);
-    expect(result.structuredContent?.midpoint.latitude).toBeCloseTo(0.0005, 4);
+    const data = structuredOf<MidpointOutput>(result);
+    expect(data.midpoint.longitude).toBeCloseTo(0.0005, 4);
+    expect(data.midpoint.latitude).toBeCloseTo(0.0005, 4);
   });
 });

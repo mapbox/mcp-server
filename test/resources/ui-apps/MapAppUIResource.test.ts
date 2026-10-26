@@ -7,6 +7,8 @@ const SK_TOKEN = 'sk.eyJzdWIiOiJ0ZXN0IiwidSI6InRlc3R1c2VyIn0.signature';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { MapAppUIResource } from '../../../src/resources/ui-apps/MapAppUIResource.js';
 import { __resetMapboxPublicTokenCache } from '../../../src/utils/mapboxPublicToken.js';
+import { resourceTextOf } from '../../utils/resultTestUtils.js';
+import type { HttpRequest } from '../../../src/utils/types.js';
 
 const fakeTokenList = [
   {
@@ -39,7 +41,8 @@ describe('MapAppUIResource', () => {
   });
 
   it('serves HTML at ui://mapbox/map-app/index.html with the mcp-app mime type', async () => {
-    const httpRequest = vi.fn(async (url: string) => {
+    const httpRequest = vi.fn<HttpRequest>(async (input) => {
+      const url = String(input);
       if (url.includes('tokens/v2/'))
         return makeOkJson(fakeTokenList) as Response;
       throw new Error(`Unexpected URL: ${url}`);
@@ -57,11 +60,10 @@ describe('MapAppUIResource', () => {
     const entry = result.contents[0];
     expect(entry.mimeType).toBe('text/html;profile=mcp-app');
     expect(entry.uri).toBe('ui://mapbox/map-app/index.html');
-    expect(typeof entry.text).toBe('string');
-    expect(entry.text as string).toContain(
-      'pk.eyJ1IjoidGVzdHVzZXIifQ.fake-public-token'
-    );
-    expect(entry.text as string).toContain('mapbox-gl.js');
+    const text = resourceTextOf(result);
+    expect(typeof text).toBe('string');
+    expect(text).toContain('pk.eyJ1IjoidGVzdHVzZXIifQ.fake-public-token');
+    expect(text).toContain('mapbox-gl.js');
 
     const meta = (entry as { _meta?: unknown })._meta as
       | { ui?: { csp?: Record<string, string[]> } }
@@ -86,7 +88,7 @@ describe('MapAppUIResource', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    expect(result.contents[0].text as string).toContain(
+    expect(resourceTextOf(result)).toContain(
       'No Mapbox public token available'
     );
   });

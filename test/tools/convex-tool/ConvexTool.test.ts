@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { ConvexTool } from '../../../src/tools/convex-tool/ConvexTool.js';
+import type { ConvexOutput } from '../../../src/tools/convex-tool/ConvexTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('ConvexTool', () => {
   const tool = new ConvexTool();
@@ -19,12 +21,12 @@ describe('ConvexTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.geometry).not.toBeNull();
-    expect(result.structuredContent?.num_points).toBe(5);
+    expect(structuredOf<ConvexOutput>(result).geometry).not.toBeNull();
+    expect(structuredOf<ConvexOutput>(result).num_points).toBe(5);
     // Hull of a square is a polygon
-    expect((result.structuredContent?.geometry as { type: string })?.type).toBe(
-      'Polygon'
-    );
+    expect(
+      (structuredOf<ConvexOutput>(result).geometry as { type: string })?.type
+    ).toBe('Polygon');
   });
 
   it('returns null geometry for collinear points', async () => {
@@ -37,8 +39,8 @@ describe('ConvexTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.geometry).toBeNull();
-    expect(result.structuredContent?.num_points).toBe(3);
+    expect(structuredOf<ConvexOutput>(result).geometry).toBeNull();
+    expect(structuredOf<ConvexOutput>(result).num_points).toBe(3);
   });
 
   it('works with real-world points', async () => {
@@ -54,8 +56,8 @@ describe('ConvexTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.geometry).not.toBeNull();
-    expect(result.structuredContent?.num_points).toBe(5);
+    expect(structuredOf<ConvexOutput>(result).geometry).not.toBeNull();
+    expect(structuredOf<ConvexOutput>(result).num_points).toBe(5);
   });
 
   it('rejects fewer than three points', async () => {

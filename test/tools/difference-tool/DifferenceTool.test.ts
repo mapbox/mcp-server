@@ -3,7 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { DifferenceTool } from '../../../src/tools/difference-tool/DifferenceTool.js';
-import { tokenFor } from '../../utils/tokenTestUtils.js';
+import type { DifferenceOutput } from '../../../src/tools/difference-tool/DifferenceTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('DifferenceTool', () => {
   const tool = new DifferenceTool();
@@ -31,8 +32,8 @@ describe('DifferenceTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.has_difference).toBe(true);
-    expect(result.structuredContent?.geometry).not.toBeNull();
+    expect(structuredOf<DifferenceOutput>(result).has_difference).toBe(true);
+    expect(structuredOf<DifferenceOutput>(result).geometry).not.toBeNull();
   });
 
   it('returns has_difference=false when polygon2 fully covers polygon1', async () => {
@@ -58,8 +59,8 @@ describe('DifferenceTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.has_difference).toBe(false);
-    expect(result.structuredContent?.geometry).toBeNull();
+    expect(structuredOf<DifferenceOutput>(result).has_difference).toBe(false);
+    expect(structuredOf<DifferenceOutput>(result).geometry).toBeNull();
   });
 
   it('returns full polygon1 when polygons do not overlap', async () => {
@@ -85,8 +86,8 @@ describe('DifferenceTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.has_difference).toBe(true);
-    expect(result.structuredContent?.geometry).not.toBeNull();
+    expect(structuredOf<DifferenceOutput>(result).has_difference).toBe(true);
+    expect(structuredOf<DifferenceOutput>(result).geometry).not.toBeNull();
   });
 
   it('respects holes in polygon1', async () => {
@@ -124,9 +125,9 @@ describe('DifferenceTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.has_difference).toBe(true);
+    expect(structuredOf<DifferenceOutput>(result).has_difference).toBe(true);
     // Result should still have a hole in it
-    expect(result.structuredContent?.geometry).not.toBeNull();
+    expect(structuredOf<DifferenceOutput>(result).geometry).not.toBeNull();
   });
 
   it('text content describes the result', async () => {
@@ -180,31 +181,26 @@ describe('DifferenceTool', () => {
   });
 
   it('stores a mapboxRender payload with input fills + difference result', async () => {
-    const token = tokenFor('account-test-difference');
-    const result = await tool.run(
-      {
-        polygon1: [
-          [
-            [0, 0],
-            [4, 0],
-            [4, 4],
-            [0, 4],
-            [0, 0]
-          ]
-        ],
-        polygon2: [
-          [
-            [1, 1],
-            [3, 1],
-            [3, 3],
-            [1, 3],
-            [1, 1]
-          ]
+    const result = await tool.run({
+      polygon1: [
+        [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+          [0, 4],
+          [0, 0]
         ]
-      },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { http: { authInfo: { token } } } as any
-    );
+      ],
+      polygon2: [
+        [
+          [1, 1],
+          [3, 1],
+          [3, 3],
+          [1, 3],
+          [1, 1]
+        ]
+      ]
+    });
 
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { mapboxRender?: { ref?: string } };
