@@ -91,6 +91,17 @@ export interface MapAppBaseMapConfig {
   densityPointOfInterestLabels?: number;
 }
 
+/**
+ * Which Mapbox-owned base style to load. Both are part of the Standard
+ * family (same config-property system and `bottom`/`middle`/`top` slots,
+ * per https://docs.mapbox.com/map-styles/reference/), so `baseMapConfig`
+ * and `slot` work under either — `standard-satellite` just doesn't support
+ * every Standard property (no `theme`, no flat-color overrides like
+ * `colorWater`/`colorBuildings`, since imagery replaces those surfaces).
+ * Defaults to `standard` when omitted.
+ */
+export type MapAppBaseStyle = 'standard' | 'standard-satellite';
+
 export interface MapAppMarker {
   coordinates: [number, number];
   /**
@@ -106,6 +117,23 @@ export interface MapAppMarker {
   color?: string;
   /** Popup text (optional). */
   popup?: string;
+  /**
+   * A Mapbox POI's `mapbox_id` (e.g. the "Mapbox ID" field printed by
+   * category_search_tool/search_and_geocode_tool's text output, or a
+   * self-fetched search result's own id). Setting this gets the marker a
+   * row in the map's results side panel, which the iframe then enriches
+   * with a popularity score and photo via a batched Place Details lookup
+   * (see mapAppHtml.ts's maybeShowSidePanel/fetchPlaceDetailsBatch) — the
+   * same panel search/category-search results already get automatically,
+   * now also available for hand-composed markers.
+   */
+  id?: string;
+  /** Display name for the side panel row. Only used when `id` is also set; falls back to "Result N" if omitted. */
+  name?: string;
+  /** Category shown in the side panel row (e.g. "Coffee Shop"). Only used when `id` is also set. */
+  category?: string;
+  /** Distance in meters, shown in the side panel row. Only used when `id` is also set. */
+  distanceMeters?: number;
 }
 
 export interface MapAppLegendEntry {
@@ -170,6 +198,8 @@ export interface MapAppPayload {
   selfFetch?: MapAppSelfFetch[];
   /** Restyles the Standard base map itself (colors, theme, lightPreset, label visibility). */
   baseMapConfig?: MapAppBaseMapConfig;
+  /** Which Mapbox-owned base style to load; defaults to `standard`. */
+  baseStyle?: MapAppBaseStyle;
 }
 
 // Zod mirror of MapAppPayload, kept loose on paint/layout/geometry internals
@@ -241,7 +271,11 @@ const MapAppMarkerSchema = z.object({
   style: z.enum(['pin', 'numbered', 'start', 'end']).optional(),
   label: z.string().optional(),
   color: z.string().optional(),
-  popup: z.string().optional()
+  popup: z.string().optional(),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  category: z.string().optional(),
+  distanceMeters: z.number().optional()
 });
 
 const MapAppLegendEntrySchema = z.object({
@@ -281,7 +315,8 @@ export const MapAppPayloadSchema = z.object({
   legend: z.array(MapAppLegendEntrySchema).optional(),
   camera: MapAppCameraSchema.optional(),
   selfFetch: z.array(MapAppSelfFetchSchema).optional(),
-  baseMapConfig: MapAppBaseMapConfigSchema.optional()
+  baseMapConfig: MapAppBaseMapConfigSchema.optional(),
+  baseStyle: z.enum(['standard', 'standard-satellite']).optional()
 });
 
 /**

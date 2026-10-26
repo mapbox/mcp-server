@@ -14,6 +14,7 @@ import {
   resolveMapboxPublicToken,
   __resetMapboxPublicTokenCache
 } from '../../src/utils/mapboxPublicToken.js';
+import type { HttpRequest } from '../../src/utils/types.js';
 
 const API_ENDPOINT = 'https://api.mapbox.com/';
 const DEFAULT_PK = 'pk.eyJ1IjoidGVzdHVzZXIifQ.fake-public-token';
@@ -60,7 +61,8 @@ describe('resolveMapboxPublicToken', () => {
   });
 
   it('resolves the default public token for a tk.* (OAuth) bearer', async () => {
-    const httpRequest = vi.fn(async (url: string) => {
+    const httpRequest = vi.fn<HttpRequest>(async (input) => {
+      const url = String(input);
       if (url.includes('tokens/v2/'))
         return makeOkJson(fakeTokenList) as Response;
       throw new Error(`Unexpected URL: ${url}`);
@@ -79,7 +81,8 @@ describe('resolveMapboxPublicToken', () => {
   });
 
   it('resolves the default public token for an sk.* bearer (regression)', async () => {
-    const httpRequest = vi.fn(async (url: string) => {
+    const httpRequest = vi.fn<HttpRequest>(async (input) => {
+      const url = String(input);
       if (url.includes('tokens/v2/'))
         return makeOkJson(fakeTokenList) as Response;
       throw new Error(`Unexpected URL: ${url}`);
@@ -145,7 +148,8 @@ describe('resolveMapboxPublicToken', () => {
   });
 
   it('caches the resolved token per-user and skips a second API call for the same user', async () => {
-    const httpRequest = vi.fn(async (url: string) => {
+    const httpRequest = vi.fn<HttpRequest>(async (input) => {
+      const url = String(input);
       if (url.includes('tokens/v2/'))
         return makeOkJson(fakeTokenList) as Response;
       throw new Error(`Unexpected URL: ${url}`);
@@ -169,7 +173,8 @@ describe('resolveMapboxPublicToken', () => {
 
   it("never returns one user's cached token to a different user (cross-tenant isolation)", async () => {
     const otherUserPk = 'pk.eyJ1Ijoib3RoZXJ1c2VyIn0.other-users-token';
-    const httpRequest = vi.fn(async (url: string) => {
+    const httpRequest = vi.fn<HttpRequest>(async (input) => {
+      const url = String(input);
       if (url.includes('tokens/v2/testuser'))
         return makeOkJson(fakeTokenList) as Response;
       if (url.includes('tokens/v2/otheruser'))

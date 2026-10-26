@@ -3,7 +3,7 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { HttpRequest } from '../../utils/types.js';
 import { GroundLocationInputSchema } from './GroundLocationTool.input.schema.js';
 import {
@@ -43,6 +43,8 @@ interface CategorySearchFeature {
     place_formatted?: string;
     poi_category?: string[];
     distance?: number;
+    mapbox_id?: string;
+    external_ids?: Record<string, string>;
   };
   geometry?: {
     type: string;
@@ -75,7 +77,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
 > {
   name = 'ground_location_tool';
   description =
-    'Answer questions about what is near a location, what neighborhood a coordinate is in, or what places are within walking/driving distance. Use this as the FIRST and ONLY tool when given coordinates and asked about nearby places, neighborhood context, local discovery, or area summaries — do NOT also call reverse_geocode_tool or search the web for places. Pass the place category (e.g. "restaurant", "coffee", "park") as the query parameter to get nearby POIs in the same call. Returns place name, nearby POIs matching the query, and travel-time reachability — all sourced from live Mapbox data with citations.';
+    'Answer questions about what is near a location, what neighborhood a coordinate is in, or what places are within walking/driving distance. Use this when given coordinates and asked about nearby places, neighborhood context, local discovery, or area summaries. It already includes reverse geocoding, so a separate reverse_geocode_tool call is not needed for the same coordinate. Pass the place category (e.g. "restaurant", "coffee", "park") as the query parameter to get nearby POIs in the same call. Returns place name, nearby POIs matching the query, and travel-time reachability — all sourced from live Mapbox data with citations.';
   annotations = {
     title: 'Ground Location Tool',
     readOnlyHint: true,
@@ -207,7 +209,9 @@ export class GroundLocationTool extends MapboxApiBasedTool<
         longitude: coords?.[0] ?? longitude,
         latitude: coords?.[1] ?? latitude,
         category: props.poi_category?.[0],
-        distance_meters: props.distance
+        distance_meters: props.distance,
+        mapbox_id: props.mapbox_id,
+        external_ids: props.external_ids
       };
     });
   }

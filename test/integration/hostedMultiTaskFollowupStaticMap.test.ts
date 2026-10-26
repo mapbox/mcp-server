@@ -6,8 +6,8 @@ import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, type Server } from 'node:http';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { Client } from '@modelcontextprotocol/client';
 
 /**
  * Same failure mode as hostedMultiTaskFollowup.test.ts, for
@@ -18,8 +18,9 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
  * `resources/read` landing on a different task than the one that fetched
  * the image found nothing.
  *
- * This proves the fix (a self-describing `mapbox://inline-image/` ref — see
- * inlineImageRef.ts) survives exactly that: the ref is produced by one real,
+ * This proves the fix (a `mapbox://response/` ref carrying the request's
+ * inputs, which any process renders again on read — see responseRef.ts)
+ * survives exactly that: the ref is produced by one real,
  * spawned server process, that process is killed outright, and a second,
  * completely independent process re-fetches the image from the ref's own
  * request params via a real `resources/read` call — no bytes, store, or
@@ -90,7 +91,7 @@ async function closeClient(client: Client): Promise<void> {
 describe.skipIf(!existsSync(SERVER_ENTRY))(
   'hosted stateless follow-up for static_map_image_tool (real server process, real MCP protocol, simulated two-task deployment)',
   () => {
-    it('reads a large static_map_image_tool inline-image ref from a completely independent process, with zero shared state', async () => {
+    it('reads a large static_map_image_tool response ref from a completely independent process, with zero shared state', async () => {
       const taskA = await spawnFreshServerClient();
       let resourceUri: string | undefined;
 
@@ -108,12 +109,12 @@ describe.skipIf(!existsSync(SERVER_ENTRY))(
 
         const textBlock = (
           result.content as Array<{ type: string; text?: string }>
-        ).find((c) => c.type === 'text' && c.text?.includes('inline-image'));
-        expect(textBlock?.text).toContain('exceeds the inline size limit');
+        ).find(
+          (c) => c.type === 'text' && c.text?.includes('mapbox://response/')
+        );
+        expect(textBlock?.text).toContain('too large to return inline');
 
-        resourceUri = textBlock!.text!.match(
-          /mapbox:\/\/inline-image\/\S+/
-        )?.[0];
+        resourceUri = textBlock!.text!.match(/mapbox:\/\/response\/\S+/)?.[0];
         expect(resourceUri).toBeTruthy();
       } finally {
         // Kill task A entirely — no shared memory, no shared temp-file

@@ -27,26 +27,24 @@ function detectTupleUsage(schema: z.ZodType): string[] {
       );
     }
 
-    // Traverse nested schemas
+    // Traverse nested schemas. In zod 4, ZodArray's _def.type is the string
+    // 'array', not the item schema, so use the public accessors.
     if (node instanceof z.ZodArray) {
-      if (node._def.type) {
-        traverse(node._def.type, `${path}[item]`);
-      }
+      traverse(node.element as z.ZodType, `${path}[item]`);
     } else if (node instanceof z.ZodObject) {
-      const shape = node._def.shape;
-      for (const [key, value] of Object.entries(shape)) {
+      for (const [key, value] of Object.entries(node.shape)) {
         traverse(value as z.ZodType, path ? `${path}.${key}` : key);
       }
     } else if (node instanceof z.ZodUnion) {
-      node._def.options.forEach((option: z.ZodType, index: number) => {
-        traverse(option, `${path}[union_option_${index}]`);
+      node.options.forEach((option, index) => {
+        traverse(option as z.ZodType, `${path}[union_option_${index}]`);
       });
-    } else if (node instanceof z.ZodOptional) {
-      traverse(node._def.innerType, path);
-    } else if (node instanceof z.ZodDefault) {
-      traverse(node._def.innerType, path);
-    } else if (node instanceof z.ZodNullable) {
-      traverse(node._def.innerType, path);
+    } else if (
+      node instanceof z.ZodOptional ||
+      node instanceof z.ZodDefault ||
+      node instanceof z.ZodNullable
+    ) {
+      traverse(node.unwrap() as z.ZodType, path);
     }
   }
 
@@ -77,12 +75,14 @@ describe('Input Schema Validation - No Tuples', () => {
       coordinates: z.tuple([z.number(), z.number()]),
       data: z.object({
         nestedTuple: z.tuple([z.string(), z.boolean()])
-      })
+      }),
+      path: z.array(z.tuple([z.number(), z.number()])).optional()
     });
 
     const tupleIssues = detectTupleUsage(schemaWithTuple);
-    expect(tupleIssues).toHaveLength(2);
+    expect(tupleIssues).toHaveLength(3);
     expect(tupleIssues[0]).toContain('coordinates: z.tuple() detected');
     expect(tupleIssues[1]).toContain('data.nestedTuple: z.tuple() detected');
+    expect(tupleIssues[2]).toContain('path[item]: z.tuple() detected');
   });
 });

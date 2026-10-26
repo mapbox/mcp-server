@@ -2,12 +2,10 @@
 // Licensed under the MIT License.
 
 import { BaseResource } from '../BaseResource.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
   ReadResourceResult,
-  ServerNotification,
-  ServerRequest
-} from '@modelcontextprotocol/sdk/types.js';
+  ServerContext
+} from '@modelcontextprotocol/server';
 import { resolveComputeRef } from '../../utils/computeRef.js';
 
 /**
@@ -29,7 +27,7 @@ export class ComputeResource extends BaseResource {
   async read(
     uri: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _extra?: RequestHandlerExtra<ServerRequest, ServerNotification>
+    _extra?: ServerContext
   ): Promise<ReadResourceResult> {
     const payload = resolveComputeRef(uri);
 

@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 import type { z } from 'zod';
-import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type {
   StaticMapImageInputSchema,
   OverlaySchema
@@ -81,23 +80,24 @@ export function getStaticMapMimeType(
 }
 
 export interface StaticMapRequestUrls {
-  /** The request URL without the access token, safe to surface to a client. */
+  /** The request URL without the access token, safe to show the model. */
   publicUrl: string;
-  /** The full request URL including the access token, for the server's own fetch. */
+  /** The same URL with the access token, for the request itself. */
   url: string;
 }
 
 /**
- * Pure function of (input, accessToken) — the Static Images API is a
- * deterministic renderer, so the same inputs always produce the same image.
- * Shared between `StaticMapImageTool` (the original request) and
- * `InlineImageResource` (re-fetching a large image on a follow-up read; see
- * inlineImageRef.ts for why re-fetching rather than storing the bytes).
+ * Builds the Static Images API request for a given input. Shared by
+ * StaticMapImageTool and ToolResponseResource, which fetches a large image
+ * again from its `mapbox://response/` ref. The API renders the same image
+ * for the same parameters, so the two requests return the same bytes.
  */
-export function buildStaticMapRequestUrl(
-  input: z.infer<typeof StaticMapImageInputSchema>,
-  accessToken: string
-): StaticMapRequestUrls {
+export function buildStaticMapRequestUrl(params: {
+  input: z.infer<typeof StaticMapImageInputSchema>;
+  accessToken: string;
+  apiEndpoint: string;
+}): StaticMapRequestUrls {
+  const { input, accessToken, apiEndpoint } = params;
   const { longitude: lng, latitude: lat } = input.center;
   const { width, height } = input.size;
 
@@ -108,7 +108,7 @@ export function buildStaticMapRequestUrl(
 
   const density = input.highDensity ? '@2x' : '';
   const encodedStyle = input.style.split('/').map(encodeURIComponent).join('/');
-  const publicUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
+  const publicUrl = `${apiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
   const url = `${publicUrl}?access_token=${accessToken}`;
 
   return { publicUrl, url };

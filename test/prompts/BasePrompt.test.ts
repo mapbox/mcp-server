@@ -6,10 +6,25 @@ import { BasePrompt } from '../../src/prompts/BasePrompt.js';
 import type {
   PromptArgument,
   PromptMessage
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
+
+// Makes validateArguments public so tests can call it directly.
+abstract class TestableBasePrompt extends BasePrompt {
+  override validateArguments(args: Record<string, string>): void {
+    super.validateArguments(args);
+  }
+}
+
+// The text of a prompt message. Throws if the content isn't text.
+function messageText(message: PromptMessage): string {
+  if (message.content.type !== 'text') {
+    throw new Error(`message content is ${message.content.type}, not text`);
+  }
+  return message.content.text;
+}
 
 // Create a concrete test implementation of BasePrompt
-class TestPrompt extends BasePrompt {
+class TestPrompt extends TestableBasePrompt {
   readonly name = 'test-prompt';
   readonly description = 'A test prompt for unit testing';
   readonly arguments: PromptArgument[] = [
@@ -173,7 +188,7 @@ describe('BasePrompt', () => {
         expect(message.role).toBeDefined();
         expect(message.content).toBeDefined();
         expect(message.content.type).toBe('text');
-        expect(typeof message.content.text).toBe('string');
+        expect(typeof messageText(message)).toBe('string');
       });
     });
 
@@ -194,10 +209,10 @@ describe('BasePrompt', () => {
       };
 
       const messages = prompt.getMessages(args);
-      const messageText = messages[0].content.text;
+      const text = messageText(messages[0]);
 
-      expect(messageText).toContain('test_required');
-      expect(messageText).toContain('test_optional');
+      expect(text).toContain('test_required');
+      expect(text).toContain('test_optional');
     });
 
     test('handles missing optional arguments gracefully', () => {
@@ -206,16 +221,16 @@ describe('BasePrompt', () => {
       };
 
       const messages = prompt.getMessages(args);
-      const messageText = messages[0].content.text;
+      const text = messageText(messages[0]);
 
-      expect(messageText).toContain('test_required');
-      expect(messageText).toContain('not provided');
+      expect(text).toContain('test_required');
+      expect(text).toContain('not provided');
     });
   });
 
   describe('edge cases', () => {
     test('validates empty args object when no arguments are required', () => {
-      class NoArgsPrompt extends BasePrompt {
+      class NoArgsPrompt extends TestableBasePrompt {
         readonly name = 'no-args';
         readonly description = 'No arguments needed';
         readonly arguments: PromptArgument[] = [];
@@ -239,7 +254,7 @@ describe('BasePrompt', () => {
     });
 
     test('validates all required arguments', () => {
-      class MultiRequiredPrompt extends BasePrompt {
+      class MultiRequiredPrompt extends TestableBasePrompt {
         readonly name = 'multi-required';
         readonly description = 'Multiple required arguments';
         readonly arguments: PromptArgument[] = [

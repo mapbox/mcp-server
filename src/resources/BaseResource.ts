@@ -2,16 +2,12 @@
 // Licensed under the MIT License.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import {
-  type McpServer,
-  ResourceTemplate
-} from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import type {
-  ServerRequest,
-  ServerNotification,
-  ReadResourceResult
-} from '@modelcontextprotocol/sdk/types.js';
+  McpServer,
+  ReadResourceResult,
+  ServerContext
+} from '@modelcontextprotocol/server';
 
 /**
  * Base class for all MCP resources
@@ -69,10 +65,10 @@ export abstract class BaseResource {
         (
           uri: URL,
           _variables: Record<string, string | string[]>,
-          extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+          ctx: ServerContext
         ) =>
           this.invocationServer.run(server, () =>
-            this.read(uri.toString(), extra)
+            this.read(uri.toString(), ctx)
           )
       );
     } else {
@@ -80,12 +76,9 @@ export abstract class BaseResource {
         this.name,
         this.uri,
         metadata,
-        (
-          uri: URL,
-          extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-        ) =>
+        (uri: URL, ctx: ServerContext) =>
           this.invocationServer.run(server, () =>
-            this.read(uri.toString(), extra)
+            this.read(uri.toString(), ctx)
           )
       );
     }
@@ -98,7 +91,7 @@ export abstract class BaseResource {
    */
   abstract read(
     uri: string,
-    extra?: RequestHandlerExtra<ServerRequest, ServerNotification>
+    extra?: ServerContext
   ): Promise<ReadResourceResult>;
 
   /**

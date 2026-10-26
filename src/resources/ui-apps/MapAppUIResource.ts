@@ -1,17 +1,16 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
   ReadResourceResult,
-  ServerNotification,
-  ServerRequest
-} from '@modelcontextprotocol/sdk/types.js';
+  ServerContext
+} from '@modelcontextprotocol/server';
 import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import { BaseResource } from '../BaseResource.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
 import { renderMapAppHtml } from './mapAppHtml.js';
+import { mapAppCsp } from './mapAppCsp.js';
 
 /**
  * Single Mapbox MCP App resource targeted by `render_map_tool`.
@@ -43,12 +42,9 @@ export class MapAppUIResource extends BaseResource {
       (() => process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/');
   }
 
-  async read(
-    _uri: string,
-    extra?: RequestHandlerExtra<ServerRequest, ServerNotification>
-  ): Promise<ReadResourceResult> {
+  async read(_uri: string, extra?: ServerContext): Promise<ReadResourceResult> {
     const accessToken =
-      (extra?.authInfo?.token as string | undefined) ||
+      (extra?.http?.authInfo?.token as string | undefined) ||
       process.env.MAPBOX_ACCESS_TOKEN ||
       '';
 
@@ -71,14 +67,7 @@ export class MapAppUIResource extends BaseResource {
           text: html,
           _meta: {
             ui: {
-              csp: {
-                connectDomains: [
-                  'https://*.mapbox.com',
-                  'https://events.mapbox.com'
-                ],
-                resourceDomains: ['https://api.mapbox.com'],
-                workerDomains: ['blob:']
-              },
+              csp: mapAppCsp(this.apiEndpoint()),
               preferredSize: { width: 1000, height: 600 }
             }
           }

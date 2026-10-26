@@ -8,7 +8,8 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { CustomMarkerOverlaySchema } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.input.schema.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
-import { resolveInlineImageRef } from '../../../src/utils/inlineImageRef.js';
+import { textOf } from '../../utils/resultTestUtils.js';
+import { resolveResponseRef } from '../../../src/utils/responseRef.js';
 
 describe('StaticMapImageTool', () => {
   afterEach(() => {
@@ -245,10 +246,9 @@ describe('StaticMapImageTool', () => {
     });
   });
 
-  it('falls back to a self-describing inline-image ref (not mapbox://temp/) instead of inlining base64', async () => {
+  it('returns a mapbox://response/ ref for large images instead of inlining base64', async () => {
     // Simulate a response larger than the 700KB inline threshold
     const largeBuffer = new ArrayBuffer(750 * 1024);
-    new Uint8Array(largeBuffer).fill(7);
     const { httpRequest } = setupHttpRequest({
       arrayBuffer: async () => largeBuffer
     } as Partial<Response>);
@@ -261,38 +261,21 @@ describe('StaticMapImageTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    // Should not contain an inline image
     expect(result.content.some((c) => c.type === 'image')).toBe(false);
-    expect(
-      result.content.every((c) => c.type !== 'text' || !c.text.includes('TTL'))
-    ).toBe(true);
 
-    const resourceText = result.content.find(
-      (c) =>
-        c.type === 'text' &&
-        (c as { type: 'text'; text: string }).text.includes(
-          'mapbox://inline-image/static-map'
-        )
-    ) as { type: 'text'; text: string } | undefined;
-    expect(resourceText).toBeDefined();
-    expect(resourceText!.text).not.toContain('mapbox://temp/');
-
-    // No temporaryResourceManager, no owner, no store involved at all — the
-    // ref encodes the (tiny) request params rather than the image bytes, so
-    // resolving it is a pure function of the URI string regardless of how
-    // large the actual image was.
-    const uri = resourceText!.text.match(
-      /mapbox:\/\/inline-image\/static-map\?\S+/
-    )?.[0];
+    // The ref carries the request's inputs, not the image, so it stays
+    // small however big the image is.
+    const uri = textOf(result, 1).match(/mapbox:\/\/response\/\S+/)?.[0];
     expect(uri).toBeTruthy();
-    expect((uri as string).length).toBeLessThan(1000);
-    const resolved = resolveInlineImageRef(uri as string);
-    expect(resolved?.tool).toBe('static-map');
-    expect(resolved?.params).toMatchObject({
-      center: { longitude: -74.006, latitude: 40.7128 },
-      zoom: 12,
-      size: { width: 1280, height: 900 },
-      style: 'mapbox/streets-v12'
+    expect(uri!.length).toBeLessThan(1000);
+    expect(resolveResponseRef(uri!)).toMatchObject({
+      tool: 'static-map',
+      input: {
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 1280, height: 900 },
+        style: 'mapbox/streets-v12'
+      }
     });
   });
 

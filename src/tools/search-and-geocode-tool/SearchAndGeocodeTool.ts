@@ -14,7 +14,7 @@ import type {
   MapboxFeatureCollection,
   MapboxFeature
 } from '../../schemas/geojson.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { buildSearchAndGeocodeRequestUrl } from './buildSearchAndGeocodeRequestUrl.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
@@ -27,7 +27,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
 > {
   name = 'search_and_geocode_tool';
   description =
-    "Search for POIs, brands, chains, geocode cities, towns, addresses. Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc, because category_search_tool is better for that. Setting a proximity point is strongly encouraged for more local results.";
+    "Search for POIs, brands, chains, geocode cities, towns, addresses. Do not use for generic place types such as 'museums', 'coffee shops', 'tacos', etc, because category_search_tool is better for that. Setting a proximity point is strongly encouraged for more local results. The underlying Search Box API is rolling out natural-language query understanding (e.g. 'quiet coffee shops with wifi near downtown'), so richer free-text phrasing in `q` can work well for category + place + attribute combinations — but as of this writing, big-box retail brand searches tied to a specific address (e.g. 'Costco near <address>', 'Walmart near <address>', 'Target near <address>') are unreliable and often return unrelated results; verify those results before relying on them.";
   annotations = {
     title: 'Search and Geocode Tool',
     readOnlyHint: true,

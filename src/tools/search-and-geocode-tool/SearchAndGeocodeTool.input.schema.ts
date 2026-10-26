@@ -7,8 +7,10 @@ import { bboxSchema, countrySchema } from '../../schemas/shared.js';
 export const SearchAndGeocodeInputSchema = z.object({
   q: z
     .string()
-    .max(256)
-    .describe('Search query text. Limited to 256 characters.'),
+    .max(200)
+    .describe(
+      'Search query text. Limited to 200 characters (the API rejects longer queries with a 400, despite the docs stating 256). Supports natural-language phrasing combining category, place, and attributes (e.g. "quiet coffee shops with wifi near downtown Seattle"), though big-box retail brand + address queries (e.g. "Costco near <address>") are currently unreliable.'
+    ),
   language: z
     .string()
     .optional()
