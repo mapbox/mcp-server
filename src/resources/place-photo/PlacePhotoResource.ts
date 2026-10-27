@@ -51,7 +51,7 @@ const lookupAll: LookupHost = async (hostname) =>
 
 /**
  * A POI's first Place Details photo, proxied through the server for the map
- * app's results panel.
+ * app's results carousel.
  *
  * Place Details photos are hosted wherever the business's own site hosts
  * them (Yext, Webflow and so on), so the map app's CSP can't list their
@@ -67,7 +67,7 @@ export class PlacePhotoResource extends MapboxApiBasedResource {
   readonly uri = `${URI_PREFIX}{id}`;
   readonly name = 'Mapbox Place Photo';
   readonly description =
-    "The first photo of a POI from Place Details, as an image, for the map app's results panel. " +
+    "The first photo of a POI from Place Details, as an image, for the map app's results carousel. " +
     'Read with mapbox://place-photo/{mapbox_id}.';
   readonly mimeType = 'image/jpeg';
 

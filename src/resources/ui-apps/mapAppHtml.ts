@@ -45,23 +45,48 @@ export function renderMapAppHtml(params: {
 <link href="https://api.mapbox.com/mapbox-gl-js/v${glVersion}/mapbox-gl.css" rel="stylesheet">
 <script src="https://api.mapbox.com/mapbox-gl-js/v${glVersion}/mapbox-gl.js"></script>
 <style>
+  /* Light and dark, following the host's theme (see applyHostContext), or
+     the system's when the host sends none. Colors come from the host's own
+     style variables (MCP Apps hostContext.styles) when it sends them, so
+     the cards match the chat around them; the fallbacks are used
+     otherwise. The map, its pins and their name labels stay as they are. */
+  :root {
+    color-scheme: light;
+    --ui-surface: var(--color-background-primary, #ffffff);
+    --ui-surface-muted: var(--color-background-secondary, #f1f5f9);
+    --ui-text: var(--color-text-primary, #0f172a);
+    --ui-text-muted: var(--color-text-secondary, #475569);
+    --ui-icon-muted: #64748b;
+    --ui-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+    --ui-error-bg: #ffebee; --ui-error-text: #b71c1c;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ui-surface: var(--color-background-primary, #0f172a);
+    --ui-surface-muted: var(--color-background-secondary, #1e293b);
+    --ui-text: var(--color-text-primary, #f1f5f9);
+    --ui-text-muted: var(--color-text-secondary, #cbd5e1);
+    --ui-icon-muted: #94a3b8;
+    --ui-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    --ui-error-bg: #3b1214; --ui-error-text: #fca5a5;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   #map { position: absolute; inset: 0; }
   #summary {
     position: absolute; top: 12px; left: 12px; z-index: 10;
-    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
+    background: var(--ui-surface); color: var(--ui-text);
     padding: 8px 12px; border-radius: 6px;
     font-size: 13px; font-weight: 500;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: var(--ui-shadow);
     max-width: calc(100% - 24px); white-space: pre-line;
   }
   #legend {
     position: absolute; bottom: 12px; left: 12px; z-index: 10;
-    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
+    background: var(--ui-surface); color: var(--ui-text);
     padding: 8px 12px; border-radius: 6px;
-    font-size: 11px;
+    font-size: 11px; box-shadow: var(--ui-shadow);
   }
   #legend .row { display: flex; align-items: center; margin: 2px 0; }
   #legend .swatch {
@@ -70,11 +95,11 @@ export function renderMapAppHtml(params: {
   }
   #loading {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: #666; font-size: 16px; z-index: 10; pointer-events: none;
+    color: var(--ui-text-muted); font-size: 16px; z-index: 10; pointer-events: none;
   }
   #error {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: #d32f2f; background: #ffebee; border-radius: 8px;
+    color: var(--ui-error-text); background: var(--ui-error-bg); border-radius: 8px;
     padding: 20px; max-width: 400px; text-align: center; z-index: 10;
   }
   .marker-badge {
@@ -85,51 +110,84 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     cursor: pointer;
   }
-  #side-panel {
-    position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 10;
-    width: 280px; max-width: calc(100% - 24px);
-    background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
-    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    display: flex; flex-direction: column; overflow: hidden;
+  /* Selected place (see selectPlace): the pin inverts and shows its name,
+     like the card it matches. */
+  .marker-badge.active {
+    background: #fff !important; color: #0f172a !important;
+    transform: scale(1.18); box-shadow: 0 3px 10px rgba(0,0,0,0.5);
   }
-  #side-panel .panel-head {
-    padding: 10px 12px; font-size: 13px; font-weight: 600;
-    border-bottom: 1px solid rgba(255,255,255,0.12); flex: 0 0 auto;
-    display: flex; justify-content: space-between; gap: 8px; cursor: pointer;
+  .marker-badge .marker-name {
+    display: none; position: absolute; top: 32px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; font-size: 11px; font-weight: 600; color: #0f172a;
+    background: rgba(255,255,255,0.92); padding: 1px 6px; border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;
   }
-  /* Click the heading to collapse the list (see togglePanel). */
-  #side-panel .panel-head::after { content: '▾'; opacity: 0.7; }
-  #side-panel.collapsed { bottom: auto; }
-  #side-panel.collapsed .panel-list { display: none; }
-  #side-panel.collapsed .panel-head { border-bottom: none; }
-  #side-panel.collapsed .panel-head::after { content: '▸'; }
-  #side-panel .panel-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
-  #side-panel .panel-item {
-    display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; cursor: pointer;
+  .marker-badge.active .marker-name { display: block; }
+  /* A place pin (search results and other places in the carousel): a
+     white disc with the place's Maki icon, black when selected. Numbered
+     badges stay for markers whose number means something (visit order). */
+  .marker-badge.place {
+    width: 30px; height: 30px; background: #fff; color: #0f172a;
+    border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.35);
   }
-  #side-panel .panel-item:hover { background: rgba(255,255,255,0.08); }
-  /* Only added once a photo has loaded (see loadPanelPhoto), at the end of
-     the row so names stay aligned whether or not a row has one. */
-  #side-panel .panel-thumb {
-    flex: 0 0 auto; width: 40px; height: 40px; border-radius: 6px; margin-left: auto;
+  .marker-badge.place svg { width: 16px; height: 16px; display: block; }
+  .marker-badge.place.active {
+    background: #0f172a !important; color: #fff !important;
+  }
+  /* Results carousel. Sits above the Mapbox logo and attribution, which
+     must stay visible; the legend moves up above it (see showCarousel). */
+  #carousel { position: absolute; left: 0; right: 0; bottom: 36px; z-index: 10; }
+  #carousel .card-list {
+    list-style: none; margin: 0; padding: 4px 32px 6px;
+    display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; scrollbar-width: none;
+  }
+  #carousel .card-list::-webkit-scrollbar { display: none; }
+  #carousel .card {
+    flex: 0 0 auto; width: 300px; max-width: calc(100vw - 64px); min-height: 84px;
+    scroll-snap-align: center;
+    display: flex; align-items: center; gap: 10px; padding: 10px;
+    background: var(--ui-surface); color: var(--ui-text);
+    border: 2px solid transparent; border-radius: 14px;
+    box-shadow: var(--ui-shadow); cursor: pointer;
+  }
+  #carousel .card.active { border-color: var(--ui-text); }
+  /* Added once a photo loads (see loadPanelPhoto), after the text in the
+     DOM but shown first. */
+  #carousel .card-thumb {
+    order: -1; flex: 0 0 auto; width: 64px; height: 64px; border-radius: 10px;
     background-size: cover; background-position: center;
   }
-  /* Visit-order badge, matching the numbered map marker. */
-  #side-panel .panel-badge {
-    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; margin-top: 1px;
+  /* Until a photo loads, or when the place has none: the place's icon
+     on a muted tile, so every card has a picture. */
+  #carousel .card-thumb.empty {
+    background: var(--ui-surface-muted); color: var(--ui-icon-muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #carousel .card-thumb.empty svg { width: 28px; height: 28px; display: block; }
+  /* Matches the numbered pin. */
+  #carousel .card-badge {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
     background: #f97316; color: #1a0f04;
     display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 700;
+    font-size: 11px; font-weight: 700;
   }
-  #side-panel .panel-name { font-size: 12.5px; font-weight: 600; }
-  #side-panel .panel-meta { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
+  #carousel .card-body { flex: 1 1 auto; min-width: 0; }
+  #carousel .card-name {
+    font-size: 14px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #carousel .card-meta, #carousel .card-extra {
+    font-size: 12px; color: var(--ui-text-muted); margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="summary" style="display:none"></div>
 <div id="legend" style="display:none"></div>
-<div id="side-panel" style="display:none"></div>
+<div id="carousel" style="display:none"></div>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
 ${initialDataScript}
@@ -143,9 +201,9 @@ ${initialDataScript}
   var errorEl = document.getElementById('error');
   var summaryEl = document.getElementById('summary');
   var legendEl = document.getElementById('legend');
-  var panelEl = document.getElementById('side-panel');
-  // Populated by buildSearchMiniPayload's marker tagging so the panel (click
-  // -> flyTo) and Place Details enrichment can find a marker by mapbox_id
+  var carouselEl = document.getElementById('carousel');
+  // Populated by buildSearchMiniPayload's marker tagging so the carousel (card
+  // <-> pin) and Place Details enrichment can find a marker by mapbox_id
   // without re-querying the map for it.
   var markersById = {};
 
@@ -213,11 +271,55 @@ ${initialDataScript}
       handleToolResult(message.params);
     }
     if (message.method === 'ui/notifications/host-context-changed' &&
-        message.params && message.params.displayMode) {
-      currentDisplayMode = message.params.displayMode;
-      if (map) setTimeout(function() { map.resize(); }, 100);
+        message.params) {
+      // Partial updates: only the fields that changed are sent.
+      applyHostContext(message.params);
+      if (message.params.displayMode) {
+        currentDisplayMode = message.params.displayMode;
+        if (map) setTimeout(function() { map.resize(); }, 100);
+      }
     }
   });
+
+  // --- Light/dark theme -----------------------------------------------------
+  var rootEl = document.documentElement;
+  var hostTheme = null;
+
+  function applyTheme(theme) {
+    if ((theme !== 'light' && theme !== 'dark') || !rootEl) return;
+    rootEl.setAttribute('data-theme', theme);
+  }
+
+  // The host's theme wins over the system's; its style variables
+  // (--color-background-primary and so on) feed the --ui-* colors.
+  function applyHostContext(ctx) {
+    if (!ctx || typeof ctx !== 'object') return;
+    if (ctx.theme === 'light' || ctx.theme === 'dark') {
+      hostTheme = ctx.theme;
+      applyTheme(hostTheme);
+    }
+    var vars = ctx.styles && ctx.styles.variables;
+    if (vars && typeof vars === 'object' && rootEl && rootEl.style &&
+        typeof rootEl.style.setProperty === 'function') {
+      Object.keys(vars).forEach(function(name) {
+        if (/^--[a-z0-9-]+$/i.test(name) && typeof vars[name] === 'string') {
+          rootEl.style.setProperty(name, vars[name]);
+        }
+      });
+    }
+  }
+  window.__applyHostContext = applyHostContext;
+
+  var darkQuery = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null;
+  function followSystemTheme() {
+    if (!hostTheme && darkQuery) applyTheme(darkQuery.matches ? 'dark' : 'light');
+  }
+  followSystemTheme();
+  if (darkQuery && typeof darkQuery.addEventListener === 'function') {
+    darkQuery.addEventListener('change', followSystemTheme);
+  }
 
   // Set once a host answers ui/initialize, even with an error. A page from
   // export_map_html_tool framed by some other site never gets an answer.
@@ -227,8 +329,9 @@ ${initialDataScript}
     appCapabilities: {},
     appInfo: { name: 'Mapbox Map', version: '1.0.0' }
   }).then(
-    function() {
+    function(result) {
       hostAnswered = true;
+      if (result) applyHostContext(result.hostContext);
       sendNotification('ui/notifications/initialized', {});
     },
     function() {
@@ -415,6 +518,7 @@ ${initialDataScript}
     } else {
       summaryEl.style.display = 'none';
     }
+    placeTopLeftControls();
     if (!map) { loadingEl.style.display = 'none'; return; }
     if (mapLoaded) render(payload);
     else pendingPayload = payload;
@@ -439,7 +543,8 @@ ${initialDataScript}
     trackedSourceIds = [];
     trackedMarkers = [];
     markersById = {};
-    panelEl.style.display = 'none';
+    carouselEl.style.display = 'none';
+    legendEl.style.bottom = '';
     clearPanel();
     // Place Details responses still in flight belong to the old render.
     panelGeneration += 1;
@@ -475,10 +580,105 @@ ${initialDataScript}
     end: { color: '#ef4444' }
   };
 
+  // Maki icons (https://github.com/mapbox/maki, CC0), 15x15 path data, for
+  // the categories search results most often have. Anything else gets
+  // the plain marker.
+  var MAKI = {
+    'attraction': 'M6,2C5.446,2,5.2478,2.5045,5,3L4.5,4h-2C1.669,4,1,4.669,1,5.5v5C1,11.331,1.669,12,2.5,12h10 c0.831,0,1.5-0.669,1.5-1.5v-5C14,4.669,13.331,4,12.5,4h-2L10,3C9.75,2.5,9.554,2,9,2H6z M2.5,5C2.7761,5,3,5.2239,3,5.5 S2.7761,6,2.5,6S2,5.7761,2,5.5S2.2239,5,2.5,5z M7.5,5c1.6569,0,3,1.3431,3,3s-1.3431,3-3,3s-3-1.3431-3-3S5.8431,5,7.5,5z M7.5,6.5C6.6716,6.5,6,7.1716,6,8l0,0c0,0.8284,0.6716,1.5,1.5,1.5l0,0C8.3284,9.5,9,8.8284,9,8l0,0C9,7.1716,8.3284,6.5,7.5,6.5 L7.5,6.5z',
+    'bakery': 'M5.294,4.382,6,9.5a.979.979,0,0,0,1,1H8a.979.979,0,0,0,1-1l.706-5.118C9.706,3,7.5,3,7.5,3S5.291,3,5.294,4.382ZM3.5,5C2,5,2,6,2,6l1,4H4.5a.793.793,0,0,0,.794-.765L4.5,5Zm-2,2.5a1.533,1.533,0,0,0-1.059.412A1.366,1.366,0,0,0,0,8.794V11H.882A1.02,1.02,0,0,0,2,10ZM11.5,5C13,5,13,6,13,6l-1,4H10.5a.793.793,0,0,1-.794-.765L10.5,5Zm2,2.5a1.533,1.533,0,0,1,1.059.412A1.366,1.366,0,0,1,15,8.794V11h-.882A1.02,1.02,0,0,1,13,10Z',
+    'bank': 'M1,3C0.446,3,0,3.446,0,4v7c0,0.554,0.446,1,1,1h13c0.554,0,1-0.446,1-1V4c0-0.554-0.446-1-1-1H1z M1,4h1.5 C2.7761,4,3,4.2239,3,4.5S2.7761,5,2.5,5S2,4.7761,2,4.5L1.5,5C1.7761,5,2,5.2239,2,5.5S1.7761,6,1.5,6S1,5.7761,1,5.5V4z M7.5,4 C8.8807,4,10,5.567,10,7.5l0,0C10,9.433,8.8807,11,7.5,11S5,9.433,5,7.5S6.1193,4,7.5,4z M12.5,4H14v1.5C14,5.7761,13.7761,6,13.5,6 S13,5.7761,13,5.5S13.2239,5,13.5,5L13,4.5C13,4.7761,12.7761,5,12.5,5S12,4.7761,12,4.5S12.2239,4,12.5,4z M7.5,5.5 c-0.323,0-0.5336,0.1088-0.6816,0.25h1.3633C8.0336,5.6088,7.823,5.5,7.5,5.5z M6.625,6C6.5795,6.091,6.5633,6.1711,6.5449,6.25 h1.9102C8.4367,6.1711,8.4205,6.091,8.375,6H6.625z M6.5,6.5v0.25h2V6.5H6.5z M6.5,7v0.25h2V7H6.5z M6.5,7.5v0.25h2V7.5H6.5z M6.5,8 L6.25,8.25h2L8.5,8H6.5z M6,8.5c0,0,0.0353,0.1024,0.1016,0.25H8.375L8,8.5H6z M1.5,9C1.7761,9,2,9.2239,2,9.5S1.7761,10,1.5,10 L2,10.5C2,10.2239,2.2239,10,2.5,10S3,10.2239,3,10.5S2.7761,11,2.5,11H1V9.5C1,9.2239,1.2239,9,1.5,9z M6.2383,9 C6.2842,9.0856,6.3144,9.159,6.375,9.25h2.2676C8.7092,9.1121,8.75,9,8.75,9H6.2383z M13.5,9C13.7761,9,14,9.2239,14,9.5V11h-1.5 c-0.2761,0-0.5-0.2239-0.5-0.5s0.2239-0.5,0.5-0.5s0.5,0.2239,0.5,0.5l0.5-0.5C13.2239,10,13,9.7761,13,9.5S13.2239,9,13.5,9z M6.5664,9.5c0.0786,0.0912,0.1647,0.1763,0.2598,0.25h1.4199C8.3462,9.6727,8.4338,9.5883,8.5,9.5H6.5664z',
+    'bar': 'M7.5,1c-2,0-7,0.25-6.5,0.75L7,8v4 c0,1-3,0.5-3,2h7c0-1.5-3-1-3-2V8l6-6.25C14.5,1.25,9.5,1,7.5,1z M7.5,2c2.5,0,4.75,0.25,4.75,0.25L11.5,3h-8L2.75,2.25 C2.75,2.25,5,2,7.5,2z',
+    'beer': 'M12,5V2c0,0-1-1-4.5-1S3,2,3,2v3c0.0288,1.3915,0.3706,2.7586,1,4c0.6255,1.4348,0.6255,3.0652,0,4.5c0,0,0,1,3.5,1 s3.5-1,3.5-1c-0.6255-1.4348-0.6255-3.0652,0-4.5C11.6294,7.7586,11.9712,6.3915,12,5z M7.5,13.5 c-0.7966,0.035-1.5937-0.0596-2.36-0.28c0.203-0.7224,0.304-1.4696,0.3-2.22h4.12c-0.004,0.7504,0.097,1.4976,0.3,2.22 C9.0937,13.4404,8.2966,13.535,7.5,13.5z M7.5,5C6.3136,5.0299,5.1306,4.8609,4,4.5v-2C5.131,2.1411,6.3137,1.9722,7.5,2 C8.6863,1.9722,9.869,2.1411,11,2.5v2C9.8694,4.8609,8.6864,5.0299,7.5,5z',
+    'cafe': 'M12,5h-2V3H2v4c0.0133,2.2091,1.8149,3.9891,4.024,3.9758C7.4345,10.9673,8.7362,10.2166,9.45,9H12c1.1046,0,2-0.8954,2-2 S13.1046,5,12,5z M12,8H9.86C9.9487,7.6739,9.9958,7.3379,10,7V6h2c0.5523,0,1,0.4477,1,1S12.5523,8,12,8z M10,12.5 c0,0.2761-0.2239,0.5-0.5,0.5h-7C2.2239,13,2,12.7761,2,12.5S2.2239,12,2.5,12h7C9.7761,12,10,12.2239,10,12.5z',
+    'cinema': 'M14,7.5v2c0,0.2761-0.2239,0.5-0.5,0.5S13,9.7761,13,9.5c0,0,0.06-0.5-1-0.5h-1v2.5c0,0.2761-0.2239,0.5-0.5,0.5h-8 C2.2239,12,2,11.7761,2,11.5v-4C2,7.2239,2.2239,7,2.5,7h8C10.7761,7,11,7.2239,11,7.5V8h1c1.06,0,1-0.5,1-0.5 C13,7.2239,13.2239,7,13.5,7S14,7.2239,14,7.5z M4,3C2.8954,3,2,3.8954,2,5s0.8954,2,2,2s2-0.8954,2-2S5.1046,3,4,3z M4,6 C3.4477,6,3,5.5523,3,5s0.4477-1,1-1s1,0.4477,1,1S4.5523,6,4,6z M8.5,2C7.1193,2,6,3.1193,6,4.5S7.1193,7,8.5,7S11,5.8807,11,4.5 S9.8807,2,8.5,2z M8.5,6C7.6716,6,7,5.3284,7,4.5S7.6716,3,8.5,3S10,3.6716,10,4.5S9.3284,6,8.5,6z',
+    'convenience': 'M2.9982,3.0687s.1875-1.062,1-1.062H5.0043V1.7276a.5.5,0,0,1,.5-.5H9.4882a.5.5,0,0,1,.5.5v.2791h1.01a.8324.8324,0,0,1,.6373.2937,1.7589,1.7589,0,0,1,.3627.7683s.3108,1.5719.5921,2.9181h-.938L11,3,3.982,2.9956,3.3336,5.9868H2.382Zm11,4.9144a1,1,0,0,1-.9992,1l-1.0008,3.973s-.1875,1.0417-1,1.0417h-7c-.8125,0-1-1.0417-1-1.0417L1.9822,8.98a.9985.9985,0,0,1,.016-1.9968h11A1,1,0,0,1,13.9982,7.9831ZM5.0327,12.13,5.03,11.0051,4.6392,9.4686a.5373.5373,0,1,0-1.0649.1445L3.78,11.0075l.1874,1.2672A.5373.5373,0,1,0,5.0327,12.13Zm2-2.5967A.5332.5332,0,0,0,6.4994,9l-.0039.0008L6.4886,9a.4992.4992,0,0,0-.3575.1509.529.529,0,0,0-.1648.3828v2.68a.5332.5332,0,1,0,1.0663,0Zm1.998,0A.5314.5314,0,0,0,8.694,9.04a.4992.4992,0,0,0-.393,0,.5312.5312,0,0,0-.3366.4934v2.68a.5331.5331,0,1,0,1.0662,0Zm2.3857.08a.5373.5373,0,1,0-1.0649-.1445L9.96,10.9938,9.9579,12.13a.5373.5373,0,1,0,1.0649.1446Z',
+    'fast-food': 'M14,8c0,0.5523-0.4477,1-1,1H2C1.4477,9,1,8.5523,1,8s0.4477-1,1-1h11C13.5523,7,14,7.4477,14,8z M3.5,10H2 c0,1.6569,1.3431,3,3,3h5c1.6569,0,3-1.3431,3-3H3.5z M3,6H2V4c0-1.1046,0.8954-2,2-2h7c1.1046,0,2,0.8954,2,2v2H3z M11,4.5 C11,4.7761,11.2239,5,11.5,5S12,4.7761,12,4.5S11.7761,4,11.5,4S11,4.2239,11,4.5z M9,3.5C9,3.7761,9.2239,4,9.5,4S10,3.7761,10,3.5 S9.7761,3,9.5,3S9,3.2239,9,3.5z M7,4.5C7,4.7761,7.2239,5,7.5,5S8,4.7761,8,4.5S7.7761,4,7.5,4S7,4.2239,7,4.5z M5,3.5 C5,3.7761,5.2239,4,5.5,4S6,3.7761,6,3.5S5.7761,3,5.5,3S5,3.2239,5,3.5z M3,4.5C3,4.7761,3.2239,5,3.5,5S4,4.7761,4,4.5 S3.7761,4,3.5,4S3,4.2239,3,4.5z',
+    'fuel': 'm14 6v5.5c0 .2761-.2239.5-.5.5s-.5-.2239-.5-.5v-2c0-.8284-.6716-1.5-1.5-1.5h-1.5v-6c0-.5523-.4477-1-1-1h-6c-.5523 0-1 .4477-1 1v11c0 .5523.4477 1 1 1h6c.5523 0 1-.4477 1-1v-4h1.5c.2761 0 .5.2239.5.5v2c0 .8284.6716 1.5 1.5 1.5s1.5-.6716 1.5-1.5v-6.5c0-.5523-.4477-1-1-1v-1.51c-.0054-.2722-.2277-.4901-.5-.49-.2816.0047-.5062.2367-.5015.5184.0002.0105.0007.0211.0015.0316v2.45c0 .5523.4477 1 1 1s1-.4477 1-1-.4477-1-1-1zm-5 .5c0 .2761-.2239.5-.5.5h-5c-.2761 0-.5-.2239-.5-.5v-3c0-.2761.2239-.5.5-.5h5c.2761 0 .5.2239.5.5z',
+    'grocery': 'M 13.199219 1.5 C 13.199219 1.5 11.808806 1.4588 11.253906 2 C 10.720406 2.5202 10.5 2.9177 10.5 4 L 1.1992188 4 L 2.59375 8.8144531 C 2.59725 8.8217531 2.6036219 8.8287375 2.6074219 8.8359375 C 2.8418219 9.4932375 3.4545469 9.9666406 4.1855469 9.9941406 C 4.1885469 9.9954406 4.1992187 10 4.1992188 10 L 10.699219 10 L 10.699219 10.199219 C 10.699219 10.199219 10.7 10.500391 10.5 10.900391 C 10.3 11.300391 10.200391 11.5 9.4003906 11.5 L 2.9003906 11.5 C 1.9003906 11.5 1.9003906 13 2.9003906 13 L 4.0996094 13 L 4.1992188 13 L 9.0996094 13 L 9.1992188 13 L 9.3007812 13 C 10.500781 13 11.399219 12.299609 11.699219 11.599609 C 11.999219 10.899609 12 10.300781 12 10.300781 L 12 10 L 12 4 C 12 3.4764 12.228619 3 12.699219 3 L 13.25 3 C 13.6642 3 14 2.6642 14 2.25 C 14 1.8358 13.6642 1.5 13.25 1.5 L 13.199219 1.5 z M 9.1992188 13 C 8.5992188 13 8.1992188 13.4 8.1992188 14 C 8.1992188 14.6 8.5992187 15 9.1992188 15 C 9.7992187 15 10.199219 14.6 10.199219 14 C 10.199219 13.4 9.7992188 13 9.1992188 13 z M 4.1992188 13 C 3.5992188 13 3.1992188 13.4 3.1992188 14 C 3.1992188 14.6 3.5992187 15 4.1992188 15 C 4.7992188 15 5.1992188 14.6 5.1992188 14 C 5.1992188 13.4 4.7992187 13 4.1992188 13 z',
+    'hospital': 'M7,1C6.4,1,6,1.4,6,2v4H2C1.4,6,1,6.4,1,7v1 c0,0.6,0.4,1,1,1h4v4c0,0.6,0.4,1,1,1h1c0.6,0,1-0.4,1-1V9h4c0.6,0,1-0.4,1-1V7c0-0.6-0.4-1-1-1H9V2c0-0.6-0.4-1-1-1H7z',
+    'ice-cream': 'M5.44,8.17a3.473,3.473,0,0,0,2-.63A3.5,3.5,0,0,0,9,8.14h.44L8,13.7a.5.5,0,0,1-.92,0Zm6-3.473a2,2,0,0,1-4,0h0a2,2,0,1,1-2-2h.12a2,2,0,1,1,3.75,0h.13A2,2,0,0,1,11.439,4.7Z',
+    'lodging': 'M0.5,2.5C0.2,2.5,0,2.7,0,3v7.5v2C0,12.8,0.2,13,0.5,13S1,12.8,1,12.5V11h13v1.5 c0,0.3,0.2,0.5,0.5,0.5s0.5-0.2,0.5-0.5v-2c0-0.3-0.2-0.5-0.5-0.5H1V3C1,2.7,0.8,2.5,0.5,2.5z M3.5,3C2.7,3,2,3.7,2,4.5l0,0 C2,5.3,2.7,6,3.5,6l0,0C4.3,6,5,5.3,5,4.5l0,0C5,3.7,4.3,3,3.5,3L3.5,3z M7,4C5.5,4,5.5,5.5,5.5,5.5V7h-3C2.2,7,2,7.2,2,7.5v1 C2,8.8,2.2,9,2.5,9H6h9V6.5C15,4,12.5,4,12.5,4H7z',
+    'marker': 'M7.5 1C5.42312 1 3 2.2883 3 5.56759C3 7.79276 6.46156 12.7117 7.5 14C8.42309 12.7117 12 7.90993 12 5.56759C12 2.2883 9.57688 1 7.5 1Z',
+    'museum': 'M7.5,0L1,3.5V4h13V3.5L7.5,0z M2,5v5l-1,1.6V13h13v-1.4L13,10V5H2z M4,6h1v5.5H4V6z M7,6h1v5.5H7V6z M10,6h1 v5.5h-1V6z',
+    'park': 'M14,5.75c0.0113-0.6863-0.3798-1.3159-1-1.61C12.9475,3.4906,12.4014,2.9926,11.75,3 c-0.0988,0.0079-0.1962,0.0281-0.29,0.06c-0.0607-0.66-0.6449-1.1458-1.3048-1.0851C9.8965,1.9987,9.6526,2.1058,9.46,2.28l0,0 c0-0.6904-0.5596-1.25-1.25-1.25S6.96,1.5896,6.96,2.28C6.96,2.28,7,2.3,7,2.33C6.4886,1.8913,5.7184,1.9503,5.2797,2.4618 C5.1316,2.6345,5.0347,2.8451,5,3.07C4.8417,3.0195,4.6761,2.9959,4.51,3C3.6816,2.9931,3.0044,3.659,2.9975,4.4874 C2.9958,4.6872,3.0341,4.8852,3.11,5.07C2.3175,5.2915,1.8546,6.1136,2.0761,6.9061C2.2163,7.4078,2.6083,7.7998,3.11,7.94 c0.2533,0.7829,1.0934,1.2123,1.8763,0.959C5.5216,8.7258,5.9137,8.2659,6,7.71C6.183,7.8691,6.4093,7.9701,6.65,8v5L5,14h5l-1.6-1 v-2c0.7381-0.8915,1.6915-1.5799,2.77-2c0.8012,0.1879,1.603-0.3092,1.7909-1.1103C12.9893,7.7686,13.0025,7.6444,13,7.52 c0.0029-0.0533,0.0029-0.1067,0-0.16C13.6202,7.0659,14.0113,6.4363,14,5.75z M8.4,10.26V6.82C8.6703,7.3007,9.1785,7.5987,9.73,7.6 h0.28c0.0156,0.4391,0.2242,0.849,0.57,1.12C9.7643,9.094,9.0251,9.6162,8.4,10.26z',
+    'parking': 'M4 2V13H6V9H8.5C10.433 9 12 7.433 12 5.5C12 3.567 10.433 2 8.5 2H4ZM6 7V4H8.5C9.32843 4 10 4.67157 10 5.5C10 6.32843 9.32843 7 8.5 7H6Z',
+    'pharmacy': 'M9.5,4l1.07-1.54c0.0599,0.0046,0.1201,0.0046,0.18,0c0.6904-0.0004,1.2497-0.5603,1.2494-1.2506 C11.999,0.519,11.4391-0.0404,10.7487-0.04C10.0584-0.0396,9.499,0.5203,9.4994,1.2106c0,0.0131,0.0002,0.0262,0.0006,0.0394 c0,0,0,0.07,0,0.1L7,4H9.5z M12,6V5H3v1l1.5,3.5L3,13v1h9v-1l-1-3.5L12,6z M10,10H8v2H7v-2H5V9h2V7h1v2h2V10z',
+    'restaurant-pizza': 'M1.393 7.931.025 7.315A14.05 14.05 0 0 1 7.764-.001l.027.07.511 1.331-.003.001a12.613 12.613 0 0 0-6.906 6.53Zm10.963 4.96L2.42 8.414a11.604 11.604 0 0 1 6.354-6.009l.003-.001.817 2.122c-.028-.002-.052-.016-.081-.016a1.062 1.062 0 1 0 .764 1.793l2.413 6.273a.249.249 0 0 1-.334.316ZM7.426 7.52a.925.925 0 1 0-1.849 0 .925.925 0 0 0 1.849 0Zm3.017 2.03a.925.925 0 1 0-.07.353.924.924 0 0 0 .07-.354Z',
+    'restaurant': 'M3.5,0l-1,5.5c-0.1464,0.805,1.7815,1.181,1.75,2L4,14c-0.0384,0.9993,1,1,1,1s1.0384-0.0007,1-1L5.75,7.5 c-0.0314-0.8176,1.7334-1.1808,1.75-2L6.5,0H6l0.25,4L5.5,4.5L5.25,0h-0.5L4.5,4.5L3.75,4L4,0H3.5z M12,0 c-0.7364,0-1.9642,0.6549-2.4551,1.6367C9.1358,2.3731,9,4.0182,9,5v2.5c0,0.8182,1.0909,1,1.5,1L10,14c-0.0905,0.9959,1,1,1,1 s1,0,1-1V0z',
+    'shop': 'm13.33 5h-1.83l-.39-2.33c-.1601-.7182-.7017-1.2905-1.41-1.49-.3493-.1124-.7131-.173-1.08-.18h-2.24c-.3669.007-.7307.0676-1.08.18-.7083.1995-1.2499.7718-1.41 1.49l-.39 2.33h-1.83c-.2761-.0017-.5013.2208-.503.497-.0003.0519.0074.1035.023.153l1.88 6.3c.1964.6246.7753 1.0496 1.43 1.05h6c.651-.0047 1.2247-.4289 1.42-1.05l1.88-6.3c.0829-.2634-.0635-.5441-.3269-.627-.0463-.0146-.0945-.0223-.1431-.023zm-8.81 0 .36-2.17c.0807-.3625.3736-.6395.74-.7.2463-.0776.5019-.1213.76-.13h2.24c.2614.0078.5205.0515.77.13.3664.0605.6593.3375.74.7l.35 2.17h-6z',
+    'theatre': 'M2,1c0,0-1,0-1,1v5.1582C1,8.8885,1.354,11,4.5,11H5V8L2.5,9c0,0,0-2.5,2.5-2.5V5 c0-0.7078,0.0868-1.3209,0.5-1.7754C5.8815,2.805,6.5046,1.9674,8.1562,2.7539L9,3.3027V2c0,0,0-1-1-1C7.2922,1,6.0224,2,5,2 S2.7865,1,2,1z M3,3c0.5523,0,1,0.4477,1,1S3.5523,5,3,5S2,4.5523,2,4S2.4477,3,3,3z M7,4c0,0-1,0-1,1v5c0,2,1,4,4,4s4-2,4-4V5 c0-1-1-1-1-1c-0.7078,0-1.9776,1-3,1S7.7865,4,7,4z M8,6c0.5523,0,1,0.4477,1,1S8.5523,8,8,8S7,7.5523,7,7S7.4477,6,8,6z M12,6 c0.5523,0,1,0.4477,1,1s-0.4477,1-1,1s-1-0.4477-1-1S11.4477,6,12,6z M7.5,10H10h2.5c0,0,0,2.5-2.5,2.5S7.5,10,7.5,10z'
+  };
+  // Category words (Search Box poi_category, or a caller's category) to
+  // Maki names, checked in order, so "pizza restaurant" is a pizza.
+  var CATEGORY_ICONS = [
+    ['pizza', 'restaurant-pizza'], ['coffee', 'cafe'], ['cafe', 'cafe'],
+    ['café', 'cafe'], ['bakery', 'bakery'], ['ice cream', 'ice-cream'],
+    ['brewery', 'beer'], ['beer', 'beer'], ['pub', 'beer'],
+    ['bar', 'bar'], ['nightclub', 'bar'], ['wine', 'bar'],
+    ['fast food', 'fast-food'], ['burger', 'fast-food'],
+    ['restaurant', 'restaurant'], ['food', 'restaurant'], ['diner', 'restaurant'],
+    ['hotel', 'lodging'], ['motel', 'lodging'], ['hostel', 'lodging'], ['lodging', 'lodging'],
+    ['grocery', 'grocery'], ['supermarket', 'grocery'], ['convenience', 'convenience'],
+    ['gas', 'fuel'], ['fuel', 'fuel'], ['parking', 'parking'],
+    ['hospital', 'hospital'], ['clinic', 'hospital'], ['pharmacy', 'pharmacy'],
+    ['park', 'park'], ['garden', 'park'], ['museum', 'museum'], ['gallery', 'museum'],
+    ['theater', 'theatre'], ['theatre', 'theatre'], ['cinema', 'cinema'], ['movie', 'cinema'],
+    ['bank', 'bank'], ['atm', 'bank'],
+    ['shop', 'shop'], ['store', 'shop'], ['boutique', 'shop'],
+    ['attraction', 'attraction'], ['landmark', 'attraction']
+  ];
+
+  // The Maki name for a marker or card: its own maki when we have that
+  // icon, else one matched from its category, else the plain marker.
+  function placeIcon(maki, category) {
+    if (typeof maki === 'string' && MAKI.hasOwnProperty(maki)) return maki;
+    if (typeof category === 'string') {
+      var words = ' ' + category.toLowerCase().split(/[^a-zà-ÿ]+/).join(' ') + ' ';
+      for (var i = 0; i < CATEGORY_ICONS.length; i++) {
+        if (words.indexOf(' ' + CATEGORY_ICONS[i][0] + ' ') !== -1) return CATEGORY_ICONS[i][1];
+      }
+    }
+    return 'marker';
+  }
+  window.__placeIcon = placeIcon;
+
+  // Only ever called with a key of MAKI, so the markup is all ours.
+  function iconSvg(name) {
+    var d = MAKI[MAKI.hasOwnProperty(name) ? name : 'marker'];
+    return '<svg viewBox="0 0 15 15" aria-hidden="true"><path fill="currentColor" d="' + d + '"/></svg>';
+  }
+
+  function buildPlaceElement(icon, color) {
+    var el = document.createElement('div');
+    el.className = 'marker-badge place';
+    // A caller's color (gray for "other results", say) tints the icon.
+    if (color) el.style.color = color;
+    el.innerHTML = iconSvg(icon);
+    return el;
+  }
+
+  // Dark or white, whichever reads better on the badge color (WCAG
+  // contrast), so numbers stay legible on orange, green or gray pins.
+  var BADGE_DARK_TEXT = '#1a0f04';
+  function badgeTextColor(color) {
+    var hex = typeof color === 'string' ? color.replace('#', '') : '';
+    if (hex.length === 3) hex = hex.split('').map(function(c) { return c + c; }).join('');
+    if (!/^[0-9a-f]{6}/i.test(hex)) return '#fff';
+    var lum = [0, 2, 4].map(function(i) {
+      var c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    var l = 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
+    // Against white (L=1) vs. against the dark text (L about 0.0055).
+    return (1.05 / (l + 0.05)) >= ((l + 0.05) / 0.0555) ? '#fff' : BADGE_DARK_TEXT;
+  }
+  window.__badgeTextColor = badgeTextColor;
+
   function buildBadgeElement(label, color) {
     var el = document.createElement('div');
     el.className = 'marker-badge';
     el.style.background = color;
+    el.style.color = badgeTextColor(color);
     el.textContent = label;
     return el;
   }
@@ -520,38 +720,58 @@ ${initialDataScript}
     var color = m.color ||
       (STYLE_DEFAULTS[style] && STYLE_DEFAULTS[style].color) || '#3b82f6';
     var marker;
-    if (style === 'numbered' || style === 'start' || style === 'end') {
+    if (style === 'place') {
+      marker = new mapboxgl.Marker({ element: buildPlaceElement(placeIcon(m.maki, m.category), m.color) });
+    } else if (style === 'numbered' || style === 'start' || style === 'end') {
       var label = m.label || (style === 'start' ? 'S' : style === 'end' ? 'E' : '');
       marker = new mapboxgl.Marker({ element: buildBadgeElement(label, color) });
     } else {
       marker = new mapboxgl.Marker({ color: color });
     }
     marker.setLngLat(m.coordinates);
-    if (m.popup) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
+    // A place with an id gets a carousel card instead of a popup: clicking
+    // its pin selects the card (see selectPlace).
+    if (m.popup && !m.id) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
     marker.addTo(map);
     trackedMarkers.push(marker);
     // Tagged by buildSearchMiniPayload with the result's mapbox_id so the
-    // side panel (click-to-flyTo) and Place Details enrichment can look the
-    // marker back up later without walking trackedMarkers.
-    if (m.id) markersById[m.id] = { marker: marker, popupText: m.popup || '' };
+    // carousel and Place Details enrichment can look the marker back up
+    // later without walking trackedMarkers.
+    if (m.id) {
+      var badgeEl = typeof marker.getElement === 'function' ? marker.getElement() : null;
+      markersById[m.id] = { marker: marker, el: badgeEl, color: color };
+      if (badgeEl && m.name) {
+        var nameEl = document.createElement('span');
+        nameEl.className = 'marker-name';
+        nameEl.textContent = m.name;
+        badgeEl.appendChild(nameEl);
+      }
+      if (badgeEl && typeof badgeEl.addEventListener === 'function') {
+        var placeId = m.id;
+        badgeEl.addEventListener('click', function(e) {
+          if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+          selectPlace(placeId, { scrollCard: true, panTo: true });
+        });
+      }
+    }
     bbox.extend(m.coordinates);
   }
 
-  // Guarantees a marker that opts into the side panel (has .id) also gets
-  // a visible number on the map matching its panel row, unless the caller
+  // Guarantees a marker that opts into the carousel (has .id) also gets
+  // a visible number on the map matching its card, unless the caller
   // already gave it an explicit label. Without this, a caller that builds
   // plain unlabeled pins for POI markers (observed live: Claude did this
   // for inline markers, leaving the map showing generic blue pins with no
-  // way to tell which panel row is which) breaks the whole point of the
-  // panel numbering. Mutates markers in place, so it must run before
+  // way to tell which card is which) breaks the whole point of the
+  // numbering. Mutates markers in place, so it must run before
   // addOneMarker draws them.
   //
   // Numbering runs across the whole render, not per call: a render can
   // draw inline markers and then merge in self-fetched search results, and
   // each set arrives numbered from 1. The first set keeps the caller's
   // numbers when they're unique (a visit order, say); a later set, or one
-  // with repeated numbers, is renumbered to continue the panel's count.
-  // Letter labels ("A") are kept as they are. A place already in the panel
+  // with repeated numbers, is renumbered to continue the carousel's count.
+  // Letter labels ("A") are kept as they are. A place already in the carousel
   // this render is dropped rather than drawn and listed twice. Returns the
   // markers to draw.
   function applyPanelNumbering(markers) {
@@ -578,12 +798,17 @@ ${initialDataScript}
     fresh.forEach(function(m) {
       if (!m || !m.id) return;
       if (m.label && (keep || !isWholeNumber(m.label))) return;
+      // A place with no number of its own gets an icon pin, not a number:
+      // the selected pin and card light up together, which is enough to
+      // tell them apart.
+      if (!m.label && m.style !== 'start' && m.style !== 'end') {
+        m.style = 'place';
+        return;
+      }
+      // Otherwise a numbered pin, or a start/end pin, takes the next number.
       panelCount += 1;
       var n = String(panelCount);
-      if (!m.label) {
-        if (m.style !== 'start' && m.style !== 'end') m.style = 'numbered';
-        if (!m.color) m.color = '#f97316';
-      } else if (typeof m.popup === 'string' && m.popup.indexOf(m.label + '. ') === 0) {
+      if (m.label && typeof m.popup === 'string' && m.popup.indexOf(m.label + '. ') === 0) {
         // Search popups start with the old number ("3. Name").
         m.popup = n + '. ' + m.popup.slice(String(m.label).length + 2);
       }
@@ -598,26 +823,44 @@ ${initialDataScript}
     return n > 0 && String(n) === String(label);
   }
 
-  // Bottom padding that keeps fitted data out from under the legend
-  // (bottom-left), unless the map is too short to spare the room.
+  // The summary chip covers GL JS's top-left control corner, so move the
+  // zoom and layer buttons below it while it's shown.
+  function placeTopLeftControls() {
+    if (!map || typeof map.getContainer !== 'function') return;
+    var container = map.getContainer();
+    var corner = container && typeof container.querySelector === 'function'
+      ? container.querySelector('.mapboxgl-ctrl-top-left')
+      : null;
+    if (!corner) return;
+    corner.style.top = summaryEl.style.display === 'block'
+      ? (summaryEl.offsetHeight + 8) + 'px'
+      : '';
+  }
+
+  // Bottom padding that keeps fitted data out from under the carousel and
+  // the legend above it, unless the map is too short to spare the room.
   function bottomPadding() {
-    if (legendEl.style.display !== 'block') return 50;
-    var bottom = (legendEl.offsetHeight || 0) + 24;
+    var bottom = 0;
+    if (carouselEl.style.display === 'block') bottom = carouselTop() + 12;
+    if (legendEl.style.display === 'block') {
+      bottom = Math.max(bottom, legendTop() + 12);
+    }
     var el = document.getElementById('map');
     var height = (el && el.clientHeight) || window.innerHeight || 0;
-    if (bottom <= 50 || (height && height - bottom - 70 < 160)) return 50;
+    if (bottom <= 50 || (height && height - bottom - 70 < 120)) return 50;
     return bottom;
   }
 
-  // Right padding that keeps fitted data out from under an open panel. On
-  // a narrow map there's no room beside it, so fit as if it weren't there
-  // (the panel starts collapsed there anyway; see appendPanelRows).
-  function rightPadding() {
-    if (panelEl.style.display !== 'flex' || panelCollapsed) return 30;
-    var right = (panelEl.offsetWidth || 280) + 24;
-    var mapWidth = mapContainerWidth();
-    if (mapWidth && mapWidth - right < 240) return 30;
-    return right;
+  // Distance from the bottom of the map to the top of the carousel. 36px
+  // keeps it clear of the Mapbox logo and attribution.
+  var CAROUSEL_BOTTOM = 36;
+  function carouselTop() {
+    return CAROUSEL_BOTTOM + (carouselEl.offsetHeight || 100);
+  }
+
+  function legendTop() {
+    var bottom = parseInt(legendEl.style.bottom, 10) || 12;
+    return bottom + (legendEl.offsetHeight || 0);
   }
 
   function mapContainerWidth() {
@@ -631,7 +874,7 @@ ${initialDataScript}
     setTimeout(function() {
       map.resize();
       map.fitBounds(bounds, {
-        padding: { top: 70, bottom: bottomPadding(), left: 30, right: rightPadding() },
+        padding: { top: 70, bottom: bottomPadding(), left: 30, right: 30 },
         duration: 600
       });
     }, 60);
@@ -652,8 +895,9 @@ ${initialDataScript}
     if (payload.summary && summaryEl.style.display === 'none') {
       summaryEl.textContent = payload.summary;
       summaryEl.style.display = 'block';
+      placeTopLeftControls();
     }
-    maybeShowSidePanel(markers, payload.summary);
+    maybeShowSidePanel(markers);
     var bounds = bbox.bounds();
     if (bounds) fitToBounds(bounds);
   }
@@ -698,8 +942,8 @@ ${initialDataScript}
     // Covers both inline markers (a caller-composed payload) and self-fetch
     // markers (merged in later via mergeAdditionalPayload) — see
     // maybeShowSidePanel below. Whichever path produced id-bearing POI
-    // markers gets the same results panel.
-    maybeShowSidePanel(markers, payload.summary);
+    // markers gets the same results carousel.
+    maybeShowSidePanel(markers);
 
     // Legend
     if (Array.isArray(payload.legend) && payload.legend.length > 0) {
@@ -1403,7 +1647,7 @@ ${initialDataScript}
     var features = [];
     points.forEach(function(f, i) {
       var props = f.properties || {};
-      var popupParts = [(i + 1) + '. ' + (props.name || 'Result')];
+      var popupParts = [props.name || 'Result'];
       var addr = props.full_address || props.place_formatted;
       if (addr) popupParts.push(addr);
       if (typeof props.distance === 'number') {
@@ -1412,16 +1656,15 @@ ${initialDataScript}
       var coords = f.geometry.coordinates;
       // id/name/category/distanceMeters are the same generic POI fields an
       // inline (hand-composed) marker can carry — see maybeShowSidePanel,
-      // which builds the results panel from either source identically.
-      // mapbox_id is missing on the rare result that lacks one; the panel
+      // which builds the results carousel from either source identically.
+      // mapbox_id is missing on the rare result that lacks one; the carousel
       // just skips that row rather than show an unclickable/unenrichable
       // entry.
       markers.push({
         id: props.mapbox_id,
         coordinates: coords,
-        style: 'numbered',
-        label: String(i + 1),
-        color: '#f97316',
+        style: 'place',
+        maki: props.maki,
         popup: popupParts.join(' — '),
         name: props.name || ('Result ' + (i + 1)),
         category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
@@ -1445,11 +1688,11 @@ ${initialDataScript}
         data: { type: 'FeatureCollection', features: features },
         paint: {
           'circle-radius': 6,
-          'circle-color': '#f97316',
-          'circle-opacity': 0.15,
+          'circle-color': '#0f172a',
+          'circle-opacity': 0.1,
           'circle-stroke-width': 1,
-          'circle-stroke-color': '#f97316',
-          'circle-stroke-opacity': 0.4
+          'circle-stroke-color': '#0f172a',
+          'circle-stroke-opacity': 0.25
         }
       }
     ] : [];
@@ -1457,27 +1700,27 @@ ${initialDataScript}
     return { summary: summary, layers: layers, markers: markers };
   }
 
-  // --- Side panel: result list + Place Details enrichment ----------------
+  // --- Results carousel: one card per place + Place Details enrichment ---
   // Triggered generically by maybeShowSidePanel for ANY marker set that
   // includes id-bearing entries — self-fetch search/category-search
   // results (via mergeAdditionalPayload) and hand-composed inline markers
   // from render_map_tool's own "markers" input (via renderBody) both funnel
   // through the same path. Renders the initial (Search Box-only, or
-  // whatever the caller already provided) list immediately so the panel
-  // never blocks on the slower enrichment call. sourceLabel is plain text
-  // shown as the panel heading (e.g. the query, category, or the payload's
-  // own summary).
+  // whatever the caller already provided) cards immediately so the
+  // carousel never blocks on the slower enrichment call.
   function derivePanelItems(markers) {
     if (!Array.isArray(markers)) return [];
     var items = [];
     markers.forEach(function(m) {
       if (!m || !m.id) return;
-      // The pin's own label, so a row reads the same as its pin ("A" too).
+      // The pin's own label, so a card reads the same as its pin ("A" too).
+      // A place pin has none, and neither does its card.
       var badge = isWholeNumber(m.label) ? parseInt(m.label, 10)
-        : (m.label ? String(m.label) : items.length + 1);
+        : (m.label ? String(m.label) : null);
       items.push({
         id: m.id,
         number: badge,
+        icon: placeIcon(m.maki, m.category),
         name: m.name || ('Result ' + (items.length + 1)),
         category: m.category,
         distanceMeters: typeof m.distanceMeters === 'number' ? m.distanceMeters : undefined,
@@ -1489,16 +1732,16 @@ ${initialDataScript}
   // Exposed so tests can exercise the pure derivation logic without a DOM.
   window.__derivePanelItems = derivePanelItems;
 
-  // Adds rows for places not yet in this render's panel and enriches just
-  // those. A response is applied only if no newer render has started since
-  // (panelGeneration), so a slow lookup can't write into a newer panel.
-  function maybeShowSidePanel(markers, summary) {
+  // Adds cards for places not yet in this render's carousel and enriches
+  // just those. A response is applied only if no newer render has started
+  // since (panelGeneration), so a slow lookup can't write into newer cards.
+  function maybeShowSidePanel(markers) {
     var items = derivePanelItems(markers).filter(function(it) {
       return !panelIds[it.id];
     });
     if (items.length === 0) return;
     items.forEach(function(it) { panelIds[it.id] = true; });
-    appendPanelRows(items, summary || 'Results');
+    appendCards(items);
     var generation = panelGeneration;
     fetchPlaceDetailsBatch(
       items.map(function(it) { return it.id; }),
@@ -1509,40 +1752,112 @@ ${initialDataScript}
     });
   }
 
-  // Keyed by mapbox_id -> { li, meta } elements, so enrichSidePanel can
-  // update a row directly once Place Details resolves, without re-parsing
-  // panelEl's markup back into a queryable DOM (innerHTML + querySelector
+  // Keyed by mapbox_id -> { li, meta, body } elements, so enrichSidePanel
+  // can update a card directly once Place Details resolves, without
+  // re-parsing markup back into a queryable DOM (innerHTML + querySelector
   // round-trips don't work in every MCP Apps host's iframe sandbox, and
   // building real nodes up front is simpler to reason about either way).
-  // Reset by clearPanel, same lifecycle as the panel itself.
+  // Reset by clearPanel, same lifecycle as the carousel itself.
   var panelRowsById = {};
   // Bumped by teardown(), so responses from an earlier render are dropped.
   var panelGeneration = 0;
   // Id-bearing markers numbered so far this render, and the ids listed.
   var panelCount = 0;
   var panelIds = {};
-  // The viewer's collapse choice, kept across renders; null until the first
-  // panel decides a default from the map's width.
-  var panelCollapsed = null;
-  var panelListEl = null;
+  var cardListEl = null;
+  var cardOrder = [];
+  var activePlaceId = null;
 
-  function buildPanelRow(it) {
+  // classList when there is one: GL JS adds its own classes to a marker's
+  // element, which assigning className would wipe out.
+  function setActiveClass(el, on) {
+    if (!el) return;
+    if (el.classList && typeof el.classList.toggle === 'function') {
+      el.classList.toggle('active', on);
+      return;
+    }
+    var names = String(el.className || '').split(' ').filter(function(c) {
+      return c && c !== 'active';
+    });
+    if (on) names.push('active');
+    el.className = names.join(' ');
+  }
+
+  // Highlights one place: its card gets a border and its pin inverts and
+  // shows the name. scrollCard brings the card into view (a pin was
+  // clicked); panTo moves the map when the pin is hidden (a card was
+  // picked).
+  function selectPlace(id, opts) {
+    var row = panelRowsById[id];
+    if (!row) return;
+    opts = opts || {};
+    if (activePlaceId !== id) {
+      if (activePlaceId) {
+        var prevRow = panelRowsById[activePlaceId];
+        var prevPin = markersById[activePlaceId];
+        if (prevRow) setActiveClass(prevRow.li, false);
+        if (prevPin && prevPin.el) {
+          setActiveClass(prevPin.el, false);
+          prevPin.el.style.zIndex = '';
+        }
+      }
+      activePlaceId = id;
+      setActiveClass(row.li, true);
+      var pin = markersById[id];
+      if (pin && pin.el) {
+        setActiveClass(pin.el, true);
+        pin.el.style.zIndex = '2';
+      }
+    }
+    if (opts.scrollCard && typeof row.li.scrollIntoView === 'function') {
+      row.li.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+    if (opts.panTo) panToIfHidden(id);
+  }
+  window.__selectPlace = selectPlace;
+
+  // Moves the map only when the pin, or the name label under it, is off
+  // screen or under the carousel, so swiping through nearby results
+  // doesn't keep shifting it.
+  var PIN_LABEL_ROOM = 52;
+  function panToIfHidden(id) {
+    var entry = markersById[id];
+    if (!entry || !map || typeof map.project !== 'function') return;
+    var lngLat = entry.marker.getLngLat();
+    var p = map.project(lngLat);
+    var el = document.getElementById('map');
+    var width = (el && el.clientWidth) || 0;
+    var height = (el && el.clientHeight) || 0;
+    if (!width || !height) return;
+    var visibleBottom = height - carouselTop() - PIN_LABEL_ROOM;
+    if (p.x >= 24 && p.x <= width - 24 && p.y >= 24 && p.y <= visibleBottom) return;
+    // Just far enough to bring it 24px inside the visible area, so the
+    // pins around it mostly stay in view.
+    var x = Math.min(Math.max(p.x, 48), width - 48);
+    var y = Math.min(Math.max(p.y, 48), Math.max(48, visibleBottom - 24));
+    map.panBy([p.x - x, p.y - y], { duration: 500 });
+  }
+
+  function buildCard(it) {
     var li = document.createElement('li');
-    li.className = 'panel-item';
+    li.className = 'card';
 
-    var badge = document.createElement('span');
-    badge.className = 'panel-badge';
-    badge.textContent = String(it.number);
+    var badge = null;
+    if (it.number !== null && it.number !== undefined) {
+      badge = document.createElement('span');
+      badge.className = 'card-badge';
+      badge.textContent = String(it.number);
+    }
     // Match the pin when the caller colored it (e.g. gray for "other
     // results" next to a legend); the default orange is in the CSS.
-    if (typeof it.color === 'string' && it.color.toLowerCase() !== '#f97316' &&
+    if (badge && typeof it.color === 'string' && it.color.toLowerCase() !== '#f97316' &&
         (/^#[0-9a-f]{3,8}$/i).test(it.color)) {
       badge.style.background = it.color;
-      badge.style.color = '#fff';
+      badge.style.color = badgeTextColor(it.color);
     }
 
     var name = document.createElement('div');
-    name.className = 'panel-name';
+    name.className = 'card-name';
     name.textContent = it.name;
 
     var metaParts = [];
@@ -1551,67 +1866,139 @@ ${initialDataScript}
       metaParts.push(Math.round(it.distanceMeters) + ' m');
     }
     var meta = document.createElement('div');
-    meta.className = 'panel-meta';
+    meta.className = 'card-meta';
     meta.textContent = metaParts.join(' · ');
 
     var body = document.createElement('div');
+    body.className = 'card-body';
     body.appendChild(name);
     body.appendChild(meta);
-    li.appendChild(badge);
+    // Placeholder picture, replaced by the photo if one loads (see
+    // loadPanelPhoto). Shown first by CSS order.
+    var thumb = document.createElement('span');
+    thumb.className = 'card-thumb empty';
+    thumb.innerHTML = iconSvg(it.icon);
+    if (typeof thumb.setAttribute === 'function') {
+      thumb.setAttribute('role', 'img');
+      thumb.setAttribute('aria-label', it.name);
+    }
+    if (badge) li.appendChild(badge);
     li.appendChild(body);
+    li.appendChild(thumb);
 
     li.addEventListener('click', function() {
-      var entry = markersById[it.id];
-      if (entry) map.flyTo({ center: entry.marker.getLngLat(), zoom: 15, duration: 500 });
+      selectPlace(it.id, { scrollCard: true, panTo: true });
     });
 
-    panelRowsById[it.id] = { li: li, meta: meta };
+    panelRowsById[it.id] = { li: li, meta: meta, body: body, thumb: thumb };
     return li;
   }
 
   function clearPanel() {
-    while (panelEl.firstChild) panelEl.removeChild(panelEl.firstChild);
+    while (carouselEl.firstChild) carouselEl.removeChild(carouselEl.firstChild);
     panelRowsById = {};
-    panelListEl = null;
+    cardListEl = null;
+    cardOrder = [];
+    activePlaceId = null;
   }
 
-  function applyPanelCollapsed() {
-    panelEl.className = panelCollapsed ? 'collapsed' : '';
+  // Swiping selects whichever card ends up in the middle.
+  var scrollTimer = null;
+  function onCardScroll() {
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function() {
+      scrollTimer = null;
+      if (!cardListEl) return;
+      var center = (cardListEl.scrollLeft || 0) + (cardListEl.clientWidth || 0) / 2;
+      var best = null;
+      var bestDist = Infinity;
+      cardOrder.forEach(function(id) {
+        var row = panelRowsById[id];
+        if (!row) return;
+        var mid = (row.li.offsetLeft || 0) + (row.li.offsetWidth || 0) / 2;
+        var d = Math.abs(mid - center);
+        if (d < bestDist) { bestDist = d; best = id; }
+      });
+      if (best && best !== activePlaceId) selectPlace(best, { panTo: true });
+    }, 120);
   }
 
-  function togglePanel() {
-    panelCollapsed = !panelCollapsed;
-    applyPanelCollapsed();
-    if (lastFitBounds) fitToBounds(lastFitBounds);
-  }
-
-  // Creates the panel on the render's first id-bearing markers, and adds
-  // rows to it for later ones (e.g. search results merged in after inline
-  // markers), so every numbered pin has a row.
-  function appendPanelRows(items, sourceLabel) {
+  // Creates the carousel on the render's first id-bearing markers, and adds
+  // cards for later ones (e.g. search results merged in after inline
+  // markers), so every numbered pin has a card. The first card starts
+  // selected.
+  function appendCards(items) {
     if (!Array.isArray(items) || items.length === 0) return;
-    if (!panelListEl) {
-      var head = document.createElement('div');
-      head.className = 'panel-head';
-      head.textContent = sourceLabel || 'Results';
-      head.addEventListener('click', togglePanel);
-
-      panelListEl = document.createElement('ul');
-      panelListEl.className = 'panel-list';
-
-      panelEl.appendChild(head);
-      panelEl.appendChild(panelListEl);
-      // On a narrow map the open panel would cover most of it.
-      if (panelCollapsed === null) {
-        var width = mapContainerWidth();
-        panelCollapsed = width > 0 && width < 560;
-      }
-      applyPanelCollapsed();
-      panelEl.style.display = 'flex';
+    var created = false;
+    if (!cardListEl) {
+      cardListEl = document.createElement('ul');
+      cardListEl.className = 'card-list';
+      cardListEl.addEventListener('scroll', onCardScroll);
+      carouselEl.appendChild(cardListEl);
+      carouselEl.style.display = 'block';
+      created = true;
     }
-    var list = panelListEl;
-    items.forEach(function(it) { list.appendChild(buildPanelRow(it)); });
+    var list = cardListEl;
+    items.forEach(function(it) {
+      list.appendChild(buildCard(it));
+      cardOrder.push(it.id);
+    });
+    // The legend (bottom-left) moves up above the cards.
+    legendEl.style.bottom = (carouselTop() + 8) + 'px';
+    if (created) selectPlace(items[0].id);
   }
+
+  // Today's hours from a Places API opening_hours string, which uses OSM
+  // syntax: "Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00", "Mo 09:00-12:00,13:00-17:00",
+  // "Su off", "24/7". Returns null for anything else (holidays, months, week
+  // numbers), so a card shows no hours rather than wrong ones. "Today" is
+  // the viewer's day, which can differ from the place's near midnight when
+  // they're in different time zones.
+  var OSM_WEEK = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+  var HOURS_RANGE = /^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$/;
+  function osmDaysInclude(days, day) {
+    var parts = days.split(',');
+    var hit = false;
+    for (var i = 0; i < parts.length; i++) {
+      var ends = parts[i].split('-');
+      var a = OSM_WEEK.indexOf(ends[0]);
+      var b = ends.length === 2 ? OSM_WEEK.indexOf(ends[1]) : a;
+      if (a === -1 || b === -1 || ends.length > 2) return null;
+      var d = OSM_WEEK.indexOf(day);
+      if (a <= b ? (d >= a && d <= b) : (d >= a || d <= b)) hit = true;
+    }
+    return hit;
+  }
+  function hoursToday(spec, now) {
+    if (typeof spec !== 'string') return null;
+    var text = spec.trim();
+    if (!text) return null;
+    if (text === '24/7') return 'Open 24 hours';
+    var day = OSM_WEEK[(now.getDay() + 6) % 7];
+    var result = null;
+    var rules = text.split(';');
+    for (var i = 0; i < rules.length; i++) {
+      var rule = rules[i].trim();
+      if (!rule) continue;
+      var space = rule.indexOf(' ');
+      if (space === -1) return null;
+      var applies = osmDaysInclude(rule.slice(0, space), day);
+      if (applies === null) return null;
+      var times = rule.slice(space + 1).trim();
+      var ranges = times === 'off' || times === 'closed' ? [] : times.split(',');
+      for (var j = 0; j < ranges.length; j++) {
+        if (!HOURS_RANGE.test(ranges[j].trim())) return null;
+      }
+      // In OSM a later rule for the same day overrides an earlier one.
+      if (applies) {
+        result = ranges.length === 0
+          ? 'Closed today'
+          : 'Today ' + ranges.map(function(r) { return r.trim().replace('-', '–'); }).join(', ');
+      }
+    }
+    return result;
+  }
+  window.__hoursToday = hoursToday;
 
   // Search Box results mix Mapbox-native POI ids (decode to
   // "urn:mbxpoi:<uuid>") with OSM-sourced ones (decode to
@@ -1637,7 +2024,7 @@ ${initialDataScript}
 
   // Places API Details endpoint — batch form. Mirrors the single-record
   // GET src/tools/place-details-tool/PlaceDetailsTool.ts calls server-side,
-  // but the panel needs details for every result at once, so this uses the
+  // but the carousel needs details for every result at once, so this uses the
   // POST /details/retrieve batch form (up to 100 ids) instead of one
   // request per pin. Docs: https://docs.mapbox.com/api/search/places/
   // Like every other self-fetch call, this runs client-side against the
@@ -1672,18 +2059,18 @@ ${initialDataScript}
       });
     };
     return post(compatibleIds.slice(0, 100), false)
-      // Enrichment is a nice-to-have on top of an already-rendered panel —
+      // Enrichment is a nice-to-have on top of already-rendered cards —
       // Public Preview quota (1,000 records/month) or a transient error
       // here should never surface as a map error, just leave the
-      // Search-Box-only rows as they are.
+      // Search-Box-only cards as they are.
       .catch(function() { return null; });
   }
 
   // Place Details photos are hosted wherever each business's site hosts
   // them, so the in-chat CSP (mapAppCsp.ts) can't allow them. Inside a host,
   // the page asks the server for the photo (PlacePhotoResource, by mapbox_id)
-  // and shows it as a data: URL. A standalone page from export_map_html_tool
-  // has no host and no CSP, so it loads the photo URL directly.
+  // and shows it as a data: URL. A page with no host has no CSP of ours, so
+  // it loads the photo URL directly.
   var MAX_PANEL_PHOTOS = 10;
   var EMBEDDED = window.parent !== window;
   var PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -1691,17 +2078,16 @@ ${initialDataScript}
 
   function loadPanelPhoto(row, id, photoUrl) {
     var show = function(src) {
-      // A later render may have replaced the panel while this loaded.
+      // A later render may have replaced the carousel while this loaded.
       if (panelRowsById[id] !== row) return;
-      var thumb = document.createElement('span');
-      thumb.className = 'panel-thumb';
-      thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
-      row.li.appendChild(thumb);
+      row.thumb.className = 'card-thumb';
+      row.thumb.innerHTML = '';
+      row.thumb.style.backgroundImage = 'url("' + src.replace(/"/g, '') + '")';
     };
     if (!EMBEDDED || !hostAnswered) {
-      // No MCP host (a standalone or framed exported page), so no CSP of
-      // ours either. Load it first: some sites refuse hotlinked photos (403), which
-      // would leave an empty box in the row.
+      // No MCP host (a standalone or framed page), so no CSP of ours
+      // either. Load it first: some sites refuse hotlinked photos (403),
+      // which would leave an empty box on the card.
       if (photoUrl.indexOf('https://') !== 0 || typeof Image !== 'function') return;
       var img = new Image();
       img.onload = function() { show(photoUrl); };
@@ -1726,23 +2112,26 @@ ${initialDataScript}
     detailsResult.results.forEach(function(place) {
       if (!place || !place.mapbox_id) return;
       var row = panelRowsById[place.mapbox_id];
-      if (row) {
-        var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
-        if (typeof photoUrl === 'string' && photosRequested < MAX_PANEL_PHOTOS) {
-          photosRequested++;
-          loadPanelPhoto(row, place.mapbox_id, photoUrl);
-        }
-        if (place.score && typeof place.score.popularity === 'number') {
-          var extra = Math.round(place.score.popularity * 100) + '% popularity';
-          row.meta.textContent = row.meta.textContent ? row.meta.textContent + ' · ' + extra : extra;
-        }
+      if (!row) return;
+      var photoUrl = place.photos && place.photos[0] && place.photos[0].url;
+      if (typeof photoUrl === 'string' && photosRequested < MAX_PANEL_PHOTOS) {
+        photosRequested++;
+        loadPanelPhoto(row, place.mapbox_id, photoUrl);
       }
-
-      var entry = markersById[place.mapbox_id];
-      if (entry && place.phone) {
-        entry.marker.setPopup(
-          new mapboxgl.Popup().setText(entry.popupText + ' — ' + place.phone)
-        );
+      if (place.score && typeof place.score.popularity === 'number') {
+        var extra = Math.round(place.score.popularity * 100) + '% popularity';
+        row.meta.textContent = row.meta.textContent ? row.meta.textContent + ' · ' + extra : extra;
+      }
+      // Today's hours and the phone number on a second line.
+      var lineParts = [];
+      var hours = hoursToday(place.opening_hours, new Date());
+      if (hours) lineParts.push(hours);
+      if (typeof place.phone === 'string' && place.phone) lineParts.push(place.phone);
+      if (lineParts.length > 0) {
+        var line = document.createElement('div');
+        line.className = 'card-extra';
+        line.textContent = lineParts.join(' · ');
+        row.body.appendChild(line);
       }
     });
   }
@@ -2058,7 +2447,7 @@ ${initialDataScript}
 
   // Mirrors the deleted server-side buildGroundLocationPayload (now
   // client-only since the map preview self-fetches): a dark origin pin plus
-  // numbered orange POI markers. Isochrone contours aren't drawn here either
+  // place pins for the POIs. Isochrone contours aren't drawn here either
   // — the original never rendered them, only a contour-minutes summary.
   function buildGroundLocationMiniPayload(place, longitude, latitude, pois) {
     var markers = [
@@ -2070,7 +2459,7 @@ ${initialDataScript}
       }
     ];
     (pois || []).forEach(function(poi, i) {
-      var parts = [(i + 1) + '. ' + poi.name];
+      var parts = [poi.name];
       if (poi.address) parts.push(poi.address);
       if (typeof poi.distance_meters === 'number') {
         parts.push(Math.round(poi.distance_meters) + ' m');
@@ -2078,9 +2467,7 @@ ${initialDataScript}
       markers.push({
         id: poi.id,
         coordinates: [poi.longitude, poi.latitude],
-        style: 'numbered',
-        label: String(i + 1),
-        color: '#f97316',
+        style: 'place',
         popup: parts.join(' — '),
         name: poi.name,
         category: poi.category,

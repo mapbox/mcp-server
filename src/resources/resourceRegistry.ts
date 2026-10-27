@@ -22,7 +22,7 @@ export const ALL_RESOURCES = [
   new ToolResponseResource({ httpRequest }),
   // Single shared map renderer, targeted exclusively by render_map_tool.
   new MapAppUIResource({ httpRequest }),
-  // Photos for the map app's results panel, which its CSP can't load directly.
+  // Photos for the map app's results carousel, which its CSP can't load directly.
   new PlacePhotoResource({ httpRequest }),
   new VersionResource()
 ] as const;
