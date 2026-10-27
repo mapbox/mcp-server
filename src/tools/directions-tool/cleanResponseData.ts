@@ -284,13 +284,10 @@ export function cleanResponseData(
           });
         }
 
-        // Process steps if they exist to collect turn-by-turn instructions.
-        // `maneuver.instruction` (e.g. "Bear right onto Great Portland
-        // Street/A4201") is present on every step whenever steps=true is
-        // requested, unlike `step.voiceInstructions`, which requires the
-        // separate voice_instructions=true parameter -- never sent by this
-        // tool, so that field was always empty and `instructions` never
-        // actually populated.
+        // One instruction per step, e.g. "Bear right onto Great Portland
+        // Street/A4201". `maneuver.instruction` comes back whenever
+        // steps=true; `step.voiceInstructions` would need
+        // voice_instructions=true, which this tool doesn't send.
         if (leg.steps) {
           leg.steps.forEach((step) => {
             if (step.maneuver?.instruction) {
@@ -314,12 +311,9 @@ export function cleanResponseData(
     // Add all incidents with the specified fields as a new property on the route
     cleanedRoute.incidents_summary = routeIncidents;
 
-    // One instruction per real maneuver (unlike the old voice-announcement
-    // source, which could repeat several announcements per turn), so a
-    // normal route -- even a long one with dozens of turns -- stays well
-    // within a generous cap. The cap here is just a backstop against a
-    // pathological case (e.g. many waypoints each with a complex urban leg),
-    // not a limit expected to bite in practice.
+    // One instruction per maneuver, so even a long route with dozens of
+    // turns fits. The cap only guards against extreme cases, like many
+    // waypoints each with a complex urban leg.
     const MAX_INSTRUCTIONS = 200;
     if (
       routeInstructions.length >= 1 &&
