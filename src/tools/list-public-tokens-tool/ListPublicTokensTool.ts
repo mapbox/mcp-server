@@ -76,7 +76,10 @@ function pickToken(
       };
     }
   }
-  const fallback = tokens.find((t) => t.default) ?? tokens[0];
+  // Never fall back to a token restricted to some other site: it wouldn't
+  // load there anyway.
+  const unrestricted = tokens.filter((t) => t.allowedUrls.length === 0);
+  const fallback = unrestricted.find((t) => t.default) ?? unrestricted[0];
   if (!fallback) return undefined;
   const which = fallback.default
     ? "The account's default public token"
@@ -143,9 +146,18 @@ export class ListPublicTokensTool extends MapboxApiBasedTool<
       });
     }
 
+    // MAPBOX_PUBLIC_TOKEN belongs to whoever runs the server. Only hand it out
+    // when the caller is running on the server's own access token too (a
+    // local install); a hosted caller with its own token must never get it.
+    const envFallback =
+      accessToken === MapboxApiBasedTool.mapboxAccessToken
+        ? process.env.MAPBOX_PUBLIC_TOKEN
+        : undefined;
+
     const username = getUserNameFromToken(accessToken);
     if (!username) {
-      return this.envFallbackOr(
+      return this.fallbackOr(
+        envFallback,
         "Couldn't read the account name from the access token."
       );
     }
@@ -163,7 +175,8 @@ export class ListPublicTokensTool extends MapboxApiBasedTool<
         response.status === 401 || response.status === 403
           ? ' Listing tokens needs an access token with the tokens:read scope.'
           : '';
-      return this.envFallbackOr(
+      return this.fallbackOr(
+        envFallback,
         `Listing tokens failed: ${await this.getErrorMessage(response)}.${scopeHint}`
       );
     }
@@ -196,9 +209,11 @@ export class ListPublicTokensTool extends MapboxApiBasedTool<
     });
   }
 
-  /** MAPBOX_PUBLIC_TOKEN when it's set, otherwise the error. */
-  private envFallbackOr(message: string): CallToolResult {
-    const envToken = process.env.MAPBOX_PUBLIC_TOKEN;
+  /** The server's MAPBOX_PUBLIC_TOKEN when allowed and set, otherwise the error. */
+  private fallbackOr(
+    envToken: string | undefined,
+    message: string
+  ): CallToolResult {
     if (envToken?.startsWith('pk.')) {
       return this.result({
         tokens: [],
@@ -227,7 +242,9 @@ export class ListPublicTokensTool extends MapboxApiBasedTool<
         : undefined,
       output.recommended
         ? `Recommended: ${output.recommended.token}\n${output.recommended.reason}`
-        : 'This account has no public tokens.',
+        : output.tokens.length > 0
+          ? 'Every public token on this account is restricted to other URLs, so none is recommended.'
+          : 'This account has no public tokens.',
       output.guidance
     ]
       .filter(Boolean)

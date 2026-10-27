@@ -168,7 +168,8 @@ describe('ListPublicTokensTool', () => {
     expect(textOf(result)).toContain('tokens:read');
   });
 
-  it('falls back to MAPBOX_PUBLIC_TOKEN when listing fails', async () => {
+  it('falls back to MAPBOX_PUBLIC_TOKEN when listing fails on the server token', async () => {
+    vi.stubEnv('MAPBOX_ACCESS_TOKEN', secretToken);
     vi.stubEnv('MAPBOX_PUBLIC_TOKEN', 'pk.env.sig');
     const { httpRequest } = setup(
       {},
@@ -184,6 +185,39 @@ describe('ListPublicTokensTool', () => {
     const output = structuredOf<ListPublicTokensOutput>(result);
     expect(output.recommended?.token).toBe('pk.env.sig');
     expect(output.recommended?.reason).toContain('tokens:read');
+  });
+
+  it("never hands a hosted caller the server's MAPBOX_PUBLIC_TOKEN", async () => {
+    vi.stubEnv('MAPBOX_PUBLIC_TOKEN', 'pk.env.sig');
+    const { httpRequest } = setup(
+      {},
+      {
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        text: async () => '{}'
+      }
+    );
+    // The caller's bearer token differs from the server's MAPBOX_ACCESS_TOKEN.
+    const result = await run(httpRequest);
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('pk.env.sig');
+  });
+
+  it("doesn't recommend a token restricted to another site", async () => {
+    const { httpRequest } = setup([restrictedPk]);
+    const result = await run(httpRequest, { site_url: 'https://other.org' });
+    const output = structuredOf<ListPublicTokensOutput>(result);
+    expect(output.tokens).toHaveLength(1);
+    expect(output.recommended).toBe(undefined);
+    expect(textOf(result)).toContain('restricted to other URLs');
+  });
+
+  it('falls back to an unrestricted token when there is no default', async () => {
+    const plainPk = { ...defaultPk, token: 'pk.plain.sig', default: false };
+    const { httpRequest } = setup([restrictedPk, plainPk]);
+    const output = structuredOf<ListPublicTokensOutput>(await run(httpRequest));
+    expect(output.recommended?.token).toBe('pk.plain.sig');
   });
 
   it('says so when the account has no public tokens', async () => {

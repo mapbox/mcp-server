@@ -541,7 +541,7 @@ Pass `site_url` (where the page will run) and the tool recommends a token restri
 
 It never returns secret or temporary tokens, and it can't create tokens (that needs `tokens:write`; the [DevKit server](https://github.com/mapbox/mcp-devkit-server)'s `create_token_tool` does it).
 
-**Requirements**: listing needs the `tokens:read` scope, the same one the in-chat map already uses to find the default public token. With a `pk.` access token, or when listing fails and `MAPBOX_PUBLIC_TOKEN` is set, it returns that token instead. To leave the tool out, start the server with `--disable-tools list_public_tokens_tool`.
+**Requirements**: listing needs the `tokens:read` scope, the same one the in-chat map already uses to find the default public token. With a `pk.` access token, or when listing fails on the server's own `MAPBOX_ACCESS_TOKEN` and `MAPBOX_PUBLIC_TOKEN` is set, it returns that token instead. A caller with its own bearer token (the hosted server) never gets `MAPBOX_PUBLIC_TOKEN`, and a token restricted to other URLs is never recommended. To leave the tool out, start the server with `--disable-tools list_public_tokens_tool`.
 
 **Example Usage**: "Build me a single-page site that shows our three store locations on a Mapbox map."
 
