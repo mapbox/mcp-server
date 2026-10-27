@@ -3,18 +3,31 @@
 
 import { describe, it, expect } from 'vitest';
 import { cleanResponseData } from '../../../src/tools/directions-tool/cleanResponseData.js';
+import { DirectionsInputSchema } from '../../../src/tools/directions-tool/DirectionsTool.input.schema.js';
 
 describe('cleanResponseData', () => {
-  // Create a complete mock input that satisfies the DirectionsInputSchema
-  const mockInput = {
+  // A full, parsed DirectionsInputSchema input. cleanResponseData only reads
+  // `geometries`.
+  const mockInput = DirectionsInputSchema.parse({
     coordinates: [
-      [0, 0],
-      [1, 1]
-    ] as [number, number][], // Use a proper tuple type
-    routing_profile: 'driving-traffic' as const,
-    geometries: 'none' as const,
+      { longitude: 0, latitude: 0 },
+      { longitude: 1, latitude: 1 }
+    ],
+    routing_profile: 'mapbox/driving-traffic',
+    geometries: 'none',
     alternatives: false
-  };
+  });
+
+  // The cleaned response types routes and waypoints as optional; these fail
+  // the test, rather than the type check, when they're missing.
+  function routesOf(result: ReturnType<typeof cleanResponseData>) {
+    if (!result.routes) throw new Error('result has no routes');
+    return result.routes;
+  }
+  function waypointsOf(result: ReturnType<typeof cleanResponseData>) {
+    if (!result.waypoints) throw new Error('result has no waypoints');
+    return result.waypoints;
+  }
 
   it('should remove unnecessary keys', () => {
     const mockData = {
@@ -33,7 +46,7 @@ describe('cleanResponseData', () => {
       waypoints: [
         {
           name: 'Test',
-          location: [-73.989, 40.733],
+          location: [-73.989, 40.733] as [number, number],
           distance: 10.5
         }
       ],
@@ -41,10 +54,10 @@ describe('cleanResponseData', () => {
     };
 
     const result = cleanResponseData(mockInput, mockData);
-    expect(result.waypoints[0].location).toBeUndefined();
-    expect(result.waypoints[0].snap_location).toEqual([-73.989, 40.733]);
-    expect(result.waypoints[0].distance).toBeUndefined();
-    expect(result.waypoints[0].snap_distance).toBe(11); // Rounded from 10.5
+    expect(waypointsOf(result)[0].location).toBeUndefined();
+    expect(waypointsOf(result)[0].snap_location).toEqual([-73.989, 40.733]);
+    expect(waypointsOf(result)[0].distance).toBeUndefined();
+    expect(waypointsOf(result)[0].snap_distance).toBe(11); // Rounded from 10.5
   });
 
   it('should round duration and distance', () => {
@@ -59,8 +72,8 @@ describe('cleanResponseData', () => {
     };
 
     const result = cleanResponseData(mockInput, mockData);
-    expect(result.routes[0].duration).toBe(1235);
-    expect(result.routes[0].distance).toBe(5679);
+    expect(routesOf(result)[0].duration).toBe(1235);
+    expect(routesOf(result)[0].distance).toBe(5679);
   });
 
   it('should delete geometry when geometries is set to none', () => {
@@ -74,7 +87,7 @@ describe('cleanResponseData', () => {
     };
 
     const result = cleanResponseData(mockInput, mockData);
-    expect(result.routes[0].geometry).toBeUndefined();
+    expect(routesOf(result)[0].geometry).toBeUndefined();
   });
 
   it('should keep geometry when geometries is not none', () => {
@@ -94,7 +107,7 @@ describe('cleanResponseData', () => {
     };
 
     const result = cleanResponseData(geojsonInput, mockData);
-    expect(result.routes[0].geometry).toBe('someGeometryData');
+    expect(routesOf(result)[0].geometry).toBe('someGeometryData');
   });
 
   it('should process route data correctly', () => {
@@ -126,20 +139,20 @@ describe('cleanResponseData', () => {
     const result = cleanResponseData(mockInput, mockData);
 
     // Check if data is properly processed
-    expect(result.routes[0].weight_name).toBeUndefined();
-    expect(result.routes[0].weight).toBeUndefined();
-    expect(result.routes[0].leg_summaries).toEqual([
+    expect(routesOf(result)[0].weight_name).toBeUndefined();
+    expect(routesOf(result)[0].weight).toBeUndefined();
+    expect(routesOf(result)[0].leg_summaries).toEqual([
       'First leg summary',
       'Second leg summary'
     ]);
-    expect(result.routes[0].duration_typical).toBeUndefined();
-    expect(result.routes[0].duration_under_typical_traffic_conditions).toBe(
+    expect(routesOf(result)[0].duration_typical).toBeUndefined();
+    expect(routesOf(result)[0].duration_under_typical_traffic_conditions).toBe(
       1300
     );
-    expect(result.routes[0].weight_typical).toBeUndefined();
-    expect(result.routes[0].intersecting_admins).toEqual(['USA', 'CAN']);
-    expect(result.routes[0].num_legs).toBe(2);
-    expect(result.routes[0].legs).toBeUndefined();
+    expect(routesOf(result)[0].weight_typical).toBeUndefined();
+    expect(routesOf(result)[0].intersecting_admins).toEqual(['USA', 'CAN']);
+    expect(routesOf(result)[0].num_legs).toBe(2);
+    expect(routesOf(result)[0].legs).toBeUndefined();
   });
 
   it('should handle notifications and collect unique messages', () => {
@@ -168,7 +181,7 @@ describe('cleanResponseData', () => {
 
     const result = cleanResponseData(mockInput, mockData);
 
-    expect(result.routes[0].notifications_summary).toEqual([
+    expect(routesOf(result)[0].notifications_summary).toEqual([
       'Traffic ahead',
       'Road closure',
       'Construction zone'
@@ -201,8 +214,8 @@ describe('cleanResponseData', () => {
 
     const result = cleanResponseData(mockInput, mockData);
 
-    expect(result.routes[0].incidents_summary).toHaveLength(1);
-    expect(result.routes[0].incidents_summary[0]).toEqual({
+    expect(routesOf(result)[0].incidents_summary).toHaveLength(1);
+    expect(routesOf(result)[0].incidents_summary![0]).toEqual({
       type: 'accident',
       end_time: '2023-05-01T12:00:00Z',
       long_description: 'Multiple vehicle collision',
@@ -210,7 +223,9 @@ describe('cleanResponseData', () => {
       affected_road_names: ['Main St'],
       length: 500
     });
-    expect(result.routes[0].incidents_summary[0].extra_field).toBeUndefined();
+    expect(routesOf(result)[0].incidents_summary![0]).not.toHaveProperty(
+      'extra_field'
+    );
   });
 
   it('should collect voice instructions when within limits', () => {
@@ -241,7 +256,7 @@ describe('cleanResponseData', () => {
 
     const result = cleanResponseData(mockInput, mockData);
 
-    expect(result.routes[0].instructions).toEqual([
+    expect(routesOf(result)[0].instructions).toEqual([
       'Turn right in 100 meters',
       'Turn right now',
       'Continue straight for 500 meters'
@@ -273,7 +288,7 @@ describe('cleanResponseData', () => {
 
     // With 6 steps and 2 instructions each, we'd have 12 instructions total
     // The function should exclude them since it's > 10
-    expect(result.routes[0].instructions).toBeUndefined();
+    expect(routesOf(result)[0].instructions).toBeUndefined();
   });
 
   it('should calculate congestion information correctly', () => {
@@ -295,7 +310,7 @@ describe('cleanResponseData', () => {
 
     const result = cleanResponseData(mockInput, mockData);
 
-    expect(result.routes[0].congestion_information).toEqual({
+    expect(routesOf(result)[0].congestion_information).toEqual({
       length_severe: 100,
       length_heavy: 200,
       length_moderate: 300,
@@ -328,6 +343,6 @@ describe('cleanResponseData', () => {
     // Total distance = 100 + 200 + 300 = 600
     // Average m/s = 14000/600 = 23.33
     // Average km/h = 23.33 * 3.6 = 84 (rounded)
-    expect(result.routes[0].average_speed_kph).toBe(84);
+    expect(routesOf(result)[0].average_speed_kph).toBe(84);
   });
 });

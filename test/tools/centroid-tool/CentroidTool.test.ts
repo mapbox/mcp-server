@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { CentroidTool } from '../../../src/tools/centroid-tool/CentroidTool.js';
+import type { CentroidOutput } from '../../../src/tools/centroid-tool/CentroidTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('CentroidTool', () => {
   const tool = new CentroidTool();
@@ -21,8 +23,9 @@ describe('CentroidTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(0, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(0, 1);
+    expect(data.centroid.latitude).toBeCloseTo(0, 1);
   });
 
   it('should calculate centroid of a triangle', async () => {
@@ -39,8 +42,9 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid of triangle should be at (3, 2)
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(3, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(2, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(3, 1);
+    expect(data.centroid.latitude).toBeCloseTo(2, 1);
   });
 
   it('should calculate centroid of a rectangle', async () => {
@@ -58,8 +62,9 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid should be at (5, 2.5)
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(5, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(2.5, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(5, 1);
+    expect(data.centroid.latitude).toBeCloseTo(2.5, 1);
   });
 
   it('should calculate centroid of polygon with real coordinates', async () => {
@@ -78,8 +83,9 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid should be roughly in the middle of SF
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(-122.4, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(37.75, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(-122.4, 1);
+    expect(data.centroid.latitude).toBeCloseTo(37.75, 1);
   });
 
   it('should calculate centroid of polygon with hole', async () => {
@@ -106,8 +112,9 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid should still be at center, even though there's a hole
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(0, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(0, 1);
+    expect(data.centroid.latitude).toBeCloseTo(0, 1);
   });
 
   it('should calculate centroid of multipolygon', async () => {
@@ -138,9 +145,10 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid should be between the two squares
-    expect(result.structuredContent?.centroid.longitude).toBeGreaterThan(1);
-    expect(result.structuredContent?.centroid.longitude).toBeLessThan(4);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(1, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeGreaterThan(1);
+    expect(data.centroid.longitude).toBeLessThan(4);
+    expect(data.centroid.latitude).toBeCloseTo(1, 1);
   });
 
   it('should handle polygon in southern hemisphere', async () => {
@@ -157,8 +165,9 @@ describe('CentroidTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(-55, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(-25, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(-55, 1);
+    expect(data.centroid.latitude).toBeCloseTo(-25, 1);
   });
 
   it('should handle L-shaped polygon', async () => {
@@ -178,10 +187,11 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid should be somewhere in the L shape
-    expect(result.structuredContent?.centroid.longitude).toBeGreaterThan(0);
-    expect(result.structuredContent?.centroid.longitude).toBeLessThan(2);
-    expect(result.structuredContent?.centroid.latitude).toBeGreaterThan(0);
-    expect(result.structuredContent?.centroid.latitude).toBeLessThan(2);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeGreaterThan(0);
+    expect(data.centroid.longitude).toBeLessThan(2);
+    expect(data.centroid.latitude).toBeGreaterThan(0);
+    expect(data.centroid.latitude).toBeLessThan(2);
   });
 
   it('should round coordinates to 6 decimal places', async () => {
@@ -198,8 +208,9 @@ describe('CentroidTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    const lon = result.structuredContent?.centroid.longitude as number;
-    const lat = result.structuredContent?.centroid.latitude as number;
+    const data = structuredOf<CentroidOutput>(result);
+    const lon = data.centroid.longitude;
+    const lat = data.centroid.latitude;
     const lonDecimals = (lon.toString().split('.')[1] || '').length;
     const latDecimals = (lat.toString().split('.')[1] || '').length;
     expect(lonDecimals).toBeLessThanOrEqual(6);
@@ -223,8 +234,9 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid should be at center
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(0, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(0, 1);
+    expect(data.centroid.latitude).toBeCloseTo(0, 1);
   });
 
   it('should handle polygon crossing antimeridian', async () => {
@@ -243,16 +255,11 @@ describe('CentroidTool', () => {
     expect(result.isError).toBe(false);
     // Centroid calculation may vary with antimeridian crossing
     // Just check it's a valid coordinate
-    expect(result.structuredContent?.centroid.latitude).toBeGreaterThanOrEqual(
-      -90
-    );
-    expect(result.structuredContent?.centroid.latitude).toBeLessThanOrEqual(90);
-    expect(result.structuredContent?.centroid.longitude).toBeGreaterThanOrEqual(
-      -180
-    );
-    expect(result.structuredContent?.centroid.longitude).toBeLessThanOrEqual(
-      180
-    );
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.latitude).toBeGreaterThanOrEqual(-90);
+    expect(data.centroid.latitude).toBeLessThanOrEqual(90);
+    expect(data.centroid.longitude).toBeGreaterThanOrEqual(-180);
+    expect(data.centroid.longitude).toBeLessThanOrEqual(180);
   });
 
   it('should handle very small polygon', async () => {
@@ -269,8 +276,9 @@ describe('CentroidTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(0.0005, 4);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(0.0005, 4);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(0.0005, 4);
+    expect(data.centroid.latitude).toBeCloseTo(0.0005, 4);
   });
 
   it('should handle large polygon', async () => {
@@ -287,8 +295,9 @@ describe('CentroidTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.centroid.longitude).toBeCloseTo(-100, 1);
-    expect(result.structuredContent?.centroid.latitude).toBeCloseTo(35, 1);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeCloseTo(-100, 1);
+    expect(data.centroid.latitude).toBeCloseTo(35, 1);
   });
 
   it('should handle complex irregular polygon', async () => {
@@ -308,9 +317,10 @@ describe('CentroidTool', () => {
 
     expect(result.isError).toBe(false);
     // Centroid should be somewhere inside or near the polygon
-    expect(result.structuredContent?.centroid.longitude).toBeGreaterThan(0);
-    expect(result.structuredContent?.centroid.longitude).toBeLessThan(5);
-    expect(result.structuredContent?.centroid.latitude).toBeGreaterThan(0);
-    expect(result.structuredContent?.centroid.latitude).toBeLessThan(5);
+    const data = structuredOf<CentroidOutput>(result);
+    expect(data.centroid.longitude).toBeGreaterThan(0);
+    expect(data.centroid.longitude).toBeLessThan(5);
+    expect(data.centroid.latitude).toBeGreaterThan(0);
+    expect(data.centroid.latitude).toBeLessThan(5);
   });
 });

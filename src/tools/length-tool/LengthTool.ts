@@ -10,7 +10,7 @@ import {
   LengthOutputSchema,
   type LengthOutput
 } from './LengthTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 export class LengthTool extends BaseTool<
   typeof LengthInputSchema,

@@ -107,6 +107,7 @@ function loadScriptSandbox(options?: {
     offsetLeft?: number;
     offsetWidth?: number;
     scrollIntoView?: (opts: unknown) => void;
+    innerHTML?: string;
   }
 
   // The script fetches each element by id exactly once at load time and
@@ -818,7 +819,7 @@ describe('mapAppHtml directions self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         routes: [
@@ -1075,7 +1076,7 @@ describe('mapAppHtml isochrone self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         type: 'FeatureCollection',
@@ -1181,7 +1182,7 @@ describe('mapAppHtml map matching self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         code: 'Ok',
@@ -1324,7 +1325,7 @@ describe('mapAppHtml search self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         type: 'FeatureCollection',
@@ -1457,7 +1458,7 @@ describe('mapAppHtml category search self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         type: 'FeatureCollection',
@@ -1542,7 +1543,7 @@ describe('mapAppHtml optimization self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         code: 'Ok',
@@ -2483,7 +2484,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 describe('mapAppHtml results side panel: inline markers', () => {
   it('renders and enriches the panel from inline markers that carry an id, with no selfFetch entries at all', async () => {
     const { sendToolResult, setFetchImpl, carouselEl } = loadScriptSandbox();
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({ results: [] })
     }));
@@ -3044,6 +3045,7 @@ describe('mapAppHtml results carousel: selecting a place', () => {
     offsetLeft?: number;
     offsetWidth?: number;
     scrollIntoView?: (opts: unknown) => void;
+    innerHTML?: string;
   };
   async function threePlaces() {
     const sandbox = loadScriptSandbox();

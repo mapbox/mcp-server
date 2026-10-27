@@ -12,6 +12,15 @@ import {
   getOwnerKeyFromToken,
   getUserNameFromToken
 } from '../../../src/utils/jwtUtils.js';
+import type { ReadResourceResult } from '@modelcontextprotocol/server';
+import { resourceTextOf } from '../../utils/resultTestUtils.js';
+
+// The blob of a resource read's first contents entry, or undefined when
+// it's text.
+function blobOf(result: ReadResourceResult): string | undefined {
+  const entry = result.contents[0];
+  return 'blob' in entry ? entry.blob : undefined;
+}
 
 // Build a Mapbox-style 3-part JWT whose payload carries the username (`u`).
 function tokenFor(username: string): string {
@@ -41,7 +50,7 @@ function forgedTokenFor(username: string): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extraFor(token?: string): any {
-  return token ? { authInfo: { token } } : {};
+  return token ? { http: { authInfo: { token } } } : {};
 }
 
 const NOT_FOUND =
@@ -82,7 +91,7 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     seedTextResource(uri, 'accountA', { route: 'A-secret-geometry' });
 
     const result = await resource.read(uri, extraFor(tokenFor('accountA')));
-    const text = result.contents[0].text as string;
+    const text = resourceTextOf(result);
 
     expect(text).toContain('A-secret-geometry');
   });
@@ -92,7 +101,7 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     seedTextResource(uri, 'accountA', { route: 'A-secret-geometry' });
 
     const result = await resource.read(uri, extraFor(tokenFor('accountB')));
-    const text = result.contents[0].text as string;
+    const text = resourceTextOf(result);
 
     expect(text).toBe(NOT_FOUND);
     expect(text).not.toContain('A-secret-geometry');
@@ -117,8 +126,8 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     expect(crossAccount.contents[0].mimeType).toBe(
       missing.contents[0].mimeType
     );
-    expect(crossAccount.contents[0].text).toBe(missing.contents[0].text);
-    expect(crossAccount.contents[0].text).toBe(NOT_FOUND);
+    expect(resourceTextOf(crossAccount)).toBe(resourceTextOf(missing));
+    expect(resourceTextOf(crossAccount)).toBe(NOT_FOUND);
   });
 
   it('fails closed when the reader has no token', async () => {
@@ -126,7 +135,7 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     seedTextResource(uri, 'accountA', { route: 'A-secret-geometry' });
 
     const result = await resource.read(uri, extraFor(undefined));
-    expect(result.contents[0].text).toBe(NOT_FOUND);
+    expect(resourceTextOf(result)).toBe(NOT_FOUND);
   });
 
   it('fails closed when the resource has no owner recorded', async () => {
@@ -139,7 +148,7 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     });
 
     const result = await resource.read(uri, extraFor(tokenFor('accountA')));
-    expect(result.contents[0].text).toBe(NOT_FOUND);
+    expect(resourceTextOf(result)).toBe(NOT_FOUND);
   });
 
   it('falls back to the env token so stdio/single-user reads still work', async () => {
@@ -150,7 +159,7 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
 
     // No authInfo on the request (stdio) -> requester resolved from env token.
     const result = await resource.read(uri, extraFor(undefined));
-    expect(result.contents[0].text as string).toContain('local-data');
+    expect(resourceTextOf(result)).toContain('local-data');
   });
 
   it('returns image blobs to the owner and not-found to others', async () => {
@@ -165,12 +174,12 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     });
 
     const owner = await resource.read(uri, extraFor(tokenFor('accountA')));
-    expect(owner.contents[0].blob).toBe('BASE64IMAGEDATA');
+    expect(blobOf(owner)).toBe('BASE64IMAGEDATA');
     expect(owner.contents[0].mimeType).toBe('image/png');
 
     const other = await resource.read(uri, extraFor(tokenFor('accountB')));
-    expect(other.contents[0].blob).toBeUndefined();
-    expect(other.contents[0].text).toBe(NOT_FOUND);
+    expect(blobOf(other)).toBeUndefined();
+    expect(resourceTextOf(other)).toBe(NOT_FOUND);
   });
 
   it('resolves a storeMapPayload ref via the real resources/read path (regression)', async () => {
@@ -185,7 +194,7 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
     );
 
     const result = await resource.read(ref, extraFor(tokenFor('accountA')));
-    const parsed = JSON.parse(result.contents[0].text as string);
+    const parsed = JSON.parse(resourceTextOf(result));
 
     expect(parsed.summary).toBe('Test route');
   });
@@ -210,8 +219,8 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
 
     const result = await resource.read(uri, extraFor(forged));
 
-    expect(result.contents[0].text).toBe(NOT_FOUND);
-    expect(result.contents[0].text).not.toContain('A-secret-geometry');
+    expect(resourceTextOf(result)).toBe(NOT_FOUND);
+    expect(resourceTextOf(result)).not.toContain('A-secret-geometry');
   });
 
   it('does NOT return an image blob to a token forging the owner’s username', async () => {
@@ -230,8 +239,8 @@ describe('TemporaryDataResource — AGI-890 cross-account access control', () =>
       extraFor(forgedTokenFor('victim_user'))
     );
 
-    expect(result.contents[0].blob).toBeUndefined();
-    expect(result.contents[0].text).toBe(NOT_FOUND);
+    expect(blobOf(result)).toBeUndefined();
+    expect(resourceTextOf(result)).toBe(NOT_FOUND);
   });
 
   it('does NOT resolve a map-payload ref for a token forging the owner’s username', async () => {
