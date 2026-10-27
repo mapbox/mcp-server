@@ -162,6 +162,8 @@ The skills come from [mapbox/mapbox-agent-skills](https://github.com/mapbox/mapb
 
 A skill is only served when all the tools it uses are enabled. Client support is still early: ChatGPT imports skills when an app is submitted, and fast-agent and MCP Inspector can read them. Clients without support can still read the `skill://` files as ordinary resources.
 
+To turn skills off, for example when a plugin already ships its own copies of the same skills, start the server with `--disable-skills` or set `DISABLE_SKILLS=true`.
+
 ## Rich Map Previews (`render_map_tool`)
 
 Every geospatial tool in this server (directions, isochrone, search, and more) can display its result as a live, interactive Mapbox GL JS map via **`render_map_tool`** — the server's single visualization primitive. It renders through the **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`) as a self-contained HTML panel directly inside the chat, with a Fullscreen toggle, in supported clients:

@@ -56,6 +56,7 @@ test/                           # Mirrors src/ structure
 - `agent-skills.json` pins the commit (full SHA) and maps each served skill to the tools it needs
 - `npm run fetch-skills` (also run by `npm run prepare`, `npm ci` and `npm run build`) generates the gitignored `src/skills/agentSkills.generated.ts`
 - To change a skill: edit it in mapbox-agent-skills, then bump `ref` here; tests fail if a skill names a tool this server doesn't have
+- `--disable-skills` or `DISABLE_SKILLS=true` turns skills off (for plugins that ship their own copies)
 
 ## Essential Workflows
 

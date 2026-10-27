@@ -97,8 +97,11 @@ const enabledToolNames = [
   ...enabledResourceFallbackTools
 ].map((tool) => tool.name);
 
-// Skills whose tools are all enabled (MCP Skills extension, SEP-2640)
-const enabledSkills = getSkillsForTools(enabledToolNames);
+// Skills whose tools are all enabled (MCP Skills extension, SEP-2640),
+// unless --disable-skills or DISABLE_SKILLS=true turned them off
+const enabledSkills = config.disableSkills
+  ? []
+  : getSkillsForTools(enabledToolNames);
 
 // Create an MCP server
 const server = new McpServer(
