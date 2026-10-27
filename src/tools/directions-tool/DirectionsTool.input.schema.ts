@@ -161,7 +161,7 @@ export const DirectionsInputSchema = z.object({
         '(a route across an entire country is typically well under 100 coordinate pairs — ' +
         'enough to draw an accurate shape, not enough to bloat the response) and to "full" ' +
         'otherwise. Pass "full" explicitly for the maximum-precision geometry (every road ' +
-        'segment vertex) if you specifically need that; on a long trip this can be tens of ' +
+        'segment vertex) if you need it, e.g. for a map people zoom in on; on a long trip this can be tens of ' +
         'thousands of coordinate pairs, at which point the response no longer fits in this ' +
         'reply and this tool returns a summary and a `mapbox://response/` ref instead (see the ' +
         'tool description). Note: the Directions API cannot return per-segment congestion data ' +
