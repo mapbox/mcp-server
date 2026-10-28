@@ -13,6 +13,11 @@
 
 ### New Features
 
+- **`list_public_tokens_tool`: a public token for pages built outside the chat (#304, part of #281).** An agent building a site or app with a Mapbox map had to ask the user for a token. The tool lists the account's public (`pk.`) tokens with their names, default flag, URL restrictions and scopes, and recommends one.
+  - **Safer token first:** pass `site_url` and it recommends a token restricted to that URL when one exists. Otherwise it recommends the default public token and says a published site should use a URL-restricted one, with the link to create it.
+  - **Public tokens only:** it asks the Tokens API for `pk` tokens and drops anything else, so secret and temporary tokens never come back. It can't create tokens (that needs `tokens:write`; DevKit's `create_token_tool` does it).
+  - **No new scope:** it needs `tokens:read`, which the in-chat map already uses to find the default public token. With a `pk.` access token, or when listing fails on the server's own `MAPBOX_ACCESS_TOKEN` and `MAPBOX_PUBLIC_TOKEN` is set, it returns that token. A caller with its own bearer token never gets the server's `MAPBOX_PUBLIC_TOKEN`, and a token restricted to other URLs is never recommended.
+  - **Server instructions** now tell the model to use it instead of asking the user for a token when it builds a page outside the chat.
 - **`feedback_tool`: report wrong map, place or routing data to Mapbox (#291).** When someone says a place has closed, a road is closed, or a route took an illegal turn, the agent can send it to the [Feedback API](https://docs.mapbox.com/api/feedback/) (`POST /user-feedback/v1/feedback`, Public Preview) with the text, a category and the location, usually taken from an earlier search or directions result. It returns the report's id and status (`received`).
   - **Confirm first:** the report goes to Mapbox under the user's account, so the description tells the model to show the user what it will send and get a yes. Clients that support elicitation also get a confirmation prompt from the tool itself. Declining sends nothing, and so does a failed prompt.
   - **Categories:** an enum of the Feedback Agent's default categories that make sense from chat (`poi_closed`, `poi_details`, `road_closure_issue`, `illegal_turn` and so on), leaving out the navigation-app ones such as voice guidance and rerouting.
