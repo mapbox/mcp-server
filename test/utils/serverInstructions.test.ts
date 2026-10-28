@@ -19,6 +19,17 @@ describe('buildServerInstructions', () => {
     );
   });
 
+  // Agents building a site with a map asked the user for a token instead
+  // of knowing the server could provide one (#281).
+  it('points page building at list_public_tokens_tool when it is enabled', () => {
+    expect(buildServerInstructions(getAllTools().map((t) => t.name))).toContain(
+      'list_public_tokens_tool'
+    );
+    expect(buildServerInstructions(['render_map_tool'])).not.toContain(
+      'list_public_tokens_tool'
+    );
+  });
+
   it('omits the static image rule when that tool is disabled', () => {
     const text = buildServerInstructions(['render_map_tool', 'isochrone_tool']);
     expect(text).toContain('use render_map_tool');
