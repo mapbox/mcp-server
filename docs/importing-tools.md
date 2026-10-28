@@ -391,7 +391,7 @@ if (request) {
 }
 ```
 
-The ref holds only the original call's inputs, so it resolves in any process with no server-side state. The route is fetched again, so with live traffic it can differ slightly from the original call. `resolveSelfFetchRef` decodes any of these refs (directions, isochrone, search and others) to the tool and parameters behind it. To build the request yourself, `buildDirectionsRequestUrl` is the URL builder `directions_tool` and `directionsRequestFromRef` both use, so your request matches the tool's.
+The ref holds only the original call's inputs, so it resolves in any process with no server-side state. The route is fetched again, so with live traffic it can differ slightly from the original call. `resolveSelfFetchRef` decodes any of these refs (directions, isochrone, search and others) to the tool and parameters behind it. To build the request yourself, `buildDirectionsRequestUrl` is the URL builder `directions_tool` and `directionsRequestFromRef` both use, so your request matches the tool's. `directionsRequestFromRef` always asks for `geometries=geojson` and `overview=full`, whatever the original call used, so you get every vertex of the route.
 
 ## Example: Using in a Web Application
 

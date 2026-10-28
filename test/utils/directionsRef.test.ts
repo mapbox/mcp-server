@@ -55,7 +55,8 @@ describe('directionsRequestFromRef', () => {
       coordinates,
       routing_profile: 'mapbox/driving',
       exclude: 'toll',
-      geometries: 'geojson'
+      geometries: 'geojson',
+      overview: 'full'
     };
     const { result, ref, url } = await runDirections(input);
 
@@ -81,6 +82,16 @@ describe('directionsRequestFromRef', () => {
     expect(url.pathname).toContain('/directions/v5/mapbox/driving-traffic/');
     expect(url.searchParams.get('geometries')).toBe('geojson');
     expect(url.searchParams.get('access_token')).toBe('pk.test');
+  });
+
+  it('asks for the full geometry when the original call took the simplified default', async () => {
+    const { ref, url } = await runDirections({
+      coordinates,
+      geometries: 'geojson'
+    });
+    expect(new URL(url).searchParams.get('overview')).toBe('simplified');
+    const request = directionsRequestFromRef(ref, { accessToken: 'pk.test' });
+    expect(new URL(request!.url).searchParams.get('overview')).toBe('full');
   });
 
   it('passes through the route the user picked among alternatives', () => {
