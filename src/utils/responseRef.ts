@@ -4,7 +4,7 @@
 const RESPONSE_URI_PREFIX = 'mapbox://response/';
 
 /** Tools whose full response can be read back through a response ref. */
-const RESPONSE_TOOLS = ['directions', 'isochrone'] as const;
+const RESPONSE_TOOLS = ['directions', 'isochrone', 'static-map'] as const;
 export type ResponseTool = (typeof RESPONSE_TOOLS)[number];
 
 export interface ResponseRefSpec {

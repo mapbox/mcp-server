@@ -11,18 +11,24 @@ import { cleanResponseData } from '../../tools/directions-tool/cleanResponseData
 import type { DirectionsResponse } from '../../tools/directions-tool/DirectionsTool.output.schema.js';
 import { IsochroneInputSchema } from '../../tools/isochrone-tool/IsochroneTool.input.schema.js';
 import { buildIsochroneRequestUrl } from '../../tools/isochrone-tool/buildIsochroneRequestUrl.js';
+import { StaticMapImageInputSchema } from '../../tools/static-map-image-tool/StaticMapImageTool.input.schema.js';
+import {
+  buildStaticMapRequestUrl,
+  getStaticMapMimeType
+} from '../../tools/static-map-image-tool/buildStaticMapRequestUrl.js';
 
 /**
- * Full `directions_tool` / `isochrone_tool` responses that were too large
- * to return inline. The `mapbox://response/{tool}?data=...` ref carries the
- * call's inputs (see responseRef.ts), and reading it runs the same request
- * again with the reader's token, so any server process can answer it.
+ * Full `directions_tool` / `isochrone_tool` responses and
+ * `static_map_image_tool` images that were too large to return inline. The
+ * `mapbox://response/{tool}?data=...` ref carries the call's inputs (see
+ * responseRef.ts), and reading it runs the same request again with the
+ * reader's token, so any server process can answer it.
  */
 export class ToolResponseResource extends MapboxApiBasedResource {
   readonly name = 'Full Tool Response';
   readonly uri = 'mapbox://response/{spec}';
   readonly description =
-    'The full response of a directions_tool or isochrone_tool call that was too large to return inline, fetched again from its ref.';
+    'The full response of a directions_tool or isochrone_tool call, or a static_map_image_tool image, that was too large to return inline, fetched again from its ref.';
   readonly mimeType = 'application/json';
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -35,6 +41,31 @@ export class ToolResponseResource extends MapboxApiBasedResource {
   ): Promise<ReadResourceResult> {
     const spec = resolveResponseRef(uri);
     const apiEndpoint = MapboxApiBasedResource.mapboxApiEndpoint;
+
+    if (spec?.tool === 'static-map') {
+      const parsed = StaticMapImageInputSchema.safeParse(spec.input);
+      if (!parsed.success) {
+        return text(uri, 'Response ref was malformed or unsupported.');
+      }
+      const { url } = buildStaticMapRequestUrl({
+        input: parsed.data,
+        accessToken,
+        apiEndpoint
+      });
+      const response = await this.httpRequest(url);
+      if (!response.ok) {
+        return text(
+          uri,
+          `Fetching the image failed: ${response.status} ${response.statusText}`
+        );
+      }
+      const blob = Buffer.from(await response.arrayBuffer()).toString('base64');
+      return {
+        contents: [
+          { uri, mimeType: getStaticMapMimeType(parsed.data.style), blob }
+        ]
+      };
+    }
     let url: string | null = null;
     let directionsInput: ReturnType<typeof DirectionsInputSchema.parse> | null =
       null;
