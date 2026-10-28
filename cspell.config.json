@@ -13,8 +13,5 @@
     "dataplor",
     "tripadvisor"
   ],
-  "ignorePaths": [
-    "node_modules",
-    "dist"
-  ]
+  "ignorePaths": ["node_modules", "dist", "src/skills/agentSkills.generated.ts"]
 }

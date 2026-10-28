@@ -149,6 +149,21 @@ Access the complete list of available category IDs for use with the category sea
 - **Clients with native MCP resource support**: Use the `resources/read` MCP protocol method
 - **Clients without resource support**: Use the `resource_reader_tool` with the resource URI
 
+## Skills
+
+The server also serves **skills**: workflow instructions a client can load when a task calls for them, over the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview) (`io.modelcontextprotocol/skills`). Each one is a `SKILL.md` at `skill://<name>/SKILL.md`, listed by `skills/list`.
+
+- **`mapbox-map-display`**: showing tool results with `render_map_tool`, combining several results on one map, hand-placed markers, and when a static image is right instead.
+- **`mapbox-reachability-analysis`**: finding places within a travel time or distance (coffee within a 10 minute walk) and mapping them with the reachable area.
+- **`mapbox-location-grounding`**: answering location questions from live Mapbox data with citations, instead of from training data.
+- **`mapbox-search-patterns`**: choosing the right search tool and parameters for geocoding and POI search.
+
+The skills come from [mapbox/mapbox-agent-skills](https://github.com/mapbox/mapbox-agent-skills), the same skills you can install in Claude Code, Cursor and other assistants. `agent-skills.json` pins the commit and lists which skills this server serves; they're bundled into the package at build time, so nothing is fetched at runtime.
+
+A skill is only served when all the tools it uses are enabled. Client support is still early: ChatGPT imports skills when an app is submitted, and fast-agent and MCP Inspector can read them. Clients without support can still read the `skill://` files as ordinary resources.
+
+To turn skills off, for example when a plugin already ships its own copies of the same skills, start the server with `--disable-skills` or set `DISABLE_SKILLS=true`.
+
 ## Rich Map Previews (`render_map_tool`)
 
 Every geospatial tool in this server (directions, isochrone, search, and more) can display its result as a live, interactive Mapbox GL JS map via **`render_map_tool`** — the server's single visualization primitive. It renders through the **MCP Apps** protocol (`@modelcontextprotocol/ext-apps`) as a self-contained HTML panel directly inside the chat, with a Fullscreen toggle, in supported clients:
