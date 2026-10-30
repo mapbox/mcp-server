@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.17.0-dev - 2026-10-30
+
 ### Breaking Changes
 
 - **MCP TypeScript SDK v2 (#296, part of #245).** The server and the `@mapbox/mcp-server/tools`, `/resources` and `/utils` exports now use the v2 SDK packages (`@modelcontextprotocol/server` and `@modelcontextprotocol/core`, 2.3.1) instead of `@modelcontextprotocol/sdk` 1.x, and `@modelcontextprotocol/ext-apps` moves from 1.x to 2.0.3. v2 is the line that gets new MCP features, such as the SDK's Skills extension support, and ext-apps 2.x requires it.
