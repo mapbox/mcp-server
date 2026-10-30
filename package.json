@@ -1,6 +1,6 @@
 {
   "name": "@mapbox/mcp-server",
-  "version": "0.16.1-dev",
+  "version": "0.17.0-dev.1",
   "description": "Mapbox MCP server.",
   "mcpName": "io.github.mapbox/mcp-server",
   "main": "./dist/commonjs/index.js",
