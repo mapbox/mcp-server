@@ -352,9 +352,17 @@ function loadScriptSandbox(options?: {
     ).__badgeTextColor as (color: unknown) => string,
     hoursToday: (
       sandbox.window as {
-        __hoursToday?: (spec: unknown, now: Date) => string | null;
+        __hoursToday?: (
+          spec: unknown,
+          now: Date,
+          timeZone?: string,
+          locale?: string
+        ) => { state: string; text: string } | null;
       }
     ).__hoursToday,
+    priceSigns: (
+      sandbox.window as { __priceSigns?: (level: unknown) => string | null }
+    ).__priceSigns,
     derivePanelItems: (
       sandbox.window as {
         __derivePanelItems?: (markers: unknown[]) => PanelItem[];
@@ -1705,7 +1713,9 @@ describe('mapAppHtml ground location self-fetch', () => {
         return {
           ok: true,
           json: async () => ({
-            results: [{ mapbox_id: coffeeId, score: { popularity: 0.65 } }]
+            results: [
+              { mapbox_id: coffeeId, attributes: { price_level: 'Cheap' } }
+            ]
           })
         };
       }
@@ -1757,7 +1767,7 @@ describe('mapAppHtml ground location self-fetch', () => {
     const [body, thumb] = carouselEl.children[0].children[0].children;
     expect(thumb.className).toBe('card-thumb empty');
     expect(body.children[0].textContent).toBe('Four Barrel Coffee');
-    expect(body.children[1].textContent).toBe('cafe · 120 m · 65% popularity');
+    expect(body.children[1].textContent).toBe('Cafe · $ · 120 m');
   });
 
   it('fetches the place name and draws origin + numbered POI markers from a selfFetch descriptor', async () => {
@@ -2006,8 +2016,10 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
                 mapbox_id: mockPoiId('poi-1'),
                 photos: [{ url: 'https://example.com/photo.jpg' }],
                 score: { popularity: 0.8 },
+                attributes: { price_level: 'Moderate' },
                 phone: '+15551234567',
-                opening_hours: '24/7'
+                opening_hours: '24/7',
+                telemetry: { tags: { timezone: 'America/Los_Angeles' } }
               }
             ]
           })
@@ -2066,10 +2078,16 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     expect(thumb.className).toBe('card-thumb empty');
     expect(name.textContent).toBe('Cafe Reveille');
-    expect(meta.textContent).toBe('cafe · 120 m · 80% popularity');
-    // Hours and phone go on a second line of the card.
+    // Category capitalized, price level as dollar signs, no popularity.
+    expect(meta.textContent).toBe('Cafe · $$ · 120 m');
+    // Hours go on a second line of the card, with a green "Open". The
+    // phone number waits for a place detail card.
     expect(extra.className).toBe('card-extra');
-    expect(extra.textContent).toBe('Open 24 hours · +15551234567');
+    const [status, rest] = extra.children;
+    expect(status.className).toBe('hours-open');
+    expect(status.textContent).toBe('Open');
+    expect(rest.textContent).toBe(' 24 hours');
+    expect(extra.children).toHaveLength(2);
     // The first card starts selected.
     expect(card.className).toBe('card active');
     // A place with a card gets no popup on its pin (the search center
@@ -2210,7 +2228,9 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
         return {
           ok: true,
           json: async () => ({
-            results: [{ mapbox_id: goodId, score: { popularity: 0.5 } }]
+            results: [
+              { mapbox_id: goodId, attributes: { price_level: 'Cheap' } }
+            ]
           })
         };
       }
@@ -2222,7 +2242,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     expect(bodies).toEqual([{ ids: [goodId] }]);
     const rows = carouselEl.children[0].children;
-    expect(rows[1].children[0].children[1].textContent).toBe('50% popularity');
+    expect(rows[1].children[0].children[1].textContent).toBe('$');
   });
 
   it('drops the id a 422 names and retries the batch once', async () => {
@@ -2247,7 +2267,9 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
         return {
           ok: true,
           json: async () => ({
-            results: [{ mapbox_id: goodId, score: { popularity: 0.5 } }]
+            results: [
+              { mapbox_id: goodId, attributes: { price_level: 'Cheap' } }
+            ]
           })
         };
       }
@@ -2259,7 +2281,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 
     expect(bodies.map((b) => b.ids)).toEqual([[rejectedId, goodId], [goodId]]);
     const rows = carouselEl.children[0].children;
-    expect(rows[1].children[0].children[1].textContent).toBe('50% popularity');
+    expect(rows[1].children[0].children[1].textContent).toBe('$');
   });
 
   it('filters out OSM-sourced ids before the batch call, so one incompatible id does not zero out enrichment for the rest', async () => {
@@ -2283,7 +2305,9 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
         return {
           ok: true,
           json: async () => ({
-            results: [{ mapbox_id: nativeId, score: { popularity: 0.5 } }]
+            results: [
+              { mapbox_id: nativeId, attributes: { price_level: 'Cheap' } }
+            ]
           })
         };
       }
@@ -2324,12 +2348,10 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].children[0].children[0].textContent).toBe('OSM Cafe');
     // Never enriched (filtered out before the batch call).
-    expect(rows[0].children[0].children[1].textContent).not.toContain(
-      'popularity'
-    );
+    expect(rows[0].children[0].children[1].textContent).toBe('');
 
     expect(rows[1].children[0].children[0].textContent).toBe('Native Cafe');
-    expect(rows[1].children[0].children[1].textContent).toBe('50% popularity');
+    expect(rows[1].children[0].children[1].textContent).toBe('$');
   });
 
   // Place Details photos are hosted on third-party CDNs (e.g.
@@ -2345,7 +2367,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
               {
                 mapbox_id: id,
                 photos: [{ url: 'https://dyn.mktgcdn.com/p/photo.jpg' }],
-                score: { popularity: 0.42 }
+                attributes: { price_level: 'Cheap' }
               }
             ]
           })
@@ -2413,7 +2435,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
     expect(thumb.style.backgroundImage).toBe(
       'url("data:image/jpeg;base64,QUJD")'
     );
-    expect(body.children[1].textContent).toBe('42% popularity');
+    expect(body.children[1].textContent).toBe('$');
     expect(JSON.stringify(row)).not.toContain('mktgcdn');
   });
 
@@ -2772,7 +2794,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
       resolve({
         ok: true,
         json: async () => ({
-          results: [{ mapbox_id: id, score: { popularity: 0.45 } }]
+          results: [{ mapbox_id: id, attributes: { price_level: 'Cheap' } }]
         })
       });
     respond(pending[0]);
@@ -2786,7 +2808,7 @@ describe('mapAppHtml results side panel: one panel per render', () => {
         }>;
       }
     ).children[0];
-    expect(row.children[0].children[1].textContent).toBe('45% popularity');
+    expect(row.children[0].children[1].textContent).toBe('$');
   });
 
   it('fits the map above the carousel, and moves the legend up above it', async () => {
@@ -3074,7 +3096,7 @@ describe('mapAppHtml results carousel: selecting a place', () => {
   const active = (els: El[]) =>
     els.map((el) => el.className.split(' ').includes('active'));
 
-  it('starts with the first card and its pin selected, with the name under the pin', async () => {
+  it('starts with the first card and its pin selected, with names under every pin', async () => {
     const { cards, pins } = await threePlaces();
 
     expect(active(cards)).toEqual([true, false, false]);
@@ -3087,6 +3109,13 @@ describe('mapAppHtml results carousel: selecting a place', () => {
     };
     expect(label.className).toBe('marker-name');
     expect(label.textContent).toBe('One');
+    // Every carousel pin is labeled, not just the selected one.
+    expect(
+      pins.map(
+        (pin) =>
+          (pin.children[0] as unknown as { textContent: string }).textContent
+      )
+    ).toEqual(['One', 'Two', 'Three']);
   });
 
   it('selects a card and its pin when the card is clicked', async () => {
@@ -3206,24 +3235,112 @@ describe('mapAppHtml badge text color', () => {
 });
 
 describe('mapAppHtml results carousel: hours today', () => {
-  const { hoursToday } = loadScriptSandbox();
+  const { hoursToday, priceSigns } = loadScriptSandbox();
   // 2026-10-19 is a Monday; 2026-10-25 a Sunday.
   const monday = new Date(2026, 9, 19, 12);
   const sunday = new Date(2026, 9, 25, 12);
 
+  // No time zone: today's hours on the viewer's day, no open/closed claim.
   it.each([
-    ['24/7', monday, 'Open 24 hours'],
-    ['Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00', monday, 'Today 07:00–19:00'],
-    ['Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00', sunday, 'Today 08:00–17:00'],
-    ['Mo 09:00-12:00,13:00-17:00', monday, 'Today 09:00–12:00, 13:00–17:00'],
-    ['Mo-Su 08:00-20:00; Su off', sunday, 'Closed today'],
-    ['Fr-Mo 10:00-22:00', monday, 'Today 10:00–22:00'],
-    ['Tu-Sa 10:00-18:00', monday, null],
+    ['24/7', monday, { state: 'open', text: '24 hours' }],
+    [
+      'Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00',
+      monday,
+      { state: 'hours', text: 'Open 7:00–19:00' }
+    ],
+    [
+      'Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00',
+      sunday,
+      { state: 'hours', text: 'Open 8:00–17:00' }
+    ],
+    [
+      'Mo 09:00-12:00,13:00-17:00',
+      monday,
+      { state: 'hours', text: 'Open 9:00–12:00, 13:00–17:00' }
+    ],
+    ['Mo-Su 08:00-20:00; Su off', sunday, { state: 'closed', text: 'today' }],
+    ['Fr-Mo 10:00-22:00', monday, { state: 'hours', text: 'Open 10:00–22:00' }],
+    ['Tu-Sa 10:00-18:00', monday, { state: 'closed', text: 'today' }],
     ['Mo-Fr 07:00-19:00; PH off', monday, null],
     ['Mo 9am-5pm', monday, null],
     ['', monday, null],
     [undefined, monday, null]
   ])('%s', (spec, now, expected) => {
-    expect(hoursToday?.(spec, now)).toBe(expected);
+    expect(hoursToday?.(spec, now, undefined, 'en-GB')).toEqual(expected);
+  });
+
+  // With the place's time zone: open now, or closed and when it opens.
+  // Times are UTC instants read in the place's zone.
+  const at = (iso: string) => new Date(iso);
+  it.each([
+    // Monday 12:00 in New York (16:00 UTC).
+    [
+      'Mo-Fr 07:00-19:00',
+      at('2026-10-19T16:00:00Z'),
+      'America/New_York',
+      { state: 'open', text: 'until 19:00' }
+    ],
+    // Monday 06:00 in New York: opens later today.
+    [
+      'Mo-Fr 07:00-19:00',
+      at('2026-10-19T10:00:00Z'),
+      'America/New_York',
+      { state: 'closed', text: '· opens 7:00' }
+    ],
+    // Monday 20:00 in New York: done for the day.
+    [
+      'Mo-Fr 07:00-19:00',
+      at('2026-10-20T00:00:00Z'),
+      'America/New_York',
+      { state: 'closed', text: '' }
+    ],
+    // Monday 01:00 in New York, open from Sunday's late shift.
+    [
+      'Su 18:00-02:00; Mo 10:00-22:00',
+      at('2026-10-19T05:00:00Z'),
+      'America/New_York',
+      { state: 'open', text: 'until 2:00' }
+    ],
+    // Monday 23:00 in New York, inside a range that runs past midnight.
+    [
+      'Mo 18:00-02:00',
+      at('2026-10-20T03:00:00Z'),
+      'America/New_York',
+      { state: 'open', text: 'until 2:00' }
+    ],
+    // Split day: between the two ranges.
+    [
+      'Mo 09:00-12:00,13:00-17:00',
+      at('2026-10-19T16:30:00Z'),
+      'America/New_York',
+      { state: 'closed', text: '· opens 13:00' }
+    ],
+    // It's already Tuesday in Tokyo, so Monday-only hours don't apply.
+    [
+      'Mo 09:00-17:00',
+      at('2026-10-19T16:00:00Z'),
+      'Asia/Tokyo',
+      { state: 'closed', text: '' }
+    ],
+    // Unknown zone falls back to the viewer's day.
+    [
+      'Mo 09:00-17:00',
+      monday,
+      'Not/AZone',
+      { state: 'hours', text: 'Open 9:00–17:00' }
+    ]
+  ])('%s at %s in %s', (spec, now, timeZone, expected) => {
+    expect(hoursToday?.(spec, now, timeZone, 'en-GB')).toEqual(expected);
+  });
+
+  it.each([
+    ['Cheap', '$'],
+    ['Moderate', '$$'],
+    ['Expensive', '$$$'],
+    ['Very Expensive', '$$$$'],
+    ['Pricey', null],
+    [undefined, null]
+  ])('price level %s is %s', (level, expected) => {
+    expect(priceSigns?.(level)).toBe(expected);
   });
 });

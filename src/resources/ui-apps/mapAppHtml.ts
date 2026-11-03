@@ -110,19 +110,21 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     cursor: pointer;
   }
-  /* Selected place (see selectPlace): the pin inverts and shows its name,
-     like the card it matches. */
+  /* Selected place (see selectPlace): the pin inverts, like the card it
+     matches. */
   .marker-badge.active {
     background: #fff !important; color: #0f172a !important;
     transform: scale(1.18); box-shadow: 0 3px 10px rgba(0,0,0,0.5);
   }
+  /* Every carousel place shows its name under the pin, with a white halo
+     instead of a box, the way map labels look. */
   .marker-badge .marker-name {
-    display: none; position: absolute; top: 32px; left: 50%; transform: translateX(-50%);
-    white-space: nowrap; font-size: 11px; font-weight: 600; color: #0f172a;
-    background: rgba(255,255,255,0.92); padding: 1px 6px; border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;
+    position: absolute; top: 32px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; font-size: 11px; font-weight: 700; color: #0f172a;
+    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+      0 0 3px #fff;
+    pointer-events: none;
   }
-  .marker-badge.active .marker-name { display: block; }
   /* A place pin (search results and other places in the carousel): a
      white disc with the place's Maki icon, black when selected. Numbered
      badges stay for markers whose number means something (visit order). */
@@ -181,6 +183,10 @@ export function renderMapAppHtml(params: {
     font-size: 12px; color: var(--ui-text-muted); margin-top: 3px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  #carousel .hours-open { color: #15803d; font-weight: 600; }
+  #carousel .hours-closed { color: #b91c1c; font-weight: 600; }
+  :root[data-theme="dark"] #carousel .hours-open { color: #4ade80; }
+  :root[data-theme="dark"] #carousel .hours-closed { color: #f87171; }
 </style>
 </head>
 <body>
@@ -1860,14 +1866,9 @@ ${initialDataScript}
     name.className = 'card-name';
     name.textContent = it.name;
 
-    var metaParts = [];
-    if (it.category) metaParts.push(it.category);
-    if (typeof it.distanceMeters === 'number') {
-      metaParts.push(Math.round(it.distanceMeters) + ' m');
-    }
     var meta = document.createElement('div');
     meta.className = 'card-meta';
-    meta.textContent = metaParts.join(' · ');
+    meta.textContent = cardMetaText(it, null);
 
     var body = document.createElement('div');
     body.className = 'card-body';
@@ -1890,9 +1891,29 @@ ${initialDataScript}
       selectPlace(it.id, { scrollCard: true, panTo: true });
     });
 
-    panelRowsById[it.id] = { li: li, meta: meta, body: body, thumb: thumb };
+    panelRowsById[it.id] = { li: li, meta: meta, body: body, thumb: thumb, item: it };
     return li;
   }
+
+  // "Cafe · $$ · 120 m". Search Box categories come lowercase.
+  function cardMetaText(it, price) {
+    var parts = [];
+    if (it.category) parts.push(it.category.charAt(0).toUpperCase() + it.category.slice(1));
+    if (price) parts.push(price);
+    if (typeof it.distanceMeters === 'number') {
+      parts.push(Math.round(it.distanceMeters) + ' m');
+    }
+    return parts.join(' · ');
+  }
+
+  // Places API attributes.price_level as dollar signs. Unknown levels show
+  // nothing rather than a guess.
+  var PRICE_SIGNS = { 'cheap': '$', 'moderate': '$$', 'expensive': '$$$', 'very expensive': '$$$$' };
+  function priceSigns(level) {
+    if (typeof level !== 'string') return null;
+    return PRICE_SIGNS[level.trim().toLowerCase()] || null;
+  }
+  window.__priceSigns = priceSigns;
 
   function clearPanel() {
     while (carouselEl.firstChild) carouselEl.removeChild(carouselEl.firstChild);
@@ -1948,13 +1969,19 @@ ${initialDataScript}
     if (created) selectPlace(items[0].id);
   }
 
-  // Today's hours from a Places API opening_hours string, which uses OSM
+  // Opening hours from a Places API opening_hours string, which uses OSM
   // syntax: "Mo-Fr 07:00-19:00; Sa,Su 08:00-17:00", "Mo 09:00-12:00,13:00-17:00",
   // "Su off", "24/7". Returns null for anything else (holidays, months, week
-  // numbers), so a card shows no hours rather than wrong ones. "Today" is
-  // the viewer's day, which can differ from the place's near midnight when
-  // they're in different time zones.
+  // numbers), so a card shows no hours rather than wrong ones.
+  //
+  // With the place's time zone (Places telemetry.tags.timezone) we know its
+  // clock, so the card says whether it's open now: { state: 'open', text:
+  // 'until 8:30 PM' } or { state: 'closed', text: '· opens 7:30 AM' }.
+  // Without one we only know the viewer's day, so the card shows today's
+  // hours: { state: 'hours', text: 'Open 7:30 AM–3:00 PM' }. Times use the
+  // viewer's locale (7:30–15:00 in en-GB).
   var OSM_WEEK = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+  var INTL_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   var HOURS_RANGE = /^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$/;
   function osmDaysInclude(days, day) {
     var parts = days.split(',');
@@ -1964,19 +1991,19 @@ ${initialDataScript}
       var a = OSM_WEEK.indexOf(ends[0]);
       var b = ends.length === 2 ? OSM_WEEK.indexOf(ends[1]) : a;
       if (a === -1 || b === -1 || ends.length > 2) return null;
-      var d = OSM_WEEK.indexOf(day);
-      if (a <= b ? (d >= a && d <= b) : (d >= a || d <= b)) hit = true;
+      if (a <= b ? (day >= a && day <= b) : (day >= a || day <= b)) hit = true;
     }
     return hit;
   }
-  function hoursToday(spec, now) {
-    if (typeof spec !== 'string') return null;
-    var text = spec.trim();
-    if (!text) return null;
-    if (text === '24/7') return 'Open 24 hours';
-    var day = OSM_WEEK[(now.getDay() + 6) % 7];
-    var result = null;
-    var rules = text.split(';');
+  function toMinutes(hhmm) {
+    return parseInt(hhmm.slice(0, 2), 10) * 60 + parseInt(hhmm.slice(3, 5), 10);
+  }
+  // A day's opening ranges as [startMinute, endMinute] pairs (end <= start
+  // runs past midnight), 'always' for 24/7, or null when unparseable.
+  function osmDayRanges(spec, day) {
+    if (spec === '24/7') return 'always';
+    var result = [];
+    var rules = spec.split(';');
     for (var i = 0; i < rules.length; i++) {
       var rule = rules[i].trim();
       if (!rule) continue;
@@ -1986,17 +2013,77 @@ ${initialDataScript}
       if (applies === null) return null;
       var times = rule.slice(space + 1).trim();
       var ranges = times === 'off' || times === 'closed' ? [] : times.split(',');
+      var parsed = [];
       for (var j = 0; j < ranges.length; j++) {
-        if (!HOURS_RANGE.test(ranges[j].trim())) return null;
+        var r = ranges[j].trim();
+        if (!HOURS_RANGE.test(r)) return null;
+        parsed.push([toMinutes(r.slice(0, 5)), toMinutes(r.slice(6, 11))]);
       }
       // In OSM a later rule for the same day overrides an earlier one.
-      if (applies) {
-        result = ranges.length === 0
-          ? 'Closed today'
-          : 'Today ' + ranges.map(function(r) { return r.trim().replace('-', '–'); }).join(', ');
-      }
+      if (applies) result = parsed;
     }
     return result;
+  }
+  // The place's weekday (0 = Monday) and minute of the day, or null for a
+  // missing or unknown time zone.
+  function clockIn(timeZone, now) {
+    if (typeof timeZone !== 'string' || !timeZone) return null;
+    var parts;
+    try {
+      parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(now);
+    } catch (e) {
+      return null;
+    }
+    var p = {};
+    parts.forEach(function(part) { p[part.type] = part.value; });
+    var day = INTL_WEEK.indexOf(p.weekday);
+    if (day === -1) return null;
+    return { day: day, minutes: (parseInt(p.hour, 10) % 24) * 60 + parseInt(p.minute, 10) };
+  }
+  function formatMinutes(minutes, locale) {
+    var d = new Date(2000, 0, 1, Math.floor(minutes / 60) % 24, minutes % 60);
+    try {
+      return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(d);
+    } catch (e) {
+      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(d);
+    }
+  }
+  function hoursToday(spec, now, timeZone, locale) {
+    if (typeof spec !== 'string') return null;
+    var text = spec.trim();
+    if (!text) return null;
+    var clock = clockIn(timeZone, now);
+    var day = clock ? clock.day : (now.getDay() + 6) % 7;
+    var today = osmDayRanges(text, day);
+    if (today === null) return null;
+    if (today === 'always') return { state: 'open', text: '24 hours' };
+    var fmt = function(m) { return formatMinutes(m, locale); };
+    if (!clock) {
+      if (today.length === 0) return { state: 'closed', text: 'today' };
+      return {
+        state: 'hours',
+        text: 'Open ' + today.map(function(r) { return fmt(r[0]) + '–' + fmt(r[1]); }).join(', ')
+      };
+    }
+    var t = clock.minutes;
+    // Still open from a range that started yesterday and runs past midnight.
+    var yesterday = osmDayRanges(text, (day + 6) % 7) || [];
+    for (var i = 0; i < yesterday.length; i++) {
+      if (yesterday[i][1] <= yesterday[i][0] && t < yesterday[i][1]) {
+        return { state: 'open', text: 'until ' + fmt(yesterday[i][1]) };
+      }
+    }
+    var next = null;
+    for (var j = 0; j < today.length; j++) {
+      var s = today[j][0];
+      var e = today[j][1];
+      var overnight = e <= s;
+      if (t >= s && (overnight || t < e)) return { state: 'open', text: 'until ' + fmt(e) };
+      if (t < s && (next === null || s < next)) next = s;
+    }
+    return { state: 'closed', text: next === null ? '' : '· opens ' + fmt(next) };
   }
   window.__hoursToday = hoursToday;
 
@@ -2118,19 +2205,29 @@ ${initialDataScript}
         photosRequested++;
         loadPanelPhoto(row, place.mapbox_id, photoUrl);
       }
-      if (place.score && typeof place.score.popularity === 'number') {
-        var extra = Math.round(place.score.popularity * 100) + '% popularity';
-        row.meta.textContent = row.meta.textContent ? row.meta.textContent + ' · ' + extra : extra;
-      }
-      // Today's hours and the phone number on a second line.
-      var lineParts = [];
-      var hours = hoursToday(place.opening_hours, new Date());
-      if (hours) lineParts.push(hours);
-      if (typeof place.phone === 'string' && place.phone) lineParts.push(place.phone);
-      if (lineParts.length > 0) {
+      var price = priceSigns(place.attributes && place.attributes.price_level);
+      if (price) row.meta.textContent = cardMetaText(row.item, price);
+      // Hours on a second line: a green "Open" or red "Closed" when we know
+      // the place's clock. Places has no star rating, and score.popularity
+      // isn't one, so the card shows neither.
+      var timeZone = place.telemetry && place.telemetry.tags && place.telemetry.tags.timezone;
+      var hours = hoursToday(place.opening_hours, new Date(), timeZone);
+      if (hours) {
         var line = document.createElement('div');
         line.className = 'card-extra';
-        line.textContent = lineParts.join(' · ');
+        if (hours.state === 'hours') {
+          line.textContent = hours.text;
+        } else {
+          var status = document.createElement('span');
+          status.className = hours.state === 'open' ? 'hours-open' : 'hours-closed';
+          status.textContent = hours.state === 'open' ? 'Open' : 'Closed';
+          line.appendChild(status);
+          if (hours.text) {
+            var rest = document.createElement('span');
+            rest.textContent = ' ' + hours.text;
+            line.appendChild(rest);
+          }
+        }
         row.body.appendChild(line);
       }
     });
