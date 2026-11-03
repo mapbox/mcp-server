@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **`resource_reader_tool` reads `mapbox://` refs again (#309).** Resource lookup only matched URIs declared with `*`, so every templated ref (`mapbox://temp/`, `response/`, `inline/`, `compute/`, `place-photo/`) came back "Resource not found". That broke ref reads for clients without native `resources/read`, such as Claude.ai and Claude Desktop.
+
 ## 0.17.0-dev.1 - 2026-10-30
 
 ### Breaking Changes
