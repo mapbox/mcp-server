@@ -40,7 +40,7 @@ describe('ResourceReaderTool', () => {
   });
 
   it('reads a mapbox://inline/ ref', async () => {
-    const uri = buildInlinePayloadRef({ summary: 'Test trip' });
+    const uri = buildInlinePayloadRef({ summary: 'Test trip', layers: [] });
 
     const result = await new ResourceReaderTool().run({ uri });
 
