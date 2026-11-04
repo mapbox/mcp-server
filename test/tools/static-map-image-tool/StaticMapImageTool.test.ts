@@ -10,6 +10,9 @@ import { CustomMarkerOverlaySchema } from '../../../src/tools/static-map-image-t
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
 import { __resetMapboxPublicTokenCache } from '../../../src/utils/mapboxPublicToken.js';
+import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server';
+import { Client } from '@modelcontextprotocol/client';
+import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 
 describe('StaticMapImageTool', () => {
   // A public token changes the URL text (see 'public token link'), so tests
@@ -1038,6 +1041,67 @@ describe('StaticMapImageTool', () => {
       expect(all).not.toContain(SERVER_PK);
       expect(all).not.toContain('access_token=');
       expect(text(result)).toContain("Don't link or embed the request URL");
+    });
+  });
+
+  describe('with an MCP Apps client', () => {
+    // A client that declares MCP Apps support gets the image in the viewer,
+    // so the text says not to repeat it; other clients get the link text.
+    async function callThrough(clientCapabilities: Record<string, unknown>) {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', 'pk.eyJ1IjoibG9jYWwifQ.server-own');
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: async () => new ArrayBuffer(1024)
+      } as Partial<Response>);
+      const server = new McpServer({ name: 'test', version: '0.0.0' });
+      new StaticMapImageTool({ httpRequest }).installTo(server);
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client(
+        { name: 'test-client', version: '0.0.0' },
+        { capabilities: clientCapabilities }
+      );
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport)
+      ]);
+      const result = (await client.callTool({
+        name: 'static_map_image_tool',
+        arguments: {
+          center: { longitude: -77.0369, latitude: 38.9072 },
+          zoom: 12,
+          size: { width: 800, height: 600 },
+          style: 'mapbox/streets-v12'
+        }
+      })) as { content: Array<{ type: string; text?: string }> };
+      await client.close();
+      return result;
+    }
+
+    it('says the viewer shows the map and offers the link only if asked', async () => {
+      const result = await callThrough({
+        extensions: {
+          'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] }
+        }
+      });
+
+      const text = result.content[0].text as string;
+      expect(text).toContain(
+        "is shown to the user at full size in this tool's map viewer, so don't embed or link it again"
+      );
+      expect(text).toContain('If the user asks for a link to the image');
+      expect(text).toContain('access_token=pk.eyJ1IjoibG9jYWwifQ.server-own');
+      expect(text).not.toContain('Give it as a link instead');
+      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
+    });
+
+    it('keeps the link text for a client without MCP Apps', async () => {
+      const result = await callThrough({});
+
+      const text = result.content[0].text as string;
+      expect(text).toContain('Give it as a link instead');
+      expect(text).toContain('Image URL: https://');
+      expect(text).not.toContain("this tool's map viewer");
+      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
     });
   });
 

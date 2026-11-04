@@ -11,6 +11,14 @@ import type { CallToolResult } from '@modelcontextprotocol/server';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import {
+  getUiCapability,
+  RESOURCE_MIME_TYPE
+} from '@modelcontextprotocol/ext-apps/server';
+import {
+  STATIC_MAP_VIEWER_URI,
+  staticMapViewerCsp
+} from '../../resources/ui-apps/StaticMapViewerUIResource.js';
 
 // Images larger than this threshold are stored as temporary resources instead
 // of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
@@ -45,6 +53,16 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+
+  // MCP Apps hosts show the image at full width in this viewer instead of as
+  // a thumbnail. The result is the same either way, so hosts without MCP
+  // Apps still get the image item and the link.
+  readonly meta = {
+    ui: {
+      resourceUri: STATIC_MAP_VIEWER_URI,
+      csp: staticMapViewerCsp(MapboxApiBasedTool.mapboxApiEndpoint)
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -177,21 +195,38 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     });
     const describedSize = `${width}x${height}${publicUrl.endsWith('@2x') ? ' @2x' : ''}`;
     const attached = `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. `;
-    const urlNote = publicToken
-      ? (inline
-          ? attached + "Your reply can't include that attachment, and "
-          : 'The image is not attached, and ') +
-        // Neither Claude's UI nor Codex renders images from other domains
-        // in a reply (both left a broken image), so ask for a link.
-        "chat interfaces generally don't show images from external URLs, so don't embed this URL as a Markdown image. " +
-        "Give it as a link instead; it carries the account's public token, so it opens in a browser.\n" +
-        `Image URL: ${publicUrl}?access_token=${publicToken}`
-      : inline
-        ? attached +
-          "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
-          'If they ask to see the map again, point them to this result or call this tool again.\n' +
-          `Request URL: ${publicUrl}`
-        : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
+    // A client that supports MCP Apps shows the image at full size in the
+    // viewer (see StaticMapViewerUIResource), so a link in the reply would
+    // show it twice. Clients that don't say so (or a stateless server that
+    // never saw their initialize) get the link text.
+    const imageUrl = publicToken
+      ? `${publicUrl}?access_token=${publicToken}`
+      : undefined;
+    const showsViewer =
+      (inline || imageUrl !== undefined) &&
+      getUiCapability(
+        this.activeServer?.server.getClientCapabilities()
+      )?.mimeTypes?.includes(RESOURCE_MIME_TYPE) === true;
+    const urlNote = showsViewer
+      ? `Static map image (${describedSize}, ${input.style}) is shown to the user at full size in this tool's map viewer, so don't embed or link it again in your reply.` +
+        (imageUrl
+          ? `\nIf the user asks for a link to the image, use this URL; it carries the account's public token: ${imageUrl}`
+          : '')
+      : imageUrl
+        ? (inline
+            ? attached + "Your reply can't include that attachment, and "
+            : 'The image is not attached, and ') +
+          // Neither Claude's UI nor Codex renders images from other domains
+          // in a reply (both left a broken image), so ask for a link.
+          "chat interfaces generally don't show images from external URLs, so don't embed this URL as a Markdown image. " +
+          "Give it as a link instead; it carries the account's public token, so it opens in a browser.\n" +
+          `Image URL: ${imageUrl}`
+        : inline
+          ? attached +
+            "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
+            'If they ask to see the map again, point them to this result or call this tool again.\n' +
+            `Request URL: ${publicUrl}`
+          : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
     const content: CallToolResult['content'] = [
       { type: 'text', text: urlNote }
     ];
