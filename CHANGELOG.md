@@ -2,6 +2,7 @@
 
 ### Bug Fixes
 
+- **The dev HTTP server (`npm run dev:http`) sends the server instructions (#314).** It built its server without them, unlike `src/index.ts` and hosted, so local plugin QA pointed at it could route tools differently from production. In Codex, an agent building a page asked the user for a Mapbox token instead of calling `list_public_tokens_tool`.
 - **Localized category lists are readable through MCP `resources/read` (#313).** `mapbox://categories/{language}` (e.g. `mapbox://categories/ja`) was documented but only `mapbox://categories` was registered, so clients that read resources directly got "Resource not found"; only the `resource_reader_tool` fallback could read it. Resources can now declare a `uriTemplate` they also answer, and the categories resource registers `mapbox://categories/{language}`.
 
 ## 0.17.0-dev.1 - 2026-10-30
