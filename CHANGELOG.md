@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Features
+
+- **`static_map_image_tool` shows its map full size in an MCP App viewer (#315).** MCP Apps hosts showed the image result as a small thumbnail, and the model's reply couldn't show it. The tool now points `_meta.ui` at `ui://mapbox/static-map/index.html`, which draws the image from the tool result at full width as a `data:` URL (no token, no request), falling back to #312's public-token URL when the image went to a temporary resource. Clients that declare MCP Apps support get text saying the map is already shown, so the reply doesn't repeat it. The result itself is unchanged, so hosts without MCP Apps keep the image and the link.
+
 ### Bug Fixes
 
 - **The dev HTTP server (`npm run dev:http`) sends the server instructions (#314).** It built its server without them, unlike `src/index.ts` and hosted, so local plugin QA pointed at it could route tools differently from production. In Codex, an agent building a page asked the user for a Mapbox token instead of calling `list_public_tokens_tool`.
