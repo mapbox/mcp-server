@@ -29,6 +29,7 @@ interface MapboxApiResponse {
  */
 export class CategoryListResource extends MapboxApiBasedResource {
   readonly uri = 'mapbox://categories';
+  readonly uriTemplate = 'mapbox://categories/{language}';
   readonly name = 'Mapbox Categories';
   readonly description =
     'List of all available Mapbox Search API categories. Categories can be used for filtering search results. Supports localization via language parameter in URI (e.g., mapbox://categories/ja for Japanese).';

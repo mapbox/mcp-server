@@ -4,6 +4,8 @@
 process.env.MAPBOX_ACCESS_TOKEN = 'pk.eyJzdWIiOiJ0ZXN0In0.signature';
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server';
+import { Client } from '@modelcontextprotocol/client';
 import {
   setupHttpRequest,
   assertHeadersSent
@@ -175,5 +177,64 @@ describe('CategoryListResource', () => {
     await new CategoryListResource({ httpRequest }).read('mapbox://categories');
     calledUrl = mockHttpRequest.mock.calls[0][0];
     expect(calledUrl).not.toContain('language=');
+  });
+
+  describe('through an MCP client', () => {
+    // resources/read matches a fixed URI exactly, so mapbox://categories/ja
+    // used to come back "Resource not found" unless the uriTemplate is
+    // registered too.
+    async function connect() {
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
+        json: async () => ({
+          listItems: [{ canonical_id: 'restaurant', name: 'レストラン' }],
+          version: '25:test',
+          attribution: 'Test Attribution'
+        })
+      });
+      const server = new McpServer({ name: 'test', version: '0.0.0' });
+      new CategoryListResource({ httpRequest }).installTo(server);
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'test-client', version: '0.0.0' });
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport)
+      ]);
+      return { client, mockHttpRequest };
+    }
+
+    it('reads a localized list by language', async () => {
+      const { client, mockHttpRequest } = await connect();
+
+      const result = await client.readResource({
+        uri: 'mapbox://categories/ja'
+      });
+
+      expect(result.contents[0].uri).toBe('mapbox://categories/ja');
+      expect(mockHttpRequest.mock.calls[0][0]).toContain('language=ja');
+      await client.close();
+    });
+
+    it('still reads the default list at the fixed URI', async () => {
+      const { client, mockHttpRequest } = await connect();
+
+      await client.readResource({ uri: 'mapbox://categories' });
+
+      expect(mockHttpRequest.mock.calls[0][0]).not.toContain('language=');
+      await client.close();
+    });
+
+    it('lists the fixed URI and the language template', async () => {
+      const { client } = await connect();
+
+      const { resources } = await client.listResources();
+      const { resourceTemplates } = await client.listResourceTemplates();
+
+      expect(resources.map((r) => r.uri)).toEqual(['mapbox://categories']);
+      expect(resourceTemplates.map((t) => t.uriTemplate)).toEqual([
+        'mapbox://categories/{language}'
+      ]);
+      await client.close();
+    });
   });
 });
