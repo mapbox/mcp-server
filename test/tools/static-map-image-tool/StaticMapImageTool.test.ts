@@ -1012,7 +1012,10 @@ describe('StaticMapImageTool', () => {
         { http: { authInfo: { token: HOSTED_TK } } } as any
       );
 
-      expect(text(result)).toContain('embed this URL as a Markdown image');
+      expect(text(result)).toContain(
+        'If your interface shows images from external URLs, embed this URL as a Markdown image'
+      );
+      expect(text(result)).toContain('otherwise give it as a link');
       expect(text(result)).toContain(`access_token=${USER_PK})`);
       const all = JSON.stringify(result);
       expect(all).not.toContain(SERVER_PK);

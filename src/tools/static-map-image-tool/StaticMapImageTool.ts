@@ -179,9 +179,11 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const attached = `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. `;
     const urlNote = publicToken
       ? (inline
-          ? attached +
-            "Your reply can't include that attachment, so to show the map in your reply, embed this URL as a Markdown image. "
-          : 'To show the map, embed this URL as a Markdown image. ') +
+          ? attached + "Your reply can't include that attachment. "
+          : '') +
+        // Claude's UI, for one, doesn't render images from other domains;
+        // the model knows its host, so let it choose embed or link.
+        'If your interface shows images from external URLs, embed this URL as a Markdown image to show the map in your reply; otherwise give it as a link. ' +
         "It carries the account's public token, so it loads in a browser.\n" +
         `![Static map](${publicUrl}?access_token=${publicToken})`
       : inline
