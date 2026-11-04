@@ -11,6 +11,10 @@ import type { CallToolResult } from '@modelcontextprotocol/server';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import {
+  STATIC_MAP_VIEWER_URI,
+  staticMapViewerCsp
+} from '../../resources/ui-apps/StaticMapViewerUIResource.js';
 
 // Images larger than this threshold are stored as temporary resources instead
 // of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
@@ -45,6 +49,16 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: true
+  };
+
+  // MCP Apps hosts show the image at full width in this viewer instead of as
+  // a thumbnail. The result is the same either way, so hosts without MCP
+  // Apps still get the image item and the link.
+  readonly meta = {
+    ui: {
+      resourceUri: STATIC_MAP_VIEWER_URI,
+      csp: staticMapViewerCsp(MapboxApiBasedTool.mapboxApiEndpoint)
+    }
   };
 
   constructor(params: { httpRequest: HttpRequest }) {
