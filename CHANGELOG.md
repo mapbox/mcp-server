@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **The dev HTTP server (`npm run dev:http`) sends the server instructions (#314).** It built its server without them, unlike `src/index.ts` and hosted, so local plugin QA pointed at it could route tools differently from production. In Codex, an agent building a page asked the user for a Mapbox token instead of calling `list_public_tokens_tool`.
+
 ### Other Features
 
 - **Tool-selection eval: site cases check `list_public_tokens_tool` (#311).** The site-building cases expected `export_map_html_tool`, which #279 reverted, so they could never pass on main. They now expect the agent to get a public token from `list_public_tokens_tool` and embed it in the page it writes, checked by a new `token_embedded` metric against a realistic-looking stub token. Adds a `site-chatgpt-app` case (a ChatGPT Apps SDK widget with a Mapbox map) and an `EVAL_CASES=<ids>` filter for running a few cases cheaply. On main's tool text, Claude Opus 5.5 (18 rows) and OpenAI `chat-latest` (15 rows) embedded the listed token every time.
