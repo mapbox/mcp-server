@@ -119,16 +119,17 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
       overlayString = encodedOverlays.join(',') + '/';
     }
 
-    const density = input.highDensity ? '@2x' : '';
     const encodedStyle = input.style
       .split('/')
       .map(encodeURIComponent)
       .join('/');
-    const publicUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
-    const url = `${publicUrl}?access_token=${accessToken}`;
+    const baseUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}`;
 
     // Fetch image
-    const response = await this.httpRequest(url);
+    let publicUrl = baseUrl + (input.highDensity ? '@2x' : '');
+    const response = await this.httpRequest(
+      `${publicUrl}?access_token=${accessToken}`
+    );
     if (!response.ok) {
       const errorMessage = await this.getErrorMessage(response);
       return {
@@ -136,7 +137,25 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
         isError: true
       };
     }
-    const buffer = await response.arrayBuffer();
+    let buffer = await response.arrayBuffer();
+
+    // A 2x image is about three times the bytes of the same map at 1x (a
+    // 1000x800 streets map: 877KB vs 295KB). Rather than hand back a
+    // temporary resource the host can't show (Codex showed no image at all),
+    // try the 1x image, which usually fits inline.
+    if (input.highDensity && buffer.byteLength > IMAGE_INLINE_THRESHOLD) {
+      const fallback = await this.httpRequest(
+        `${baseUrl}?access_token=${accessToken}`
+      );
+      if (fallback.ok) {
+        const fallbackBuffer = await fallback.arrayBuffer();
+        if (fallbackBuffer.byteLength < buffer.byteLength) {
+          buffer = fallbackBuffer;
+          publicUrl = baseUrl;
+        }
+      }
+    }
+
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 

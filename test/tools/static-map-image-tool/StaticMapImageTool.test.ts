@@ -277,6 +277,96 @@ describe('StaticMapImageTool', () => {
     expect(temporaryResourceManager.count()).toBe(1);
   });
 
+  describe('high-density images too large to inline', () => {
+    // 2x answers with `big`, 1x with `small` (or a failure).
+    function setup(big: number, small: number | 'fail') {
+      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      mockHttpRequest.mockImplementation(async (url: string) => {
+        if (url.includes('@2x')) {
+          return {
+            ok: true,
+            status: 200,
+            arrayBuffer: async () => new ArrayBuffer(big)
+          };
+        }
+        if (small === 'fail') {
+          return {
+            ok: false,
+            status: 500,
+            statusText: 'Server Error',
+            json: async () => ({ message: 'boom' }),
+            text: async () => 'boom'
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          arrayBuffer: async () => new ArrayBuffer(small)
+        };
+      });
+      return { httpRequest, mockHttpRequest };
+    }
+    const input = {
+      center: { longitude: -77.036574, latitude: 38.897684 },
+      zoom: 12,
+      size: { width: 1000, height: 800 },
+      highDensity: true,
+      style: 'mapbox/streets-v12'
+    };
+
+    it('falls back to the 1x image when it fits inline', async () => {
+      const { httpRequest, mockHttpRequest } = setup(877 * 1024, 295 * 1024);
+      temporaryResourceManager.clear();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(result.isError).toBe(false);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
+      expect(mockHttpRequest.mock.calls[0][0]).toContain('1000x800@2x?');
+      expect(mockHttpRequest.mock.calls[1][0]).toContain('1000x800?');
+      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
+      // The URL text matches the image actually returned.
+      const urlText = (result.content[0] as { text: string }).text;
+      expect(urlText.endsWith('/1000x800')).toBe(true);
+      expect(temporaryResourceManager.count()).toBe(0);
+    });
+
+    it('stores a temporary resource when the 1x image is too large too', async () => {
+      const { httpRequest } = setup(2000 * 1024, 750 * 1024);
+      temporaryResourceManager.clear();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(result.isError).toBe(false);
+      expect(result.content.some((c) => c.type === 'image')).toBe(false);
+      expect(temporaryResourceManager.count()).toBe(1);
+      // The smaller 1x image is the one stored.
+      const urlText = (result.content[0] as { text: string }).text;
+      expect(urlText.endsWith('/1000x800')).toBe(true);
+    });
+
+    it('keeps the 2x image when the 1x request fails', async () => {
+      const { httpRequest } = setup(877 * 1024, 'fail');
+      temporaryResourceManager.clear();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(result.isError).toBe(false);
+      expect(temporaryResourceManager.count()).toBe(1);
+      const urlText = (result.content[0] as { text: string }).text;
+      expect(urlText.endsWith('/1000x800@2x')).toBe(true);
+    });
+
+    it('does not refetch a 2x image that fits inline', async () => {
+      const { httpRequest, mockHttpRequest } = setup(500 * 1024, 200 * 1024);
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
+    });
+  });
+
   it('returns error when Mapbox API returns non-2xx response', async () => {
     const { httpRequest } = setupHttpRequest({
       ok: false,
