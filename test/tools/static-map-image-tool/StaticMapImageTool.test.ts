@@ -991,7 +991,7 @@ describe('StaticMapImageTool', () => {
 
       expect(text(result)).toMatch(
         new RegExp(
-          `\\nImage URL: https://\\S+/600x400\\?access_token=${SERVER_PK}$`
+          `\\n!\\[Static map\\]\\(https://\\S+/600x400\\?access_token=${SERVER_PK}\\)$`
         )
       );
       expect(JSON.stringify(result)).not.toContain(
@@ -1012,7 +1012,8 @@ describe('StaticMapImageTool', () => {
         { http: { authInfo: { token: HOSTED_TK } } } as any
       );
 
-      expect(text(result)).toContain(`access_token=${USER_PK}`);
+      expect(text(result)).toContain('embed this URL as a Markdown image');
+      expect(text(result)).toContain(`access_token=${USER_PK})`);
       const all = JSON.stringify(result);
       expect(all).not.toContain(SERVER_PK);
       expect(all).not.toContain(HOSTED_TK);
