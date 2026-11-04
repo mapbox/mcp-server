@@ -159,12 +159,23 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
-    // Use public URL (without credentials) to avoid leaking the access token
+    // The URL has no access token (it would end up in the chat history), so
+    // it returns 401 on its own. Hosts show the image from this result, but a
+    // model can't put it in its own reply, so left with a bare URL it links
+    // that instead (Codex did). Say so before the URL.
+    const inline = buffer.byteLength <= IMAGE_INLINE_THRESHOLD;
+    const describedSize = `${width}x${height}${publicUrl.endsWith('@2x') ? ' @2x' : ''}`;
+    const urlNote = inline
+      ? `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. ` +
+        "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
+        'If they ask to see the map again, point them to this result or call this tool again.\n' +
+        `Request URL: ${publicUrl}`
+      : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
     const content: CallToolResult['content'] = [
-      { type: 'text', text: publicUrl }
+      { type: 'text', text: urlNote }
     ];
 
-    if (buffer.byteLength > IMAGE_INLINE_THRESHOLD) {
+    if (!inline) {
       // Image is too large to inline safely — store as temporary resource
       const resourceId = randomBytes(16).toString('hex');
       const resourceUri = `mapbox://temp/static-map-${resourceId}`;

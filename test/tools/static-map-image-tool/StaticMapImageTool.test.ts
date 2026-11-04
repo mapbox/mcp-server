@@ -895,6 +895,49 @@ describe('StaticMapImageTool', () => {
     });
   });
 
+  describe('URL text', () => {
+    // The URL has no token, so it 401s on its own. Codex linked it as the
+    // map; the text tells the model the image is in the result instead.
+    it('says the image is attached and not to link the URL', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -122.4011, latitude: 37.7897 },
+        zoom: 14,
+        size: { width: 1000, height: 800 },
+        highDensity: true,
+        style: 'mapbox/streets-v12'
+      });
+
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain(
+        'Static map image (1000x800 @2x, mapbox/streets-v12) is attached'
+      );
+      expect(text).toContain("Don't link or embed the request URL");
+      expect(text).toMatch(/\nRequest URL: https:\/\/\S+\/1000x800@2x$/);
+    });
+
+    it('only warns about the URL when the image went to a temporary resource', async () => {
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: async () => new ArrayBuffer(750 * 1024)
+      } as Partial<Response>);
+      temporaryResourceManager.clear();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -122.4011, latitude: 37.7897 },
+        zoom: 14,
+        size: { width: 1000, height: 800 },
+        style: 'mapbox/streets-v12'
+      });
+
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).not.toContain('is attached');
+      expect(text).toMatch(
+        /^Request URL \(it has no access token, so don't link or embed it\): https:/
+      );
+    });
+  });
+
   describe('credential safety', () => {
     it('never includes the Mapbox access token in any content item', async () => {
       const { httpRequest } = setupHttpRequest();
