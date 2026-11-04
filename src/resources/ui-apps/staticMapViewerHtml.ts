@@ -97,9 +97,9 @@ export function renderStaticMapViewerHtml(params: {
     return 'Static map';
   }
 
-  // A public-token URL for the Mapbox API in the result's text (the
-  // ![Static map](...) line, or the link line when the viewer shows the
-  // map). Only that origin, and only with a public token.
+  // A public-token URL for the Mapbox API in the result's text (its
+  // "Image URL:" line, or the link line when the viewer shows the map).
+  // Only that origin, and only with a public token.
   function urlFrom(texts) {
     var prefix = API_ORIGIN + '/';
     for (var i = 0; i < texts.length; i++) {

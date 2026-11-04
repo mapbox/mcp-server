@@ -994,7 +994,7 @@ describe('StaticMapImageTool', () => {
 
       expect(text(result)).toMatch(
         new RegExp(
-          `\\n!\\[Static map\\]\\(https://\\S+/600x400\\?access_token=${SERVER_PK}\\)$`
+          `\\nImage URL: https://\\S+/600x400\\?access_token=${SERVER_PK}$`
         )
       );
       expect(JSON.stringify(result)).not.toContain(
@@ -1016,10 +1016,11 @@ describe('StaticMapImageTool', () => {
       );
 
       expect(text(result)).toContain(
-        'If your interface shows images from external URLs, embed this URL as a Markdown image'
+        "don't embed this URL as a Markdown image. Give it as a link instead"
       );
-      expect(text(result)).toContain('otherwise give it as a link');
-      expect(text(result)).toContain(`access_token=${USER_PK})`);
+      expect(text(result)).toMatch(
+        new RegExp(`\\nImage URL: https://\\S+\\?access_token=${USER_PK}$`)
+      );
       const all = JSON.stringify(result);
       expect(all).not.toContain(SERVER_PK);
       expect(all).not.toContain(HOSTED_TK);
@@ -1045,7 +1046,7 @@ describe('StaticMapImageTool', () => {
 
   describe('with an MCP Apps client', () => {
     // A client that declares MCP Apps support gets the image in the viewer,
-    // so the text says not to repeat it; other clients keep embed-or-link.
+    // so the text says not to repeat it; other clients get the link text.
     async function callThrough(clientCapabilities: Record<string, unknown>) {
       vi.stubEnv('MAPBOX_PUBLIC_TOKEN', 'pk.eyJ1IjoibG9jYWwifQ.server-own');
       const { httpRequest } = setupHttpRequest({
@@ -1089,15 +1090,16 @@ describe('StaticMapImageTool', () => {
       );
       expect(text).toContain('If the user asks for a link to the image');
       expect(text).toContain('access_token=pk.eyJ1IjoibG9jYWwifQ.server-own');
-      expect(text).not.toContain('![Static map]');
+      expect(text).not.toContain('Give it as a link instead');
       expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
     });
 
-    it('keeps embed-or-link for a client without MCP Apps', async () => {
+    it('keeps the link text for a client without MCP Apps', async () => {
       const result = await callThrough({});
 
       const text = result.content[0].text as string;
-      expect(text).toContain('![Static map](');
+      expect(text).toContain('Give it as a link instead');
+      expect(text).toContain('Image URL: https://');
       expect(text).not.toContain("this tool's map viewer");
       expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
     });

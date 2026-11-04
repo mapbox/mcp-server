@@ -128,7 +128,10 @@ describe('static map viewer page', () => {
 
     sendToolResult({
       content: [
-        { type: 'text', text: `To show the map...\n![Static map](${PK_URL})` },
+        {
+          type: 'text',
+          text: `The image is not attached, and ... Give it as a link instead.\nImage URL: ${PK_URL}`
+        },
         { type: 'text', text: 'Image (766KB) stored as temporary resource.' }
       ]
     });
@@ -161,7 +164,7 @@ describe('static map viewer page', () => {
     const { img, messageEl, sendToolResult } = loadViewer();
 
     sendToolResult({
-      content: [{ type: 'text', text: `![Static map](${url})` }]
+      content: [{ type: 'text', text: `Image URL: ${url}` }]
     });
 
     expect(img.src).toBe('');
