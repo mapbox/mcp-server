@@ -162,8 +162,8 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
 
     // Hosts show the image from this result, but a model can't put it in its
     // own reply, so it hands the user a URL instead or says "the map above"
-    // over nothing (Codex did both). Give it one that works, as a Markdown
-    // image it can embed: the request URL with a public (pk.) token, never the
+    // over nothing (Codex did both). Give it a link that works: the request
+    // URL with a public (pk.) token, never the
     // access token used for the fetch (#201). The server's own
     // MAPBOX_PUBLIC_TOKEN is only used when the caller runs on the server's
     // own access token (a local install), so a hosted caller never gets it
@@ -179,13 +179,13 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const attached = `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. `;
     const urlNote = publicToken
       ? (inline
-          ? attached + "Your reply can't include that attachment. "
-          : '') +
-        // Claude's UI, for one, doesn't render images from other domains;
-        // the model knows its host, so let it choose embed or link.
-        'If your interface shows images from external URLs, embed this URL as a Markdown image to show the map in your reply; otherwise give it as a link. ' +
-        "It carries the account's public token, so it loads in a browser.\n" +
-        `![Static map](${publicUrl}?access_token=${publicToken})`
+          ? attached + "Your reply can't include that attachment, and "
+          : 'The image is not attached, and ') +
+        // Neither Claude's UI nor Codex renders images from other domains
+        // in a reply (both left a broken image), so ask for a link.
+        "chat interfaces generally don't show images from external URLs, so don't embed this URL as a Markdown image. " +
+        "Give it as a link instead; it carries the account's public token, so it opens in a browser.\n" +
+        `Image URL: ${publicUrl}?access_token=${publicToken}`
       : inline
         ? attached +
           "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
