@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **`static_map_image_tool` falls back to 1x when a 2x image is too large to inline (#312).** A high-density image over the 700 KB inline limit came back as a `mapbox://temp/` resource with no image, so hosts like Codex showed nothing. The tool now requests the same map at 1x first (a 1000x800 streets map is 877 KB at 2x but 295 KB at 1x) and only stores a temporary resource when that's still too large.
+
 ## 0.17.0-dev.1 - 2026-10-30
 
 ### Breaking Changes
