@@ -4,15 +4,23 @@
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { CustomMarkerOverlaySchema } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.input.schema.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
 import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
+import { __resetMapboxPublicTokenCache } from '../../../src/utils/mapboxPublicToken.js';
 
 describe('StaticMapImageTool', () => {
+  // A public token changes the URL text (see 'public token link'), so tests
+  // don't depend on whether the shell running them has one set.
+  beforeEach(() => {
+    vi.stubEnv('MAPBOX_PUBLIC_TOKEN', '');
+  });
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    __resetMapboxPublicTokenCache();
   });
 
   it('generates valid URL and fetches image', async () => {
@@ -895,7 +903,7 @@ describe('StaticMapImageTool', () => {
     });
   });
 
-  describe('URL text', () => {
+  describe('URL text without a public token', () => {
     // The URL has no token, so it 401s on its own. Codex linked it as the
     // map; the text tells the model the image is in the result instead.
     it('says the image is attached and not to link the URL', async () => {
@@ -935,6 +943,96 @@ describe('StaticMapImageTool', () => {
       expect(text).toMatch(
         /^Request URL \(it has no access token, so don't link or embed it\): https:/
       );
+    });
+  });
+
+  describe('public token link', () => {
+    // A hosted caller (tk. token for user "testuser").
+    const HOSTED_TK = 'tk.eyJ1IjoidGVzdHVzZXIifQ.signature';
+    const USER_PK = 'pk.eyJ1IjoidGVzdHVzZXIifQ.user-default';
+    const SERVER_PK = 'pk.eyJ1Ijoic2VydmVyIn0.server-own';
+    const input = {
+      center: { longitude: -122.4011, latitude: 37.7897 },
+      zoom: 14,
+      size: { width: 600, height: 400 },
+      style: 'mapbox/streets-v12'
+    };
+    // Image fetches succeed; the Tokens API answers with `tokens`.
+    function setup(tokens: { status: number; body?: unknown }) {
+      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      mockHttpRequest.mockImplementation(async (url: string) =>
+        url.includes('/tokens/v2/')
+          ? {
+              ok: tokens.status === 200,
+              status: tokens.status,
+              json: async () => tokens.body
+            }
+          : {
+              ok: true,
+              status: 200,
+              arrayBuffer: async () => new ArrayBuffer(1024)
+            }
+      );
+      return { httpRequest, mockHttpRequest };
+    }
+    const text = (r: { content: unknown[] }) =>
+      (r.content[0] as { text: string }).text;
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      __resetMapboxPublicTokenCache();
+    });
+
+    it("links with the server's MAPBOX_PUBLIC_TOKEN on a local install", async () => {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', SERVER_PK);
+      const { httpRequest } = setup({ status: 403 });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(text(result)).toMatch(
+        new RegExp(
+          `\\nImage URL: https://\\S+/600x400\\?access_token=${SERVER_PK}$`
+        )
+      );
+      expect(JSON.stringify(result)).not.toContain(
+        process.env.MAPBOX_ACCESS_TOKEN as string
+      );
+    });
+
+    it('links a hosted caller with their own default public token', async () => {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', SERVER_PK);
+      const { httpRequest } = setup({
+        status: 200,
+        body: [{ usage: 'pk', default: true, token: USER_PK }]
+      });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(
+        input,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { http: { authInfo: { token: HOSTED_TK } } } as any
+      );
+
+      expect(text(result)).toContain(`access_token=${USER_PK}`);
+      const all = JSON.stringify(result);
+      expect(all).not.toContain(SERVER_PK);
+      expect(all).not.toContain(HOSTED_TK);
+    });
+
+    it("never gives a hosted caller the server's public token", async () => {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', SERVER_PK);
+      // No tokens:read, so the caller's own public token can't be found.
+      const { httpRequest } = setup({ status: 403 });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(
+        input,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { http: { authInfo: { token: HOSTED_TK } } } as any
+      );
+
+      const all = JSON.stringify(result);
+      expect(all).not.toContain(SERVER_PK);
+      expect(all).not.toContain('access_token=');
+      expect(text(result)).toContain("Don't link or embed the request URL");
     });
   });
 

@@ -10,6 +10,7 @@ import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
 
 // Images larger than this threshold are stored as temporary resources instead
 // of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
@@ -159,18 +160,32 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const isRasterStyle = input.style.includes('satellite');
     const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
 
-    // The URL has no access token (it would end up in the chat history), so
-    // it returns 401 on its own. Hosts show the image from this result, but a
-    // model can't put it in its own reply, so left with a bare URL it links
-    // that instead (Codex did). Say so before the URL.
+    // Hosts show the image from this result, but a model can't put it in its
+    // own reply, so it hands the user a URL instead (Codex did). Give it one
+    // that works: the request URL with a public (pk.) token, never the
+    // access token used for the fetch (#201). The server's own
+    // MAPBOX_PUBLIC_TOKEN is only used when the caller runs on the server's
+    // own access token (a local install), so a hosted caller never gets it
+    // in their chat history. With no public token, say not to link the URL.
     const inline = buffer.byteLength <= IMAGE_INLINE_THRESHOLD;
+    const publicToken = await resolveMapboxPublicToken({
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+      httpRequest: this.httpRequest,
+      allowEnvFallback: accessToken === MapboxApiBasedTool.mapboxAccessToken
+    });
     const describedSize = `${width}x${height}${publicUrl.endsWith('@2x') ? ' @2x' : ''}`;
-    const urlNote = inline
-      ? `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. ` +
-        "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
-        'If they ask to see the map again, point them to this result or call this tool again.\n' +
-        `Request URL: ${publicUrl}`
-      : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
+    const attached = `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. `;
+    const urlNote = publicToken
+      ? (inline ? attached : '') +
+        "To link it, use this URL; it carries the account's public token, so it opens in a browser.\n" +
+        `Image URL: ${publicUrl}?access_token=${publicToken}`
+      : inline
+        ? attached +
+          "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
+          'If they ask to see the map again, point them to this result or call this tool again.\n' +
+          `Request URL: ${publicUrl}`
+        : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
     const content: CallToolResult['content'] = [
       { type: 'text', text: urlNote }
     ];
