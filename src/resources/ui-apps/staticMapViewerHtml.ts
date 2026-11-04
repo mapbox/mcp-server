@@ -44,7 +44,6 @@ export function renderStaticMapViewerHtml(params: {
 <script>
 (function() {
   var API_ORIGIN = ${JSON.stringify(apiOrigin)};
-  var MARKDOWN_IMAGE = '![Static map](';
   var IMAGE_TYPES = ['image/png', 'image/jpeg'];
   var img = document.getElementById('map');
   var messageEl = document.getElementById('message');
@@ -98,20 +97,23 @@ export function renderStaticMapViewerHtml(params: {
     return 'Static map';
   }
 
-  // The public-token URL from the text's ![Static map](...) line, only when
-  // it points at the Mapbox API and carries a public token.
+  // A public-token URL for the Mapbox API in the result's text (the
+  // ![Static map](...) line, or the link line when the viewer shows the
+  // map). Only that origin, and only with a public token.
   function urlFrom(texts) {
+    var prefix = API_ORIGIN + '/';
     for (var i = 0; i < texts.length; i++) {
       var t = texts[i];
-      var start = t.indexOf(MARKDOWN_IMAGE);
-      if (start === -1) continue;
-      var url = t.slice(start + MARKDOWN_IMAGE.length);
-      var end = url.indexOf(')');
-      if (end === -1) continue;
-      url = url.slice(0, end);
-      if (url.indexOf(API_ORIGIN + '/') === 0 &&
-          url.indexOf('access_token=pk.') !== -1) {
-        return url;
+      var start = t.indexOf(prefix);
+      while (start !== -1) {
+        var end = start;
+        while (end < t.length && ' )]>"'.indexOf(t.charAt(end)) === -1 &&
+               t.charCodeAt(end) > 32) {
+          end++;
+        }
+        var url = t.slice(start, end);
+        if (url.indexOf('access_token=pk.') !== -1) return url;
+        start = t.indexOf(prefix, end);
       }
     }
     return null;

@@ -136,6 +136,21 @@ describe('static map viewer page', () => {
     expect(img.src).toBe(PK_URL);
   });
 
+  it("finds the URL in the viewer's link line too", () => {
+    const { img, sendToolResult } = loadViewer();
+
+    sendToolResult({
+      content: [
+        {
+          type: 'text',
+          text: `Static map image (1000x700, mapbox/streets-v12) is shown to the user at full size in this tool's map viewer.\nIf the user asks for a link to the image, use this URL; it carries the account's public token: ${PK_URL}`
+        }
+      ]
+    });
+
+    expect(img.src).toBe(PK_URL);
+  });
+
   it.each([
     [
       'another origin',

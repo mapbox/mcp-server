@@ -12,6 +12,10 @@ import { temporaryResourceManager } from '../../utils/temporaryResourceManager.j
 import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
 import {
+  getUiCapability,
+  RESOURCE_MIME_TYPE
+} from '@modelcontextprotocol/ext-apps/server';
+import {
   STATIC_MAP_VIEWER_URI,
   staticMapViewerCsp
 } from '../../resources/ui-apps/StaticMapViewerUIResource.js';
@@ -191,21 +195,38 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     });
     const describedSize = `${width}x${height}${publicUrl.endsWith('@2x') ? ' @2x' : ''}`;
     const attached = `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. `;
-    const urlNote = publicToken
-      ? (inline
-          ? attached + "Your reply can't include that attachment. "
-          : '') +
-        // Claude's UI, for one, doesn't render images from other domains;
-        // the model knows its host, so let it choose embed or link.
-        'If your interface shows images from external URLs, embed this URL as a Markdown image to show the map in your reply; otherwise give it as a link. ' +
-        "It carries the account's public token, so it loads in a browser.\n" +
-        `![Static map](${publicUrl}?access_token=${publicToken})`
-      : inline
-        ? attached +
-          "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
-          'If they ask to see the map again, point them to this result or call this tool again.\n' +
-          `Request URL: ${publicUrl}`
-        : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
+    // A client that supports MCP Apps shows the image at full size in the
+    // viewer (see StaticMapViewerUIResource), so an embed or link in the
+    // reply would show it twice. Clients that don't say so (or a stateless
+    // server that never saw their initialize) get the embed-or-link text.
+    const imageUrl = publicToken
+      ? `${publicUrl}?access_token=${publicToken}`
+      : undefined;
+    const showsViewer =
+      (inline || imageUrl !== undefined) &&
+      getUiCapability(
+        this.activeServer?.server.getClientCapabilities()
+      )?.mimeTypes?.includes(RESOURCE_MIME_TYPE) === true;
+    const urlNote = showsViewer
+      ? `Static map image (${describedSize}, ${input.style}) is shown to the user at full size in this tool's map viewer, so don't embed or link it again in your reply.` +
+        (imageUrl
+          ? `\nIf the user asks for a link to the image, use this URL; it carries the account's public token: ${imageUrl}`
+          : '')
+      : publicToken
+        ? (inline
+            ? attached + "Your reply can't include that attachment. "
+            : '') +
+          // Claude's UI, for one, doesn't render images from other domains;
+          // the model knows its host, so let it choose embed or link.
+          'If your interface shows images from external URLs, embed this URL as a Markdown image to show the map in your reply; otherwise give it as a link. ' +
+          "It carries the account's public token, so it loads in a browser.\n" +
+          `![Static map](${imageUrl})`
+        : inline
+          ? attached +
+            "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
+            'If they ask to see the map again, point them to this result or call this tool again.\n' +
+            `Request URL: ${publicUrl}`
+          : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
     const content: CallToolResult['content'] = [
       { type: 'text', text: urlNote }
     ];
