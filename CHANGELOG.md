@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.17.0-pr308-dev - 2026-11-04
+
 ### Fixed
 
 - **The `render_map_tool` map view ignores `postMessage` events that don't come from the host window.** The check was lost when the directions preview was folded into the shared map app, so another frame on the page could send a fake tool result. (#308)
