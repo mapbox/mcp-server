@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **Localized category lists are readable through MCP `resources/read` (#313).** `mapbox://categories/{language}` (e.g. `mapbox://categories/ja`) was documented but only `mapbox://categories` was registered, so clients that read resources directly got "Resource not found"; only the `resource_reader_tool` fallback could read it. Resources can now declare a `uriTemplate` they also answer, and the categories resource registers `mapbox://categories/{language}`.
+
 ## 0.17.0-dev.1 - 2026-10-30
 
 ### Breaking Changes
