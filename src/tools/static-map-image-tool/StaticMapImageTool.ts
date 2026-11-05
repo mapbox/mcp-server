@@ -1,36 +1,31 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { randomUUID, randomBytes } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
-import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
 import type { CallToolResult } from '@modelcontextprotocol/server';
-import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
-import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
+import { buildResponseRef } from '../../utils/responseRef.js';
+import {
+  buildStaticMapRequestUrl,
+  getStaticMapMimeType
+} from './buildStaticMapRequestUrl.js';
+import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
+import {
+  getUiCapability,
+  RESOURCE_MIME_TYPE
+} from '@modelcontextprotocol/ext-apps/server';
+import {
+  STATIC_MAP_VIEWER_URI,
+  staticMapViewerCsp
+} from '../../resources/ui-apps/StaticMapViewerUIResource.js';
 
-// Images larger than this threshold are stored as temporary resources instead
+// Images larger than this threshold get a `mapbox://response/` ref instead
 // of being inlined as base64, to avoid exceeding Claude Desktop's 1MB tool
 // result limit. base64 adds ~33% overhead, so 700KB raw ≈ 933KB encoded.
 const IMAGE_INLINE_THRESHOLD = 700 * 1024; // 700KB
-
-// encodeURIComponent leaves (, ), !, ', and * unescaped (they're valid in a
-// URI component per RFC 3986's "unreserved" carve-out from the older
-// escape() behaviour). Every overlay value below is embedded inside a
-// path segment delimited by literal parentheses (e.g. `url-<value>(lon,lat)`,
-// `geojson(<value>)`), so a raw `)` in the value can terminate that segment
-// early from the Static Images API's own overlay-syntax parser's point of
-// view, even though this value already passed URL/JSON validation on our
-// side. Escape those characters explicitly so both parsers agree on where
-// the value actually ends.
-function encodeOverlayComponent(value: string): string {
-  return encodeURIComponent(value).replace(
-    /[()!'*]/g,
-    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()
-  );
-}
 
 export class StaticMapImageTool extends MapboxApiBasedTool<
   typeof StaticMapImageInputSchema
@@ -46,6 +41,16 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     openWorldHint: true
   };
 
+  // MCP Apps hosts show the image at full width in this viewer instead of as
+  // a thumbnail. The result is the same either way, so hosts without MCP
+  // Apps still get the image item and the link.
+  readonly meta = {
+    ui: {
+      resourceUri: STATIC_MAP_VIEWER_URI,
+      csp: staticMapViewerCsp(MapboxApiBasedTool.mapboxApiEndpoint)
+    }
+  };
+
   constructor(params: { httpRequest: HttpRequest }) {
     super({
       inputSchema: StaticMapImageInputSchema,
@@ -53,82 +58,24 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     });
   }
 
-  private encodeOverlay(overlay: z.infer<typeof OverlaySchema>): string {
-    switch (overlay.type) {
-      case 'marker': {
-        const size = overlay.size === 'large' ? 'pin-l' : 'pin-s';
-        let marker = size;
-
-        if (overlay.label) {
-          marker += `-${overlay.label}`;
-        }
-
-        if (overlay.color) {
-          marker += `+${overlay.color}`;
-        }
-
-        return `${marker}(${overlay.longitude},${overlay.latitude})`;
-      }
-
-      case 'custom-marker': {
-        const encodedUrl = encodeOverlayComponent(overlay.url);
-        return `url-${encodedUrl}(${overlay.longitude},${overlay.latitude})`;
-      }
-
-      case 'path': {
-        let path = `path-${overlay.strokeWidth}`;
-
-        if (overlay.strokeColor) {
-          path += `+${overlay.strokeColor}`;
-          if (overlay.strokeOpacity !== undefined) {
-            path += `-${overlay.strokeOpacity}`;
-          }
-        }
-
-        if (overlay.fillColor) {
-          path += `+${overlay.fillColor}`;
-          if (overlay.fillOpacity !== undefined) {
-            path += `-${overlay.fillOpacity}`;
-          }
-        }
-
-        // URL encode the polyline to handle special characters
-        return `${path}(${encodeOverlayComponent(overlay.encodedPolyline)})`;
-      }
-
-      case 'geojson': {
-        const geojsonString = JSON.stringify(overlay.data);
-        return `geojson(${encodeOverlayComponent(geojsonString)})`;
-      }
-    }
-  }
-
   protected async execute(
     input: z.infer<typeof StaticMapImageInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    const { longitude: lng, latitude: lat } = input.center;
     const { width, height } = input.size;
-
-    // Build overlay string
-    let overlayString = '';
-    if (input.overlays && input.overlays.length > 0) {
-      const encodedOverlays = input.overlays.map((overlay) => {
-        return this.encodeOverlay(overlay);
-      });
-      overlayString = encodedOverlays.join(',') + '/';
-    }
-
-    const density = input.highDensity ? '@2x' : '';
-    const encodedStyle = input.style
-      .split('/')
-      .map(encodeURIComponent)
-      .join('/');
-    const publicUrl = `${MapboxApiBasedTool.mapboxApiEndpoint}styles/v1/${encodedStyle}/static/${overlayString}${lng},${lat},${input.zoom}/${width}x${height}${density}`;
-    const url = `${publicUrl}?access_token=${accessToken}`;
+    const apiEndpoint = MapboxApiBasedTool.mapboxApiEndpoint;
+    // The input the returned image was rendered from: the 1x fallback below
+    // swaps it, so a mapbox://response/ ref renders the same image again.
+    let rendered = input;
+    const requested = buildStaticMapRequestUrl({
+      input,
+      accessToken,
+      apiEndpoint
+    });
+    let publicUrl = requested.publicUrl;
 
     // Fetch image
-    const response = await this.httpRequest(url);
+    const response = await this.httpRequest(requested.url);
     if (!response.ok) {
       const errorMessage = await this.getErrorMessage(response);
       return {
@@ -136,31 +83,96 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
         isError: true
       };
     }
-    const buffer = await response.arrayBuffer();
-    const isRasterStyle = input.style.includes('satellite');
-    const mimeType = isRasterStyle ? 'image/jpeg' : 'image/png';
+    let buffer = await response.arrayBuffer();
 
-    // Use public URL (without credentials) to avoid leaking the access token
+    // A 2x image is about three times the bytes of the same map at 1x (a
+    // 1000x800 streets map: 877KB vs 295KB). Rather than hand back a
+    // resource ref the host can't show (Codex showed no image at all),
+    // try the 1x image, which usually fits inline.
+    if (input.highDensity && buffer.byteLength > IMAGE_INLINE_THRESHOLD) {
+      const oneX = { ...input, highDensity: false };
+      const fallbackUrls = buildStaticMapRequestUrl({
+        input: oneX,
+        accessToken,
+        apiEndpoint
+      });
+      const fallback = await this.httpRequest(fallbackUrls.url);
+      if (fallback.ok) {
+        const fallbackBuffer = await fallback.arrayBuffer();
+        if (fallbackBuffer.byteLength < buffer.byteLength) {
+          buffer = fallbackBuffer;
+          rendered = oneX;
+          publicUrl = fallbackUrls.publicUrl;
+        }
+      }
+    }
+
+    const mimeType = getStaticMapMimeType(input.style);
+
+    // Hosts show the image from this result, but a model can't put it in its
+    // own reply, so it hands the user a URL instead or says "the map above"
+    // over nothing (Codex did both). Give it a link that works: the request
+    // URL with a public (pk.) token, never the
+    // access token used for the fetch (#201). The server's own
+    // MAPBOX_PUBLIC_TOKEN is only used when the caller runs on the server's
+    // own access token (a local install), so a hosted caller never gets it
+    // in their chat history. With no public token, say not to link the URL.
+    const inline = buffer.byteLength <= IMAGE_INLINE_THRESHOLD;
+    const publicToken = await resolveMapboxPublicToken({
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint,
+      httpRequest: this.httpRequest,
+      allowEnvFallback: accessToken === MapboxApiBasedTool.mapboxAccessToken
+    });
+    const describedSize = `${width}x${height}${publicUrl.endsWith('@2x') ? ' @2x' : ''}`;
+    const attached = `Static map image (${describedSize}, ${input.style}) is attached to this result, which is where the host shows it to the user. `;
+    // A client that supports MCP Apps shows the image at full size in the
+    // viewer (see StaticMapViewerUIResource), so a link in the reply would
+    // show it twice. Clients that don't say so (or a stateless server that
+    // never saw their initialize) get the link text.
+    const imageUrl = publicToken
+      ? `${publicUrl}?access_token=${publicToken}`
+      : undefined;
+    const showsViewer =
+      (inline || imageUrl !== undefined) &&
+      getUiCapability(
+        this.activeServer?.server.getClientCapabilities()
+      )?.mimeTypes?.includes(RESOURCE_MIME_TYPE) === true;
+    const urlNote = showsViewer
+      ? `Static map image (${describedSize}, ${input.style}) is shown to the user at full size in this tool's map viewer, so don't embed or link it again in your reply.` +
+        (imageUrl
+          ? `\nIf the user asks for a link to the image, use this URL; it carries the account's public token: ${imageUrl}`
+          : '')
+      : imageUrl
+        ? (inline
+            ? attached + "Your reply can't include that attachment, and "
+            : 'The image is not attached, and ') +
+          // Neither Claude's UI nor Codex renders images from other domains
+          // in a reply (both left a broken image), so ask for a link.
+          "chat interfaces generally don't show images from external URLs, so don't embed this URL as a Markdown image. " +
+          "Give it as a link instead; it carries the account's public token, so it opens in a browser.\n" +
+          `Image URL: ${imageUrl}`
+        : inline
+          ? attached +
+            "Don't link or embed the request URL below: it has no access token, so it won't load for the user. " +
+            'If they ask to see the map again, point them to this result or call this tool again.\n' +
+            `Request URL: ${publicUrl}`
+          : `Request URL (it has no access token, so don't link or embed it): ${publicUrl}`;
     const content: CallToolResult['content'] = [
-      { type: 'text', text: publicUrl }
+      { type: 'text', text: urlNote }
     ];
 
-    if (buffer.byteLength > IMAGE_INLINE_THRESHOLD) {
-      // Image is too large to inline safely — store as temporary resource
-      const resourceId = randomBytes(16).toString('hex');
-      const resourceUri = `mapbox://temp/static-map-${resourceId}`;
-      const base64Data = Buffer.from(buffer).toString('base64');
-      temporaryResourceManager.create({
-        id: resourceId,
-        uri: resourceUri,
-        data: base64Data,
-        metadata: { toolName: this.name, size: buffer.byteLength },
-        mimeType,
-        owner: getOwnerKeyFromToken(accessToken)
+    if (!inline) {
+      // Image is too large to inline safely. The ref carries the request's
+      // inputs, not the image, so any server process can answer a later
+      // read by rendering it again (see responseRef.ts).
+      const resourceUri = buildResponseRef({
+        tool: 'static-map',
+        input: rendered
       });
       content.push({
         type: 'text',
-        text: `⚠️ Image (${Math.round(buffer.byteLength / 1024)}KB) stored as temporary resource.\nResource URI: ${resourceUri}\nTTL: 30 minutes`
+        text: `⚠️ Image (${Math.round(buffer.byteLength / 1024)}KB) is too large to return inline.\nRead ${resourceUri} with the MCP resource API to get it. Reading it renders the same image again.`
       });
     } else {
       // Image is small enough to inline as base64

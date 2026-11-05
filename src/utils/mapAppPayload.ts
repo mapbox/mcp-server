@@ -200,6 +200,11 @@ export interface MapAppPayload {
   baseMapConfig?: MapAppBaseMapConfig;
   /** Which Mapbox-owned base style to load; defaults to `standard`. */
   baseStyle?: MapAppBaseStyle;
+  /**
+   * Live traffic congestion over the base map. Left out, the map keeps
+   * whatever the user picked with its Traffic button.
+   */
+  showTraffic?: boolean;
 }
 
 // Zod mirror of MapAppPayload, kept loose on paint/layout/geometry internals
@@ -316,7 +321,8 @@ export const MapAppPayloadSchema = z.object({
   camera: MapAppCameraSchema.optional(),
   selfFetch: z.array(MapAppSelfFetchSchema).optional(),
   baseMapConfig: MapAppBaseMapConfigSchema.optional(),
-  baseStyle: z.enum(['standard', 'standard-satellite']).optional()
+  baseStyle: z.enum(['standard', 'standard-satellite']).optional(),
+  showTraffic: z.boolean().optional()
 });
 
 /**
