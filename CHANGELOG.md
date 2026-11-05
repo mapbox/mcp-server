@@ -4,6 +4,7 @@
 
 - **The dev HTTP server (`npm run dev:http`) sends the server instructions (#314).** It built its server without them, unlike `src/index.ts` and hosted, so local plugin QA pointed at it could route tools differently from production. In Codex, an agent building a page asked the user for a Mapbox token instead of calling `list_public_tokens_tool`.
 - **The `render_map_tool` map view ignores `postMessage` events that don't come from the host window (#308).** The check was lost when the directions preview was folded into the shared map app, so another frame on the page could send a fake tool result.
+- **`resource_reader_tool` reads `mapbox://` refs again (#309).** Resource lookup only matched URIs declared with `*`, so every templated ref (`mapbox://temp/`, `response/`, `inline/`, `compute/`, `place-photo/`) came back "Resource not found". That broke ref reads for clients without native `resources/read`, such as Claude.ai and Claude Desktop.
 
 ### Other Features
 
