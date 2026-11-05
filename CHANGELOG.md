@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.17.0-dev.2 - 2026-11-05
+
 ### New Features
 
 - **`render_map_tool`: live traffic, and Satellite/Traffic buttons on the map (#278).** Asked to show traffic downtown, ChatGPT told a user the map couldn't do it, which was true: the map only drew GeoJSON, and traffic showed up only in route summaries. Switching to satellite also took another tool call. Fixes #277.
