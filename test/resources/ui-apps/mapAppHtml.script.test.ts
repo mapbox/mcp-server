@@ -61,7 +61,7 @@ function loadScriptSandbox(options?: {
   // click without constructing a real Event object.
   function fakeElement() {
     const children: FakeElement[] = [];
-    const clickListeners: Array<() => void> = [];
+    const listeners: Record<string, Array<(event?: unknown) => void>> = {};
     const el: FakeElement = {
       style: {} as Record<string, string>,
       textContent: '',
@@ -79,10 +79,14 @@ function loadScriptSandbox(options?: {
       get firstChild() {
         return children[0];
       },
-      addEventListener: (type: string, cb: () => void) => {
-        if (type === 'click') clickListeners.push(cb);
+      value: '',
+      focus: () => {},
+      addEventListener: (type: string, cb: (event?: unknown) => void) => {
+        (listeners[type] ??= []).push(cb);
       },
-      __fireClick: () => clickListeners.forEach((cb) => cb())
+      __fireClick: () => el.__fire('click'),
+      __fire: (type: string, event?: unknown) =>
+        (listeners[type] ?? []).forEach((cb) => cb(event))
     };
     return el;
   }
@@ -95,8 +99,11 @@ function loadScriptSandbox(options?: {
     appendChild: (child: FakeElement) => FakeElement;
     removeChild: (child: FakeElement) => FakeElement;
     readonly firstChild: FakeElement | undefined;
-    addEventListener: (type: string, cb: () => void) => void;
+    value: string;
+    focus: () => void;
+    addEventListener: (type: string, cb: (event?: unknown) => void) => void;
     __fireClick: () => void;
+    __fire: (type: string, event?: unknown) => void;
   }
 
   // The script fetches each element by id exactly once at load time and
@@ -150,7 +157,8 @@ function loadScriptSandbox(options?: {
       fitBoundsCalls.push(opts);
     },
     flyTo: () => {},
-    resize: () => {}
+    resize: () => {},
+    getCenter: () => ({ lng: 24.94, lat: 60.17 })
   };
 
   // Every `new mapboxgl.Marker()` call below returns this same shared
@@ -190,7 +198,8 @@ function loadScriptSandbox(options?: {
     },
     document: {
       getElementById: getElementById,
-      createElement: () => fakeElement()
+      createElement: () => fakeElement(),
+      body: { classList: { add: () => {} } }
     },
     mapboxgl: {
       accessToken: '',
@@ -284,6 +293,8 @@ function loadScriptSandbox(options?: {
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
     sidePanelEl: getElementById('side-panel'),
+    explorerFormEl: getElementById('explorer-search'),
+    explorerInputEl: getElementById('explorer-search-input'),
     mapEl: getElementById('map') as unknown as { clientWidth?: number },
     fitBoundsCalls,
     derivePanelItems: (
@@ -1397,6 +1408,80 @@ describe('mapAppHtml search self-fetch', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(errorEl?.textContent).toContain('Could not fetch search results');
+  });
+});
+
+describe('mapAppHtml explorer search (map_explorer_tool)', () => {
+  const explorerResult = {
+    content: [{ type: 'text', text: 'Opened the Mapbox map explorer.' }],
+    structuredContent: {
+      explorer: true,
+      mapboxRender: { layers: [], markers: [] }
+    }
+  };
+
+  it('shows the search box only for an explorer result', () => {
+    const plain = loadScriptSandbox();
+    plain.sendToolResult({
+      structuredContent: { mapboxRender: { layers: [], markers: [] } }
+    });
+    expect(plain.explorerFormEl.style.display).not.toBe('flex');
+
+    const explorer = loadScriptSandbox();
+    explorer.sendToolResult(explorerResult);
+    expect(explorer.explorerFormEl.style.display).toBe('flex');
+    expect(explorer.errorEl?.style.display).not.toBe('block');
+  });
+
+  it('searches near the current map center and draws the results', async () => {
+    const {
+      sendToolResult,
+      setFetchImpl,
+      explorerFormEl,
+      explorerInputEl,
+      summaryEl
+    } = loadScriptSandbox();
+    const fetchSpy = vi.fn(async (_url: string) => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Café Regatta', mapbox_id: 'id-1' },
+            geometry: { type: 'Point', coordinates: [24.91, 60.18] }
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+    sendToolResult(explorerResult);
+
+    const preventDefault = vi.fn();
+    explorerInputEl.value = '  coffee ';
+    explorerFormEl.__fire('submit', { preventDefault });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const url = new URL(String(fetchSpy.mock.calls[0][0]));
+    expect(url.pathname).toContain('search/searchbox/v1/forward');
+    expect(url.searchParams.get('q')).toBe('coffee');
+    expect(url.searchParams.get('proximity')).toBe('24.94,60.17');
+    expect(summaryEl?.textContent).toBe('1 result for "coffee"');
+  });
+
+  it('does not search for a blank query', () => {
+    const { sendToolResult, setFetchImpl, explorerFormEl, explorerInputEl } =
+      loadScriptSandbox();
+    const fetchSpy = vi.fn();
+    setFetchImpl(fetchSpy);
+    sendToolResult(explorerResult);
+
+    explorerInputEl.value = '   ';
+    explorerFormEl.__fire('submit', { preventDefault: () => {} });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

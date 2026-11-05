@@ -8,6 +8,7 @@ import { ComputeResource } from './compute/ComputeResource.js';
 import { InlinePayloadResource } from './inline-payload/InlinePayloadResource.js';
 import { ToolResponseResource } from './tool-response/ToolResponseResource.js';
 import { MapAppUIResource } from './ui-apps/MapAppUIResource.js';
+import { HomeUIResource } from './ui-apps/HomeUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { PlacePhotoResource } from './place-photo/PlacePhotoResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
@@ -22,6 +23,8 @@ export const ALL_RESOURCES = [
   new ToolResponseResource({ httpRequest }),
   // Single shared map renderer, targeted exclusively by render_map_tool.
   new MapAppUIResource({ httpRequest }),
+  // ChatGPT sidebar home page, targeted by mapbox_home_tool.
+  new HomeUIResource({ httpRequest }),
   // Photos for the map app's results panel, which its CSP can't load directly.
   new PlacePhotoResource({ httpRequest }),
   new VersionResource()
