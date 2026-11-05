@@ -31,8 +31,17 @@ export type ToolMeta = {
    * https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#mcp-app-entrypoints
    */
   'openai/ui'?: {
-    entrypoints: Array<{ type: 'global' } | { type: 'thread' }>;
+    entrypoints: Array<
+      { type: 'global'; quickAction?: QuickAction } | { type: 'thread' }
+    >;
   };
+};
+
+/** A shortcut shown next to a global entrypoint that calls a tool. */
+export type QuickAction = {
+  title: string;
+  icons?: Icon[];
+  target: { type: 'tool'; name: string; arguments: Record<string, unknown> };
 };
 
 export abstract class BaseTool<

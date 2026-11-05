@@ -82,7 +82,17 @@ describe('MapboxHomeTool', () => {
     const tool = new MapboxHomeTool({ httpRequest: routes() });
     expect(tool.meta).toMatchObject({
       ui: { resourceUri: HOME_APP_URI, visibility: ['app'] },
-      'openai/ui': { entrypoints: [{ type: 'global' }] }
+      'openai/ui': {
+        entrypoints: [
+          {
+            type: 'global',
+            quickAction: {
+              title: 'Explore map',
+              target: { type: 'tool', name: 'map_explorer_tool', arguments: {} }
+            }
+          }
+        ]
+      }
     });
     expect(tool.annotations.readOnlyHint).toBe(true);
   });

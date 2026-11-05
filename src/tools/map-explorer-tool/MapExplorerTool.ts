@@ -11,11 +11,9 @@ import { mapboxMarkIcon } from '../shared/mapboxMarkIcon.js';
 const MapExplorerInputSchema = z.object({});
 
 /**
- * `map_explorer_tool` — the ChatGPT sidebar app. Opens the map app with a
- * place search box, from ChatGPT's sidebar rather than from a model call.
- *
- * Hidden from the model (`visibility: ['app']`); ChatGPT ignores visibility
- * for entrypoints and calls it with `{}` when the user opens it.
+ * `map_explorer_tool` — opens the map app with a place search box. ChatGPT
+ * calls it with `{}` from the "Explore map" quick action on the Mapbox
+ * sidebar entry (`mapbox_home_tool`), not from a model call.
  */
 export class MapExplorerTool extends BaseTool<typeof MapExplorerInputSchema> {
   readonly name = 'map_explorer_tool';
@@ -45,8 +43,7 @@ export class MapExplorerTool extends BaseTool<typeof MapExplorerInputSchema> {
         resourceUri: MAP_APP_URI,
         visibility: ['app'],
         csp: mapAppCsp(apiEndpoint())
-      },
-      'openai/ui': { entrypoints: [{ type: 'global' }] }
+      }
     };
   }
 
