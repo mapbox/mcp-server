@@ -8,19 +8,19 @@ import type { ToolMeta } from '../BaseTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { getUserNameFromToken } from '../../utils/jwtUtils.js';
 import {
-  CONSOLE_APP_URI,
-  consoleAppCsp
-} from '../../resources/ui-apps/ConsoleUIResource.js';
+  HOME_APP_URI,
+  homeAppCsp
+} from '../../resources/ui-apps/HomeUIResource.js';
 import { mapboxMarkIcon } from '../shared/mapboxMarkIcon.js';
 import {
-  MapboxConsoleOutputSchema,
-  type ConsoleStyle,
-  type ConsoleTileset,
-  type ConsoleToken,
-  type MapboxConsoleOutput
-} from './MapboxConsoleTool.output.schema.js';
+  MapboxHomeOutputSchema,
+  type AccountStyle,
+  type AccountTileset,
+  type AccountToken,
+  type MapboxHomeOutput
+} from './MapboxHomeTool.output.schema.js';
 
-const MapboxConsoleInputSchema = z.object({});
+const MapboxHomeInputSchema = z.object({});
 
 const PAGE_LIMIT = 100;
 
@@ -44,22 +44,22 @@ function num(value: unknown): number | undefined {
 }
 
 /**
- * `mapbox_console_tool` — a ChatGPT sidebar app that lists the account's
- * styles, tilesets and public tokens, like a small Mapbox Console.
+ * `mapbox_home_tool` — the Mapbox home page in ChatGPT's sidebar. For now it
+ * lists the account's styles, tilesets and public tokens.
  *
  * App-only: ChatGPT calls it with `{}` when the user opens the sidebar entry,
  * and the app calls it again to refresh. Read-only, and never returns secret
  * or temporary tokens.
  */
-export class MapboxConsoleTool extends MapboxApiBasedTool<
-  typeof MapboxConsoleInputSchema,
-  typeof MapboxConsoleOutputSchema
+export class MapboxHomeTool extends MapboxApiBasedTool<
+  typeof MapboxHomeInputSchema,
+  typeof MapboxHomeOutputSchema
 > {
-  readonly name = 'mapbox_console_tool';
+  readonly name = 'mapbox_home_tool';
   readonly description =
-    "Open the Mapbox Console sidebar app, listing the user's map styles, tilesets and public tokens.";
+    "Open the Mapbox home sidebar app, listing the user's map styles, tilesets and public tokens.";
   readonly annotations = {
-    title: 'Mapbox Console',
+    title: 'Mapbox',
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: true,
@@ -70,15 +70,15 @@ export class MapboxConsoleTool extends MapboxApiBasedTool<
 
   constructor(params: { httpRequest: HttpRequest }) {
     super({
-      inputSchema: MapboxConsoleInputSchema,
-      outputSchema: MapboxConsoleOutputSchema,
+      inputSchema: MapboxHomeInputSchema,
+      outputSchema: MapboxHomeOutputSchema,
       httpRequest: params.httpRequest
     });
     this.meta = {
       ui: {
-        resourceUri: CONSOLE_APP_URI,
+        resourceUri: HOME_APP_URI,
         visibility: ['app'],
-        csp: consoleAppCsp(MapboxApiBasedTool.mapboxApiEndpoint)
+        csp: homeAppCsp(MapboxApiBasedTool.mapboxApiEndpoint)
       },
       'openai/ui': { entrypoints: [{ type: 'global' }] }
     };
@@ -92,7 +92,7 @@ export class MapboxConsoleTool extends MapboxApiBasedTool<
     if (!username) {
       const error = "Couldn't read the account name from the access token.";
       return this.result({
-        console: true,
+        home: true,
         styles: { items: [], error },
         tilesets: { items: [], error },
         tokens: { items: [], error }
@@ -107,7 +107,7 @@ export class MapboxConsoleTool extends MapboxApiBasedTool<
       })
     ]);
 
-    return this.result({ console: true, username, styles, tilesets, tokens });
+    return this.result({ home: true, username, styles, tilesets, tokens });
   }
 
   private async list<T>(
@@ -160,7 +160,7 @@ export class MapboxConsoleTool extends MapboxApiBasedTool<
     }
   }
 
-  private result(output: MapboxConsoleOutput): CallToolResult {
+  private result(output: MapboxHomeOutput): CallToolResult {
     const summary = (['styles', 'tilesets', 'tokens'] as const)
       .map((key) => {
         const s = output[key];
@@ -173,7 +173,7 @@ export class MapboxConsoleTool extends MapboxApiBasedTool<
       content: [
         {
           type: 'text',
-          text: `Mapbox Console${output.username ? ` for ${output.username}` : ''}. ${summary}.`
+          text: `Mapbox${output.username ? ` for ${output.username}` : ''}. ${summary}.`
         }
       ],
       structuredContent: output,
@@ -182,7 +182,7 @@ export class MapboxConsoleTool extends MapboxApiBasedTool<
   }
 }
 
-function toStyle(raw: Record<string, unknown>): ConsoleStyle | undefined {
+function toStyle(raw: Record<string, unknown>): AccountStyle | undefined {
   const id = str(raw.id);
   const owner = str(raw.owner);
   if (!id || !owner) return undefined;
@@ -201,7 +201,7 @@ function toStyle(raw: Record<string, unknown>): ConsoleStyle | undefined {
   };
 }
 
-function toTileset(raw: Record<string, unknown>): ConsoleTileset | undefined {
+function toTileset(raw: Record<string, unknown>): AccountTileset | undefined {
   const id = str(raw.id);
   if (!id) return undefined;
   return {
@@ -216,7 +216,7 @@ function toTileset(raw: Record<string, unknown>): ConsoleTileset | undefined {
 }
 
 /** Public tokens only: anything else is dropped even if the API returns it. */
-function toPublicToken(raw: Record<string, unknown>): ConsoleToken | undefined {
+function toPublicToken(raw: Record<string, unknown>): AccountToken | undefined {
   const token = str(raw.token);
   if (raw.usage !== 'pk' || !token?.startsWith('pk.')) return undefined;
   return {
