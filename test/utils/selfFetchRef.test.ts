@@ -115,6 +115,56 @@ describe('selfFetchRef', () => {
     expect(resolveSelfFetchRef(ref)).toBeNull();
   });
 
+  it('returns null for a search ref whose proximity or bbox is malformed', () => {
+    // A hand-written ref with proximity as a "lon,lat" string would reach
+    // the API as proximity=undefined,undefined and 400.
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('category_search', {
+          category: 'cafe',
+          proximity: '-122.4,37.8'
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('search', { q: 'coffee', bbox: [1, 2, 3, 4] })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('search', {
+          q: 'coffee',
+          proximity: { longitude: -122.4, latitude: 37.8 }
+        })
+      )
+    ).not.toBeNull();
+  });
+
+  it('returns null for a route ref whose coordinates were retyped wrong', () => {
+    // Codex passed a directions ref whose destination read "longittude".
+    const sfo = { longitude: -122.3903, latitude: 37.6094 };
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('directions', {
+          coordinates: [sfo, { longittude: -122.161, latitude: 37.4445 }]
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('optimization', { coordinates: [sfo] })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('map_matching', {
+          coordinates: [sfo, { longitude: -122.161, latitude: 37.4445 }]
+        })
+      )
+    ).not.toBeNull();
+  });
+
   it('isSelfFetchRef distinguishes self-fetch refs from other schemes', () => {
     expect(isSelfFetchRef('mapbox://selffetch/directions?data=abc')).toBe(true);
     expect(isSelfFetchRef('mapbox://temp/map-payload-abc')).toBe(false);

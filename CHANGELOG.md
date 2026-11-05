@@ -3,6 +3,12 @@
 ### Bug Fixes
 
 - **Agents asked for a Mapbox token instead of calling `list_public_tokens_tool` (#321).** Building a single-page map app on staging, Codex quoted our instruction back and still asked the user to paste a token. The server instructions and the tool description now say to put the returned `pk.` token in the page, since public tokens are made to ship in browser code, and not to leave a placeholder.
+- **Maps from searches showed the wrong place, or failed with two searches (#320).** Found on staging.
+  - **Wrong city:** "Show coffee shops near Union Square, San Francisco" drew cafés in southern New Jersey, where the user was. The map runs a search ref's search again from the browser, and with no `proximity` or `bbox` the Search Box API biases toward the caller's IP, so on a hosted server the map and the reply came from different places. `search_and_geocode_tool` and `category_search_tool` now pin the ref to the first result in that case, flagged `proximityFromResults` so the map draws no "Search center" pin there.
+  - **Distances:** the cards and popups showed distances measured from that IP (4059202 m from SFO for a user in New Jersey). They now show only when the call passed a `proximity`.
+  - **Two searches on one map:** "Driving route from SFO to Palo Alto" passed a search ref for each end, and the second failed with `There is already a source with ID "selffetch-search-results"`. Self-fetched layers that would reuse an id now get a free one (`-2`, `-3`, ...), which also covers two routes, isochrones or trips on one map.
+  - **"[object Object]" errors:** Search Box errors carry the reason in an object (`{"message":{"error":"Invalid proximity provided..."}}`), and both the map and the tools printed the object. Both now show the `error` text. Search refs whose `proximity` or `bbox` isn't the shape the map sends (a hand-written `"lon,lat"` string, say) are now rejected when resolved, so `render_map_tool` tells the model to re-run the search instead of the map failing.
+  - **Retyped route refs:** Codex passed a directions ref whose destination key read `longittude`, and the map failed with "Could not fetch route". Directions, map matching and optimization refs now need at least two coordinates with numeric `longitude` and `latitude` to resolve, the same check the map makes, so a damaged ref is caught at `render_map_tool` instead.
 
 ## 0.17.0-dev.2 - 2026-11-05
 

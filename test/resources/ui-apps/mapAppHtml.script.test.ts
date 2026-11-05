@@ -1706,6 +1706,87 @@ describe('mapAppHtml search self-fetch', () => {
     expect(errorEl?.style.display).not.toBe('block');
   });
 
+  it('draws two search refs in one render without a source id collision', async () => {
+    // "Driving route from SFO to Palo Alto": the model passed a search ref
+    // for each end, and the second addSource("selffetch-search-results")
+    // threw "There is already a source with ID".
+    const { sendToolResult, setFetchImpl, map, errorEl } = loadScriptSandbox();
+    setFetchImpl(async (url: string) => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: url.includes('SFO') ? 'SFO' : 'Palo Alto' },
+            geometry: {
+              type: 'Point',
+              coordinates: url.includes('SFO')
+                ? [-122.379, 37.621]
+                : [-122.143, 37.442]
+            }
+          }
+        ]
+      })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/search?data=abc',
+          layers: [],
+          selfFetch: [
+            { tool: 'search', params: { q: 'SFO' } },
+            { tool: 'search', params: { q: 'Palo Alto' } }
+          ]
+        }
+      }
+    });
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    expect(map.getSource('selffetch-search-results')).toBeTruthy();
+    expect(map.getSource('selffetch-search-results-2')).toBeTruthy();
+    expect(map.getLayer('selffetch-search-results-2')).toEqual(
+      expect.objectContaining({ source: 'selffetch-search-results-2' })
+    );
+    expect(errorEl?.style.display).not.toBe('block');
+  });
+
+  it('shows no distances when the proximity came from the results, not the caller', async () => {
+    const { sendToolResult, setFetchImpl, getLastPopupText } =
+      loadScriptSandbox();
+    const fc = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { name: 'Nave Cafe', distance: 4059202 },
+          geometry: { type: 'Point', coordinates: [-122.4075, 37.788] }
+        }
+      ]
+    };
+    setFetchImpl(async () => ({ ok: true, json: async () => fc }));
+    const send = (params: Record<string, unknown>) =>
+      sendToolResult({
+        structuredContent: {
+          mapboxRender: {
+            ref: 'mapbox://selffetch/category_search?data=abc',
+            layers: [],
+            selfFetch: [{ tool: 'category_search', params }]
+          }
+        }
+      });
+    const proximity = { longitude: -122.4075, latitude: 37.788 };
+
+    send({ category: 'coffee', proximity, proximityFromResults: true });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(getLastPopupText()).toBe('Nave Cafe');
+
+    send({ category: 'coffee', proximity });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    expect(getLastPopupText()).toBe('Nave Cafe — 4059202 m');
+  });
+
   it('filters to the selected result when selectedMapboxId is set', async () => {
     const { sendToolResult, setFetchImpl, summaryEl } = loadScriptSandbox();
 
@@ -1857,6 +1938,37 @@ describe('mapAppHtml category search self-fetch', () => {
     expect(errorEl?.textContent).toContain(
       'Could not fetch category search results'
     );
+  });
+});
+
+describe('mapAppHtml self-fetch API errors', () => {
+  it("shows a Search Box error's nested message instead of [object Object]", async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    setFetchImpl(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        message: {
+          status_code: 400,
+          error:
+            "Invalid proximity provided. Must be lon,lat coordinates or 'ip'."
+        }
+      })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(errorEl?.textContent).toContain('Invalid proximity provided');
+    expect(errorEl?.textContent).not.toContain('[object Object]');
   });
 });
 

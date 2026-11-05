@@ -66,8 +66,13 @@ export abstract class MapboxApiBasedTool<
     try {
       const errorBody = await response.text();
       const errorJson = JSON.parse(errorBody);
-      if (errorJson.message) {
-        return `${response.status}: ${errorJson.message}`;
+      // Search Box nests it: {"message":{"error":"Invalid proximity ..."}}.
+      const message =
+        typeof errorJson.message === 'object' && errorJson.message !== null
+          ? (errorJson.message.error ?? errorJson.message.message)
+          : errorJson.message;
+      if (typeof message === 'string' && message) {
+        return `${response.status}: ${message}`;
       }
     } catch {
       // If parsing fails, fall back to status text
