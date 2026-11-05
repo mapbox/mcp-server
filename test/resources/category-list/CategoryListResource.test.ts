@@ -9,6 +9,7 @@ import {
   assertHeadersSent
 } from '../../utils/httpPipelineUtils.js';
 import { CategoryListResource } from '../../../src/resources/category-list/CategoryListResource.js';
+import { resourceTextOf } from '../../utils/resultTestUtils.js';
 
 describe('CategoryListResource', () => {
   afterEach(() => {
@@ -111,7 +112,7 @@ describe('CategoryListResource', () => {
     expect(result.contents[0].uri).toBe('mapbox://categories');
     expect(result.contents[0].mimeType).toBe('application/json');
 
-    const parsed = JSON.parse(result.contents[0].text!);
+    const parsed = JSON.parse(resourceTextOf(result));
     expect(parsed.listItems).toEqual(['restaurant', 'hotel']);
     expect(parsed.version).toBe('25:test');
     expect(parsed.attribution).toBe('Test Attribution');
@@ -131,7 +132,7 @@ describe('CategoryListResource', () => {
     );
 
     expect(result.contents).toHaveLength(1);
-    const parsed = JSON.parse(result.contents[0].text!);
+    const parsed = JSON.parse(resourceTextOf(result));
     expect(parsed.listItems).toEqual([]);
   });
 

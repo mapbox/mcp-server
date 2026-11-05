@@ -699,7 +699,7 @@ describe('SearchAndGeocodeTool', () => {
           proximity: { longitude: -122.4194, latitude: 37.7749 }
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { authInfo: { token } } as any
+        { http: { authInfo: { token } } } as any
       );
 
       expect(result.isError).toBe(false);

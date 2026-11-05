@@ -1,11 +1,11 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import {
-  type Prompt,
-  type PromptArgument,
-  type PromptMessage
-} from '@modelcontextprotocol/sdk/types.js';
+import type {
+  Prompt,
+  PromptArgument,
+  PromptMessage
+} from '@modelcontextprotocol/server';
 
 /**
  * Base class for all MCP prompts.

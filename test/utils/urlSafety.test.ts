@@ -40,6 +40,28 @@ describe('isSafeExternalUrl', () => {
     expect(isSafeExternalUrl('https://localhost./x.png')).toBe(false);
     expect(isSafeExternalUrl('https://LOCALHOST./x.png')).toBe(false);
     expect(isSafeExternalUrl('https://app.localhost./x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://ip6-localhost./x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://broadcasthost./x.png')).toBe(false);
+  });
+
+  it('rejects local hostnames written with several trailing dots', () => {
+    expect(isSafeExternalUrl('https://localhost../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://app.localhost.../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://metadata.google.internal../x.png')).toBe(
+      false
+    );
+    expect(isSafeExternalUrl('https://intranet../x.png')).toBe(false);
+  });
+
+  it('rejects IP literals written with several trailing dots', () => {
+    expect(isSafeExternalUrl('https://127.0.0.1../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://169.254.169.254../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://10.0.0.1../x.png')).toBe(false);
+    expect(isSafeExternalUrl('https://0x7f000001../x.png')).toBe(false);
+  });
+
+  it('allows public hostnames written with a trailing root-label dot', () => {
+    expect(isSafeExternalUrl('https://example.com./marker.png')).toBe(true);
   });
 
   it('rejects cloud-internal DNS zones (.internal)', () => {

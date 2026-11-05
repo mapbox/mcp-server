@@ -3,7 +3,7 @@
 
 import { MapboxApiBasedResource } from '../MapboxApiBasedResource.js';
 import type { HttpRequest } from '../../utils/types.js';
-import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ReadResourceResult } from '@modelcontextprotocol/server';
 
 // Interface for the full API response from Mapbox
 interface MapboxApiResponse {

@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { lookup } from 'node:dns/promises';
-import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ReadResourceResult } from '@modelcontextprotocol/server';
 import { MapboxApiBasedResource } from '../MapboxApiBasedResource.js';
 import type { HttpRequest } from '../../utils/types.js';
 import {

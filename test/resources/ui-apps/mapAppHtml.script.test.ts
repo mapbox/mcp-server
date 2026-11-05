@@ -50,7 +50,9 @@ function loadScriptSandbox(options?: {
     .replace(/<\/script>$/, '');
 
   const postMessageCalls: Array<Record<string, unknown>> = [];
-  let messageListener: ((event: { data: unknown }) => void) | undefined;
+  let messageListener:
+    | ((event: { data: unknown; source: unknown }) => void)
+    | undefined;
 
   // A minimal stand-in for a DOM Element — enough for the panel code's
   // createElement/appendChild/removeChild/addEventListener usage, without
@@ -264,37 +266,40 @@ function loadScriptSandbox(options?: {
   vm.createContext(sandbox);
   vm.runInContext(scriptSource, sandbox);
 
+  const hostWindow = (sandbox.window as { parent: unknown }).parent;
+  const postToApp = (data: unknown, source: unknown = hostWindow) =>
+    messageListener?.({ data, source });
+
   // Resolve the initial `ui/initialize` request so the app proceeds past
   // its handshake (mirrors what a real host would respond with).
   const initId = postMessageCalls.find((m) => m.method === 'ui/initialize')
     ?.id as number | undefined;
   if (initId !== undefined && messageListener && !options?.noHost) {
-    messageListener({ data: { jsonrpc: '2.0', id: initId, result: {} } });
+    postToApp({ jsonrpc: '2.0', id: initId, result: {} });
   }
 
   return {
-    sendToolResult: (result: unknown) => {
-      messageListener?.({
-        data: {
+    sendToolResult: (result: unknown, source?: unknown) => {
+      postToApp(
+        {
           jsonrpc: '2.0',
           method: 'ui/notifications/tool-result',
           params: result
-        }
-      });
+        },
+        source
+      );
     },
     // Resolves the most recent still-pending resources/read request with
     // the given JSON-RPC `result`, mirroring what the real host does after
     // the iframe asks to dereference a payload ref.
-    resolveResourcesRead: (result: unknown) => {
+    resolveResourcesRead: (result: unknown, source?: unknown) => {
       const call = [...postMessageCalls]
         .reverse()
         .find((m) => m.method === 'resources/read');
       if (!call || messageListener === undefined) {
         throw new Error('No pending resources/read call to resolve');
       }
-      messageListener({
-        data: { jsonrpc: '2.0', id: call.id, result }
-      });
+      postToApp({ jsonrpc: '2.0', id: call.id, result }, source);
     },
     setFetchImpl: (impl: (url: string, init?: unknown) => Promise<unknown>) => {
       fetchImpl = impl;
@@ -338,6 +343,90 @@ interface PanelItem {
   category?: string;
   distanceMeters?: number;
 }
+
+describe('mapAppHtml message source', () => {
+  it('ignores a tool-result posted by a window other than the host', () => {
+    const { sendToolResult, map } = loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+
+    sendToolResult(
+      {
+        structuredContent: {
+          mapboxRender: {
+            summary: 'Spoofed',
+            layers: [
+              {
+                id: 'spoofed',
+                type: 'line',
+                data: {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                      [-77, 38],
+                      [-76, 39]
+                    ]
+                  },
+                  properties: {}
+                }
+              }
+            ]
+          }
+        }
+      },
+      { postMessage: () => {} }
+    );
+
+    expect(addLayerSpy).not.toHaveBeenCalled();
+  });
+
+  it('ignores a reply to a pending request posted by a window other than the host', async () => {
+    const { sendToolResult, resolveResourcesRead, map } = loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+    const ref = 'mapbox://temp/map-payload-abc';
+    const readResult = (layerId: string) => ({
+      contents: [
+        {
+          uri: ref,
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            layers: [
+              {
+                id: layerId,
+                type: 'line',
+                data: {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                      [-77, 38],
+                      [-76, 39]
+                    ]
+                  },
+                  properties: {}
+                }
+              }
+            ]
+          })
+        }
+      ]
+    });
+
+    sendToolResult({ structuredContent: { mapboxRender: { ref } } });
+    resolveResourcesRead(readResult('spoofed'), { postMessage: () => {} });
+    await Promise.resolve();
+    expect(addLayerSpy).not.toHaveBeenCalled();
+
+    // The request is still pending, so the host's reply is applied.
+    resolveResourcesRead(readResult('route'));
+    await Promise.resolve();
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'route' })
+    );
+  });
+});
 
 describe('mapAppHtml inline-payload-first tool-result handling', () => {
   it('renders directly from an inline payload without ever calling resources/read', () => {
@@ -922,7 +1011,7 @@ describe('mapAppHtml directions self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         routes: [
@@ -1179,7 +1268,7 @@ describe('mapAppHtml isochrone self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         type: 'FeatureCollection',
@@ -1285,7 +1374,7 @@ describe('mapAppHtml map matching self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         code: 'Ok',
@@ -1428,7 +1517,7 @@ describe('mapAppHtml search self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         type: 'FeatureCollection',
@@ -1561,7 +1650,7 @@ describe('mapAppHtml category search self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         type: 'FeatureCollection',
@@ -1646,7 +1735,7 @@ describe('mapAppHtml optimization self-fetch', () => {
     map.addLayer = addLayerSpy;
     map.addSource = addSourceSpy;
 
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
         code: 'Ok',
@@ -2580,7 +2669,7 @@ describe('mapAppHtml results side panel: self-fetch (category_search)', () => {
 describe('mapAppHtml results side panel: inline markers', () => {
   it('renders and enriches the panel from inline markers that carry an id, with no selfFetch entries at all', async () => {
     const { sendToolResult, setFetchImpl, sidePanelEl } = loadScriptSandbox();
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({ results: [] })
     }));

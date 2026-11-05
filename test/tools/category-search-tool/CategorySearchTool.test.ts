@@ -469,7 +469,7 @@ describe('CategorySearchTool', () => {
         proximity: { longitude: -122.42, latitude: 37.78 }
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
 
     expect(result.isError).toBe(false);

@@ -12,9 +12,9 @@
  * rate limiting, and observability on top of this same @mapbox/mcp-server
  * package. This script skips all of that (auth is just MAPBOX_ACCESS_TOKEN
  * from the environment, same as stdio mode) to keep local testing simple.
- * Only tools + resources are registered (no prompts/completions/tracing) —
- * enough to test tool calls and MCP App rendering, not full parity with
- * src/index.ts.
+ * Only tools, resources and the server instructions are registered (no
+ * prompts/completions/tracing) — enough to test tool calls, tool routing
+ * and MCP App rendering, not full parity with src/index.ts.
  *
  * Usage:
  *   MAPBOX_ACCESS_TOKEN=sk.xxx npx tsx scripts/dev-http-server.ts
@@ -25,8 +25,8 @@
  */
 
 import { createServer } from 'node:http';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import {
   registerAppResource,
   RESOURCE_MIME_TYPE
@@ -41,6 +41,7 @@ import {
 } from '../src/tools/toolRegistry.js';
 import { getAllResources } from '../src/resources/resourceRegistry.js';
 import { getVersionInfo } from '../src/utils/versionUtils.js';
+import { buildServerInstructions } from '../src/utils/serverInstructions.js';
 
 function buildServer(): McpServer {
   const versionInfo = getVersionInfo();
@@ -54,6 +55,13 @@ function buildServer(): McpServer {
   const server = new McpServer(
     { name: versionInfo.name, version: versionInfo.version },
     {
+      // Same instructions src/index.ts sends. They do part of the routing
+      // (e.g. pages built outside the chat get a token from
+      // list_public_tokens_tool), so without them a local test can pick
+      // tools differently from production.
+      instructions: buildServerInstructions(
+        enabledTools.map((tool) => tool.name)
+      ),
       capabilities: {
         tools: { listChanged: true },
         resources: {},
@@ -112,7 +120,7 @@ const httpServer = createServer((req, res) => {
   // manual testing, no session/resumability concerns to worry about.
   void (async () => {
     const server = buildServer();
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined
     });
     try {

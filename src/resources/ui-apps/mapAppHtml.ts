@@ -263,6 +263,7 @@ ${initialDataScript}
   }
 
   window.addEventListener('message', function(event) {
+    if (event.source !== window.parent) return;
     var message = event.data;
     if (!message || typeof message !== 'object') return;
     if (message.id !== undefined && pendingRequests.has(message.id)) {

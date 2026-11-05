@@ -1,8 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 
 export const JSON_SCHEMA_2020_12 =
   'https://json-schema.org/draft/2020-12/schema';
@@ -104,46 +103,14 @@ export function toJsonSchema2020(schema: unknown): unknown {
 }
 
 /**
- * Make `tools/list` publish JSON Schema 2020-12 instead of draft-07.
+ * No-op, kept so callers written for SDK v1 keep working.
  *
- * MCP SDK 1.x's McpServer generates every tool's inputSchema/outputSchema
- * as draft-07 (with no option to change it), but MCP specifies 2020-12 as
- * the default dialect, and newer clients enforce that — Claude Desktop
- * refuses to call any tool whose outputSchema declares draft-07 ("JSON
- * Schema declares an unsupported dialect ... The default validator
- * supports JSON Schema 2020-12 only").
+ * MCP SDK v1's McpServer published every tool schema as draft-07, which
+ * newer clients reject (Claude Desktop: "JSON Schema declares an
+ * unsupported dialect"), so this used to convert `tools/list` schemas to
+ * 2020-12. SDK v2 publishes 2020-12 itself.
  *
- * McpServer installs its tools/list handler through the public
- * setRequestHandler on first tool registration, so this wraps that method
- * on this one server instance (not a global patch) and converts the
- * schemas in the handler's result. Must be called before any tool is
- * registered.
+ * @deprecated Not needed on SDK v2; remove the call.
  */
-export function publishJsonSchema2020(server: McpServer): void {
-  const inner = server.server;
-  const listToolsMethod = ListToolsRequestSchema.shape.method.value;
-  const original = inner.setRequestHandler.bind(inner);
-
-  // setRequestHandler's generic signature can't be expressed for a wrapper
-  // without re-declaring the SDK's internal schema types.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (inner as any).setRequestHandler = (requestSchema: any, handler: any) => {
-    if (requestSchema?.shape?.method?.value !== listToolsMethod) {
-      return original(requestSchema, handler);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return original(requestSchema, async (request: any, extra: any) => {
-      const result = await handler(request, extra);
-      return {
-        ...result,
-        tools: result.tools.map((tool: Schema) => ({
-          ...tool,
-          inputSchema: toJsonSchema2020(tool.inputSchema),
-          ...(tool.outputSchema !== undefined && {
-            outputSchema: toJsonSchema2020(tool.outputSchema)
-          })
-        }))
-      };
-    });
-  };
-}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function publishJsonSchema2020(_server: McpServer): void {}

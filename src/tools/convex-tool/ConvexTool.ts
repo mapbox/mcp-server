@@ -10,7 +10,7 @@ import {
   ConvexOutputSchema,
   type ConvexOutput
 } from './ConvexTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 export class ConvexTool extends BaseTool<
   typeof ConvexInputSchema,

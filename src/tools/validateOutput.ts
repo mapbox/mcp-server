@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import type { ZodTypeAny } from 'zod';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * Validates the structured content against the output schema.

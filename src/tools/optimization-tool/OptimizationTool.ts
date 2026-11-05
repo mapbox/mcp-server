@@ -11,7 +11,7 @@ import {
   OptimizationOutputSchema,
   type OptimizationOutput
 } from './OptimizationTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { ToolExecutionContext } from '../../utils/tracing.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { buildOptimizationRequestUrl } from './buildOptimizationRequestUrl.js';

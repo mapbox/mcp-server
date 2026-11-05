@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { BoundingBoxTool } from '../../../src/tools/bounding-box-tool/BoundingBoxTool.js';
+import type { BoundingBoxOutput } from '../../../src/tools/bounding-box-tool/BoundingBoxTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('BoundingBoxTool', () => {
   const tool = new BoundingBoxTool();
@@ -11,9 +13,10 @@ describe('BoundingBoxTool', () => {
     const result = await tool.run({
       geometry: [10, 20]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([10, 20, 10, 20]);
+    expect(data.bbox).toEqual([10, 20, 10, 20]);
   });
 
   it('should calculate bbox for a linestring', async () => {
@@ -24,9 +27,10 @@ describe('BoundingBoxTool', () => {
         [5, 10]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 0, 10, 10]);
+    expect(data.bbox).toEqual([0, 0, 10, 10]);
   });
 
   it('should calculate bbox for a polygon', async () => {
@@ -41,9 +45,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 0, 10, 10]);
+    expect(data.bbox).toEqual([0, 0, 10, 10]);
   });
 
   it('should calculate bbox for a polygon with hole', async () => {
@@ -67,10 +72,11 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
     // BBox should be based on outer ring only
-    expect(result.structuredContent?.bbox).toEqual([-10, -10, 10, 10]);
+    expect(data.bbox).toEqual([-10, -10, 10, 10]);
   });
 
   it('should calculate bbox for a multipolygon', async () => {
@@ -98,10 +104,11 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
     // BBox should encompass both polygons
-    expect(result.structuredContent?.bbox).toEqual([0, 0, 20, 20]);
+    expect(data.bbox).toEqual([0, 0, 20, 20]);
   });
 
   it('should calculate bbox for irregular polygon', async () => {
@@ -117,9 +124,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([1, 2, 9, 9]);
+    expect(data.bbox).toEqual([1, 2, 9, 9]);
   });
 
   it('should calculate bbox for negative coordinates', async () => {
@@ -134,9 +142,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([-120, -30, -110, -20]);
+    expect(data.bbox).toEqual([-120, -30, -110, -20]);
   });
 
   it('should calculate bbox crossing the equator and prime meridian', async () => {
@@ -151,9 +160,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([-10, -10, 10, 10]);
+    expect(data.bbox).toEqual([-10, -10, 10, 10]);
   });
 
   it('should calculate bbox for real world coordinates (San Francisco)', async () => {
@@ -168,12 +178,13 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox[0]).toBeCloseTo(-122.52, 5);
-    expect(result.structuredContent?.bbox[1]).toBeCloseTo(37.7, 5);
-    expect(result.structuredContent?.bbox[2]).toBeCloseTo(-122.35, 5);
-    expect(result.structuredContent?.bbox[3]).toBeCloseTo(37.82, 5);
+    expect(data.bbox[0]).toBeCloseTo(-122.52, 5);
+    expect(data.bbox[1]).toBeCloseTo(37.7, 5);
+    expect(data.bbox[2]).toBeCloseTo(-122.35, 5);
+    expect(data.bbox[3]).toBeCloseTo(37.82, 5);
   });
 
   it('should calculate bbox near poles', async () => {
@@ -188,9 +199,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 85, 90, 89]);
+    expect(data.bbox).toEqual([0, 85, 90, 89]);
   });
 
   it('should round bbox coordinates to 6 decimal places', async () => {
@@ -205,9 +217,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    const bbox = result.structuredContent?.bbox as number[];
+    const bbox = data.bbox as number[];
     bbox.forEach((coord) => {
       const decimalPlaces = (coord.toString().split('.')[1] || '').length;
       expect(decimalPlaces).toBeLessThanOrEqual(6);
@@ -226,9 +239,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 0, 0.0001, 0.0001]);
+    expect(data.bbox).toEqual([0, 0, 0.0001, 0.0001]);
   });
 
   it('should calculate bbox for very large geometries', async () => {
@@ -243,9 +257,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([-180, -90, 180, 90]);
+    expect(data.bbox).toEqual([-180, -90, 180, 90]);
   });
 
   it('should calculate bbox for diagonal line', async () => {
@@ -255,9 +270,10 @@ describe('BoundingBoxTool', () => {
         [10, 10]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 0, 10, 10]);
+    expect(data.bbox).toEqual([0, 0, 10, 10]);
   });
 
   it('should calculate bbox for horizontal line', async () => {
@@ -267,9 +283,10 @@ describe('BoundingBoxTool', () => {
         [10, 5]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 5, 10, 5]);
+    expect(data.bbox).toEqual([0, 5, 10, 5]);
   });
 
   it('should calculate bbox for vertical line', async () => {
@@ -279,9 +296,10 @@ describe('BoundingBoxTool', () => {
         [5, 10]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([5, 0, 5, 10]);
+    expect(data.bbox).toEqual([5, 0, 5, 10]);
   });
 
   it('should calculate bbox for zigzag linestring', async () => {
@@ -294,9 +312,10 @@ describe('BoundingBoxTool', () => {
         [20, 0]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 0, 20, 10]);
+    expect(data.bbox).toEqual([0, 0, 20, 10]);
   });
 
   it('should handle triangle polygon', async () => {
@@ -310,9 +329,10 @@ describe('BoundingBoxTool', () => {
         ]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.bbox).toEqual([0, 0, 10, 10]);
+    expect(data.bbox).toEqual([0, 0, 10, 10]);
   });
 
   it('should calculate bbox format as [minLon, minLat, maxLon, maxLat]', async () => {
@@ -322,9 +342,10 @@ describe('BoundingBoxTool', () => {
         [30, 40]
       ]
     });
+    const data = structuredOf<BoundingBoxOutput>(result);
 
     expect(result.isError).toBe(false);
-    const bbox = result.structuredContent?.bbox as number[];
+    const bbox = data.bbox as number[];
     // Verify format: [west, south, east, north]
     expect(bbox[0]).toBeLessThanOrEqual(bbox[2]); // minLon <= maxLon
     expect(bbox[1]).toBeLessThanOrEqual(bbox[3]); // minLat <= maxLat

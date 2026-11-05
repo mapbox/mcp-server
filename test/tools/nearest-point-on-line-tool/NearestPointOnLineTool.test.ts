@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { NearestPointOnLineTool } from '../../../src/tools/nearest-point-on-line-tool/NearestPointOnLineTool.js';
+import type { NearestPointOnLineOutput } from '../../../src/tools/nearest-point-on-line-tool/NearestPointOnLineTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('NearestPointOnLineTool', () => {
   const tool = new NearestPointOnLineTool();
@@ -19,9 +21,15 @@ describe('NearestPointOnLineTool', () => {
 
     expect(result.isError).toBe(false);
     // Nearest point on the line should be directly below the input point
-    expect(result.structuredContent?.nearest.longitude).toBeCloseTo(0.5, 1);
-    expect(result.structuredContent?.nearest.latitude).toBeCloseTo(0, 1);
-    expect(result.structuredContent?.distance).toBeGreaterThan(0);
+    expect(
+      structuredOf<NearestPointOnLineOutput>(result).nearest.longitude
+    ).toBeCloseTo(0.5, 1);
+    expect(
+      structuredOf<NearestPointOnLineOutput>(result).nearest.latitude
+    ).toBeCloseTo(0, 1);
+    expect(
+      structuredOf<NearestPointOnLineOutput>(result).distance
+    ).toBeGreaterThan(0);
   });
 
   it('returns zero distance when point is on the line', async () => {
@@ -35,7 +43,10 @@ describe('NearestPointOnLineTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.distance).toBeCloseTo(0, 1);
+    expect(structuredOf<NearestPointOnLineOutput>(result).distance).toBeCloseTo(
+      0,
+      1
+    );
   });
 
   it('defaults to kilometers units', async () => {
@@ -48,7 +59,9 @@ describe('NearestPointOnLineTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('kilometers');
+    expect(structuredOf<NearestPointOnLineOutput>(result).units).toBe(
+      'kilometers'
+    );
   });
 
   it('returns distance in meters when specified', async () => {
@@ -70,11 +83,11 @@ describe('NearestPointOnLineTool', () => {
       units: 'meters'
     });
 
-    expect(m.structuredContent?.distance).toBeCloseTo(
-      (km.structuredContent?.distance as number) * 1000,
+    expect(structuredOf<NearestPointOnLineOutput>(m).distance).toBeCloseTo(
+      (structuredOf<NearestPointOnLineOutput>(km).distance as number) * 1000,
       0
     );
-    expect(m.structuredContent?.units).toBe('meters');
+    expect(structuredOf<NearestPointOnLineOutput>(m).units).toBe('meters');
   });
 
   it('returns location along the line', async () => {
@@ -90,7 +103,10 @@ describe('NearestPointOnLineTool', () => {
     expect(result.isError).toBe(false);
     // location should be roughly half the line length
     const lineLength = 111; // ~111km for 1 degree at equator
-    expect(result.structuredContent?.location).toBeCloseTo(lineLength / 2, -1);
+    expect(structuredOf<NearestPointOnLineOutput>(result).location).toBeCloseTo(
+      lineLength / 2,
+      -1
+    );
   });
 
   it('works with a multi-segment line', async () => {
@@ -106,8 +122,12 @@ describe('NearestPointOnLineTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.nearest).toBeDefined();
-    expect(result.structuredContent?.distance).toBeGreaterThanOrEqual(0);
+    expect(
+      structuredOf<NearestPointOnLineOutput>(result).nearest
+    ).toBeDefined();
+    expect(
+      structuredOf<NearestPointOnLineOutput>(result).distance
+    ).toBeGreaterThanOrEqual(0);
   });
 
   it('rejects a line with fewer than two coordinates', async () => {

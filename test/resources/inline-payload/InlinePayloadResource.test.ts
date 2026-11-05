@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { InlinePayloadResource } from '../../../src/resources/inline-payload/InlinePayloadResource.js';
 import { buildInlinePayloadRef } from '../../../src/utils/inlinePayloadRef.js';
+import { resourceTextOf } from '../../utils/resultTestUtils.js';
 
 describe('InlinePayloadResource', () => {
   it("resolves render_map_tool's self-describing merged ref via the real resources/read path with zero prior server-side state", async () => {
@@ -33,7 +34,7 @@ describe('InlinePayloadResource', () => {
     const result = await resource.read(ref);
 
     expect(result.contents[0].mimeType).toBe('application/json');
-    const payload = JSON.parse(result.contents[0].text as string);
+    const payload = JSON.parse(resourceTextOf(result));
     expect(payload.summary).toBe('Test trip');
     expect(payload.layers).toHaveLength(1);
     expect(payload.markers).toHaveLength(1);
@@ -44,6 +45,6 @@ describe('InlinePayloadResource', () => {
     const result = await resource.read('mapbox://inline/payload?data=!!!');
 
     expect(result.contents[0].mimeType).toBe('text/plain');
-    expect(result.contents[0].text).toContain('malformed');
+    expect(resourceTextOf(result)).toContain('malformed');
   });
 });

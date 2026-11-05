@@ -2,8 +2,10 @@
 // Licensed under the MIT License.
 
 import { BaseTool } from '../BaseTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type {
+  CallToolResult,
+  ServerContext
+} from '@modelcontextprotocol/server';
 import type { ResourceReaderToolInput } from './ResourceReaderTool.input.schema.js';
 import { ResourceReaderToolInputSchema } from './ResourceReaderTool.input.schema.js';
 import { ResourceReaderToolOutputSchema } from './ResourceReaderTool.output.schema.js';
@@ -37,8 +39,8 @@ export class ResourceReaderTool extends BaseTool<
 
   async run(
     rawInput: unknown,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    extra?: RequestHandlerExtra<any, any>
+
+    extra?: ServerContext
   ): Promise<CallToolResult> {
     try {
       const input = this.inputSchema.parse(rawInput);
@@ -72,8 +74,8 @@ export class ResourceReaderTool extends BaseTool<
 
   private async execute(
     input: ResourceReaderToolInput,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    extra?: RequestHandlerExtra<any, any>
+
+    extra?: ServerContext
   ): Promise<CallToolResult> {
     // Find the resource by URI
     const resource = getResourceByUri(input.uri);

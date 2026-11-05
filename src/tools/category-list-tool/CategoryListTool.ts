@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { HttpRequest } from '../../utils/types.js';
 import type { CategoryListInput } from './CategoryListTool.input.schema.js';
 import { CategoryListInputSchema } from './CategoryListTool.input.schema.js';

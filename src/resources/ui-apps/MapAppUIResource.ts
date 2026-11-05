@@ -1,12 +1,10 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
   ReadResourceResult,
-  ServerNotification,
-  ServerRequest
-} from '@modelcontextprotocol/sdk/types.js';
+  ServerContext
+} from '@modelcontextprotocol/server';
 import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import { BaseResource } from '../BaseResource.js';
 import type { HttpRequest } from '../../utils/types.js';
@@ -44,12 +42,9 @@ export class MapAppUIResource extends BaseResource {
       (() => process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/');
   }
 
-  async read(
-    _uri: string,
-    extra?: RequestHandlerExtra<ServerRequest, ServerNotification>
-  ): Promise<ReadResourceResult> {
+  async read(_uri: string, extra?: ServerContext): Promise<ReadResourceResult> {
     const accessToken =
-      (extra?.authInfo?.token as string | undefined) ||
+      (extra?.http?.authInfo?.token as string | undefined) ||
       process.env.MAPBOX_ACCESS_TOKEN ||
       '';
 

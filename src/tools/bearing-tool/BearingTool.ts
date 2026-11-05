@@ -10,7 +10,7 @@ import {
   BearingOutputSchema,
   type BearingOutput
 } from './BearingTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * BearingTool - Calculate the bearing between two geographic coordinates

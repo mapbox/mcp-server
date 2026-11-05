@@ -1,7 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ReadResourceResult } from '@modelcontextprotocol/server';
 import { MapboxApiBasedResource } from '../MapboxApiBasedResource.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { resolveResponseRef } from '../../utils/responseRef.js';

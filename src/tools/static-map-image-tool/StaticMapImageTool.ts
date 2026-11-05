@@ -7,7 +7,7 @@ import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { StaticMapImageInputSchema } from './StaticMapImageTool.input.schema.js';
 import type { OverlaySchema } from './StaticMapImageTool.input.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { getOwnerKeyFromToken } from '../../utils/jwtUtils.js';
 

@@ -3,7 +3,7 @@
 
 import { BaseResource } from '../BaseResource.js';
 import { getVersionInfo } from '../../utils/versionUtils.js';
-import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ReadResourceResult } from '@modelcontextprotocol/server';
 
 /**
  * Resource exposing MCP server version information.

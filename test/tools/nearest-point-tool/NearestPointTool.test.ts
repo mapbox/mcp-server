@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { NearestPointTool } from '../../../src/tools/nearest-point-tool/NearestPointTool.js';
+import type { NearestPointOutput } from '../../../src/tools/nearest-point-tool/NearestPointTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('NearestPointTool', () => {
   const tool = new NearestPointTool();
@@ -18,11 +20,11 @@ describe('NearestPointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.nearest).toMatchObject({
+    expect(structuredOf<NearestPointOutput>(result).nearest).toMatchObject({
       longitude: 1,
       latitude: 0
     });
-    expect(result.structuredContent?.index).toBe(0);
+    expect(structuredOf<NearestPointOutput>(result).index).toBe(0);
   });
 
   it('returns correct index for nearest point', async () => {
@@ -36,8 +38,8 @@ describe('NearestPointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.index).toBe(2);
-    expect(result.structuredContent?.nearest).toMatchObject({
+    expect(structuredOf<NearestPointOutput>(result).index).toBe(2);
+    expect(structuredOf<NearestPointOutput>(result).nearest).toMatchObject({
       longitude: 0.5,
       latitude: 0
     });
@@ -50,8 +52,10 @@ describe('NearestPointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('meters');
-    expect(result.structuredContent?.distance).toBeGreaterThan(0);
+    expect(structuredOf<NearestPointOutput>(result).units).toBe('meters');
+    expect(structuredOf<NearestPointOutput>(result).distance).toBeGreaterThan(
+      0
+    );
   });
 
   it('returns distance in kilometers when specified', async () => {
@@ -65,10 +69,13 @@ describe('NearestPointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('kilometers');
+    expect(structuredOf<NearestPointOutput>(result).units).toBe('kilometers');
     // LA is closer to SF than NY
-    expect(result.structuredContent?.index).toBe(0);
-    expect(result.structuredContent?.distance).toBeCloseTo(559, 0);
+    expect(structuredOf<NearestPointOutput>(result).index).toBe(0);
+    expect(structuredOf<NearestPointOutput>(result).distance).toBeCloseTo(
+      559,
+      0
+    );
   });
 
   it('handles a single candidate point', async () => {
@@ -78,7 +85,7 @@ describe('NearestPointTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.index).toBe(0);
+    expect(structuredOf<NearestPointOutput>(result).index).toBe(0);
   });
 
   it('rejects empty points array', async () => {
