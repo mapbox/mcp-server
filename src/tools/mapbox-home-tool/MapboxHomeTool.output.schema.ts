@@ -12,7 +12,7 @@ const section = <T extends z.ZodTypeAny>(item: T) =>
     error: z.string().optional()
   });
 
-export const ConsoleStyleSchema = z.object({
+export const AccountStyleSchema = z.object({
   id: z.string(),
   name: z.string(),
   owner: z.string(),
@@ -23,7 +23,7 @@ export const ConsoleStyleSchema = z.object({
   zoom: z.number().optional()
 });
 
-export const ConsoleTilesetSchema = z.object({
+export const AccountTilesetSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.string().optional(),
@@ -33,7 +33,7 @@ export const ConsoleTilesetSchema = z.object({
   modified: z.string().optional()
 });
 
-export const ConsoleTokenSchema = z.object({
+export const AccountTokenSchema = z.object({
   id: z.string().optional(),
   token: z.string(),
   note: z.string().nullable(),
@@ -43,15 +43,15 @@ export const ConsoleTokenSchema = z.object({
   modified: z.string().optional()
 });
 
-export const MapboxConsoleOutputSchema = z.object({
-  console: z.literal(true),
+export const MapboxHomeOutputSchema = z.object({
+  home: z.literal(true),
   username: z.string().optional(),
-  styles: section(ConsoleStyleSchema),
-  tilesets: section(ConsoleTilesetSchema),
-  tokens: section(ConsoleTokenSchema)
+  styles: section(AccountStyleSchema),
+  tilesets: section(AccountTilesetSchema),
+  tokens: section(AccountTokenSchema)
 });
 
-export type ConsoleStyle = z.infer<typeof ConsoleStyleSchema>;
-export type ConsoleTileset = z.infer<typeof ConsoleTilesetSchema>;
-export type ConsoleToken = z.infer<typeof ConsoleTokenSchema>;
-export type MapboxConsoleOutput = z.infer<typeof MapboxConsoleOutputSchema>;
+export type AccountStyle = z.infer<typeof AccountStyleSchema>;
+export type AccountTileset = z.infer<typeof AccountTilesetSchema>;
+export type AccountToken = z.infer<typeof AccountTokenSchema>;
+export type MapboxHomeOutput = z.infer<typeof MapboxHomeOutputSchema>;

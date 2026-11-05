@@ -2,11 +2,11 @@
 // Licensed under the MIT License.
 
 /**
- * HTML for the Mapbox Console sidebar app (`mapbox_console_tool`). Renders
+ * HTML for the Mapbox home sidebar app (`mapbox_home_tool`). Renders
  * the tool's structuredContent: styles, tilesets and public tokens. All
  * account data goes in through textContent, never innerHTML.
  */
-export function renderConsoleAppHtml(params: {
+export function renderHomeAppHtml(params: {
   publicToken: string;
   apiEndpoint?: string;
 }): string {
@@ -17,7 +17,7 @@ export function renderConsoleAppHtml(params: {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mapbox Console</title>
+<title>Mapbox</title>
 <style>
   :root {
     --bg: #ffffff; --surface: #f7f7f8; --border: #e5e5e7; --text: #0d0d0d;
@@ -87,7 +87,7 @@ export function renderConsoleAppHtml(params: {
 <div class="wrap">
   <header>
     <div>
-      <h1>Mapbox Console</h1>
+      <h1>Mapbox</h1>
       <div id="account"></div>
     </div>
     <button id="refresh" type="button">Refresh</button>
@@ -107,7 +107,7 @@ export function renderConsoleAppHtml(params: {
 (function() {
   var TOKEN = ${JSON.stringify(params.publicToken)};
   var API_ENDPOINT = ${JSON.stringify(apiEndpoint)};
-  var TOOL_NAME = 'mapbox_console_tool';
+  var TOOL_NAME = 'mapbox_home_tool';
 
   var data = null;
   var activeTab = 'styles';
@@ -149,7 +149,7 @@ export function renderConsoleAppHtml(params: {
   request('ui/initialize', {
     protocolVersion: '2026-01-26',
     appCapabilities: {},
-    appInfo: { name: 'Mapbox Console', version: '1.0.0' }
+    appInfo: { name: 'Mapbox', version: '1.0.0' }
   }).then(function(result) {
     applyTheme(result && result.hostContext && result.hostContext.theme);
   }, function() {}).then(function() { notify('ui/notifications/initialized', {}); });
@@ -199,7 +199,7 @@ export function renderConsoleAppHtml(params: {
   }
 
   function setData(sc) {
-    if (!sc || sc.console !== true) return;
+    if (!sc || sc.home !== true) return;
     data = sc;
     accountEl.textContent = sc.username ? 'Account: ' + sc.username : '';
     tabEls.forEach(function(tab) {

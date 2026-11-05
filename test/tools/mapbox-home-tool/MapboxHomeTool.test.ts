@@ -3,9 +3,9 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { ServerContext } from '@modelcontextprotocol/server';
-import { MapboxConsoleTool } from '../../../src/tools/mapbox-console-tool/MapboxConsoleTool.js';
-import type { MapboxConsoleOutput } from '../../../src/tools/mapbox-console-tool/MapboxConsoleTool.output.schema.js';
-import { CONSOLE_APP_URI } from '../../../src/resources/ui-apps/ConsoleUIResource.js';
+import { MapboxHomeTool } from '../../../src/tools/mapbox-home-tool/MapboxHomeTool.js';
+import type { MapboxHomeOutput } from '../../../src/tools/mapbox-home-tool/MapboxHomeTool.output.schema.js';
+import { HOME_APP_URI } from '../../../src/resources/ui-apps/HomeUIResource.js';
 import type { HttpRequest } from '../../../src/utils/types.js';
 import { structuredOf } from '../../utils/resultTestUtils.js';
 
@@ -75,13 +75,13 @@ function routes(
   });
 }
 
-describe('MapboxConsoleTool', () => {
+describe('MapboxHomeTool', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('is an app-only ChatGPT sidebar entrypoint on the console UI', () => {
-    const tool = new MapboxConsoleTool({ httpRequest: routes() });
+  it('is an app-only ChatGPT sidebar entrypoint on the home UI', () => {
+    const tool = new MapboxHomeTool({ httpRequest: routes() });
     expect(tool.meta).toMatchObject({
-      ui: { resourceUri: CONSOLE_APP_URI, visibility: ['app'] },
+      ui: { resourceUri: HOME_APP_URI, visibility: ['app'] },
       'openai/ui': { entrypoints: [{ type: 'global' }] }
     });
     expect(tool.annotations.readOnlyHint).toBe(true);
@@ -89,14 +89,14 @@ describe('MapboxConsoleTool', () => {
 
   it("lists the account's styles, tilesets and public tokens", async () => {
     const httpRequest = routes();
-    const result = await new MapboxConsoleTool({ httpRequest }).run(
+    const result = await new MapboxHomeTool({ httpRequest }).run(
       {},
       withToken(secretToken)
     );
 
     expect(result.isError).toBe(false);
-    const out = structuredOf<MapboxConsoleOutput>(result);
-    expect(out.console).toBe(true);
+    const out = structuredOf<MapboxHomeOutput>(result);
+    expect(out.home).toBe(true);
     expect(out.username).toBe('test-user');
     expect(out.styles.items).toEqual([
       {
@@ -130,18 +130,18 @@ describe('MapboxConsoleTool', () => {
   });
 
   it('never returns secret tokens, even if the API sends them', async () => {
-    const result = await new MapboxConsoleTool({ httpRequest: routes() }).run(
+    const result = await new MapboxHomeTool({ httpRequest: routes() }).run(
       {},
       withToken(secretToken)
     );
-    const out = structuredOf<MapboxConsoleOutput>(result);
+    const out = structuredOf<MapboxHomeOutput>(result);
     expect(out.tokens.items.map((t) => t.token)).toEqual(['pk.default.sig']);
     expect(JSON.stringify(result)).not.toContain('sk.secret');
     expect(JSON.stringify(result)).not.toContain('sk.mislabeled');
   });
 
   it('reports a missing scope per section without failing the others', async () => {
-    const result = await new MapboxConsoleTool({
+    const result = await new MapboxHomeTool({
       httpRequest: routes({
         tilesets: json(
           { message: 'Not Authorized - No Token' },
@@ -151,7 +151,7 @@ describe('MapboxConsoleTool', () => {
     }).run({}, withToken(secretToken));
 
     expect(result.isError).toBe(false);
-    const out = structuredOf<MapboxConsoleOutput>(result);
+    const out = structuredOf<MapboxHomeOutput>(result);
     expect(out.tilesets.items).toEqual([]);
     expect(out.tilesets.error).toContain('tilesets:list');
     expect(out.tilesets.error).not.toContain('..');
@@ -159,7 +159,7 @@ describe('MapboxConsoleTool', () => {
   });
 
   it('flags a section with more pages as truncated', async () => {
-    const result = await new MapboxConsoleTool({
+    const result = await new MapboxHomeTool({
       httpRequest: routes({
         styles: json(styles, {
           link: '<https://api.mapbox.com/styles/v1/test-user?start=x>; rel="next"'
@@ -167,18 +167,18 @@ describe('MapboxConsoleTool', () => {
       })
     }).run({}, withToken(secretToken));
 
-    const out = structuredOf<MapboxConsoleOutput>(result);
+    const out = structuredOf<MapboxHomeOutput>(result);
     expect(out.styles.truncated).toBe(true);
     expect(out.tilesets.truncated).toBeUndefined();
   });
 
   it('explains when the token has no account name', async () => {
     const httpRequest = routes();
-    const result = await new MapboxConsoleTool({ httpRequest }).run(
+    const result = await new MapboxHomeTool({ httpRequest }).run(
       {},
       withToken('sk.bm90LWpzb24.sig')
     );
-    const out = structuredOf<MapboxConsoleOutput>(result);
+    const out = structuredOf<MapboxHomeOutput>(result);
     expect(out.styles.error).toContain('account name');
     expect(httpRequest).not.toHaveBeenCalled();
   });
