@@ -166,7 +166,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
         category: input.category,
         language: input.language,
         limit: input.limit,
-        proximity: searchSelfFetchProximity(input, data),
+        ...searchSelfFetchProximity(input, data),
         bbox: input.bbox,
         country: input.country,
         poi_category_exclusions: input.poi_category_exclusions

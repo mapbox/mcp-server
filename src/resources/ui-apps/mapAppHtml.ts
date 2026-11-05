@@ -1124,10 +1124,21 @@ ${initialDataScript}
   // the map (does NOT teardown first) and refits to include the new
   // content. Used once a self-fetched layer (e.g. a directions route)
   // resolves after the initial render.
+  // Self-fetch layers use fixed ids, so two refs of the same kind in one
+  // render (search results for SFO and for Palo Alto) would both add
+  // "selffetch-search-results" and the second addSource() throws.
+  function unusedLayerId(id) {
+    if (!map.getSource(id) && !map.getLayer(id)) return id;
+    var n = 2;
+    while (map.getSource(id + '-' + n) || map.getLayer(id + '-' + n)) n++;
+    return id + '-' + n;
+  }
+
   function mergeAdditionalPayload(payload) {
     if (!map) return;
     var bbox = bboxAccumulator();
     (Array.isArray(payload.layers) ? payload.layers : []).forEach(function(layer) {
+      if (layer && layer.id) layer = Object.assign({}, layer, { id: unusedLayerId(layer.id) });
       addOneLayer(layer, bbox);
     });
     var markers = applyPanelNumbering(payload.markers);
@@ -1885,8 +1896,11 @@ ${initialDataScript}
       var popupParts = [props.name || 'Result'];
       var addr = props.full_address || props.place_formatted;
       if (addr) popupParts.push(addr);
-      if (typeof props.distance === 'number') {
-        popupParts.push(Math.round(props.distance) + ' m');
+      // Without a proximity the API measures distance from the caller's IP,
+      // which on a hosted server is the user's browser or nowhere useful.
+      var distance = proximity && typeof props.distance === 'number' ? props.distance : undefined;
+      if (distance !== undefined) {
+        popupParts.push(Math.round(distance) + ' m');
       }
       var coords = f.geometry.coordinates;
       // id/name/category/distanceMeters are the same generic POI fields an
@@ -1903,7 +1917,7 @@ ${initialDataScript}
         popup: popupParts.join(' — '),
         name: props.name || ('Result ' + (i + 1)),
         category: Array.isArray(props.poi_category) ? props.poi_category[0] : undefined,
-        distanceMeters: typeof props.distance === 'number' ? props.distance : undefined
+        distanceMeters: distance
       });
       features.push({
         type: 'Feature',
@@ -2462,6 +2476,13 @@ ${initialDataScript}
     });
   }
 
+  // A proximity the server filled in from the first result (see
+  // searchSelfFetchProximity) only steers the re-fetch: it isn't a center
+  // the user asked about, so no "Search center" pin and no distances.
+  function searchCenter(params) {
+    return params.proximityFromResults ? undefined : params.proximity;
+  }
+
   function selfFetchSearch(params) {
     if (!TOKEN || !isSafeSearchParams(params)) {
       showError('Could not fetch search results: missing token or invalid parameters.');
@@ -2496,7 +2517,7 @@ ${initialDataScript}
           });
           if (match.length > 0) fc = { type: 'FeatureCollection', features: match };
         }
-        var mini = buildSearchMiniPayload(fc, params.q, params.proximity);
+        var mini = buildSearchMiniPayload(fc, params.q, searchCenter(params));
         if (!mini) {
           showError('Search API returned no results.');
           return;
@@ -2574,7 +2595,7 @@ ${initialDataScript}
         return res.json();
       })
       .then(function(data) {
-        var mini = buildSearchMiniPayload(data, params.category, params.proximity);
+        var mini = buildSearchMiniPayload(data, params.category, searchCenter(params));
         if (!mini) {
           showError('Category Search API returned no results.');
           return;

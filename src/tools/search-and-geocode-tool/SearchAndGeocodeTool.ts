@@ -288,7 +288,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     const ref = buildSelfFetchRef('search', {
       q: input.q,
       language: input.language,
-      proximity: searchSelfFetchProximity(input, data),
+      ...searchSelfFetchProximity(input, data),
       bbox: input.bbox,
       country: input.country,
       types: input.types,

@@ -767,7 +767,8 @@ describe('SearchAndGeocodeTool', () => {
       expect(payload?.selfFetch?.[0]?.params).toEqual(
         expect.objectContaining({
           q: 'coffee shops near Union Square, San Francisco',
-          proximity: { longitude: -122.397, latitude: 37.795 }
+          proximity: { longitude: -122.397, latitude: 37.795 },
+          proximityFromResults: true
         })
       );
     });

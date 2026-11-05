@@ -526,10 +526,12 @@ describe('CategorySearchTool', () => {
         ?.params as Record<string, unknown>;
     };
 
-    expect((await resolveParams({ category: 'coffee' })).proximity).toEqual({
-      longitude: -122.4075,
-      latitude: 37.788
-    });
+    expect(await resolveParams({ category: 'coffee' })).toEqual(
+      expect.objectContaining({
+        proximity: { longitude: -122.4075, latitude: 37.788 },
+        proximityFromResults: true
+      })
+    );
 
     // A bbox already pins the search, so leave proximity out.
     const bbox = {
@@ -540,6 +542,7 @@ describe('CategorySearchTool', () => {
     };
     const withBbox = await resolveParams({ category: 'coffee', bbox });
     expect(withBbox.proximity).toBeUndefined();
+    expect(withBbox.proximityFromResults).toBeUndefined();
     expect(withBbox.bbox).toEqual(bbox);
   });
 });
