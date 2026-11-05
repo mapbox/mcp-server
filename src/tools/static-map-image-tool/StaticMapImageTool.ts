@@ -161,6 +161,15 @@ export class StaticMapImageTool extends MapboxApiBasedTool<
     const content: CallToolResult['content'] = [
       { type: 'text', text: urlNote }
     ];
+    // Say so when the 1x fallback replaced the @2x image the caller asked
+    // for, so the model can tell the user. Its own item, so the first one
+    // still starts with the size (the viewer's alt text).
+    if (rendered !== input) {
+      content.push({
+        type: 'text',
+        text: 'The @2x image was too large to send, so this is the 1x image. For @2x, call this tool again with a smaller size.'
+      });
+    }
 
     if (!inline) {
       // Image is too large to inline safely. The ref carries the request's
