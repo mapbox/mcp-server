@@ -179,6 +179,31 @@ describe('CategoryListResource', () => {
     expect(calledUrl).not.toContain('language=');
   });
 
+  it.each([
+    'mapbox://categories/%20ja',
+    'mapbox://categories/ja?x=1',
+    'mapbox://categories/japanese'
+  ])('rejects %s instead of returning the English list', async (uri) => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+
+    await expect(
+      new CategoryListResource({ httpRequest }).read(uri)
+    ).rejects.toThrow('Resource not found');
+    expect(mockHttpRequest).not.toHaveBeenCalled();
+  });
+
+  it('passes a language with a script or region through, like zh-Hant', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest({
+      json: async () => ({ listItems: [], version: '1', attribution: '' })
+    });
+
+    await new CategoryListResource({ httpRequest }).read(
+      'mapbox://categories/zh-Hant'
+    );
+
+    expect(mockHttpRequest.mock.calls[0][0]).toContain('language=zh-Hant');
+  });
+
   describe('through an MCP client', () => {
     // resources/read matches a fixed URI exactly, so mapbox://categories/ja
     // used to come back "Resource not found" unless the uriTemplate is
