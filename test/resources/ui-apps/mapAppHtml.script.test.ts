@@ -1072,6 +1072,20 @@ describe('mapAppHtml Satellite and Traffic toggles', () => {
     );
   });
 
+  it("doesn't bring back an earlier render's base map config after a style switch", () => {
+    const sandbox = loadScriptSandbox();
+    const setConfigProperty = vi.fn();
+    (sandbox.map as { setConfigProperty?: unknown }).setConfigProperty =
+      setConfigProperty;
+    sendPayload(sandbox, { baseMapConfig: { lightPreset: 'night' } });
+    sendPayload(sandbox, { layers: [routeLayer] });
+    setConfigProperty.mockClear();
+
+    buttons(sandbox).satellite.__fireClick();
+
+    expect(setConfigProperty).not.toHaveBeenCalled();
+  });
+
   it('a baseStyle from the model updates the Satellite button', () => {
     const sandbox = loadScriptSandbox();
     sendPayload(sandbox, { baseStyle: 'standard-satellite' });

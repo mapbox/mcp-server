@@ -614,6 +614,9 @@ ${initialDataScript}
     trackedSourceIds = [];
     trackedMarkers = [];
     drawnLayers = [];
+    // A render without baseMapConfig must not bring back the last one (say,
+    // night mode) when the Satellite button switches style.
+    currentBaseMapConfig = null;
     markersById = {};
     carouselEl.style.display = 'none';
     legendsEl.style.bottom = '';

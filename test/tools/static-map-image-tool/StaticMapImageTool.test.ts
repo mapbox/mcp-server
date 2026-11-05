@@ -329,7 +329,10 @@ describe('StaticMapImageTool', () => {
 
     const refInput = (result: Awaited<ReturnType<StaticMapImageTool['run']>>) =>
       resolveResponseRef(
-        textOf(result, 1).match(/mapbox:\/\/response\/\S+/)![0]
+        result.content
+          .map((c) => (c.type === 'text' ? c.text : ''))
+          .join('\n')
+          .match(/mapbox:\/\/response\/\S+/)![0]
       )?.input as { highDensity?: boolean };
 
     it('falls back to the 1x image when it fits inline', async () => {
@@ -341,7 +344,15 @@ describe('StaticMapImageTool', () => {
       expect(mockHttpRequest).toHaveBeenCalledTimes(2);
       expect(mockHttpRequest.mock.calls[0][0]).toContain('1000x800@2x?');
       expect(mockHttpRequest.mock.calls[1][0]).toContain('1000x800?');
-      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
+      expect(result.content.map((c) => c.type)).toEqual([
+        'text',
+        'text',
+        'image'
+      ]);
+      // The model is told it got 1x, so it can tell the user.
+      expect(textOf(result, 1)).toContain(
+        'The @2x image was too large to send, so this is the 1x image.'
+      );
       // The URL text matches the image actually returned.
       const urlText = (result.content[0] as { text: string }).text;
       expect(urlText.endsWith('/1000x800')).toBe(true);
@@ -375,6 +386,7 @@ describe('StaticMapImageTool', () => {
       const { httpRequest, mockHttpRequest } = setup(500 * 1024, 200 * 1024);
 
       const result = await new StaticMapImageTool({ httpRequest }).run(input);
+      expect(JSON.stringify(result)).not.toContain('too large to send');
 
       expect(mockHttpRequest).toHaveBeenCalledTimes(1);
       expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
@@ -1126,6 +1138,31 @@ describe('StaticMapImageTool', () => {
       const serialized = JSON.stringify(result);
       expect(serialized).not.toContain('access_token=');
       expect(serialized).not.toContain(tokenValue);
+    });
+
+    it('keeps the access token out of the large-image ref, including its encoded data', async () => {
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: async () => new ArrayBuffer(750 * 1024)
+      } as Partial<Response>);
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 1000, height: 800 },
+        style: 'mapbox/streets-v12'
+      });
+
+      const uri = JSON.stringify(result).match(
+        /mapbox:\/\/response\/[^\s"\\]+/
+      )?.[0];
+      expect(uri).toBeTruthy();
+      const data = new URL(uri!).searchParams.get('data');
+      expect(data).toBeTruthy();
+      const decoded = Buffer.from(data!, 'base64url').toString('utf8');
+      expect(decoded).toContain('streets-v12');
+      const tokenValue = process.env.MAPBOX_ACCESS_TOKEN!;
+      expect(decoded).not.toContain(tokenValue);
+      expect(decoded).not.toContain('access_token');
     });
 
     it('returns only text + image content (no externalUrl iframe)', async () => {
