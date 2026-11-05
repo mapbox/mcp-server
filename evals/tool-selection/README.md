@@ -21,6 +21,7 @@ It is not part of `npm test`: it calls the Claude API and costs money. Mapbox AP
   - `pass` (all checks hold), `first_ok` and `no_forbidden`
   - `ref_ok`: every `render_map_tool` call passes refs it was actually given, unchanged, and doesn't hand-build a map when a ref was available
   - `no_token_ask`: the agent neither asks the user for a Mapbox token nor writes a placeholder token (`YOUR_MAPBOX_...`, `pk...`) into a file
+  - `token_embedded`: a page the agent writes uses the token `list_public_tokens_tool` returned
 
 ## Running
 
@@ -41,6 +42,7 @@ open .claude/hillclimb/tool-selection/report.html
 ```
 
 - **Options:** `--model` (default `claude-opus-5-5`), `--reps`, `--concurrency` (default 8) and `--timeout-s` (default 600).
+- **Some cases only:** `EVAL_CASES=site-route,site-walksheds` runs just those cases from `cases.json`.
 - **Resume:** runs pick up where they left off. Each `(case, rep)` is skipped once it has a row in `results.jsonl`.
 - **Failures:** failed attempts go to `errors.jsonl` instead.
 - **Variants:** a v1 run should note what changed in `.claude/hillclimb/tool-selection/v1/change.md`, so the report can explain the difference.
@@ -75,9 +77,9 @@ Add an entry to `cases.json` with a `why` that names the description or instruct
 
 Give it `stubs` for every tool the prompt might reasonably call, written about the place in the prompt. A canned answer about the wrong place makes Claude retry or switch tools, and that gets scored as a routing failure. Calls without a stub return "No results" and are counted in the `unstubbed` column. A non-zero count means the case needs another stub, not that the model misrouted.
 
-The grader throws if a case names a tool that doesn't exist, so a renamed tool can't turn a `must_not` into a silent pass. A case can list tools in `needs_tools` instead: on a server without one of them, the case fails with "needs X, which this server doesn't have" rather than throwing. The site-building cases use this for `export_map_html_tool` (#275), so on main they show the baseline behavior instead of crashing the run.
+The grader throws if a case names a tool that doesn't exist, so a renamed tool can't turn a `must_not` into a silent pass. A case can list tools in `needs_tools` instead: on a server without one of them, the case fails with "needs X, which this server doesn't have" rather than throwing. Use it when a case tests a tool that's still in a PR, so on main it shows the baseline behavior instead of crashing the run.
 
-The stubs return canned output, so a stubbed `export_map_html_tool` result is a placeholder page. An agent that notices sometimes writes its own page or offers to rebuild it with a token, which `no_token_ask` flags. Read those transcripts before counting them as regressions. The noise floor for a pass rate is roughly `1/sqrt(rows x reps)`. At 34 rows x 3 reps that's about ±10 points overall, and much wider for any single case.
+The site-building cases expect the agent to get a public token from `list_public_tokens_tool` and embed it in the page. Its stub returns a made-up `pk.` token, and `token_embedded` checks that the written page uses it rather than a placeholder or a made-up token. The noise floor for a pass rate is roughly `1/sqrt(rows x reps)`. At 34 rows x 3 reps that's about ±10 points overall, and much wider for any single case.
 
 ## Files
 

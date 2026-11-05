@@ -57,12 +57,25 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     max-width: calc(100% - 24px); white-space: pre-line;
   }
+  /* Bottom offsets keep the Mapbox logo (bottom left) and attribution
+     (bottom right) visible, as the Mapbox terms require. */
+  #legends {
+    position: absolute; bottom: 40px; left: 12px; z-index: 10;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  }
   #legend {
-    position: absolute; bottom: 12px; left: 12px; z-index: 10;
     background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
     padding: 8px 12px; border-radius: 6px;
     font-size: 11px;
   }
+  /* Traffic: Fast [4 colors] Slow, below any payload legend. */
+  #traffic-legend {
+    align-items: center; gap: 8px; padding: 8px; border-radius: 8px;
+    background: #fff; color: #05070a; font-size: 14px; line-height: 1.3;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12); white-space: nowrap;
+  }
+  #traffic-legend .bar { display: flex; gap: 2px; }
+  #traffic-legend .bar span { width: 20px; height: 10px; border-radius: 2px; }
   #legend .row { display: flex; align-items: center; margin: 2px 0; }
   #legend .swatch {
     display: inline-block; width: 14px; height: 14px;
@@ -85,8 +98,14 @@ export function renderMapAppHtml(params: {
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     cursor: pointer;
   }
+  /* Satellite / Traffic buttons under the zoom control (see buildLayerToggles). */
+  .mapboxgl-ctrl-group.layer-toggles button {
+    display: flex; align-items: center; justify-content: center; color: #333;
+  }
+  .mapboxgl-ctrl-group.layer-toggles button.active { color: #2563eb; background: #dbeafe; }
+  .mapboxgl-ctrl-group.layer-toggles button:focus:not(:focus-visible) { box-shadow: none; }
   #side-panel {
-    position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 10;
+    position: absolute; top: 12px; right: 12px; bottom: 34px; z-index: 10;
     width: 280px; max-width: calc(100% - 24px);
     background: rgba(15, 23, 42, 0.88); color: #f1f5f9;
     border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -128,7 +147,10 @@ export function renderMapAppHtml(params: {
 <body>
 <div id="map"></div>
 <div id="summary" style="display:none"></div>
-<div id="legend" style="display:none"></div>
+<div id="legends">
+  <div id="legend" style="display:none"></div>
+  <div id="traffic-legend" style="display:none"></div>
+</div>
 <div id="side-panel" style="display:none"></div>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
@@ -143,6 +165,8 @@ ${initialDataScript}
   var errorEl = document.getElementById('error');
   var summaryEl = document.getElementById('summary');
   var legendEl = document.getElementById('legend');
+  var trafficLegendEl = document.getElementById('traffic-legend');
+  var legendsEl = document.getElementById('legends');
   var panelEl = document.getElementById('side-panel');
   // Populated by buildSearchMiniPayload's marker tagging so the panel (click
   // -> flyTo) and Place Details enrichment can find a marker by mapbox_id
@@ -162,6 +186,45 @@ ${initialDataScript}
   var trackedLayerIds = [];
   var trackedSourceIds = [];
   var trackedMarkers = [];
+  // Copies of the GeoJSON layers drawn so far. setStyle() drops every
+  // source and layer we added (DOM markers survive it), so a style switch
+  // from the Satellite button puts these back (see restoreOverlays).
+  var drawnLayers = [];
+  var currentBaseMapConfig = null;
+  var payloadLegend = [];
+  var trafficOn = false;
+  // Mapbox Traffic v1: live congestion per road segment, refreshed every few
+  // minutes. Served from api.mapbox.com, which the page's CSP already allows.
+  var TRAFFIC_ID = 'mapbox-live-traffic';
+  // Colors from the design's traffic legend (Fast to Slow).
+  var TRAFFIC_LEVELS = [
+    { value: 'low', label: 'Light traffic', color: '#00c94e' },
+    { value: 'moderate', label: 'Moderate traffic', color: '#ff9900' },
+    { value: 'heavy', label: 'Heavy traffic', color: '#ff2b3a' },
+    { value: 'severe', label: 'Severe traffic', color: '#8b0a18' }
+  ];
+  var TRAFFIC_MAIN_ROADS = [
+    'motorway', 'motorway_link', 'trunk', 'trunk_link',
+    'primary', 'secondary', 'tertiary', 'link'
+  ];
+  // 24px filled icons (a globe and a car, as in the design), sized to match
+  // the zoom buttons. The globe's lines are cut out in the button color.
+  var TOGGLE_ICONS = {
+    satellite: '<circle cx="12" cy="12" r="9.5"/>' +
+      '<path d="M2.5 12h19M12 2.5a14 14 0 0 1 0 19M12 2.5a14 14 0 0 0 0 19" ' +
+      'fill="none" stroke="#fff" stroke-width="1.6"/>',
+    traffic: '<path fill-rule="evenodd" d="M5 11l1.6-4.4A2.4 2.4 0 0 1 8.9 5h6.2' +
+      'a2.4 2.4 0 0 1 2.3 1.6L19 11a2 2 0 0 1 2 2v4a1 1 0 0 1-1 1h-1v1.5' +
+      'a1.5 1.5 0 0 1-3 0V18H8v1.5a1.5 1.5 0 0 1-3 0V18H4a1 1 0 0 1-1-1v-4' +
+      'a2 2 0 0 1 2-2zm2.2 0h9.6l-1.1-3.2a1 1 0 0 0-1-.8H9.3a1 1 0 0 0-1 .8z' +
+      'M7.5 13a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3zm9 0a1.5 1.5 0 1 0 0 3' +
+      'a1.5 1.5 0 1 0 0-3z"/>'
+  };
+
+  // Set by the layer toggle control, which initMap() adds before the rest
+  // of this script has run.
+  var satelliteButton = null;
+  var trafficButton = null;
 
   // --- MCP App postMessage protocol -----------------------------------------
   var messageId = 0;
@@ -284,6 +347,7 @@ ${initialDataScript}
     }
     map = new mapboxgl.Map(mapOptions);
     map.addControl(new mapboxgl.NavigationControl(), 'top-left');
+    map.addControl(new LayerToggleControl(), 'top-left');
     map.on('load', function() {
       mapLoaded = true;
       if (pendingPayload) {
@@ -416,6 +480,7 @@ ${initialDataScript}
     } else {
       summaryEl.style.display = 'none';
     }
+    placeTopLeftControls();
     if (!map) { loadingEl.style.display = 'none'; return; }
     if (mapLoaded) render(payload);
     else pendingPayload = payload;
@@ -439,6 +504,7 @@ ${initialDataScript}
     trackedLayerIds = [];
     trackedSourceIds = [];
     trackedMarkers = [];
+    drawnLayers = [];
     markersById = {};
     panelEl.style.display = 'none';
     clearPanel();
@@ -491,17 +557,12 @@ ${initialDataScript}
     if (!layer || !layer.id || !layer.data) return;
     map.addSource(layer.id, { type: 'geojson', data: layer.data });
     trackedSourceIds.push(layer.id);
-
-    var def = {
-      id: layer.id,
-      type: layer.type,
-      source: layer.id
-    };
-    if (layer.paint) def.paint = layer.paint;
-    if (layer.layout) def.layout = layer.layout;
-    if (layer.slot) def.slot = layer.slot;
-    map.addLayer(def);
+    map.addLayer(layerDefinition(layer));
     trackedLayerIds.push(layer.id);
+    drawnLayers.push({
+      id: layer.id, type: layer.type, data: layer.data,
+      paint: layer.paint, layout: layer.layout, slot: layer.slot
+    });
 
     var feature = layer.data;
     if (feature.type === 'FeatureCollection' && Array.isArray(feature.features)) {
@@ -511,6 +572,187 @@ ${initialDataScript}
     } else if (feature.geometry) {
       bbox.extend(feature.geometry.coordinates);
     }
+  }
+
+  function layerDefinition(layer) {
+    var def = {
+      id: layer.id,
+      type: layer.type,
+      source: layer.id
+    };
+    if (layer.paint) def.paint = layer.paint;
+    if (layer.layout) def.layout = layer.layout;
+    if (layer.slot) def.slot = layer.slot;
+    return def;
+  }
+
+  // --- Satellite / Traffic toggles -----------------------------------------
+  function addTrafficLayer() {
+    if (!map.getSource(TRAFFIC_ID)) {
+      map.addSource(TRAFFIC_ID, {
+        type: 'vector',
+        url: 'mapbox://mapbox.mapbox-traffic-v1'
+      });
+    }
+    if (map.getLayer(TRAFFIC_ID)) return;
+    var colors = ['match', ['get', 'congestion']];
+    TRAFFIC_LEVELS.forEach(function(level) { colors.push(level.value, level.color); });
+    colors.push('rgba(0,0,0,0)');
+    map.addLayer({
+      id: TRAFFIC_ID,
+      type: 'line',
+      source: TRAFFIC_ID,
+      'source-layer': 'traffic',
+      // Above land and water, below roads' labels and anything we draw.
+      slot: 'middle',
+      // Light traffic on every side street turns the whole map green, so
+      // show it only on main roads; any slowdown shows on every road.
+      filter: ['any',
+        ['!=', ['get', 'congestion'], 'low'],
+        ['match', ['get', 'class'], TRAFFIC_MAIN_ROADS, true, false]
+      ],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': colors,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 15, 2, 18, 4],
+        // Each direction is its own line; shift it to its side of the road.
+        'line-offset': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 15, 1.5, 18, 3],
+        'line-opacity': 0.9
+      }
+    });
+  }
+
+  function removeTrafficLayer() {
+    if (map.getLayer(TRAFFIC_ID)) map.removeLayer(TRAFFIC_ID);
+    if (map.getSource(TRAFFIC_ID)) map.removeSource(TRAFFIC_ID);
+  }
+
+  function setTraffic(on) {
+    trafficOn = on;
+    if (map && mapLoaded) {
+      if (on) addTrafficLayer();
+      else removeTrafficLayer();
+    }
+    renderLegend();
+    syncToggleButtons();
+  }
+
+  // Switches the base style, then runs afterLoad once the new style is up.
+  function switchBaseStyle(styleId, afterLoad) {
+    currentBaseStyleId = styleId;
+    syncToggleButtons();
+    map.setStyle('mapbox://styles/mapbox/' + styleId);
+    map.once('style.load', afterLoad);
+  }
+
+  // After a style switch from the Satellite button: put back what setStyle
+  // dropped, without refitting the camera the user may have moved.
+  function restoreOverlays() {
+    applyBaseMapConfig(currentBaseMapConfig);
+    drawnLayers.forEach(function(layer) {
+      if (!map.getSource(layer.id)) {
+        map.addSource(layer.id, { type: 'geojson', data: layer.data });
+      }
+      if (!map.getLayer(layer.id)) map.addLayer(layerDefinition(layer));
+    });
+    if (trafficOn) addTrafficLayer();
+  }
+
+  function toggleSatellite() {
+    if (!map || !mapLoaded) return;
+    switchBaseStyle(
+      currentBaseStyleId === 'standard-satellite' ? 'standard' : 'standard-satellite',
+      restoreOverlays
+    );
+  }
+
+  // A GL JS control (onAdd returns its element). Built by a returned object
+  // rather than prototype methods because initMap() runs before the rest
+  // of this script, and addControl calls onAdd right away.
+  function LayerToggleControl() {
+    return { onAdd: buildLayerToggles, onRemove: function() {} };
+  }
+
+  function buildLayerToggles() {
+    var container = document.createElement('div');
+    container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group layer-toggles';
+    satelliteButton = buildToggleButton('Satellite view', TOGGLE_ICONS.satellite, toggleSatellite);
+    trafficButton = buildToggleButton('Live traffic', TOGGLE_ICONS.traffic, function() {
+      setTraffic(!trafficOn);
+    });
+    container.appendChild(satelliteButton);
+    container.appendChild(trafficButton);
+    syncToggleButtons();
+    return container;
+  }
+
+  function buildToggleButton(label, icon, onClick) {
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.title = label;
+    if (typeof button.setAttribute === 'function') button.setAttribute('aria-label', label);
+    button.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" ' +
+      'fill="currentColor" aria-hidden="true">' + icon + '</svg>';
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
+  function syncToggleButtons() {
+    setPressed(satelliteButton, currentBaseStyleId === 'standard-satellite');
+    setPressed(trafficButton, trafficOn);
+  }
+
+  function setPressed(button, pressed) {
+    if (!button) return;
+    button.className = pressed ? 'active' : '';
+    if (typeof button.setAttribute === 'function') {
+      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    }
+  }
+
+  // The summary chip covers GL JS's top-left control corner, so move the
+  // zoom and layer buttons below it while it's shown.
+  function placeTopLeftControls() {
+    if (!map || typeof map.getContainer !== 'function') return;
+    var container = map.getContainer();
+    var corner = container && typeof container.querySelector === 'function'
+      ? container.querySelector('.mapboxgl-ctrl-top-left')
+      : null;
+    if (!corner) return;
+    corner.style.top = summaryEl.style.display === 'block'
+      ? (summaryEl.offsetHeight + 8) + 'px'
+      : '';
+  }
+
+  // The payload's legend rows, and below them the traffic scale while
+  // traffic is on.
+  function renderLegend() {
+    renderTrafficLegend();
+    var rows = payloadLegend;
+    if (rows.length === 0) {
+      legendEl.style.display = 'none';
+      return;
+    }
+    legendEl.innerHTML = rows.map(function(row) {
+      var op = (typeof row.opacity === 'number') ? row.opacity : 1;
+      return '<div class="row"><span class="swatch" style="background:' +
+        escapeAttr(row.color) + ';opacity:' + op + '"></span>' +
+        escapeText(row.label) + '</div>';
+    }).join('');
+    legendEl.style.display = 'block';
+  }
+
+  function renderTrafficLegend() {
+    if (!trafficOn) {
+      trafficLegendEl.style.display = 'none';
+      return;
+    }
+    trafficLegendEl.innerHTML = '<span>Fast</span><span class="bar">' +
+      TRAFFIC_LEVELS.map(function(level) {
+        return '<span title="' + level.label + '" style="background:' +
+          level.color + '"></span>';
+      }).join('') + '</span><span>Slow</span>';
+    trafficLegendEl.style.display = 'flex';
   }
 
   function addOneMarker(m, bbox) {
@@ -599,11 +841,13 @@ ${initialDataScript}
     return n > 0 && String(n) === String(label);
   }
 
-  // Bottom padding that keeps fitted data out from under the legend
+  // Bottom padding that keeps fitted data out from under the legends
   // (bottom-left), unless the map is too short to spare the room.
   function bottomPadding() {
-    if (legendEl.style.display !== 'block') return 50;
-    var bottom = (legendEl.offsetHeight || 0) + 24;
+    if (legendEl.style.display !== 'block' &&
+        trafficLegendEl.style.display !== 'flex') return 50;
+    // The legends sit 40px up, above the logo.
+    var bottom = (legendsEl.offsetHeight || 0) + 52;
     var el = document.getElementById('map');
     var height = (el && el.clientHeight) || window.innerHeight || 0;
     if (bottom <= 50 || (height && height - bottom - 70 < 160)) return 50;
@@ -653,6 +897,7 @@ ${initialDataScript}
     if (payload.summary && summaryEl.style.display === 'none') {
       summaryEl.textContent = payload.summary;
       summaryEl.style.display = 'block';
+      placeTopLeftControls();
     }
     maybeShowSidePanel(markers, payload.summary);
     var bounds = bbox.bounds();
@@ -661,6 +906,7 @@ ${initialDataScript}
 
   function applyBaseMapConfig(baseMapConfig) {
     if (!baseMapConfig || typeof baseMapConfig !== 'object') return;
+    currentBaseMapConfig = baseMapConfig;
     if (typeof map.setConfigProperty !== 'function') return;
     Object.keys(baseMapConfig).forEach(function(key) {
       try { map.setConfigProperty('basemap', key, baseMapConfig[key]); } catch (_) { /* not a Standard-based style */ }
@@ -679,9 +925,7 @@ ${initialDataScript}
       ? 'standard-satellite'
       : (payload.baseStyle === 'standard' ? 'standard' : null);
     if (desiredBaseStyleId && desiredBaseStyleId !== currentBaseStyleId) {
-      currentBaseStyleId = desiredBaseStyleId;
-      map.setStyle('mapbox://styles/mapbox/' + desiredBaseStyleId);
-      map.once('style.load', function() { renderBody(payload); });
+      switchBaseStyle(desiredBaseStyleId, function() { renderBody(payload); });
       return;
     }
     renderBody(payload);
@@ -702,18 +946,11 @@ ${initialDataScript}
     // markers gets the same results panel.
     maybeShowSidePanel(markers, payload.summary);
 
-    // Legend
-    if (Array.isArray(payload.legend) && payload.legend.length > 0) {
-      legendEl.innerHTML = payload.legend.map(function(row) {
-        var op = (typeof row.opacity === 'number') ? row.opacity : 1;
-        return '<div class="row"><span class="swatch" style="background:' +
-          escapeAttr(row.color) + ';opacity:' + op + '"></span>' +
-          escapeText(row.label) + '</div>';
-      }).join('');
-      legendEl.style.display = 'block';
-    } else {
-      legendEl.style.display = 'none';
-    }
+    payloadLegend = Array.isArray(payload.legend) ? payload.legend : [];
+    // showTraffic set by the caller wins; left out, keep whatever the user
+    // picked with the Traffic button (a style switch dropped the layer, so
+    // setTraffic puts it back).
+    setTraffic(typeof payload.showTraffic === 'boolean' ? payload.showTraffic : trafficOn);
 
     loadingEl.style.display = 'none';
     requestSizeToFit();
@@ -745,6 +982,9 @@ ${initialDataScript}
           if (!data) return;
           var src = map.getSource(payload.defer.layerId);
           if (src && typeof src.setData === 'function') src.setData(data);
+          drawnLayers.forEach(function(layer) {
+            if (layer.id === payload.defer.layerId) layer.data = data;
+          });
         },
         function() { /* ignore — keep what we rendered inline */ }
       );

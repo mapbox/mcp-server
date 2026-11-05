@@ -254,11 +254,10 @@
     "id": "site-walksheds",
     "category": "site-building",
     "prompt": "I'm building a website for our coffee shops. Create index.html with an interactive map showing the areas within a 10-minute walk of our two shops: 1 Main St, Brooklyn and 200 Kent Ave, Brooklyn.",
-    "why": "Field report (ChatGPT/Codex building a site): the agent asked the user for a Mapbox token because render_map_tool only renders in chat. The page should get its map from export_map_html_tool without a token request.",
+    "why": "Field report (ChatGPT/Codex building a site): the agent asked the user for a Mapbox token because render_map_tool only renders in chat. The page should get a public token from list_public_tokens_tool (#304) and embed it. The page may call the Isochrone API itself with that token instead of calling isochrone_tool, so the eval doesn't require isochrone_tool.",
     "host_tools": ["write_file"],
-    "needs_tools": ["export_map_html_tool"],
     "expect": {
-      "must": ["isochrone_tool", "export_map_html_tool", "write_file"],
+      "must": ["list_public_tokens_tool", "write_file"],
       "must_not": ["static_map_image_tool", "places_map_display_v0"]
     },
     "stubs": {
@@ -272,14 +271,27 @@
     "prompt": "Make a simple web page (index.html) for our team offsite showing the driving route from Denver Union Station to Red Rocks Amphitheatre on an interactive map.",
     "why": "Same field report as site-walksheds, with a route instead of areas.",
     "host_tools": ["write_file"],
-    "needs_tools": ["export_map_html_tool"],
     "expect": {
-      "must": ["directions_tool", "export_map_html_tool", "write_file"],
+      "must": ["directions_tool", "list_public_tokens_tool", "write_file"],
       "must_not": ["static_map_image_tool", "places_map_display_v0"]
     },
     "stubs": {
       "search_and_geocode_tool": "1. Denver Union Station, 1701 Wynkoop St, Denver, CO 80202 (39.7531, -105.0000)\n2. Red Rocks Amphitheatre, 18300 W Alameda Pkwy, Morrison, CO 80465 (39.6654, -105.2057)",
       "directions_tool": "Route 1: 25.9 km, 27 min via US-6 W and I-70 W. Route 2: 28.4 km, 31 min via US-285 S and CO-470 N."
+    }
+  },
+  {
+    "id": "site-chatgpt-app",
+    "category": "site-building",
+    "prompt": "I'm building a ChatGPT app with the Apps SDK. Write widget.html, the component it shows inline in the chat, with an interactive Mapbox GL JS map of our three bakeries: 410 Valencia St, 2001 Fillmore St and 1 Ferry Building, San Francisco.",
+    "why": "A map in an app the user builds for another host runs outside our render_map_tool UI, so it needs its own public token: from list_public_tokens_tool, not a placeholder or a request to the user.",
+    "host_tools": ["write_file"],
+    "expect": {
+      "must": ["list_public_tokens_tool", "write_file"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. 410 Valencia St, San Francisco, CA 94103 (37.7655, -122.4218)\n2. 2001 Fillmore St, San Francisco, CA 94115 (37.7880, -122.4335)\n3. 1 Ferry Building, San Francisco, CA 94111 (37.7955, -122.3937)"
     }
   }
 ]

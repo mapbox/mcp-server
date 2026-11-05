@@ -21,7 +21,7 @@ export class ResourceReaderTool extends BaseTool<
 > {
   name = 'resource_reader_tool';
   description =
-    'Reads an MCP resource by URI. This tool is a fallback for clients that do not support the native MCP resource API. Supports reading category lists and other Mapbox resources. Use "mapbox://categories" for default categories or "mapbox://categories/{language}" for localized versions (e.g., "mapbox://categories/ja" for Japanese).';
+    'Reads an MCP resource by URI. This tool is a fallback for clients that do not support the native MCP resource API. Supports reading category lists and the mapbox:// refs other tools return (mapbox://temp/..., mapbox://response/..., mapbox://inline/..., mapbox://compute/...); pass a ref exactly as returned. Use "mapbox://categories" for default categories or "mapbox://categories/{language}" for localized versions (e.g., "mapbox://categories/ja" for Japanese).';
   annotations = {
     title: 'Resource Reader Tool',
     readOnlyHint: true,
