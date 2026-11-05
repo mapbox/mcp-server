@@ -29,8 +29,13 @@ export class DirectionsTool extends MapboxApiBasedTool<
     'Returns a `mapboxRender.ref` in structuredContent regardless of the geometries value; if the ' +
     'user wants to see the route on a map, pass it to render_map_tool. ' +
     'Use geometries="none" (default) for compact text/data responses (distance, duration, ' +
-    'turn-by-turn instructions). Use geometries="geojson" only when you need the raw route ' +
-    'coordinates in the response yourself - render_map_tool works either way.';
+    'turn-by-turn instructions, congestion). Use geometries="geojson" when you need the raw route ' +
+    'coordinates in the response yourself, e.g. to draw the route in your own app. It defaults ' +
+    "to a simplified geometry that keeps the route's shape when zoomed out but cuts corners up " +
+    'close; pass overview="full" for every vertex when your map lets people zoom in on the ' +
+    'route. render_map_tool works either way. Only overview="full" on a very long trip can exceed the response size ' +
+    'limit; then this tool returns a summary and a `mapbox://response/...` ref you can read with ' +
+    'the MCP resources API.';
   annotations = {
     title: 'Directions Tool',
     readOnlyHint: true,

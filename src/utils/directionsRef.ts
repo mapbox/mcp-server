@@ -55,6 +55,9 @@ export function directionsRequestFromRef(
       coordinates: coords,
       routing_profile: params.routing_profile ?? 'mapbox/driving-traffic',
       geometries: 'geojson',
+      // geojson now defaults to a simplified overview; whoever draws from
+      // this wants every vertex, like the map app's own self-fetch.
+      overview: 'full',
       alternatives: params.alternatives === true,
       exclude: params.exclude,
       depart_at: params.depart_at,

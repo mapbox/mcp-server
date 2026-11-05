@@ -38,17 +38,19 @@ export function getResourceByUri(uri: string): ResourceInstance | undefined {
   const exactMatch = ALL_RESOURCES.find((resource) => resource.uri === uri);
   if (exactMatch) return exactMatch;
 
-  // Find pattern match (e.g., mapbox://categories/ja matches mapbox://categories)
+  // Find pattern match (e.g., mapbox://categories/ja matches mapbox://categories,
+  // mapbox://temp/abc matches the template mapbox://temp/{id}). The prefix is
+  // everything before the first `{` or `*`.
   // Plain string prefix check — avoids building a RegExp from data at runtime,
   // which would let an unbounded, user-supplied `uri` be tested against a
   // dynamically constructed pattern (untrusted-input-into-RegExp is a ReDoS
   // smell even though today's static resource URIs are innocuous).
   return ALL_RESOURCES.find((resource) => {
-    const wildcardIndex = resource.uri.indexOf('*');
+    const variableIndex = resource.uri.search(/[{*]/);
     const basePrefix =
-      wildcardIndex === -1
+      variableIndex === -1
         ? resource.uri
-        : resource.uri.slice(0, wildcardIndex);
+        : resource.uri.slice(0, variableIndex);
     return uri.startsWith(basePrefix);
   });
 }

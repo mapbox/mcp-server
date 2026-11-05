@@ -54,7 +54,9 @@ function loadScriptSandbox(options?: {
     .replace(/<\/script>$/, '');
 
   const postMessageCalls: Array<Record<string, unknown>> = [];
-  let messageListener: ((event: { data: unknown }) => void) | undefined;
+  let messageListener:
+    | ((event: { data: unknown; source: unknown }) => void)
+    | undefined;
 
   // A minimal stand-in for a DOM Element — enough for the panel code's
   // createElement/appendChild/removeChild/addEventListener usage, without
@@ -69,6 +71,10 @@ function loadScriptSandbox(options?: {
       style: {} as Record<string, string>,
       textContent: '',
       className: '',
+      attributes: {} as Record<string, string>,
+      setAttribute(name: string, value: string) {
+        this.attributes[name] = value;
+      },
       children,
       appendChild: (child: FakeElement) => {
         children.push(child);
@@ -95,6 +101,8 @@ function loadScriptSandbox(options?: {
     style: Record<string, string>;
     textContent: string;
     className: string;
+    attributes: Record<string, string>;
+    setAttribute: (name: string, value: string) => void;
     children: FakeElement[];
     appendChild: (child: FakeElement) => FakeElement;
     removeChild: (child: FakeElement) => FakeElement;
@@ -134,9 +142,18 @@ function loadScriptSandbox(options?: {
   const markerConstructorCalls: Array<Record<string, unknown>> = [];
   const setStyleCalls: string[] = [];
   const fitBoundsCalls: Array<{ padding: Record<string, number> }> = [];
+  // What's currently on the style, like GL JS: setStyle() drops it all.
+  const styleSources: Record<string, Record<string, unknown>> = {};
+  const styleLayers: Record<string, Record<string, unknown>> = {};
+  const controls: FakeElement[] = [];
   const topLeftCorner = fakeElement();
   const fakeMapInstance = {
-    addControl: () => {},
+    // GL JS calls a control's onAdd right away and mounts what it returns.
+    addControl: (control: { onAdd?: (map: unknown) => FakeElement }) => {
+      if (control && typeof control.onAdd === 'function') {
+        controls.push(control.onAdd(fakeMapInstance));
+      }
+    },
     getContainer: () => ({
       querySelector: (selector: string) =>
         selector === '.mapboxgl-ctrl-top-left' ? topLeftCorner : null
@@ -152,13 +169,23 @@ function loadScriptSandbox(options?: {
     },
     setStyle: (styleUrl: string) => {
       setStyleCalls.push(styleUrl);
+      for (const id of Object.keys(styleSources)) delete styleSources[id];
+      for (const id of Object.keys(styleLayers)) delete styleLayers[id];
     },
-    addSource: () => {},
-    addLayer: () => {},
-    getLayer: () => null,
-    getSource: () => null,
-    removeLayer: () => {},
-    removeSource: () => {},
+    addSource: (id: string, source: Record<string, unknown>) => {
+      styleSources[id] = source;
+    },
+    addLayer: (layer: Record<string, unknown>) => {
+      styleLayers[layer.id as string] = layer;
+    },
+    getLayer: (id: string) => styleLayers[id] ?? null,
+    getSource: (id: string) => styleSources[id] ?? null,
+    removeLayer: (id: string) => {
+      delete styleLayers[id];
+    },
+    removeSource: (id: string) => {
+      delete styleSources[id];
+    },
     fitBounds: (
       _bounds: unknown,
       opts: { padding: Record<string, number> }
@@ -277,43 +304,44 @@ function loadScriptSandbox(options?: {
   vm.createContext(sandbox);
   vm.runInContext(scriptSource, sandbox);
 
+  const hostWindow = (sandbox.window as { parent: unknown }).parent;
+  const postToApp = (data: unknown, source: unknown = hostWindow) =>
+    messageListener?.({ data, source });
+
   // Resolve the initial `ui/initialize` request so the app proceeds past
   // its handshake (mirrors what a real host would respond with).
   const initId = postMessageCalls.find((m) => m.method === 'ui/initialize')
     ?.id as number | undefined;
   if (initId !== undefined && messageListener && !options?.noHost) {
-    messageListener({
-      data: {
-        jsonrpc: '2.0',
-        id: initId,
-        result: options?.hostContext ? { hostContext: options.hostContext } : {}
-      }
+    postToApp({
+      jsonrpc: '2.0',
+      id: initId,
+      result: options?.hostContext ? { hostContext: options.hostContext } : {}
     });
   }
 
   return {
-    sendToolResult: (result: unknown) => {
-      messageListener?.({
-        data: {
+    sendToolResult: (result: unknown, source?: unknown) => {
+      postToApp(
+        {
           jsonrpc: '2.0',
           method: 'ui/notifications/tool-result',
           params: result
-        }
-      });
+        },
+        source
+      );
     },
     // Resolves the most recent still-pending resources/read request with
     // the given JSON-RPC `result`, mirroring what the real host does after
     // the iframe asks to dereference a payload ref.
-    resolveResourcesRead: (result: unknown) => {
+    resolveResourcesRead: (result: unknown, source?: unknown) => {
       const call = [...postMessageCalls]
         .reverse()
         .find((m) => m.method === 'resources/read');
       if (!call || messageListener === undefined) {
         throw new Error('No pending resources/read call to resolve');
       }
-      messageListener({
-        data: { jsonrpc: '2.0', id: call.id, result }
-      });
+      postToApp({ jsonrpc: '2.0', id: call.id, result }, source);
     },
     setFetchImpl: (impl: (url: string, init?: unknown) => Promise<unknown>) => {
       fetchImpl = impl;
@@ -321,12 +349,10 @@ function loadScriptSandbox(options?: {
     getLastPopupText: () => lastPopupText,
     rootEl,
     sendHostContext: (params: Record<string, unknown>) => {
-      messageListener?.({
-        data: {
-          jsonrpc: '2.0',
-          method: 'ui/notifications/host-context-changed',
-          params
-        }
+      postToApp({
+        jsonrpc: '2.0',
+        method: 'ui/notifications/host-context-changed',
+        params
       });
     },
     postMessageCalls,
@@ -335,6 +361,21 @@ function loadScriptSandbox(options?: {
     mapConstructorCalls,
     markerConstructorCalls,
     setStyleCalls,
+    styleSources,
+    styleLayers,
+    controls,
+    topLeftCorner,
+    legendEl: getElementById('legend') as unknown as {
+      innerHTML?: string;
+      style: Record<string, string>;
+    },
+    legendsEl: getElementById('legends') as unknown as {
+      style: Record<string, string>;
+    },
+    trafficLegendEl: getElementById('traffic-legend') as unknown as {
+      innerHTML?: string;
+      style: Record<string, string>;
+    },
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
     topLeftCorner,
@@ -379,24 +420,6 @@ interface PanelItem {
   distanceMeters?: number;
 }
 
-describe('mapAppHtml summary chip', () => {
-  it('moves the top-left controls below the summary chip while it shows', () => {
-    const sandbox = loadScriptSandbox();
-    (sandbox.summaryEl as unknown as { offsetHeight: number }).offsetHeight =
-      30;
-    const send = (payload: Record<string, unknown>) =>
-      sandbox.sendToolResult({
-        structuredContent: { mapboxRender: { layers: [], ...payload } }
-      });
-
-    send({ summary: '6 results for "coffee"' });
-    expect(sandbox.topLeftCorner.style.top).toBe('38px');
-
-    send({ markers: [{ coordinates: [-122.4, 37.8] }] });
-    expect(sandbox.topLeftCorner.style.top).toBe('');
-  });
-});
-
 describe('mapAppHtml light and dark theme', () => {
   it('follows the system when the host sends no theme', () => {
     expect(
@@ -440,6 +463,90 @@ describe('mapAppHtml light and dark theme', () => {
     sendHostContext({ displayMode: 'fullscreen' });
     sendHostContext({ theme: 'sepia' });
     expect(rootEl.attributes['data-theme']).toBe('dark');
+  });
+});
+
+describe('mapAppHtml message source', () => {
+  it('ignores a tool-result posted by a window other than the host', () => {
+    const { sendToolResult, map } = loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+
+    sendToolResult(
+      {
+        structuredContent: {
+          mapboxRender: {
+            summary: 'Spoofed',
+            layers: [
+              {
+                id: 'spoofed',
+                type: 'line',
+                data: {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                      [-77, 38],
+                      [-76, 39]
+                    ]
+                  },
+                  properties: {}
+                }
+              }
+            ]
+          }
+        }
+      },
+      { postMessage: () => {} }
+    );
+
+    expect(addLayerSpy).not.toHaveBeenCalled();
+  });
+
+  it('ignores a reply to a pending request posted by a window other than the host', async () => {
+    const { sendToolResult, resolveResourcesRead, map } = loadScriptSandbox();
+    const addLayerSpy = vi.fn();
+    map.addLayer = addLayerSpy;
+    const ref = 'mapbox://temp/map-payload-abc';
+    const readResult = (layerId: string) => ({
+      contents: [
+        {
+          uri: ref,
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            layers: [
+              {
+                id: layerId,
+                type: 'line',
+                data: {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                      [-77, 38],
+                      [-76, 39]
+                    ]
+                  },
+                  properties: {}
+                }
+              }
+            ]
+          })
+        }
+      ]
+    });
+
+    sendToolResult({ structuredContent: { mapboxRender: { ref } } });
+    resolveResourcesRead(readResult('spoofed'), { postMessage: () => {} });
+    await Promise.resolve();
+    expect(addLayerSpy).not.toHaveBeenCalled();
+
+    // The request is still pending, so the host's reply is applied.
+    resolveResourcesRead(readResult('route'));
+    await Promise.resolve();
+    expect(addLayerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'route' })
+    );
   });
 });
 
@@ -815,6 +922,205 @@ describe('mapAppHtml baseMapConfig and slot', () => {
 
     const callArg = addLayerSpy.mock.calls[0][0] as { slot?: unknown };
     expect(callArg.slot).toBeUndefined();
+  });
+});
+
+describe('mapAppHtml Satellite and Traffic toggles', () => {
+  const routeLayer = {
+    id: 'route',
+    type: 'line',
+    slot: 'top',
+    data: {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [-122.4, 37.78],
+          [-122.41, 37.79]
+        ]
+      }
+    }
+  };
+
+  function sendPayload(
+    sandbox: ReturnType<typeof loadScriptSandbox>,
+    payload: Record<string, unknown>
+  ) {
+    sandbox.sendToolResult({
+      structuredContent: { mapboxRender: { layers: [], ...payload } }
+    });
+  }
+
+  function buttons(sandbox: ReturnType<typeof loadScriptSandbox>) {
+    expect(sandbox.controls).toHaveLength(1);
+    const [satellite, traffic] = sandbox.controls[0].children;
+    return { satellite, traffic };
+  }
+
+  it('adds Satellite and Traffic buttons under the zoom control, both off', () => {
+    const sandbox = loadScriptSandbox();
+    const { satellite, traffic } = buttons(sandbox);
+
+    expect(sandbox.controls[0].className).toContain('mapboxgl-ctrl-group');
+    expect(satellite.attributes['aria-label']).toBe('Satellite view');
+    expect(traffic.attributes['aria-label']).toBe('Live traffic');
+    expect(satellite.attributes['aria-pressed']).toBe('false');
+    expect(traffic.attributes['aria-pressed']).toBe('false');
+  });
+
+  it('the Traffic button adds live congestion under labels and adds it to the legend', () => {
+    const sandbox = loadScriptSandbox();
+    sendPayload(sandbox, { layers: [routeLayer] });
+    const { traffic } = buttons(sandbox);
+
+    traffic.__fireClick();
+
+    expect(sandbox.styleSources['mapbox-live-traffic']).toEqual({
+      type: 'vector',
+      url: 'mapbox://mapbox.mapbox-traffic-v1'
+    });
+    const layer = sandbox.styleLayers['mapbox-live-traffic'];
+    expect(layer).toMatchObject({
+      type: 'line',
+      'source-layer': 'traffic',
+      slot: 'middle'
+    });
+    expect((layer.paint as Record<string, unknown>)['line-color']).toContain(
+      'severe'
+    );
+    // Light traffic only on main roads; slowdowns on every road.
+    const filter = JSON.stringify(layer.filter);
+    expect(filter).toContain('["!=",["get","congestion"],"low"]');
+    expect(filter).toContain('"primary"');
+    expect(filter).not.toContain('"street"');
+    expect(traffic.attributes['aria-pressed']).toBe('true');
+    expect(traffic.className).toBe('active');
+    expect(sandbox.trafficLegendEl.style.display).toBe('flex');
+    expect(sandbox.trafficLegendEl.innerHTML).toMatch(
+      /^<span>Fast<\/span>.*#00c94e.*#ff9900.*#ff2b3a.*#8b0a18.*<span>Slow<\/span>$/
+    );
+    expect(sandbox.legendEl.style.display).not.toBe('block');
+
+    traffic.__fireClick();
+
+    expect(sandbox.styleLayers['mapbox-live-traffic']).toBeUndefined();
+    expect(sandbox.styleSources['mapbox-live-traffic']).toBeUndefined();
+    expect(traffic.attributes['aria-pressed']).toBe('false');
+    expect(sandbox.trafficLegendEl.style.display).toBe('none');
+  });
+
+  it('keeps the payload legend alongside the traffic one', () => {
+    const sandbox = loadScriptSandbox();
+    sendPayload(sandbox, {
+      layers: [routeLayer],
+      legend: [{ color: '#3b82f6', label: 'Route' }]
+    });
+
+    buttons(sandbox).traffic.__fireClick();
+
+    expect(sandbox.legendEl.innerHTML).toContain('Route');
+    expect(sandbox.legendEl.innerHTML).not.toContain('traffic');
+    expect(sandbox.trafficLegendEl.style.display).toBe('flex');
+  });
+
+  it('the Satellite button switches style and puts back the drawn layers and traffic, without moving the camera', async () => {
+    const sandbox = loadScriptSandbox();
+    sendPayload(sandbox, { layers: [routeLayer] });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const fitsBefore = sandbox.fitBoundsCalls.length;
+    const { satellite, traffic } = buttons(sandbox);
+    traffic.__fireClick();
+
+    satellite.__fireClick();
+
+    expect(sandbox.setStyleCalls).toEqual([
+      'mapbox://styles/mapbox/standard-satellite'
+    ]);
+    expect(sandbox.styleLayers.route).toMatchObject({
+      type: 'line',
+      source: 'route',
+      slot: 'top'
+    });
+    expect(sandbox.styleSources.route).toMatchObject({ type: 'geojson' });
+    expect(sandbox.styleLayers['mapbox-live-traffic']).toBeDefined();
+    expect(satellite.attributes['aria-pressed']).toBe('true');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(sandbox.fitBoundsCalls.length).toBe(fitsBefore);
+
+    satellite.__fireClick();
+
+    expect(sandbox.setStyleCalls[1]).toBe('mapbox://styles/mapbox/standard');
+    expect(sandbox.styleLayers.route).toBeDefined();
+    expect(satellite.attributes['aria-pressed']).toBe('false');
+  });
+
+  it('reapplies the base map config after the Satellite button switches style', () => {
+    const sandbox = loadScriptSandbox();
+    const setConfigProperty = vi.fn();
+    (sandbox.map as { setConfigProperty?: unknown }).setConfigProperty =
+      setConfigProperty;
+    sendPayload(sandbox, {
+      baseMapConfig: { showPointOfInterestLabels: false }
+    });
+    setConfigProperty.mockClear();
+
+    buttons(sandbox).satellite.__fireClick();
+
+    expect(setConfigProperty).toHaveBeenCalledWith(
+      'basemap',
+      'showPointOfInterestLabels',
+      false
+    );
+  });
+
+  it('a baseStyle from the model updates the Satellite button', () => {
+    const sandbox = loadScriptSandbox();
+    sendPayload(sandbox, { baseStyle: 'standard-satellite' });
+
+    expect(buttons(sandbox).satellite.attributes['aria-pressed']).toBe('true');
+  });
+
+  it('showTraffic: true turns traffic on, and a later render without it keeps it on', () => {
+    const sandbox = loadScriptSandbox();
+    sendPayload(sandbox, { layers: [routeLayer], showTraffic: true });
+
+    expect(sandbox.styleLayers['mapbox-live-traffic']).toBeDefined();
+    expect(buttons(sandbox).traffic.attributes['aria-pressed']).toBe('true');
+
+    sendPayload(sandbox, { layers: [routeLayer] });
+    expect(sandbox.styleLayers['mapbox-live-traffic']).toBeDefined();
+
+    sendPayload(sandbox, { layers: [routeLayer], showTraffic: false });
+    expect(sandbox.styleLayers['mapbox-live-traffic']).toBeUndefined();
+  });
+
+  it('keeps traffic on when the model switches base style', () => {
+    const sandbox = loadScriptSandbox();
+    sendPayload(sandbox, { layers: [routeLayer], showTraffic: true });
+
+    sendPayload(sandbox, {
+      layers: [routeLayer],
+      baseStyle: 'standard-satellite'
+    });
+
+    expect(sandbox.setStyleCalls).toEqual([
+      'mapbox://styles/mapbox/standard-satellite'
+    ]);
+    expect(sandbox.styleLayers['mapbox-live-traffic']).toBeDefined();
+    expect(sandbox.styleLayers.route).toBeDefined();
+  });
+
+  it('moves the top-left controls below the summary chip while it shows', () => {
+    const sandbox = loadScriptSandbox();
+    (sandbox.summaryEl as unknown as { offsetHeight: number }).offsetHeight =
+      30;
+
+    sendPayload(sandbox, { summary: 'Downtown traffic' });
+    expect(sandbox.topLeftCorner.style.top).toBe('38px');
+
+    sendPayload(sandbox, { layers: [routeLayer] });
+    expect(sandbox.topLeftCorner.style.top).toBe('');
   });
 });
 
@@ -2843,8 +3149,8 @@ describe('mapAppHtml results side panel: one panel per render', () => {
     });
   });
 
-  it('puts the legend above the carousel, and back when a render has no cards', async () => {
-    const { sendToolResult, setFetchImpl, legendEl } = loadScriptSandbox();
+  it('puts the legends above the carousel, and back when a render has no cards', async () => {
+    const { sendToolResult, setFetchImpl, legendsEl } = loadScriptSandbox();
     setFetchImpl(async () => ({
       ok: true,
       json: async () => ({ results: [] })
@@ -2863,11 +3169,11 @@ describe('mapAppHtml results side panel: one panel per render', () => {
 
     render([{ coordinates: at(-122.41), id: mockPoiId('lg-1'), name: 'One' }]);
     for (let i = 0; i < 6; i++) await Promise.resolve();
-    expect(legendEl.style.bottom).toBe('144px');
+    expect(legendsEl.style.bottom).toBe('144px');
 
     render([{ coordinates: at(-122.41), name: 'No id' }]);
     for (let i = 0; i < 6; i++) await Promise.resolve();
-    expect(legendEl.style.bottom).toBe('');
+    expect(legendsEl.style.bottom).toBe('');
   });
 
   it("tints a place pin's icon with the caller's color", async () => {

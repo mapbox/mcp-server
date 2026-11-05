@@ -42,13 +42,13 @@ interface RawIncident {
   [key: string]: unknown;
 }
 
-interface RawVoiceInstruction {
-  announcement?: string;
+interface RawManeuver {
+  instruction?: string;
   [key: string]: unknown;
 }
 
 interface RawStep {
-  voiceInstructions?: RawVoiceInstruction[];
+  maneuver?: RawManeuver;
   [key: string]: unknown;
 }
 
@@ -200,8 +200,8 @@ export function cleanResponseData(
       length?: number;
     }> = [];
 
-    // Collect voice instruction announcements from all steps
-    const routeAnnouncements: string[] = [];
+    // Collect turn-by-turn instructions from all steps
+    const routeInstructions: string[] = [];
 
     let totalDistanceWeightedSpeed = 0; // Sum of (speed × distance) for each segment
     let sumDistanceMeters = 0;
@@ -213,6 +213,11 @@ export function cleanResponseData(
       moderate: 0,
       low: 0
     };
+    // The API only returns a congestion annotation at all when overview=full
+    // was requested (see buildDirectionsRequestUrl.ts) — tracked here so we
+    // can omit congestion_information entirely rather than reporting a
+    // misleading all-zero breakdown when it was never requested.
+    let sawCongestionAnnotation = false;
 
     if (route.legs) {
       route.legs.forEach((leg) => {
@@ -229,6 +234,7 @@ export function cleanResponseData(
         }
 
         if (leg.annotation?.congestion && leg.annotation?.distance) {
+          sawCongestionAnnotation = true;
           // iterate every congestion string in leg.annotation.congestion
           // each string is one of `severe, heavy, moderate, low, unknown`
           // keep track of total distance by type of congestion
@@ -284,15 +290,14 @@ export function cleanResponseData(
           });
         }
 
-        // Process steps if they exist to collect voice instructions
+        // One instruction per step, e.g. "Bear right onto Great Portland
+        // Street/A4201". `maneuver.instruction` comes back whenever
+        // steps=true; `step.voiceInstructions` would need
+        // voice_instructions=true, which this tool doesn't send.
         if (leg.steps) {
           leg.steps.forEach((step) => {
-            if (step.voiceInstructions) {
-              step.voiceInstructions.forEach((instruction) => {
-                if (instruction.announcement) {
-                  routeAnnouncements.push(instruction.announcement);
-                }
-              });
+            if (step.maneuver?.instruction) {
+              routeInstructions.push(step.maneuver.instruction);
             }
           });
         }
@@ -312,21 +317,31 @@ export function cleanResponseData(
     // Add all incidents with the specified fields as a new property on the route
     cleanedRoute.incidents_summary = routeIncidents;
 
-    // Add voice instruction announcements only if there are 1 to 10 of them
-    // If there are more than 10, it's just too many, and if there is 0 then we don't have them.
-    if (routeAnnouncements.length >= 1 && routeAnnouncements.length <= 10) {
-      cleanedRoute.instructions = routeAnnouncements;
+    // One instruction per maneuver, so even a long route with dozens of
+    // turns fits. The cap only guards against extreme cases, like many
+    // waypoints each with a complex urban leg.
+    const MAX_INSTRUCTIONS = 200;
+    if (
+      routeInstructions.length >= 1 &&
+      routeInstructions.length <= MAX_INSTRUCTIONS
+    ) {
+      cleanedRoute.instructions = routeInstructions;
     }
 
     cleanedRoute.num_legs = route.legs?.length || 0;
 
-    // Add congestion distance information to route
-    cleanedRoute.congestion_information = {
-      length_low: Math.round(congestionTypeToDistance.low),
-      length_moderate: Math.round(congestionTypeToDistance.moderate),
-      length_heavy: Math.round(congestionTypeToDistance.heavy),
-      length_severe: Math.round(congestionTypeToDistance.severe)
-    };
+    // Add congestion distance information to route, but only when the API
+    // actually returned a congestion annotation -- omitted (rather than
+    // reported as all-zero) when it wasn't requested/available, so this
+    // can't be misread as "confirmed no traffic anywhere".
+    if (sawCongestionAnnotation) {
+      cleanedRoute.congestion_information = {
+        length_low: Math.round(congestionTypeToDistance.low),
+        length_moderate: Math.round(congestionTypeToDistance.moderate),
+        length_heavy: Math.round(congestionTypeToDistance.heavy),
+        length_severe: Math.round(congestionTypeToDistance.severe)
+      };
+    }
 
     // Calculate and add average speed in km/h
     if (sumDistanceMeters > 0 && totalDistanceWeightedSpeed > 0) {

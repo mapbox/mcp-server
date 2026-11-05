@@ -198,6 +198,12 @@ export const RenderMapInputSchema = z.object({
     .optional()
     .describe(
       'Which Mapbox-owned base style to load; defaults to "standard". "standard-satellite" is the same Standard style family rendered over global satellite imagery instead of a vector basemap — same config-property system and bottom/middle/top slots apply, but it has no theme and no flat-color overrides like colorWater/colorBuildings (there\'s no vector surface to recolor). See https://docs.mapbox.com/map-styles/reference/standard-satellite/ for its supported baseMapConfig properties.'
+    ),
+  showTraffic: z
+    .boolean()
+    .optional()
+    .describe(
+      'Show live traffic congestion (light/moderate/heavy/severe) on every road in view, from Mapbox Traffic. Use when the user asks to see traffic or congestion in an area. Works on both base styles. Left out, the map keeps whatever the user picked with its Traffic button.'
     )
 });
 
