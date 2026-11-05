@@ -25,7 +25,7 @@ export const ALL_RESOURCES = [
   new MapAppUIResource({ httpRequest }),
   // Full-width viewer for static_map_image_tool's image.
   new StaticMapViewerUIResource(),
-  // Photos for the map app's results panel, which its CSP can't load directly.
+  // Photos for the map app's results carousel, which its CSP can't load directly.
   new PlacePhotoResource({ httpRequest }),
   new VersionResource()
 ] as const;

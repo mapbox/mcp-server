@@ -70,7 +70,7 @@ export class RenderMapTool extends BaseTool<
     'hand-composed payloads from raw GeoJSON. For a hand-composed POI marker ' +
     '(e.g. built from category_search_tool/search_and_geocode_tool/' +
     "place_details_tool output), set `markers[].id` to the place's mapbox_id " +
-    '— this gets it the same auto-enriching results panel (popularity ' +
+    '— this gets it the same auto-enriching results carousel (popularity ' +
     'score and photo) that a payload_refs-based search result gets ' +
     'automatically, with no extra tool calls. ' +
     'To restyle the base map itself (e.g. "make the water red", switch to night ' +
@@ -79,10 +79,15 @@ export class RenderMapTool extends BaseTool<
     'To show live traffic congestion on the roads in view, pass ' +
     '`showTraffic: true`. The map also has Satellite and Traffic buttons ' +
     'users can toggle themselves. ' +
-    'Every call is a fresh render — it does not accumulate state — so to ' +
-    'restyle an already-drawn map without losing its content, re-pass the ' +
-    'same `payload_refs`/`layers` alongside `baseMapConfig`/`baseStyle` rather ' +
-    'than sending them alone.';
+    'Every call redraws the map from scratch: only the traffic and satellite ' +
+    'settings carry over from the previous call. So to restyle an ' +
+    'already-drawn map or toggle traffic without losing its content, re-pass ' +
+    'the same `payload_refs`/`layers` alongside ' +
+    '`baseMapConfig`/`baseStyle`/`showTraffic` rather than sending them alone. ' +
+    "After rendering places, don't list them again in your reply: the map's " +
+    'cards already show each name, category, price level, distance and hours. ' +
+    'Answer the question or add what the cards leave out (like the phone ' +
+    'number or address) instead.';
 
   readonly annotations = {
     title: 'Render Map',
