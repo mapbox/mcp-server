@@ -136,6 +136,32 @@ describe('Tool Configuration', () => {
       const config = parseToolConfigFromArgs();
       expect(config).toEqual({ enabledTools: ['version_tool'] });
     });
+
+    it('should parse --disable-skills', () => {
+      process.argv = ['node', 'index.js', '--disable-skills'];
+      const config = parseToolConfigFromArgs();
+      expect(config).toEqual({ disableSkills: true });
+    });
+
+    it('should disable skills when DISABLE_SKILLS=true', () => {
+      vi.stubEnv('DISABLE_SKILLS', 'true');
+      process.argv = ['node', 'index.js'];
+      try {
+        expect(parseToolConfigFromArgs()).toEqual({ disableSkills: true });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should leave skills on for any other DISABLE_SKILLS value', () => {
+      vi.stubEnv('DISABLE_SKILLS', '1');
+      process.argv = ['node', 'index.js'];
+      try {
+        expect(parseToolConfigFromArgs()).toEqual({});
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
   });
 
   describe('filterTools', () => {

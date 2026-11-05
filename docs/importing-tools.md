@@ -9,6 +9,7 @@ The Mapbox MCP Server exposes several subpath exports for direct integration:
 - `@mapbox/mcp-server/tools` - Geospatial tools (routing, search, geocoding, etc.)
 - `@mapbox/mcp-server/resources` - Static resources (category lists, etc.)
 - `@mapbox/mcp-server/prompts` - Pre-built prompts for common workflows
+- `@mapbox/mcp-server/skills` - Skills served over the MCP Skills extension
 - `@mapbox/mcp-server/utils` - HTTP pipeline utilities and server setup helpers
 
 All exports support both **ESM** and **CommonJS** via dual builds powered by [tshy](https://github.com/isaacs/tshy).
@@ -234,6 +235,23 @@ import { GetDirectionsPrompt } from '@mapbox/mcp-server/prompts';
 
 const prompt = new GetDirectionsPrompt();
 ```
+
+## Skills
+
+Skills are workflow instructions served over the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview) (SEP-2640), using the SDK's own support for it (`@modelcontextprotocol/server/ext/skills`). To serve the same skills from your own server, install them before connecting:
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/server';
+import { getSkillsForTools, installSkillsTo } from '@mapbox/mcp-server/skills';
+
+// Only the skills whose tools you've installed.
+const skills = getSkillsForTools(['isochrone_tool', 'render_map_tool' /* … */]);
+
+const server = new McpServer({ name: 'my-server', version: '1.0.0' });
+await installSkillsTo(server, skills);
+```
+
+This declares the extension and serves `skills/list`, `skills/get` and the `skill://<name>/SKILL.md` files. If you create a server per request, build the catalog once with `loadSkills(skills)` and call `catalog.attach(server)` on each one instead. `ALL_SKILLS` has every skill this package serves, taken from [mapbox/mapbox-agent-skills](https://github.com/mapbox/mapbox-agent-skills) at the commit `AGENT_SKILLS_SOURCE` names.
 
 ## HTTP Pipeline Utilities
 
