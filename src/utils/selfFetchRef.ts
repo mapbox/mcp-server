@@ -121,6 +121,33 @@ function hasValidSelfFetchParams(
       isNonEmptyNumberArray(params.contours_meters)
     );
   }
+  if (tool === 'search' || tool === 'category_search') {
+    // Hand-written refs have passed proximity as a "lon,lat" string, which
+    // the iframe sends as proximity=undefined,undefined and the API 400s.
+    const p = params.proximity as
+      | { longitude?: unknown; latitude?: unknown }
+      | undefined;
+    if (
+      p !== undefined &&
+      p !== null &&
+      (typeof p !== 'object' ||
+        typeof p.longitude !== 'number' ||
+        typeof p.latitude !== 'number')
+    ) {
+      return false;
+    }
+    const b = params.bbox as Record<string, unknown> | undefined;
+    if (
+      b !== undefined &&
+      b !== null &&
+      (typeof b !== 'object' ||
+        !['minLongitude', 'minLatitude', 'maxLongitude', 'maxLatitude'].every(
+          (k) => typeof b[k] === 'number'
+        ))
+    ) {
+      return false;
+    }
+  }
   return true;
 }
 

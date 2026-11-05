@@ -1124,6 +1124,15 @@ ${initialDataScript}
   // the map (does NOT teardown first) and refits to include the new
   // content. Used once a self-fetched layer (e.g. a directions route)
   // resolves after the initial render.
+  // Search Box errors carry an object, {"message":{"error":"Invalid
+  // proximity provided..."}}, where the other APIs carry a string; showing
+  // the object printed "[object Object]".
+  function apiErrorText(body, fallback) {
+    var m = body && body.message;
+    if (m && typeof m === 'object') m = m.error || m.message;
+    return typeof m === 'string' && m ? m : fallback;
+  }
+
   // Self-fetch layers use fixed ids, so two refs of the same kind in one
   // render (search results for SFO and for Palo Alto) would both add
   // "selffetch-search-results" and the second addSource() throws.
@@ -1466,10 +1475,7 @@ ${initialDataScript}
             .json()
             .catch(function() { return null; })
             .then(function(body) {
-              var msg =
-                body && body.message
-                  ? body.message
-                  : 'Directions API error (' + res.status + ')';
+              var msg = apiErrorText(body, 'Directions API error (' + res.status + ')');
               throw new Error(msg);
             });
         }
@@ -1641,10 +1647,7 @@ ${initialDataScript}
             .json()
             .catch(function() { return null; })
             .then(function(body) {
-              var msg =
-                body && body.message
-                  ? body.message
-                  : 'Isochrone API error (' + res.status + ')';
+              var msg = apiErrorText(body, 'Isochrone API error (' + res.status + ')');
               throw new Error(msg);
             });
         }
@@ -1780,10 +1783,7 @@ ${initialDataScript}
             .json()
             .catch(function() { return null; })
             .then(function(body) {
-              var msg =
-                body && body.message
-                  ? body.message
-                  : 'Map Matching API error (' + res.status + ')';
+              var msg = apiErrorText(body, 'Map Matching API error (' + res.status + ')');
               throw new Error(msg);
             });
         }
@@ -2496,10 +2496,7 @@ ${initialDataScript}
             .json()
             .catch(function() { return null; })
             .then(function(body) {
-              var msg =
-                body && body.message
-                  ? body.message
-                  : 'Search API error (' + res.status + ')';
+              var msg = apiErrorText(body, 'Search API error (' + res.status + ')');
               throw new Error(msg);
             });
         }
@@ -2585,10 +2582,7 @@ ${initialDataScript}
             .json()
             .catch(function() { return null; })
             .then(function(body) {
-              var msg =
-                body && body.message
-                  ? body.message
-                  : 'Category Search API error (' + res.status + ')';
+              var msg = apiErrorText(body, 'Category Search API error (' + res.status + ')');
               throw new Error(msg);
             });
         }
@@ -2733,10 +2727,7 @@ ${initialDataScript}
             .json()
             .catch(function() { return null; })
             .then(function(body) {
-              var msg =
-                body && body.message
-                  ? body.message
-                  : 'Optimization API error (' + res.status + ')';
+              var msg = apiErrorText(body, 'Optimization API error (' + res.status + ')');
               throw new Error(msg);
             });
         }

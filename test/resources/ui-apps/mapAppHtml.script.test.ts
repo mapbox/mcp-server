@@ -1941,6 +1941,37 @@ describe('mapAppHtml category search self-fetch', () => {
   });
 });
 
+describe('mapAppHtml self-fetch API errors', () => {
+  it("shows a Search Box error's nested message instead of [object Object]", async () => {
+    const { sendToolResult, setFetchImpl, errorEl } = loadScriptSandbox();
+    setFetchImpl(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        message: {
+          status_code: 400,
+          error:
+            "Invalid proximity provided. Must be lon,lat coordinates or 'ip'."
+        }
+      })
+    }));
+
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          ref: 'mapbox://selffetch/category_search?data=abc',
+          layers: [],
+          selfFetch: [{ tool: 'category_search', params: { category: 'cafe' } }]
+        }
+      }
+    });
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(errorEl?.textContent).toContain('Invalid proximity provided');
+    expect(errorEl?.textContent).not.toContain('[object Object]');
+  });
+});
+
 describe('mapAppHtml optimization self-fetch', () => {
   it('fetches and draws the trip line + numbered visit markers from a selfFetch descriptor', async () => {
     const { sendToolResult, setFetchImpl, map, summaryEl, errorEl } =

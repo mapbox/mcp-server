@@ -119,6 +119,30 @@ describe('CategorySearchTool', () => {
     });
   });
 
+  it("reports a Search Box error's nested message instead of [object Object]", async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      text: async () =>
+        JSON.stringify({
+          message: {
+            status_code: 400,
+            error: 'Limit must be in range [1,25]'
+          }
+        })
+    });
+
+    const result = await new CategorySearchTool({ httpRequest }).run({
+      category: 'restaurant'
+    });
+
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: 'Category Search API error: 400: Limit must be in range [1,25]'
+    });
+  });
+
   it('validates limit constraints', async () => {
     const { httpRequest } = setupHttpRequest();
     const tool = new CategorySearchTool({ httpRequest });

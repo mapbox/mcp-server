@@ -115,6 +115,32 @@ describe('selfFetchRef', () => {
     expect(resolveSelfFetchRef(ref)).toBeNull();
   });
 
+  it('returns null for a search ref whose proximity or bbox is malformed', () => {
+    // A hand-written ref with proximity as a "lon,lat" string would reach
+    // the API as proximity=undefined,undefined and 400.
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('category_search', {
+          category: 'cafe',
+          proximity: '-122.4,37.8'
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('search', { q: 'coffee', bbox: [1, 2, 3, 4] })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('search', {
+          q: 'coffee',
+          proximity: { longitude: -122.4, latitude: 37.8 }
+        })
+      )
+    ).not.toBeNull();
+  });
+
   it('isSelfFetchRef distinguishes self-fetch refs from other schemes', () => {
     expect(isSelfFetchRef('mapbox://selffetch/directions?data=abc')).toBe(true);
     expect(isSelfFetchRef('mapbox://temp/map-payload-abc')).toBe(false);

@@ -6,6 +6,7 @@
   - **Wrong city:** "Show coffee shops near Union Square, San Francisco" drew cafés in southern New Jersey, where the user was. The map runs a search ref's search again from the browser, and with no `proximity` or `bbox` the Search Box API biases toward the caller's IP, so on a hosted server the map and the reply came from different places. `search_and_geocode_tool` and `category_search_tool` now pin the ref to the first result in that case, flagged `proximityFromResults` so the map draws no "Search center" pin there.
   - **Distances:** the cards and popups showed distances measured from that IP (4059202 m from SFO for a user in New Jersey). They now show only when the call passed a `proximity`.
   - **Two searches on one map:** "Driving route from SFO to Palo Alto" passed a search ref for each end, and the second failed with `There is already a source with ID "selffetch-search-results"`. Self-fetched layers that would reuse an id now get a free one (`-2`, `-3`, ...), which also covers two routes, isochrones or trips on one map.
+  - **"[object Object]" errors:** Search Box errors carry the reason in an object (`{"message":{"error":"Invalid proximity provided..."}}`), and both the map and the tools printed the object. Both now show the `error` text. Search refs whose `proximity` or `bbox` isn't the shape the map sends (a hand-written `"lon,lat"` string, say) are now rejected when resolved, so `render_map_tool` tells the model to re-run the search instead of the map failing.
 
 ## 0.17.0-dev.2 - 2026-11-05
 
