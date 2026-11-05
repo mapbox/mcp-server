@@ -206,6 +206,19 @@ export function renderMapAppHtml(params: {
   #carousel .hours-closed { color: #b91c1c; font-weight: 600; }
   :root[data-theme="dark"] #carousel .hours-open { color: #4ade80; }
   :root[data-theme="dark"] #carousel .hours-closed { color: #f87171; }
+  /* Shown only by map_explorer_tool (the ChatGPT sidebar app), centered
+     clear of the top-left controls. */
+  #explorer-search {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 11;
+    width: 360px; max-width: calc(100% - 120px); display: flex;
+  }
+  #explorer-search input {
+    flex: 1; min-width: 0; padding: 9px 12px; font-size: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.2); border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2); outline: none;
+  }
+  #explorer-search input:focus { border-color: #4264fb; }
+  body.explorer #summary { top: 60px; }
 </style>
 </head>
 <body>
@@ -216,6 +229,9 @@ export function renderMapAppHtml(params: {
   <div id="traffic-legend" style="display:none"></div>
 </div>
 <div id="carousel" style="display:none"></div>
+<form id="explorer-search" style="display:none" role="search">
+  <input id="explorer-search-input" type="search" placeholder="Search places" aria-label="Search places" autocomplete="off">
+</form>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
 ${initialDataScript}
@@ -483,6 +499,9 @@ ${initialDataScript}
   // structuredContent (e.g. Claude Desktop) never have inline data to find
   // here, so they fall through to the ref path exactly as before.
   function handleToolResult(result) {
+    if (result && result.structuredContent && result.structuredContent.explorer === true) {
+      showExplorerSearch();
+    }
     var payload = extractInlinePayload(result);
     if (payload) {
       stageRender(payload);
@@ -517,6 +536,34 @@ ${initialDataScript}
     }
     showError('Tool result did not contain a map payload.');
   }
+
+  // --- Explorer search (map_explorer_tool) ---------------------------------
+  // Each search is a fresh render of a search self-fetch, biased toward the
+  // current view, so it reuses the same results carousel as search_and_geocode_tool.
+  var explorerFormEl = document.getElementById('explorer-search');
+  var explorerInputEl = document.getElementById('explorer-search-input');
+
+  function showExplorerSearch() {
+    document.body.classList.add('explorer');
+    explorerFormEl.style.display = 'flex';
+    explorerInputEl.focus();
+  }
+
+  explorerFormEl.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var q = explorerInputEl.value.trim();
+    if (!q || !map || !mapLoaded) return;
+    errorEl.style.display = 'none';
+    var center = map.getCenter();
+    stageRender({
+      layers: [],
+      markers: [],
+      selfFetch: [{
+        tool: 'search',
+        params: { q: q, proximity: { longitude: center.lng, latitude: center.lat } }
+      }]
+    });
+  });
 
   function readResourceExpiryMessage(rr) {
     if (!rr || !Array.isArray(rr.contents) || rr.contents.length === 0) return null;
@@ -927,8 +974,9 @@ ${initialDataScript}
       ? container.querySelector('.mapboxgl-ctrl-top-left')
       : null;
     if (!corner) return;
+    // The chip sits lower in explorer mode, under the search box.
     corner.style.top = summaryEl.style.display === 'block'
-      ? (summaryEl.offsetHeight + 8) + 'px'
+      ? ((summaryEl.offsetTop || 12) + summaryEl.offsetHeight - 4) + 'px'
       : '';
   }
 
