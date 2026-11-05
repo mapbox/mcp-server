@@ -79,10 +79,11 @@ export class RenderMapTool extends BaseTool<
     'To show live traffic congestion on the roads in view, pass ' +
     '`showTraffic: true`. The map also has Satellite and Traffic buttons ' +
     'users can toggle themselves. ' +
-    'Every call is a fresh render — it does not accumulate state — so to ' +
-    'restyle an already-drawn map without losing its content, re-pass the ' +
-    'same `payload_refs`/`layers` alongside `baseMapConfig`/`baseStyle` rather ' +
-    'than sending them alone.';
+    'Every call redraws the map from scratch: only the traffic and satellite ' +
+    'settings carry over from the previous call. So to restyle an ' +
+    'already-drawn map or toggle traffic without losing its content, re-pass ' +
+    'the same `payload_refs`/`layers` alongside ' +
+    '`baseMapConfig`/`baseStyle`/`showTraffic` rather than sending them alone.';
 
   readonly annotations = {
     title: 'Render Map',

@@ -25,6 +25,11 @@
       "id": "no_token_ask",
       "label": "No token ask",
       "kind": "binary"
+    },
+    {
+      "id": "token_embedded",
+      "label": "Token embedded",
+      "kind": "binary"
     }
   ],
   "perf_fields": [
