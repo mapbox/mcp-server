@@ -53,6 +53,7 @@ describe('HomeUIResource', () => {
     const html = resourceTextOf(result);
     expect(html).toContain('<title>Mapbox</title>');
     expect(html).toContain('"pk.eyJ1IjoidGVzdHVzZXIifQ.pub"');
+    expect(html).toContain('var MENTION = "@Mapbox ";');
     expect(html).not.toContain(SK_TOKEN);
     expect(entry._meta).toMatchObject({
       ui: { csp: { resourceDomains: ['https://api.mapbox.com'] } },
@@ -76,10 +77,27 @@ describe('HomeUIResource', () => {
     expect(html).toContain('var TOKEN = "";');
   });
 
-  it('allows a custom API endpoint origin for thumbnails', () => {
-    expect(homeAppCsp('https://api.example.com/').resourceDomains).toEqual([
-      'https://api.mapbox.com',
-      'https://api.example.com'
-    ]);
+  it('allows GL JS for the style preview and a custom API endpoint for thumbnails', () => {
+    expect(homeAppCsp('https://api.example.com/')).toEqual({
+      connectDomains: [
+        'https://api.mapbox.com',
+        'https://events.mapbox.com',
+        'https://api.example.com'
+      ],
+      resourceDomains: ['https://api.mapbox.com', 'https://api.example.com'],
+      workerDomains: ['blob:']
+    });
+  });
+
+  it('mentions MAPBOX_CHATGPT_PLUGIN_NAME in starter drafts', async () => {
+    process.env.MAPBOX_CHATGPT_PLUGIN_NAME = ' MCP-dev ';
+    try {
+      const html = resourceTextOf(
+        await new HomeUIResource({ httpRequest: vi.fn() }).read(HOME_APP_URI)
+      );
+      expect(html).toContain('var MENTION = "@MCP-dev ";');
+    } finally {
+      delete process.env.MAPBOX_CHATGPT_PLUGIN_NAME;
+    }
   });
 });

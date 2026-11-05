@@ -25,15 +25,16 @@ async function listedTool() {
 }
 
 describe('MapExplorerTool', () => {
-  it('is a ChatGPT sidebar app on the shared map app, hidden from the model', async () => {
+  it('is an app-only tool on the shared map app, with no sidebar entry of its own', async () => {
     const { tool } = await listedTool();
 
     expect(tool.name).toBe('map_explorer_tool');
     expect(tool.title).toBe('Mapbox Maps');
     expect(tool._meta).toMatchObject({
-      ui: { resourceUri: MAP_APP_URI, visibility: ['app'] },
-      'openai/ui': { entrypoints: [{ type: 'global' }] }
+      ui: { resourceUri: MAP_APP_URI, visibility: ['app'] }
     });
+    // Opened from the Mapbox home entry's quick action instead.
+    expect(tool._meta?.['openai/ui']).toBeUndefined();
     expect(tool.icons?.[0]).toMatchObject({
       mimeType: 'image/svg+xml',
       sizes: ['any']

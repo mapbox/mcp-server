@@ -44,8 +44,9 @@ function num(value: unknown): number | undefined {
 }
 
 /**
- * `mapbox_home_tool` — the Mapbox home page in ChatGPT's sidebar. For now it
- * lists the account's styles, tilesets and public tokens.
+ * `mapbox_home_tool` — the Mapbox home page in ChatGPT's sidebar: starter
+ * prompts that hand off to the chat, plus the account's styles, tilesets and
+ * public tokens. Its quick action opens `map_explorer_tool`.
  *
  * App-only: ChatGPT calls it with `{}` when the user opens the sidebar entry,
  * and the app calls it again to refresh. Read-only, and never returns secret
@@ -57,7 +58,7 @@ export class MapboxHomeTool extends MapboxApiBasedTool<
 > {
   readonly name = 'mapbox_home_tool';
   readonly description =
-    "Open the Mapbox home sidebar app, listing the user's map styles, tilesets and public tokens.";
+    "Open the Mapbox home page: starter prompts and the user's map styles, tilesets and public tokens.";
   readonly annotations = {
     title: 'Mapbox',
     readOnlyHint: true,
@@ -80,7 +81,18 @@ export class MapboxHomeTool extends MapboxApiBasedTool<
         visibility: ['app'],
         csp: homeAppCsp(MapboxApiBasedTool.mapboxApiEndpoint)
       },
-      'openai/ui': { entrypoints: [{ type: 'global' }] }
+      'openai/ui': {
+        entrypoints: [
+          {
+            type: 'global',
+            quickAction: {
+              title: 'Explore map',
+              icons: [mapboxMarkIcon],
+              target: { type: 'tool', name: 'map_explorer_tool', arguments: {} }
+            }
+          }
+        ]
+      }
     };
   }
 

@@ -2,13 +2,13 @@
 
 ### New Features
 
-- **ChatGPT sidebar app: `map_explorer_tool` (#316).** Adds **Mapbox Maps** to ChatGPT's sidebar through the [OpenAI MCP Extensions](https://developers.openai.com/plugins/build/extensions) global entrypoint (`_meta["openai/ui"].entrypoints: [{ type: "global" }]`). It opens the existing map app fullscreen with a place search box; each search runs the same Search Box self-fetch as `search_and_geocode_tool` results, biased toward the map center.
-  - **Not offered to the model:** the tool is app-only (`_meta.ui.visibility: ["app"]`). ChatGPT ignores visibility for entrypoints and calls it with `{}`. Hosts without the extension ignore the `openai/ui` metadata.
-  - **Square icon:** the tool has its own Mapbox mark icon, since the sidebar would otherwise fall back to the wide server logo.
-  - `BaseTool` now passes `icons` and typed `_meta` (`ui.visibility`, `openai/ui`) through to `registerTool`.
-- **ChatGPT sidebar home page: `mapbox_home_tool` (#316).** A second sidebar entry, **Mapbox**, is the home page for Mapbox in ChatGPT. For now it lists the account's styles, tilesets and public tokens in its own UI resource (`ui://mapbox/home/index.html`), with a filter, a refresh button, "Open in Studio" links and Static Images thumbnails for styles.
-  - **Read-only and app-only.** The server fetches the three lists with the caller's token and returns them as `structuredContent`; the page never sees a secret token. Only `pk.` tokens are returned, even if the API sends others.
-  - **Scopes per list:** `styles:list`, `tilesets:list` and `tokens:read`. A list that fails shows its error and the missing scope, and the others still load. Each list shows the first 100 entries and says when there are more.
+- **ChatGPT sidebar app: `mapbox_home_tool` (#316).** Adds **Mapbox** to ChatGPT's sidebar through the [OpenAI MCP Extensions](https://developers.openai.com/plugins/build/extensions) global entrypoint (`_meta["openai/ui"].entrypoints`). It opens a fullscreen home page (`ui://mapbox/home/index.html`) that hands work to the chat rather than copying Mapbox Studio:
+  - **Start with ChatGPT:** starter tasks (route, nearby places, travel-time area, multi-stop trip) open a new chat with an editable, unsent draft (`ui/message` with `"openai/message": { target: "new", send: false }`). Drafts start with `@Mapbox`; set `MAPBOX_CHATGPT_PLUGIN_NAME` when the plugin has another name in ChatGPT.
+  - **Your styles:** the four most recently modified styles with Static Images thumbnails, or a default cover when the API can't render one. "Preview" opens a fullscreen, interactive map of the style (`/styles/{owner}/{id}`; GL JS loads only then). "Ask about it" opens a new chat with the style (or tileset) as a titled item after the plugin mention, plus the preview's current view.
+  - **Account pages:** `/styles`, `/tilesets` and `/tokens` list up to 100 entries each with a filter, refresh and "Open in Studio" links, and open from deep links (`hostContext["openai/deepLink"]`).
+  - **Read-only and app-only** (`_meta.ui.visibility: ["app"]`). The server fetches the lists with the caller's token; only `pk.` tokens are returned. Each list needs its own scope (`styles:list`, `tilesets:list`, `tokens:read`); a list that fails shows the missing scope and the others still load.
+- **"Explore map" quick action: `map_explorer_tool` (#316).** A quick action on the Mapbox sidebar entry opens the existing map app fullscreen with a place search box; each search runs the same Search Box self-fetch as `search_and_geocode_tool` results, biased toward the map center. App-only, so the model never sees it.
+- Both tools use a square Mapbox mark icon, since the sidebar would otherwise fall back to the wide server logo. `BaseTool` now passes `icons` and typed `_meta` (`ui.visibility`, `openai/ui` entrypoints and quick actions) through to `registerTool`. Hosts without the extension ignore the `openai/ui` metadata.
 
 ## 0.17.1-dev.1 - 2026-11-09
 
