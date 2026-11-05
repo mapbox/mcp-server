@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.17.0-dev.3 - 2026-11-05
+
 ### Bug Fixes
 
 - **Agents asked for a Mapbox token instead of calling `list_public_tokens_tool` (#321).** Building a single-page map app on staging, Codex quoted our instruction back and still asked the user to paste a token. The server instructions and the tool description now say to put the returned `pk.` token in the page, since public tokens are made to ship in browser code, and not to leave a placeholder.
