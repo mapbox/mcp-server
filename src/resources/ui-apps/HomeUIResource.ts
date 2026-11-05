@@ -9,12 +9,12 @@ import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import { BaseResource } from '../BaseResource.js';
 import type { HttpRequest } from '../../utils/types.js';
 import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
-import { renderConsoleAppHtml } from './consoleAppHtml.js';
+import { renderHomeAppHtml } from './homeAppHtml.js';
 
-export const CONSOLE_APP_URI = 'ui://mapbox/console/index.html';
+export const HOME_APP_URI = 'ui://mapbox/home/index.html';
 
 /** Style thumbnails come from the Static Images API; nothing else is loaded. */
-export function consoleAppCsp(apiEndpoint: string): {
+export function homeAppCsp(apiEndpoint: string): {
   resourceDomains: string[];
 } {
   const resourceDomains = ['https://api.mapbox.com'];
@@ -27,10 +27,10 @@ export function consoleAppCsp(apiEndpoint: string): {
   return { resourceDomains };
 }
 
-/** UI for `mapbox_console_tool`, the ChatGPT sidebar console. */
-export class ConsoleUIResource extends BaseResource {
-  readonly name = 'Mapbox Console App UI';
-  readonly uri = CONSOLE_APP_URI;
+/** UI for `mapbox_home_tool`, the Mapbox home page in ChatGPT's sidebar. */
+export class HomeUIResource extends BaseResource {
+  readonly name = 'Mapbox Home App UI';
+  readonly uri = HOME_APP_URI;
   readonly description =
     "Lists the account's styles, tilesets and public tokens (MCP Apps)";
   readonly mimeType = RESOURCE_MIME_TYPE;
@@ -55,7 +55,7 @@ export class ConsoleUIResource extends BaseResource {
       process.env.MAPBOX_ACCESS_TOKEN ||
       '';
 
-    // Only for style thumbnails; the console still works without one.
+    // Only for style thumbnails; the page still works without one.
     const publicToken = accessToken
       ? await resolveMapboxPublicToken({
           accessToken,
@@ -69,12 +69,12 @@ export class ConsoleUIResource extends BaseResource {
         {
           uri: this.uri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: renderConsoleAppHtml({
+          text: renderHomeAppHtml({
             publicToken: publicToken ?? '',
             apiEndpoint: this.apiEndpoint()
           }),
           _meta: {
-            ui: { csp: consoleAppCsp(this.apiEndpoint()) },
+            ui: { csp: homeAppCsp(this.apiEndpoint()) },
             'openai/ui': {
               preferredDisplayMode: 'fullscreen',
               availableDisplayModes: ['fullscreen']
