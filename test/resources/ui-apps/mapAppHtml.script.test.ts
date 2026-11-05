@@ -378,9 +378,7 @@ function loadScriptSandbox(options?: {
     },
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
-    topLeftCorner,
     carouselEl: getElementById('carousel'),
-    legendEl: getElementById('legend'),
     mapEl: getElementById('map') as unknown as { clientWidth?: number },
     fitBoundsCalls,
     placeIcon: (
