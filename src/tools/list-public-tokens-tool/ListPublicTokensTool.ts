@@ -107,6 +107,8 @@ export class ListPublicTokensTool extends MapboxApiBasedTool<
   description =
     "Lists the Mapbox account's public (pk.) access tokens, for when you build a web page or app " +
     'outside this chat that loads Mapbox GL JS or calls Mapbox APIs from the browser. ' +
+    'Put the returned pk. token in the page: public tokens are made to ship in browser code, ' +
+    'so a placeholder or asking the user to paste a token is not needed. ' +
     'To show a map in the chat, use render_map_tool instead; it needs no token. ' +
     'Pass site_url (where the page will run) to get a token restricted to that URL when the account ' +
     "has one. Returns each token's name, whether it is the default, its URL restrictions and scopes, " +

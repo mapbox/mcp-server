@@ -2,6 +2,7 @@
 
 ### Bug Fixes
 
+- **Agents asked for a Mapbox token instead of calling `list_public_tokens_tool` (#321).** Building a single-page map app on staging, Codex quoted our instruction back and still asked the user to paste a token. The server instructions and the tool description now say to put the returned `pk.` token in the page, since public tokens are made to ship in browser code, and not to leave a placeholder.
 - **Maps from searches showed the wrong place, or failed with two searches (#320).** Found on staging.
   - **Wrong city:** "Show coffee shops near Union Square, San Francisco" drew cafés in southern New Jersey, where the user was. The map runs a search ref's search again from the browser, and with no `proximity` or `bbox` the Search Box API biases toward the caller's IP, so on a hosted server the map and the reply came from different places. `search_and_geocode_tool` and `category_search_tool` now pin the ref to the first result in that case, flagged `proximityFromResults` so the map draws no "Search center" pin there.
   - **Distances:** the cards and popups showed distances measured from that IP (4059202 m from SFO for a user in New Jersey). They now show only when the call passed a `proximity`.

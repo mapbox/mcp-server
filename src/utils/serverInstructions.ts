@@ -26,7 +26,7 @@ export function buildServerInstructions(
   }
   if (enabledToolNames.includes('list_public_tokens_tool')) {
     lines.push(
-      'When building a web page or app outside this chat that needs a Mapbox token, get one with list_public_tokens_tool instead of asking the user for it.'
+      "When building a web page or app outside this chat that needs a Mapbox token, call list_public_tokens_tool and put the pk. token it returns in the page. Public tokens are made to ship in browser code, so don't leave a placeholder like YOUR_MAPBOX_TOKEN or ask the user to paste one."
     );
   }
   return lines.join('\n');
