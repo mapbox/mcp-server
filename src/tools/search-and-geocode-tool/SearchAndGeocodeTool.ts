@@ -17,7 +17,10 @@ import type {
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { buildSearchAndGeocodeRequestUrl } from './buildSearchAndGeocodeRequestUrl.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
-import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
+import {
+  buildSelfFetchRef,
+  searchSelfFetchProximity
+} from '../../utils/selfFetchRef.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#search-request
 
@@ -285,7 +288,7 @@ export class SearchAndGeocodeTool extends MapboxApiBasedTool<
     const ref = buildSelfFetchRef('search', {
       q: input.q,
       language: input.language,
-      proximity: input.proximity,
+      proximity: searchSelfFetchProximity(input, data),
       bbox: input.bbox,
       country: input.country,
       types: input.types,

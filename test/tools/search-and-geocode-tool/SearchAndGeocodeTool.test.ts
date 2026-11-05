@@ -729,5 +729,47 @@ describe('SearchAndGeocodeTool', () => {
         }
       ]);
     });
+    it('pins the self-fetch to the first point result when the call has no proximity or bbox', async () => {
+      // Without one the Search Box API biases toward the caller's IP, so on
+      // a hosted server the map's re-fetch (from the user's browser) could
+      // land somewhere other than the results the model saw.
+      const fakeResp = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {
+              name: 'Philz Coffee',
+              full_address: '5 Embarcadero Ctr',
+              feature_type: 'poi',
+              context: {}
+            },
+            geometry: { type: 'Point', coordinates: [-122.397, 37.795] }
+          }
+        ]
+      };
+      const { httpRequest } = setupHttpRequest({
+        ok: true,
+        json: async () => fakeResp
+      });
+      const result = await new SearchAndGeocodeTool({ httpRequest }).run(
+        { q: 'coffee shops near Union Square, San Francisco' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { http: { authInfo: { token: tokenFor('account-pin') } } } as any
+      );
+
+      const sc = result.structuredContent as {
+        mapboxRender?: { ref?: string };
+      };
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
+      expect(payload?.selfFetch?.[0]?.params).toEqual(
+        expect.objectContaining({
+          q: 'coffee shops near Union Square, San Francisco',
+          proximity: { longitude: -122.397, latitude: 37.795 }
+        })
+      );
+    });
   });
 });

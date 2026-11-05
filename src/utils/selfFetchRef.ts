@@ -38,6 +38,42 @@ export function buildSelfFetchRef(
   return `${SELF_FETCH_URI_PREFIX}${tool}?data=${data}`;
 }
 
+/**
+ * The proximity a search self-fetch should send when the call gave neither
+ * `proximity` nor `bbox`. Without one, the Search Box API biases toward the
+ * caller's IP: the server's own call and the iframe's re-fetch come from
+ * different places on a hosted server, so the map showed cafés near the
+ * user's browser (New Jersey) while the reply described the server's
+ * results (San Francisco). Pinning the re-fetch to the first point result
+ * keeps the map on the results the model saw.
+ */
+export function searchSelfFetchProximity(
+  input: {
+    proximity?: { longitude: number; latitude: number };
+    bbox?: unknown;
+  },
+  data: unknown
+): { longitude: number; latitude: number } | undefined {
+  if (input.proximity || input.bbox) return input.proximity;
+  const features = (data as { features?: unknown } | null | undefined)
+    ?.features;
+  if (!Array.isArray(features)) return undefined;
+  for (const f of features as Array<{
+    geometry?: { type?: string; coordinates?: unknown };
+  }>) {
+    const c = f?.geometry?.coordinates;
+    if (
+      f?.geometry?.type === 'Point' &&
+      Array.isArray(c) &&
+      typeof c[0] === 'number' &&
+      typeof c[1] === 'number'
+    ) {
+      return { longitude: c[0], latitude: c[1] };
+    }
+  }
+  return undefined;
+}
+
 function isNonEmptyNumberArray(value: unknown): boolean {
   return (
     Array.isArray(value) &&

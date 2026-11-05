@@ -493,4 +493,53 @@ describe('CategorySearchTool', () => {
       }
     ]);
   });
+  it('pins the self-fetch to the first result when the call has no proximity or bbox', async () => {
+    // Without one the Search Box API biases toward the caller's IP, and on
+    // a hosted server the iframe's re-fetch comes from the user's browser,
+    // not the server, so the map showed somewhere else entirely.
+    const fakeResp = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { name: 'Nave Cafe', feature_type: 'poi', context: {} },
+          geometry: { type: 'Point', coordinates: [-122.4075, 37.788] }
+        }
+      ]
+    };
+    const resolveParams = async (input: Record<string, unknown>) => {
+      const { httpRequest } = setupHttpRequest({
+        ok: true,
+        json: async () => fakeResp
+      });
+      const result = await new CategorySearchTool({ httpRequest }).run(
+        input,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { http: { authInfo: { token: tokenFor('account-pin') } } } as any
+      );
+      const sc = result.structuredContent as {
+        mapboxRender?: { ref?: string };
+      };
+      const { resolveSelfFetchRef } =
+        await import('../../../src/utils/selfFetchRef.js');
+      return resolveSelfFetchRef(sc.mapboxRender!.ref!)?.selfFetch?.[0]
+        ?.params as Record<string, unknown>;
+    };
+
+    expect((await resolveParams({ category: 'coffee' })).proximity).toEqual({
+      longitude: -122.4075,
+      latitude: 37.788
+    });
+
+    // A bbox already pins the search, so leave proximity out.
+    const bbox = {
+      minLongitude: -122.42,
+      minLatitude: 37.78,
+      maxLongitude: -122.4,
+      maxLatitude: 37.8
+    };
+    const withBbox = await resolveParams({ category: 'coffee', bbox });
+    expect(withBbox.proximity).toBeUndefined();
+    expect(withBbox.bbox).toEqual(bbox);
+  });
 });
