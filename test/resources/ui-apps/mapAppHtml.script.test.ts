@@ -314,6 +314,10 @@ function loadScriptSandbox(options?: {
       innerHTML?: string;
       style: Record<string, string>;
     },
+    trafficLegendEl: getElementById('traffic-legend') as unknown as {
+      innerHTML?: string;
+      style: Record<string, string>;
+    },
     errorEl: elementsById.error,
     summaryEl: elementsById.summary,
     sidePanelEl: getElementById('side-panel'),
@@ -781,18 +785,21 @@ describe('mapAppHtml Satellite and Traffic toggles', () => {
     expect(filter).not.toContain('"street"');
     expect(traffic.attributes['aria-pressed']).toBe('true');
     expect(traffic.className).toBe('active');
-    expect(sandbox.legendEl.style.display).toBe('block');
-    expect(sandbox.legendEl.innerHTML).toContain('Heavy traffic');
+    expect(sandbox.trafficLegendEl.style.display).toBe('flex');
+    expect(sandbox.trafficLegendEl.innerHTML).toMatch(
+      /^<span>Fast<\/span>.*#00c94e.*#ff9900.*#ff2b3a.*#8b0a18.*<span>Slow<\/span>$/
+    );
+    expect(sandbox.legendEl.style.display).not.toBe('block');
 
     traffic.__fireClick();
 
     expect(sandbox.styleLayers['mapbox-live-traffic']).toBeUndefined();
     expect(sandbox.styleSources['mapbox-live-traffic']).toBeUndefined();
     expect(traffic.attributes['aria-pressed']).toBe('false');
-    expect(sandbox.legendEl.style.display).toBe('none');
+    expect(sandbox.trafficLegendEl.style.display).toBe('none');
   });
 
-  it('keeps the payload legend rows alongside the traffic ones', () => {
+  it('keeps the payload legend alongside the traffic one', () => {
     const sandbox = loadScriptSandbox();
     sendPayload(sandbox, {
       layers: [routeLayer],
@@ -802,7 +809,8 @@ describe('mapAppHtml Satellite and Traffic toggles', () => {
     buttons(sandbox).traffic.__fireClick();
 
     expect(sandbox.legendEl.innerHTML).toContain('Route');
-    expect(sandbox.legendEl.innerHTML).toContain('Light traffic');
+    expect(sandbox.legendEl.innerHTML).not.toContain('traffic');
+    expect(sandbox.trafficLegendEl.style.display).toBe('flex');
   });
 
   it('the Satellite button switches style and puts back the drawn layers and traffic, without moving the camera', async () => {
