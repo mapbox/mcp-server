@@ -162,6 +162,14 @@ Every geospatial tool in this server (directions, isochrone, search, and more) c
 
 If you need a guaranteed static image in clients without MCP Apps support, use `static_map_image_tool` instead — it returns a base64-encoded PNG/JPEG that every client can display.
 
+### ChatGPT sidebar app (`map_explorer_tool`)
+
+In ChatGPT, the server also adds **Mapbox Maps** to the sidebar ([OpenAI MCP Extensions](https://developers.openai.com/plugins/build/extensions) global entrypoint). It opens the same map app fullscreen with a place search box, so users can explore without asking the model first. Results show in the same numbered panel as `search_and_geocode_tool` results, biased toward the current view. The tool is app-only (`_meta.ui.visibility: ["app"]`), so it isn't offered to the model.
+
+### ChatGPT sidebar console (`mapbox_console_tool`)
+
+**Mapbox Console** is a second sidebar entry that lists the account's styles, tilesets and public tokens, with a filter, links to Mapbox Studio and style thumbnails. It's read-only and app-only, and never shows secret or temporary tokens. Each list needs its own token scope (`styles:list`, `tilesets:list`, `tokens:read`); a list the token can't read shows the missing scope instead, and the others still load.
+
 #### CLIENT_NEEDS_RESOURCE_FALLBACK
 
 **Resource Fallback Tools (Opt-In for Non-Compliant Clients)**

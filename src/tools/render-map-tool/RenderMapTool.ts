@@ -12,6 +12,7 @@ import {
   mapAppCsp,
   type MapAppCsp
 } from '../../resources/ui-apps/mapAppCsp.js';
+import { MAP_APP_URI } from '../../resources/ui-apps/MapAppUIResource.js';
 import {
   RenderMapInputSchema,
   type RenderMapInput
@@ -108,7 +109,7 @@ export class RenderMapTool extends BaseTool<
       (() => process.env.MAPBOX_API_ENDPOINT || 'https://api.mapbox.com/');
     this.meta = {
       ui: {
-        resourceUri: 'ui://mapbox/map-app/index.html',
+        resourceUri: MAP_APP_URI,
         csp: mapAppCsp(this.apiEndpoint())
       }
     };

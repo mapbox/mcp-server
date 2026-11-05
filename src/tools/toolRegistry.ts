@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 // INSERT NEW TOOL IMPORT HERE
+import { MapExplorerTool } from './map-explorer-tool/MapExplorerTool.js';
+import { MapboxConsoleTool } from './mapbox-console-tool/MapboxConsoleTool.js';
 import { ListPublicTokensTool } from './list-public-tokens-tool/ListPublicTokensTool.js';
 import { FeedbackTool } from './feedback-tool/FeedbackTool.js';
 import { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
@@ -71,6 +73,8 @@ export const CORE_TOOLS = [
   new MatrixTool({ httpRequest }),
   new OptimizationTool({ httpRequest }),
   new RenderMapTool({ httpRequest }),
+  new MapExplorerTool(),
+  new MapboxConsoleTool({ httpRequest }),
   new ReverseGeocodeTool({ httpRequest }),
   new StaticMapImageTool({ httpRequest }),
   new SearchAndGeocodeTool({ httpRequest })

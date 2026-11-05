@@ -12,6 +12,8 @@ import { resolveMapboxPublicToken } from '../../utils/mapboxPublicToken.js';
 import { renderMapAppHtml } from './mapAppHtml.js';
 import { mapAppCsp } from './mapAppCsp.js';
 
+export const MAP_APP_URI = 'ui://mapbox/map-app/index.html';
+
 /**
  * Single Mapbox MCP App resource targeted by `render_map_tool`.
  *
@@ -23,7 +25,7 @@ import { mapAppCsp } from './mapAppCsp.js';
  */
 export class MapAppUIResource extends BaseResource {
   readonly name = 'Mapbox Map App UI';
-  readonly uri = 'ui://mapbox/map-app/index.html';
+  readonly uri = MAP_APP_URI;
   readonly description =
     'Generic Mapbox GL JS renderer driven by render_map_tool payloads (MCP Apps)';
   readonly mimeType = RESOURCE_MIME_TYPE;

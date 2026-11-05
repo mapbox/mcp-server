@@ -37,7 +37,8 @@ function loadClientBuildUrlFn(): ClientBuildUrlFn {
 
   const fakeElement = {
     style: {} as Record<string, string>,
-    textContent: ''
+    textContent: '',
+    addEventListener: () => {}
   };
   const sandbox: Record<string, unknown> = {
     window: {
