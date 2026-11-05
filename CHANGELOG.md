@@ -8,6 +8,7 @@
   - **Distances:** the cards and popups showed distances measured from that IP (4059202 m from SFO for a user in New Jersey). They now show only when the call passed a `proximity`.
   - **Two searches on one map:** "Driving route from SFO to Palo Alto" passed a search ref for each end, and the second failed with `There is already a source with ID "selffetch-search-results"`. Self-fetched layers that would reuse an id now get a free one (`-2`, `-3`, ...), which also covers two routes, isochrones or trips on one map.
   - **"[object Object]" errors:** Search Box errors carry the reason in an object (`{"message":{"error":"Invalid proximity provided..."}}`), and both the map and the tools printed the object. Both now show the `error` text. Search refs whose `proximity` or `bbox` isn't the shape the map sends (a hand-written `"lon,lat"` string, say) are now rejected when resolved, so `render_map_tool` tells the model to re-run the search instead of the map failing.
+  - **Retyped route refs:** Codex passed a directions ref whose destination key read `longittude`, and the map failed with "Could not fetch route". Directions, map matching and optimization refs now need at least two coordinates with numeric `longitude` and `latitude` to resolve, the same check the map makes, so a damaged ref is caught at `render_map_tool` instead.
 
 ## 0.17.0-dev.2 - 2026-11-05
 

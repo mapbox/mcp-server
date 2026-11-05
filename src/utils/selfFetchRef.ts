@@ -121,6 +121,29 @@ function hasValidSelfFetchParams(
       isNonEmptyNumberArray(params.contours_meters)
     );
   }
+  if (
+    tool === 'directions' ||
+    tool === 'map_matching' ||
+    tool === 'optimization'
+  ) {
+    // Mirrors isSafeDirectionsParams and its siblings in mapAppHtml.ts. A
+    // model that retyped a directions ref sent the destination as
+    // {"longittude": ...}; the map then failed with "Could not fetch route"
+    // instead of render_map_tool telling the model to re-run the tool.
+    const coords = params.coordinates;
+    return (
+      Array.isArray(coords) &&
+      coords.length >= 2 &&
+      coords.every(
+        (c: { longitude?: unknown; latitude?: unknown } | null) =>
+          !!c &&
+          typeof c.longitude === 'number' &&
+          Number.isFinite(c.longitude) &&
+          typeof c.latitude === 'number' &&
+          Number.isFinite(c.latitude)
+      )
+    );
+  }
   if (tool === 'search' || tool === 'category_search') {
     // Hand-written refs have passed proximity as a "lon,lat" string, which
     // the iframe sends as proximity=undefined,undefined and the API 400s.

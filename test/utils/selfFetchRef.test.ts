@@ -141,6 +141,30 @@ describe('selfFetchRef', () => {
     ).not.toBeNull();
   });
 
+  it('returns null for a route ref whose coordinates were retyped wrong', () => {
+    // Codex passed a directions ref whose destination read "longittude".
+    const sfo = { longitude: -122.3903, latitude: 37.6094 };
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('directions', {
+          coordinates: [sfo, { longittude: -122.161, latitude: 37.4445 }]
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('optimization', { coordinates: [sfo] })
+      )
+    ).toBeNull();
+    expect(
+      resolveSelfFetchRef(
+        buildSelfFetchRef('map_matching', {
+          coordinates: [sfo, { longitude: -122.161, latitude: 37.4445 }]
+        })
+      )
+    ).not.toBeNull();
+  });
+
   it('isSelfFetchRef distinguishes self-fetch refs from other schemes', () => {
     expect(isSelfFetchRef('mapbox://selffetch/directions?data=abc')).toBe(true);
     expect(isSelfFetchRef('mapbox://temp/map-payload-abc')).toBe(false);
