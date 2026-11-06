@@ -126,6 +126,10 @@ describe('ToolResponseResource', () => {
         input: { profile: 'mapbox/walking', coordinates: coordinates[0] }
       })
     ],
+    [
+      'a static map with no center',
+      buildResponseRef({ tool: 'static-map', input: { zoom: 12 } })
+    ],
     ['a malformed ref', 'mapbox://response/directions?data=%%%']
   ])('never calls the API for %s', async (_label, uri) => {
     const { httpRequest, resource } = setup();
@@ -143,5 +147,44 @@ describe('ToolResponseResource', () => {
     const result = await resource.read(uri);
     expect(result.contents[0]).toMatchObject({ mimeType: 'text/plain' });
     expect((result.contents[0] as { text: string }).text).toContain('422');
+  });
+
+  describe('static-map', () => {
+    const input = {
+      center: { longitude: -74.006, latitude: 40.7128 },
+      zoom: 12,
+      size: { width: 1280, height: 900 },
+      style: 'mapbox/satellite-v9'
+    };
+
+    it('renders the image again and returns its exact bytes', async () => {
+      const bytes = Buffer.from(
+        Array.from({ length: 2048 }, (_, i) => i % 256)
+      );
+      const { httpRequest, resource } = setup(
+        new Response(bytes, { headers: { 'content-type': 'image/jpeg' } })
+      );
+
+      const result = await resource.read(
+        buildResponseRef({ tool: 'static-map', input })
+      );
+
+      const url = new URL(httpRequest.mock.calls[0][0]);
+      expect(url.pathname).toBe(
+        '/styles/v1/mapbox/satellite-v9/static/-74.006,40.7128,12/1280x900'
+      );
+      const content = result.contents[0] as { mimeType: string; blob: string };
+      expect(content.mimeType).toBe('image/jpeg');
+      expect(Buffer.from(content.blob, 'base64')).toEqual(bytes);
+    });
+
+    it('reports an API error as text', async () => {
+      const { resource } = setup(new Response('nope', { status: 403 }));
+      const result = await resource.read(
+        buildResponseRef({ tool: 'static-map', input })
+      );
+      expect(result.contents[0]).toMatchObject({ mimeType: 'text/plain' });
+      expect((result.contents[0] as { text: string }).text).toContain('403');
+    });
   });
 });

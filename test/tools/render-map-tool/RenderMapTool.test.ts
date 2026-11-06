@@ -64,7 +64,7 @@ describe('RenderMapTool', () => {
         ]
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
 
     expect(result.isError).toBe(false);
@@ -116,7 +116,7 @@ describe('RenderMapTool', () => {
         markers: [{ coordinates: [-77, 38], style: 'start' }]
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
 
     expect(result.isError).toBe(false);
@@ -162,7 +162,7 @@ describe('RenderMapTool', () => {
         ]
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
 
     expect(result.isError).toBe(false);
@@ -230,7 +230,7 @@ describe('RenderMapTool', () => {
     const result = await tool.run(
       { payload_refs: [ref] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as {
@@ -308,7 +308,7 @@ describe('RenderMapTool', () => {
     const result = await tool.run(
       { payload_refs: [a, b] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as {
@@ -323,8 +323,10 @@ describe('RenderMapTool', () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     const result = await tool.run(
       { payload_refs: ['mapbox://temp/map-payload-does-not-exist'] },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token: tokenFor('account-test-render-map-stale') } } as any
+
+      {
+        http: { authInfo: { token: tokenFor('account-test-render-map-stale') } }
+      } as any
     );
     expect(result.isError).toBe(true);
     const text = (
@@ -368,7 +370,7 @@ describe('RenderMapTool', () => {
     const result = await tool.run(
       { payload_refs: [goodRef, 'mapbox://temp/map-payload-stale-one'] },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token } } as any
+      { http: { authInfo: { token } } } as any
     );
     expect(result.isError).toBe(false);
     const sc = result.structuredContent as { layer_count: number };
@@ -395,7 +397,7 @@ describe('RenderMapTool', () => {
     const result = await tool.run(
       { payload_refs: [badRef], summary: '15-min drive-time area' },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { authInfo: { token: tokenFor('alice') } } as any
+      { http: { authInfo: { token: tokenFor('alice') } } } as any
     );
     expect(result.isError).toBe(true);
     const text = (result.content[0] as { type: 'text'; text: string }).text;
@@ -746,5 +748,38 @@ describe('RenderMapTool', () => {
       mapboxRender?: { baseStyle?: string };
     };
     expect(sc.mapboxRender?.baseStyle).toBe('standard-satellite');
+  });
+
+  it('accepts a showTraffic-only call and carries it through the inline ref', async () => {
+    const { resolveInlinePayloadRef } =
+      await import('../../../src/utils/inlinePayloadRef.js');
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ showTraffic: true });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      mapboxRender?: { showTraffic?: boolean; ref?: string };
+    };
+    expect(sc.mapboxRender?.showTraffic).toBe(true);
+    expect(sc.mapboxRender?.ref).toBeDefined();
+    expect(resolveInlinePayloadRef(sc.mapboxRender!.ref!)?.showTraffic).toBe(
+      true
+    );
+  });
+
+  it('carries showTraffic: false through so the model can turn traffic off', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({ showTraffic: false });
+
+    expect(result.isError).toBe(false);
+    const sc = result.structuredContent as {
+      mapboxRender?: { showTraffic?: boolean };
+    };
+    expect(sc.mapboxRender?.showTraffic).toBe(false);
+  });
+
+  it('tells the model it can show live traffic', () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    expect(tool.description).toContain('showTraffic: true');
   });
 });

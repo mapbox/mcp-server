@@ -3,7 +3,7 @@
 
 import type { z } from 'zod';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { HttpRequest } from '../../utils/types.js';
 import { CategorySearchInputSchema } from './CategorySearchTool.input.schema.js';
 import { CategorySearchResponseSchema } from './CategorySearchTool.output.schema.js';
@@ -13,7 +13,10 @@ import type {
 } from '../../schemas/geojson.js';
 import { buildCategorySearchRequestUrl } from './buildCategorySearchRequestUrl.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
-import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
+import {
+  buildSelfFetchRef,
+  searchSelfFetchProximity
+} from '../../utils/selfFetchRef.js';
 
 // API Documentation: https://docs.mapbox.com/api/search/search-box/#category-search
 
@@ -163,7 +166,7 @@ export class CategorySearchTool extends MapboxApiBasedTool<
         category: input.category,
         language: input.language,
         limit: input.limit,
-        proximity: input.proximity,
+        ...searchSelfFetchProximity(input, data),
         bbox: input.bbox,
         country: input.country,
         poi_category_exclusions: input.poi_category_exclusions

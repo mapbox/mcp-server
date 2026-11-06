@@ -7,6 +7,7 @@ export interface DirectionsRequestInput {
   coordinates: { longitude: number; latitude: number }[];
   routing_profile: string;
   geometries: 'none' | 'geojson';
+  overview?: 'full' | 'simplified';
   alternatives: boolean;
   exclude?: string;
   depart_at?: string;
@@ -31,6 +32,15 @@ export function buildDirectionsRequestUrl(params: {
 }): string {
   const { input, accessToken, apiEndpoint, geometriesOverride } = params;
   const geometries = geometriesOverride ?? input.geometries;
+  // Deliberately keyed off input.geometries, not the possibly-overridden
+  // `geometries` above: geometriesOverride only exists so the self-fetch
+  // parity test can simulate the client's "always fetch geojson itself"
+  // behavior against this same function, and that self-fetch path always
+  // wants 'full' (see mapAppHtml.ts) regardless of what the original call
+  // requested. A real DirectionsTool call never sets geometriesOverride, so
+  // this only matters for that test.
+  const overview =
+    input.overview ?? (input.geometries === 'geojson' ? 'simplified' : 'full');
 
   const joined = input.coordinates
     .map(({ longitude, latitude }) => `${longitude},${latitude}`)
@@ -45,11 +55,19 @@ export function buildDirectionsRequestUrl(params: {
   queryParams.append('alternatives', input.alternatives.toString());
 
   if (input.routing_profile === 'mapbox/driving-traffic') {
-    queryParams.append('annotations', 'distance,congestion,speed');
+    // The Directions API rejects `congestion` unless overview=full
+    // (confirmed live: 422 "Overview option must be full for congestion") —
+    // distance/speed have no such restriction and stay accurate at any
+    // overview level, since per-segment annotations aren't affected by how
+    // much the returned geometry itself is simplified.
+    queryParams.append(
+      'annotations',
+      overview === 'full' ? 'distance,congestion,speed' : 'distance,speed'
+    );
   } else {
     queryParams.append('annotations', 'distance,speed');
   }
-  queryParams.append('overview', 'full');
+  queryParams.append('overview', overview);
 
   if (input.depart_at) {
     queryParams.append('depart_at', formatIsoDateTime(input.depart_at));

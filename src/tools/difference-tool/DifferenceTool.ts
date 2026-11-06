@@ -10,7 +10,7 @@ import {
   DifferenceOutputSchema,
   type DifferenceOutput
 } from './DifferenceTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildComputeRef } from '../../utils/computeRef.js';
 

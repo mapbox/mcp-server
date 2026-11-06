@@ -25,6 +25,11 @@
       "id": "no_token_ask",
       "label": "No token ask",
       "kind": "binary"
+    },
+    {
+      "id": "token_embedded",
+      "label": "Token embedded",
+      "kind": "binary"
     }
   ],
   "perf_fields": [
@@ -37,5 +42,5 @@
     "evals/tool-selection/cases.json",
     "evals/tool-selection/harness.ts"
   ],
-  "harness_sha": "831b60ff5233625f5c7e02bc9a66498463a2ae1fd84231a879cff69b715a05e6"
+  "harness_sha": "3c128127e0665589541d371aae59161a7df19ab5c5f319067a1745a0f04fb9f4"
 }

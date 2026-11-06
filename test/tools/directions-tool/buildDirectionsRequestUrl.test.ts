@@ -78,6 +78,85 @@ describe('buildDirectionsRequestUrl', () => {
     expect(url).toContain('alternatives=true');
   });
 
+  it('defaults overview to simplified for geometries=geojson, dropping congestion for driving-traffic', () => {
+    const url = buildDirectionsRequestUrl({
+      input: {
+        coordinates: [
+          { longitude: -0.1278, latitude: 51.5074 },
+          { longitude: -3.1883, latitude: 55.9533 }
+        ],
+        routing_profile: 'mapbox/driving-traffic',
+        geometries: 'geojson',
+        alternatives: false
+      },
+      accessToken: 'pk.test-token',
+      apiEndpoint: 'https://api.mapbox.com/'
+    });
+
+    expect(url).toContain('overview=simplified');
+    expect(url).toContain('annotations=distance%2Cspeed');
+    expect(url).not.toContain('congestion');
+  });
+
+  it('defaults overview to full for geometries=none, keeping congestion for driving-traffic', () => {
+    const url = buildDirectionsRequestUrl({
+      input: {
+        coordinates: [
+          { longitude: -0.1278, latitude: 51.5074 },
+          { longitude: -3.1883, latitude: 55.9533 }
+        ],
+        routing_profile: 'mapbox/driving-traffic',
+        geometries: 'none',
+        alternatives: false
+      },
+      accessToken: 'pk.test-token',
+      apiEndpoint: 'https://api.mapbox.com/'
+    });
+
+    expect(url).toContain('overview=full');
+    expect(url).toContain('annotations=distance%2Ccongestion%2Cspeed');
+  });
+
+  it('lets the caller opt into overview=full for geometries=geojson, restoring congestion', () => {
+    const url = buildDirectionsRequestUrl({
+      input: {
+        coordinates: [
+          { longitude: -0.1278, latitude: 51.5074 },
+          { longitude: -3.1883, latitude: 55.9533 }
+        ],
+        routing_profile: 'mapbox/driving-traffic',
+        geometries: 'geojson',
+        overview: 'full',
+        alternatives: false
+      },
+      accessToken: 'pk.test-token',
+      apiEndpoint: 'https://api.mapbox.com/'
+    });
+
+    expect(url).toContain('overview=full');
+    expect(url).toContain('annotations=distance%2Ccongestion%2Cspeed');
+  });
+
+  it('lets the caller opt into overview=simplified for geometries=none too', () => {
+    const url = buildDirectionsRequestUrl({
+      input: {
+        coordinates: [
+          { longitude: -0.1278, latitude: 51.5074 },
+          { longitude: -3.1883, latitude: 55.9533 }
+        ],
+        routing_profile: 'mapbox/driving-traffic',
+        geometries: 'none',
+        overview: 'simplified',
+        alternatives: false
+      },
+      accessToken: 'pk.test-token',
+      apiEndpoint: 'https://api.mapbox.com/'
+    });
+
+    expect(url).toContain('overview=simplified');
+    expect(url).toContain('annotations=distance%2Cspeed');
+  });
+
   it('percent-encodes exclude through URLSearchParams so it can never inject or duplicate another query parameter', () => {
     const url = buildDirectionsRequestUrl({
       input: {

@@ -3,8 +3,10 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MapboxApiBasedTool } from '../../src/tools/MapboxApiBasedTool.js';
-import type { OutputSchema } from '../../src/tools/MapboxApiBasedTool.output.schema.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { setupHttpRequest } from '../utils/httpPipelineUtils.js';
+import { structuredOf } from '../utils/resultTestUtils.js';
 
 const TestInputSchema = z.object({
   test: z.string()
@@ -22,13 +24,16 @@ class TestTool extends MapboxApiBasedTool<typeof TestInputSchema> {
   };
 
   constructor() {
-    super({ inputSchema: TestInputSchema });
+    super({
+      inputSchema: TestInputSchema,
+      httpRequest: setupHttpRequest().httpRequest
+    });
   }
 
   protected async execute(
     input: z.infer<typeof TestInputSchema>,
     _accessToken: string
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<CallToolResult> {
     // Return different types based on input
     if (input.test === 'object') {
       const data = {
@@ -90,7 +95,7 @@ describe('MapboxApiBasedTool Structured Content', () => {
       'This is structured content'
     );
     expect(result.structuredContent).toHaveProperty('data');
-    expect(result.structuredContent?.data).toEqual({
+    expect(structuredOf<{ data: unknown }>(result).data).toEqual({
       value: 42,
       success: true
     });

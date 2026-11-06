@@ -3,7 +3,7 @@
 
 import { MapboxApiBasedResource } from '../MapboxApiBasedResource.js';
 import type { HttpRequest } from '../../utils/types.js';
-import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ReadResourceResult } from '@modelcontextprotocol/server';
 
 // Interface for the full API response from Mapbox
 interface MapboxApiResponse {
@@ -29,9 +29,10 @@ interface MapboxApiResponse {
  */
 export class CategoryListResource extends MapboxApiBasedResource {
   readonly uri = 'mapbox://categories';
+  readonly uriTemplate = 'mapbox://categories/{language}';
   readonly name = 'Mapbox Categories';
   readonly description =
-    'List of all available Mapbox Search API categories. Categories can be used for filtering search results. Supports localization via language parameter in URI (e.g., mapbox://categories/ja for Japanese).';
+    'List of all available Mapbox Search API categories. Categories can be used for filtering search results. Supports localization via language parameter in URI (e.g., mapbox://categories/ja for Japanese). A language code the API does not support gets the default (English) list.';
   readonly mimeType = 'application/json';
 
   constructor(params: { httpRequest: HttpRequest }) {
@@ -95,10 +96,22 @@ export class CategoryListResource extends MapboxApiBasedResource {
   /**
    * Extract language code from URI
    * @param uri Resource URI (e.g., mapbox://categories/ja)
-   * @returns Language code or undefined if not present
+   * @returns Language code, or undefined for the default list
+   * @throws for anything after `mapbox://categories/` that isn't a language
+   *   code (e.g. `%20ja` or `ja?x=1`), rather than quietly returning English.
+   *   A well-formed code the API doesn't support (e.g. `xx`) still goes
+   *   through: the API answers with its English list.
    */
   private extractLanguageFromUri(uri: string): string | undefined {
-    const match = uri.match(/^mapbox:\/\/categories\/([a-z]{2})$/i);
-    return match?.[1];
+    if (uri === this.uri) return undefined;
+    const match = uri.match(
+      /^mapbox:\/\/categories\/([a-z]{2}(?:-[a-z]{2,4})?)$/i
+    );
+    if (!match) {
+      throw new Error(
+        `Resource not found: ${uri}. Use mapbox://categories for the default list, or mapbox://categories/{language} with a language code such as "ja".`
+      );
+    }
+    return match[1];
   }
 }

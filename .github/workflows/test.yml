@@ -26,5 +26,8 @@ jobs:
       - name: Compile typescript
         run: npm run build
 
+      - name: Typecheck src and tests
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test

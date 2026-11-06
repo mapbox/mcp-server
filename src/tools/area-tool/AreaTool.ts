@@ -7,7 +7,7 @@ import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool } from '../BaseTool.js';
 import { AreaInputSchema } from './AreaTool.input.schema.js';
 import { AreaOutputSchema, type AreaOutput } from './AreaTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * AreaTool - Calculate the area of a polygon or multipolygon

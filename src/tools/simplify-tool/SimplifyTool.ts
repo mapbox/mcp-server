@@ -10,7 +10,7 @@ import {
   SimplifyOutputSchema,
   type SimplifyOutput
 } from './SimplifyTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * SimplifyTool - Simplify geometries by reducing vertex count

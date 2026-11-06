@@ -4,15 +4,27 @@
 process.env.MAPBOX_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature';
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { CustomMarkerOverlaySchema } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.input.schema.js';
 import { StaticMapImageTool } from '../../../src/tools/static-map-image-tool/StaticMapImageTool.js';
-import { temporaryResourceManager } from '../../../src/utils/temporaryResourceManager.js';
+import { textOf } from '../../utils/resultTestUtils.js';
+import { resolveResponseRef } from '../../../src/utils/responseRef.js';
+import { __resetMapboxPublicTokenCache } from '../../../src/utils/mapboxPublicToken.js';
+import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server';
+import { Client } from '@modelcontextprotocol/client';
+import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 
 describe('StaticMapImageTool', () => {
+  // A public token changes the URL text (see 'public token link'), so tests
+  // don't depend on whether the shell running them has one set.
+  beforeEach(() => {
+    vi.stubEnv('MAPBOX_PUBLIC_TOKEN', '');
+  });
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    __resetMapboxPublicTokenCache();
   });
 
   it('generates valid URL and fetches image', async () => {
@@ -245,14 +257,12 @@ describe('StaticMapImageTool', () => {
     });
   });
 
-  it('stores large images as temporary resources instead of inlining base64', async () => {
+  it('returns a mapbox://response/ ref for large images instead of inlining base64', async () => {
     // Simulate a response larger than the 700KB inline threshold
     const largeBuffer = new ArrayBuffer(750 * 1024);
     const { httpRequest } = setupHttpRequest({
       arrayBuffer: async () => largeBuffer
     } as Partial<Response>);
-
-    temporaryResourceManager.clear();
 
     const result = await new StaticMapImageTool({ httpRequest }).run({
       center: { longitude: -74.006, latitude: 40.7128 },
@@ -262,19 +272,125 @@ describe('StaticMapImageTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    // Should not contain an inline image
     expect(result.content.some((c) => c.type === 'image')).toBe(false);
-    // Should contain a text item with the resource URI
-    const resourceText = result.content.find(
-      (c) =>
-        c.type === 'text' &&
-        (c as { type: 'text'; text: string }).text.includes(
-          'mapbox://temp/static-map-'
-        )
-    );
-    expect(resourceText).toBeDefined();
-    // Temp resource should be registered
-    expect(temporaryResourceManager.count()).toBe(1);
+
+    // The ref carries the request's inputs, not the image, so it stays
+    // small however big the image is.
+    const uri = textOf(result, 1).match(/mapbox:\/\/response\/\S+/)?.[0];
+    expect(uri).toBeTruthy();
+    expect(uri!.length).toBeLessThan(1000);
+    expect(resolveResponseRef(uri!)).toMatchObject({
+      tool: 'static-map',
+      input: {
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 1280, height: 900 },
+        style: 'mapbox/streets-v12'
+      }
+    });
+  });
+
+  describe('high-density images too large to inline', () => {
+    // 2x answers with `big`, 1x with `small` (or a failure).
+    function setup(big: number, small: number | 'fail') {
+      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      mockHttpRequest.mockImplementation(async (url: string) => {
+        if (url.includes('@2x')) {
+          return {
+            ok: true,
+            status: 200,
+            arrayBuffer: async () => new ArrayBuffer(big)
+          };
+        }
+        if (small === 'fail') {
+          return {
+            ok: false,
+            status: 500,
+            statusText: 'Server Error',
+            json: async () => ({ message: 'boom' }),
+            text: async () => 'boom'
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          arrayBuffer: async () => new ArrayBuffer(small)
+        };
+      });
+      return { httpRequest, mockHttpRequest };
+    }
+    const input = {
+      center: { longitude: -77.036574, latitude: 38.897684 },
+      zoom: 12,
+      size: { width: 1000, height: 800 },
+      highDensity: true,
+      style: 'mapbox/streets-v12'
+    };
+
+    const refInput = (result: Awaited<ReturnType<StaticMapImageTool['run']>>) =>
+      resolveResponseRef(
+        result.content
+          .map((c) => (c.type === 'text' ? c.text : ''))
+          .join('\n')
+          .match(/mapbox:\/\/response\/\S+/)![0]
+      )?.input as { highDensity?: boolean };
+
+    it('falls back to the 1x image when it fits inline', async () => {
+      const { httpRequest, mockHttpRequest } = setup(877 * 1024, 295 * 1024);
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(result.isError).toBe(false);
+      expect(mockHttpRequest).toHaveBeenCalledTimes(2);
+      expect(mockHttpRequest.mock.calls[0][0]).toContain('1000x800@2x?');
+      expect(mockHttpRequest.mock.calls[1][0]).toContain('1000x800?');
+      expect(result.content.map((c) => c.type)).toEqual([
+        'text',
+        'text',
+        'image'
+      ]);
+      // The model is told it got 1x, so it can tell the user.
+      expect(textOf(result, 1)).toContain(
+        'The @2x image was too large to send, so this is the 1x image.'
+      );
+      // The URL text matches the image actually returned.
+      const urlText = (result.content[0] as { text: string }).text;
+      expect(urlText.endsWith('/1000x800')).toBe(true);
+    });
+
+    it('returns a ref to the 1x image when that is too large too', async () => {
+      const { httpRequest } = setup(2000 * 1024, 750 * 1024);
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(result.isError).toBe(false);
+      expect(result.content.some((c) => c.type === 'image')).toBe(false);
+      // The ref renders the smaller 1x image again, not the 2x one.
+      expect(refInput(result).highDensity).toBe(false);
+      const urlText = (result.content[0] as { text: string }).text;
+      expect(urlText.endsWith('/1000x800')).toBe(true);
+    });
+
+    it('keeps the 2x image when the 1x request fails', async () => {
+      const { httpRequest } = setup(877 * 1024, 'fail');
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(result.isError).toBe(false);
+      expect(refInput(result).highDensity).toBe(true);
+      const urlText = (result.content[0] as { text: string }).text;
+      expect(urlText.endsWith('/1000x800@2x')).toBe(true);
+    });
+
+    it('does not refetch a 2x image that fits inline', async () => {
+      const { httpRequest, mockHttpRequest } = setup(500 * 1024, 200 * 1024);
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+      expect(JSON.stringify(result)).not.toContain('too large to send');
+
+      expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
+    });
   });
 
   it('returns error when Mapbox API returns non-2xx response', async () => {
@@ -805,6 +921,204 @@ describe('StaticMapImageTool', () => {
     });
   });
 
+  describe('URL text without a public token', () => {
+    // The URL has no token, so it 401s on its own. Codex linked it as the
+    // map; the text tells the model the image is in the result instead.
+    it('says the image is attached and not to link the URL', async () => {
+      const { httpRequest } = setupHttpRequest();
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -122.4011, latitude: 37.7897 },
+        zoom: 14,
+        size: { width: 1000, height: 800 },
+        highDensity: true,
+        style: 'mapbox/streets-v12'
+      });
+
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain(
+        'Static map image (1000x800 @2x, mapbox/streets-v12) is attached'
+      );
+      expect(text).toContain("Don't link or embed the request URL");
+      expect(text).toMatch(/\nRequest URL: https:\/\/\S+\/1000x800@2x$/);
+    });
+
+    it('only warns about the URL when the image went to a resource ref', async () => {
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: async () => new ArrayBuffer(750 * 1024)
+      } as Partial<Response>);
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -122.4011, latitude: 37.7897 },
+        zoom: 14,
+        size: { width: 1000, height: 800 },
+        style: 'mapbox/streets-v12'
+      });
+
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).not.toContain('is attached');
+      expect(text).toMatch(
+        /^Request URL \(it has no access token, so don't link or embed it\): https:/
+      );
+    });
+  });
+
+  describe('public token link', () => {
+    // A hosted caller (tk. token for user "testuser").
+    const HOSTED_TK = 'tk.eyJ1IjoidGVzdHVzZXIifQ.signature';
+    const USER_PK = 'pk.eyJ1IjoidGVzdHVzZXIifQ.user-default';
+    const SERVER_PK = 'pk.eyJ1Ijoic2VydmVyIn0.server-own';
+    const input = {
+      center: { longitude: -122.4011, latitude: 37.7897 },
+      zoom: 14,
+      size: { width: 600, height: 400 },
+      style: 'mapbox/streets-v12'
+    };
+    // Image fetches succeed; the Tokens API answers with `tokens`.
+    function setup(tokens: { status: number; body?: unknown }) {
+      const { httpRequest, mockHttpRequest } = setupHttpRequest();
+      mockHttpRequest.mockImplementation(async (url: string) =>
+        url.includes('/tokens/v2/')
+          ? {
+              ok: tokens.status === 200,
+              status: tokens.status,
+              json: async () => tokens.body
+            }
+          : {
+              ok: true,
+              status: 200,
+              arrayBuffer: async () => new ArrayBuffer(1024)
+            }
+      );
+      return { httpRequest, mockHttpRequest };
+    }
+    const text = (r: { content: unknown[] }) =>
+      (r.content[0] as { text: string }).text;
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      __resetMapboxPublicTokenCache();
+    });
+
+    it("links with the server's MAPBOX_PUBLIC_TOKEN on a local install", async () => {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', SERVER_PK);
+      const { httpRequest } = setup({ status: 403 });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(input);
+
+      expect(text(result)).toMatch(
+        new RegExp(
+          `\\nImage URL: https://\\S+/600x400\\?access_token=${SERVER_PK}$`
+        )
+      );
+      expect(JSON.stringify(result)).not.toContain(
+        process.env.MAPBOX_ACCESS_TOKEN as string
+      );
+    });
+
+    it('links a hosted caller with their own default public token', async () => {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', SERVER_PK);
+      const { httpRequest } = setup({
+        status: 200,
+        body: [{ usage: 'pk', default: true, token: USER_PK }]
+      });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(
+        input,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { http: { authInfo: { token: HOSTED_TK } } } as any
+      );
+
+      expect(text(result)).toContain(
+        "don't embed this URL as a Markdown image. Give it as a link instead"
+      );
+      expect(text(result)).toMatch(
+        new RegExp(`\\nImage URL: https://\\S+\\?access_token=${USER_PK}$`)
+      );
+      const all = JSON.stringify(result);
+      expect(all).not.toContain(SERVER_PK);
+      expect(all).not.toContain(HOSTED_TK);
+    });
+
+    it("never gives a hosted caller the server's public token", async () => {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', SERVER_PK);
+      // No tokens:read, so the caller's own public token can't be found.
+      const { httpRequest } = setup({ status: 403 });
+
+      const result = await new StaticMapImageTool({ httpRequest }).run(
+        input,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { http: { authInfo: { token: HOSTED_TK } } } as any
+      );
+
+      const all = JSON.stringify(result);
+      expect(all).not.toContain(SERVER_PK);
+      expect(all).not.toContain('access_token=');
+      expect(text(result)).toContain("Don't link or embed the request URL");
+    });
+  });
+
+  describe('with an MCP Apps client', () => {
+    // A client that declares MCP Apps support gets the image in the viewer,
+    // so the text says not to repeat it; other clients get the link text.
+    async function callThrough(clientCapabilities: Record<string, unknown>) {
+      vi.stubEnv('MAPBOX_PUBLIC_TOKEN', 'pk.eyJ1IjoibG9jYWwifQ.server-own');
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: async () => new ArrayBuffer(1024)
+      } as Partial<Response>);
+      const server = new McpServer({ name: 'test', version: '0.0.0' });
+      new StaticMapImageTool({ httpRequest }).installTo(server);
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client(
+        { name: 'test-client', version: '0.0.0' },
+        { capabilities: clientCapabilities }
+      );
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport)
+      ]);
+      const result = (await client.callTool({
+        name: 'static_map_image_tool',
+        arguments: {
+          center: { longitude: -77.0369, latitude: 38.9072 },
+          zoom: 12,
+          size: { width: 800, height: 600 },
+          style: 'mapbox/streets-v12'
+        }
+      })) as { content: Array<{ type: string; text?: string }> };
+      await client.close();
+      return result;
+    }
+
+    it('says the viewer shows the map and offers the link only if asked', async () => {
+      const result = await callThrough({
+        extensions: {
+          'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] }
+        }
+      });
+
+      const text = result.content[0].text as string;
+      expect(text).toContain(
+        "is shown to the user at full size in this tool's map viewer, so don't embed or link it again"
+      );
+      expect(text).toContain('If the user asks for a link to the image');
+      expect(text).toContain('access_token=pk.eyJ1IjoibG9jYWwifQ.server-own');
+      expect(text).not.toContain('Give it as a link instead');
+      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
+    });
+
+    it('keeps the link text for a client without MCP Apps', async () => {
+      const result = await callThrough({});
+
+      const text = result.content[0].text as string;
+      expect(text).toContain('Give it as a link instead');
+      expect(text).toContain('Image URL: https://');
+      expect(text).not.toContain("this tool's map viewer");
+      expect(result.content.map((c) => c.type)).toEqual(['text', 'image']);
+    });
+  });
+
   describe('credential safety', () => {
     it('never includes the Mapbox access token in any content item', async () => {
       const { httpRequest } = setupHttpRequest();
@@ -824,6 +1138,31 @@ describe('StaticMapImageTool', () => {
       const serialized = JSON.stringify(result);
       expect(serialized).not.toContain('access_token=');
       expect(serialized).not.toContain(tokenValue);
+    });
+
+    it('keeps the access token out of the large-image ref, including its encoded data', async () => {
+      const { httpRequest } = setupHttpRequest({
+        arrayBuffer: async () => new ArrayBuffer(750 * 1024)
+      } as Partial<Response>);
+
+      const result = await new StaticMapImageTool({ httpRequest }).run({
+        center: { longitude: -74.006, latitude: 40.7128 },
+        zoom: 12,
+        size: { width: 1000, height: 800 },
+        style: 'mapbox/streets-v12'
+      });
+
+      const uri = JSON.stringify(result).match(
+        /mapbox:\/\/response\/[^\s"\\]+/
+      )?.[0];
+      expect(uri).toBeTruthy();
+      const data = new URL(uri!).searchParams.get('data');
+      expect(data).toBeTruthy();
+      const decoded = Buffer.from(data!, 'base64url').toString('utf8');
+      expect(decoded).toContain('streets-v12');
+      const tokenValue = process.env.MAPBOX_ACCESS_TOKEN!;
+      expect(decoded).not.toContain(tokenValue);
+      expect(decoded).not.toContain('access_token');
     });
 
     it('returns only text + image content (no externalUrl iframe)', async () => {

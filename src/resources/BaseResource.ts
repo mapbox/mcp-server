@@ -2,16 +2,12 @@
 // Licensed under the MIT License.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import {
-  type McpServer,
-  ResourceTemplate
-} from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import type {
-  ServerRequest,
-  ServerNotification,
-  ReadResourceResult
-} from '@modelcontextprotocol/sdk/types.js';
+  McpServer,
+  ReadResourceResult,
+  ServerContext
+} from '@modelcontextprotocol/server';
 
 /**
  * Base class for all MCP resources
@@ -21,6 +17,12 @@ export abstract class BaseResource {
   abstract readonly name: string;
   abstract readonly description?: string;
   abstract readonly mimeType?: string;
+  /**
+   * A URI template this resource also answers, next to its fixed `uri`
+   * (e.g. mapbox://categories/{language}). resources/read matches a fixed
+   * URI exactly, so variants of it need a template to be readable.
+   */
+  readonly uriTemplate?: string;
 
   /**
    * The most recently installed server. Used as a fallback when `read()` is
@@ -61,34 +63,45 @@ export abstract class BaseResource {
     if (this.uri.includes('{')) {
       // URI contains template variables — register as a ResourceTemplate so the
       // SDK performs proper URI template matching (e.g. mapbox://temp/{id}).
-      const template = new ResourceTemplate(this.uri, { list: undefined });
-      server.registerResource(
-        this.name,
-        template,
-        metadata,
-        (
-          uri: URL,
-          _variables: Record<string, string | string[]>,
-          extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-        ) =>
-          this.invocationServer.run(server, () =>
-            this.read(uri.toString(), extra)
-          )
-      );
+      this.registerTemplate(server, this.name, this.uri, metadata);
     } else {
       server.registerResource(
         this.name,
         this.uri,
         metadata,
-        (
-          uri: URL,
-          extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-        ) =>
+        (uri: URL, ctx: ServerContext) =>
           this.invocationServer.run(server, () =>
-            this.read(uri.toString(), extra)
+            this.read(uri.toString(), ctx)
           )
       );
     }
+    if (this.uriTemplate) {
+      this.registerTemplate(
+        server,
+        `${this.name} (${this.uriTemplate})`,
+        this.uriTemplate,
+        metadata
+      );
+    }
+  }
+
+  private registerTemplate(
+    server: McpServer,
+    name: string,
+    uriTemplate: string,
+    metadata: { title: string; description?: string; mimeType?: string }
+  ): void {
+    server.registerResource(
+      name,
+      new ResourceTemplate(uriTemplate, { list: undefined }),
+      metadata,
+      (
+        uri: URL,
+        _variables: Record<string, string | string[]>,
+        ctx: ServerContext
+      ) =>
+        this.invocationServer.run(server, () => this.read(uri.toString(), ctx))
+    );
   }
 
   /**
@@ -98,7 +111,7 @@ export abstract class BaseResource {
    */
   abstract read(
     uri: string,
-    extra?: RequestHandlerExtra<ServerRequest, ServerNotification>
+    extra?: ServerContext
   ): Promise<ReadResourceResult>;
 
   /**

@@ -67,25 +67,25 @@ const markerSchema = z.object({
     .string()
     .optional()
     .describe(
-      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results side panel (popularity score and photo when available, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Omit for non-POI markers (route endpoints, waypoints, etc.).'
+      'A Mapbox POI\'s mapbox_id — e.g. the "Mapbox ID" field printed by category_search_tool/search_and_geocode_tool. Set this on a hand-composed POI marker to get the same auto-enriching results carousel card (popularity score, photo and today\'s hours when available, via one batched Place Details lookup) that a payload_refs-based search result gets automatically. Leave `style` and `label` unset for such a place: it is drawn as a white pin with an icon for its category, like search results. Set `style: "numbered"` with a `label` only when the number means something, such as a visit order. Omit `id` for non-POI markers (route endpoints, waypoints, etc.).'
     ),
   name: z
     .string()
     .optional()
     .describe(
-      'Display name for the results panel row. Only used when `id` is also set; falls back to "Result N" if omitted.'
+      'Display name for the results carousel card (and under its pin when selected). Only used when `id` is also set; falls back to "Result N" if omitted.'
     ),
   category: z
     .string()
     .optional()
     .describe(
-      'Category shown in the results panel row (e.g. "Coffee Shop"). Only used when `id` is also set.'
+      'Category shown on the results carousel card (e.g. "Coffee Shop"), also used to pick the pin\'s icon. Only used when `id` is also set.'
     ),
   distanceMeters: z
     .number()
     .optional()
     .describe(
-      'Distance in meters, shown in the results panel row. Only used when `id` is also set.'
+      'Distance in meters, shown on the results carousel card. Only used when `id` is also set.'
     )
 });
 
@@ -181,7 +181,7 @@ export const RenderMapInputSchema = z.object({
     .array(markerSchema)
     .optional()
     .describe(
-      "Inline point markers (start/end, numbered visits, POI pins, etc.). Use only for hand-composed payloads. For POI markers, set `id` to the place's mapbox_id to get an auto-enriching results panel (see markerSchema's `id` field) instead of just a pin."
+      "Inline point markers (start/end, numbered visits, POI pins, etc.). Use only for hand-composed payloads. For POI markers, set `id` to the place's mapbox_id to get an auto-enriching results carousel card (see markerSchema's `id` field) instead of just a pin."
     ),
   legend: z
     .array(legendEntrySchema)
@@ -198,6 +198,12 @@ export const RenderMapInputSchema = z.object({
     .optional()
     .describe(
       'Which Mapbox-owned base style to load; defaults to "standard". "standard-satellite" is the same Standard style family rendered over global satellite imagery instead of a vector basemap — same config-property system and bottom/middle/top slots apply, but it has no theme and no flat-color overrides like colorWater/colorBuildings (there\'s no vector surface to recolor). See https://docs.mapbox.com/map-styles/reference/standard-satellite/ for its supported baseMapConfig properties.'
+    ),
+  showTraffic: z
+    .boolean()
+    .optional()
+    .describe(
+      'Show live traffic congestion (light/moderate/heavy/severe) on every road in view, from Mapbox Traffic. Use when the user asks to see traffic or congestion in an area. Works on both base styles. Left out, the map keeps whatever the user picked with its Traffic button.'
     )
 });
 

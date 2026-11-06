@@ -33,7 +33,10 @@ const publicTokenCache = new Map<string, CachedToken>();
  *    token (requires `tokens:read` scope on the bearer). OAuth-issued bearers
  *    are tk.* temporary tokens, so this is the path exercised in hosted
  *    (OAuth) deployments — without it, granting `tokens:read` has no effect.
- * 4. Fall back to the MAPBOX_PUBLIC_TOKEN env var.
+ * 4. Fall back to the MAPBOX_PUBLIC_TOKEN env var, unless `allowEnvFallback`
+ *    is false. That token belongs to whoever runs the server, so a caller
+ *    that puts the token somewhere users keep (e.g. a URL in chat history)
+ *    should only allow it for the server's own access token.
  *
  * Returns undefined if none of the above produces a pk.* token.
  */
@@ -41,6 +44,7 @@ export async function resolveMapboxPublicToken(params: {
   accessToken: string;
   apiEndpoint: string;
   httpRequest: HttpRequest;
+  allowEnvFallback?: boolean;
 }): Promise<string | undefined> {
   const { accessToken, apiEndpoint, httpRequest } = params;
 
@@ -98,6 +102,7 @@ export async function resolveMapboxPublicToken(params: {
     }
   }
 
+  if (params.allowEnvFallback === false) return undefined;
   const envFallback = process.env.MAPBOX_PUBLIC_TOKEN;
   return envFallback && envFallback.startsWith('pk.') ? envFallback : undefined;
 }

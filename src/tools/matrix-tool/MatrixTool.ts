@@ -4,7 +4,7 @@
 import type { z } from 'zod';
 import { URLSearchParams } from 'node:url';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { HttpRequest } from '../../utils/types.js';
 import { MatrixInputSchema } from './MatrixTool.input.schema.js';
 import {

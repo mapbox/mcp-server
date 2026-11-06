@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { ComputeResource } from '../../../src/resources/compute/ComputeResource.js';
 import { buildComputeRef } from '../../../src/utils/computeRef.js';
+import { resourceTextOf } from '../../utils/resultTestUtils.js';
 
 describe('ComputeResource', () => {
   it('resolves a union compute ref via the real resources/read path with zero prior server-side state', async () => {
@@ -47,7 +48,7 @@ describe('ComputeResource', () => {
     const result = await resource.read(ref);
 
     expect(result.contents[0].mimeType).toBe('application/json');
-    const payload = JSON.parse(result.contents[0].text as string);
+    const payload = JSON.parse(resourceTextOf(result));
     expect(payload.layers).toHaveLength(6);
     expect(payload.summary).toBe('Union of 2 polygons');
   });
@@ -88,9 +89,9 @@ describe('ComputeResource', () => {
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const asAccountB = { authInfo: { token: 'irrelevant' } } as any;
+    const asAccountB = { http: { authInfo: { token: 'irrelevant' } } } as any;
     const result = await resource.read(ref, asAccountB);
-    const payload = JSON.parse(result.contents[0].text as string);
+    const payload = JSON.parse(resourceTextOf(result));
     expect(payload.summary).toBe('Intersection of two polygons');
   });
 
@@ -99,6 +100,6 @@ describe('ComputeResource', () => {
     const result = await resource.read('mapbox://compute/union?data=!!!');
 
     expect(result.contents[0].mimeType).toBe('text/plain');
-    expect(result.contents[0].text).toContain('malformed or unsupported');
+    expect(resourceTextOf(result)).toContain('malformed or unsupported');
   });
 });

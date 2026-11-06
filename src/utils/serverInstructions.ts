@@ -24,5 +24,10 @@ export function buildServerInstructions(
       'Use static_map_image_tool only when the user explicitly asks for a static image file (PNG/JPEG), never as the default way to show a map.'
     );
   }
+  if (enabledToolNames.includes('list_public_tokens_tool')) {
+    lines.push(
+      "When building a web page or app outside this chat that needs a Mapbox token, call list_public_tokens_tool and put the pk. token it returns in the page. Public tokens are made to ship in browser code, so don't leave a placeholder like YOUR_MAPBOX_TOKEN or ask the user to paste one."
+    );
+  }
   return lines.join('\n');
 }

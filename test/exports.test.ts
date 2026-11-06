@@ -183,12 +183,10 @@ describe('Package exports', () => {
     // Mirrors how an external deployment (e.g. hosted-mcp-server) builds its
     // own McpServer from the subpath exports instead of running src/index.ts.
     it('should give an externally built server 2020-12 schemas and instructions', async () => {
-      const { McpServer } =
-        await import('@modelcontextprotocol/sdk/server/mcp.js');
-      const { Client } =
-        await import('@modelcontextprotocol/sdk/client/index.js');
+      const { McpServer } = await import('@modelcontextprotocol/server');
+      const { Client } = await import('@modelcontextprotocol/client');
       const { InMemoryTransport } =
-        await import('@modelcontextprotocol/sdk/inMemory.js');
+        await import('@modelcontextprotocol/server');
       const { publishJsonSchema2020, buildServerInstructions } =
         await import('../src/utils/index.js');
       const { getAllTools } = await import('../src/tools/index.js');

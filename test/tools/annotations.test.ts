@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { getAllTools } from '../../src/tools/toolRegistry.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 
 describe('Tool Annotations', () => {
   it('should have annotations for all tools', () => {

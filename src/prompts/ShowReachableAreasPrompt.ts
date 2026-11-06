@@ -5,7 +5,7 @@ import { BasePrompt } from './BasePrompt.js';
 import type {
   PromptArgument,
   PromptMessage
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 
 /**
  * Prompt for visualizing areas reachable within a specified time from a location.

@@ -3,7 +3,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { distance as turfDistance } from '@turf/turf';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import {
   FeedbackInputSchema,

@@ -10,7 +10,7 @@ import {
   NearestPointOnLineOutputSchema,
   type NearestPointOnLineOutput
 } from './NearestPointOnLineTool.output.schema.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 export class NearestPointOnLineTool extends BaseTool<
   typeof NearestPointOnLineInputSchema,

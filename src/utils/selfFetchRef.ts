@@ -38,6 +38,50 @@ export function buildSelfFetchRef(
   return `${SELF_FETCH_URI_PREFIX}${tool}?data=${data}`;
 }
 
+/**
+ * The proximity params for a search self-fetch. When the call gave neither
+ * `proximity` nor `bbox`, the Search Box API biases toward the caller's IP:
+ * the server's own call and the iframe's re-fetch come from different
+ * places on a hosted server, so the map showed cafés near the user's
+ * browser (New Jersey) while the reply described the server's results (San
+ * Francisco). Pinning the re-fetch to the first point result keeps the map
+ * on the results the model saw. `proximityFromResults` tells the iframe
+ * that this point isn't a search center, so it draws no center pin and
+ * shows no distances.
+ */
+export function searchSelfFetchProximity(
+  input: {
+    proximity?: { longitude: number; latitude: number };
+    bbox?: unknown;
+  },
+  data: unknown
+): {
+  proximity?: { longitude: number; latitude: number };
+  proximityFromResults?: true;
+} {
+  if (input.proximity || input.bbox) return { proximity: input.proximity };
+  const features = (data as { features?: unknown } | null | undefined)
+    ?.features;
+  if (!Array.isArray(features)) return {};
+  for (const f of features as Array<{
+    geometry?: { type?: string; coordinates?: unknown };
+  }>) {
+    const c = f?.geometry?.coordinates;
+    if (
+      f?.geometry?.type === 'Point' &&
+      Array.isArray(c) &&
+      typeof c[0] === 'number' &&
+      typeof c[1] === 'number'
+    ) {
+      return {
+        proximity: { longitude: c[0], latitude: c[1] },
+        proximityFromResults: true
+      };
+    }
+  }
+  return {};
+}
+
 function isNonEmptyNumberArray(value: unknown): boolean {
   return (
     Array.isArray(value) &&
@@ -76,6 +120,56 @@ function hasValidSelfFetchParams(
       isNonEmptyNumberArray(params.contours_minutes) ||
       isNonEmptyNumberArray(params.contours_meters)
     );
+  }
+  if (
+    tool === 'directions' ||
+    tool === 'map_matching' ||
+    tool === 'optimization'
+  ) {
+    // Mirrors isSafeDirectionsParams and its siblings in mapAppHtml.ts. A
+    // model that retyped a directions ref sent the destination as
+    // {"longittude": ...}; the map then failed with "Could not fetch route"
+    // instead of render_map_tool telling the model to re-run the tool.
+    const coords = params.coordinates;
+    return (
+      Array.isArray(coords) &&
+      coords.length >= 2 &&
+      coords.every(
+        (c: { longitude?: unknown; latitude?: unknown } | null) =>
+          !!c &&
+          typeof c.longitude === 'number' &&
+          Number.isFinite(c.longitude) &&
+          typeof c.latitude === 'number' &&
+          Number.isFinite(c.latitude)
+      )
+    );
+  }
+  if (tool === 'search' || tool === 'category_search') {
+    // Hand-written refs have passed proximity as a "lon,lat" string, which
+    // the iframe sends as proximity=undefined,undefined and the API 400s.
+    const p = params.proximity as
+      | { longitude?: unknown; latitude?: unknown }
+      | undefined;
+    if (
+      p !== undefined &&
+      p !== null &&
+      (typeof p !== 'object' ||
+        typeof p.longitude !== 'number' ||
+        typeof p.latitude !== 'number')
+    ) {
+      return false;
+    }
+    const b = params.bbox as Record<string, unknown> | undefined;
+    if (
+      b !== undefined &&
+      b !== null &&
+      (typeof b !== 'object' ||
+        !['minLongitude', 'minLatitude', 'maxLongitude', 'maxLatitude'].every(
+          (k) => typeof b[k] === 'number'
+        ))
+    ) {
+      return false;
+    }
   }
   return true;
 }

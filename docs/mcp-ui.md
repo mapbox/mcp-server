@@ -1,11 +1,11 @@
 # Interactive Map Previews
 
-> **MCP-UI support has been removed from this server.** Interactive map previews are now handled exclusively through **[`render_map_tool`](./render-map-tool.md)** via the MCP Apps protocol. This page is kept at its existing URL to avoid breaking old links; see [render-map-tool.md](./render-map-tool.md) for the current, comprehensive guide.
+> **MCP-UI support has been removed from this server.** Interactive maps are handled through **[`render_map_tool`](./render-map-tool.md)** via the MCP Apps protocol, and `static_map_image_tool` has a small MCP Apps viewer of its own that shows its image at full size. This page is kept at its existing URL to avoid breaking old links; see [render-map-tool.md](./render-map-tool.md) for the current, comprehensive guide.
 
 ## What changed
 
 - **Before**: `static_map_image_tool` conditionally attached an MCP-UI `UIResource` (an embedded iframe) alongside its base64 image, and separately declared an MCP Apps resource (`StaticMapUIResource`) for hosts that supported it. Both were controlled by the `ENABLE_MCP_UI` env var / `--disable-mcp-ui` CLI flag.
-- **Now**: `static_map_image_tool` returns the Mapbox Static Images API URL (as text) and a base64-encoded image only — a plain, static result with no interactive panel of its own. Live, interactive map rendering is the responsibility of the single dedicated visualization tool, `render_map_tool`, which every geospatial tool in this server (including one you compose yourself from raw GeoJSON) can feed into.
+- **Now**: `static_map_image_tool` returns a text note and the base64-encoded image (or a `mapbox://response/` ref when the image is over 700 KB). The note carries the image URL with the caller's public token, never the access token used for the request. MCP Apps hosts show the image at full size in the tool's viewer (`ui://mapbox/static-map/index.html`), which only displays the image and isn't interactive. Live, interactive maps are the job of `render_map_tool`, which every geospatial tool in this server (including one you compose yourself from raw GeoJSON) can feed into.
 - The `ENABLE_MCP_UI` environment variable and `--disable-mcp-ui` CLI flag still parse without error for backwards compatibility, but no longer have any effect — there is nothing left for them to toggle.
 
 ## Where to go instead

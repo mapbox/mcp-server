@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { DistanceTool } from '../../../src/tools/distance-tool/DistanceTool.js';
+import type { DistanceOutput } from '../../../src/tools/distance-tool/DistanceTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('DistanceTool', () => {
   const tool = new DistanceTool();
@@ -13,14 +15,15 @@ describe('DistanceTool', () => {
       to: { longitude: -118.2437, latitude: 34.0522 }, // Los Angeles
       units: 'kilometers'
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    expect(result.structuredContent?.distance).toBeCloseTo(559, 0);
-    expect(result.structuredContent?.units).toBe('kilometers');
-    expect(result.structuredContent?.from).toEqual({
+    expect(data.distance).toBeCloseTo(559, 0);
+    expect(data.units).toBe('kilometers');
+    expect(data.from).toEqual({
       longitude: -122.4194,
       latitude: 37.7749
     });
-    expect(result.structuredContent?.to).toEqual({
+    expect(data.to).toEqual({
       longitude: -118.2437,
       latitude: 34.0522
     });
@@ -32,9 +35,10 @@ describe('DistanceTool', () => {
       to: { longitude: -118.2437, latitude: 34.0522 }, // Los Angeles
       units: 'miles'
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    expect(result.structuredContent?.distance).toBeCloseTo(347, 0);
-    expect(result.structuredContent?.units).toBe('miles');
+    expect(data.distance).toBeCloseTo(347, 0);
+    expect(data.units).toBe('miles');
   });
 
   it('should calculate distance in meters', async () => {
@@ -43,9 +47,10 @@ describe('DistanceTool', () => {
       to: { longitude: -118.2437, latitude: 34.0522 }, // Los Angeles
       units: 'meters'
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    expect(result.structuredContent?.distance).toBeGreaterThan(559000);
-    expect(result.structuredContent?.units).toBe('meters');
+    expect(data.distance).toBeGreaterThan(559000);
+    expect(data.units).toBe('meters');
   });
 
   it('should default to kilometers when units not specified', async () => {
@@ -53,8 +58,9 @@ describe('DistanceTool', () => {
       from: { longitude: -122.4194, latitude: 37.7749 },
       to: { longitude: -118.2437, latitude: 34.0522 }
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    expect(result.structuredContent?.units).toBe('kilometers');
+    expect(data.units).toBe('kilometers');
   });
 
   it('should calculate short distances accurately', async () => {
@@ -63,8 +69,9 @@ describe('DistanceTool', () => {
       to: { longitude: 0, latitude: 0.01 }, // ~1.11 km
       units: 'meters'
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    expect(result.structuredContent?.distance).toBeCloseTo(1112, 0);
+    expect(data.distance).toBeCloseTo(1112, 0);
   });
 
   it('should handle cross-hemisphere distances', async () => {
@@ -73,8 +80,9 @@ describe('DistanceTool', () => {
       to: { longitude: 139.691706, latitude: 35.689487 }, // Tokyo
       units: 'kilometers'
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    expect(result.structuredContent?.distance).toBeCloseTo(10850, 0);
+    expect(data.distance).toBeCloseTo(10850, 0);
   });
 
   it('should calculate distance for same point as zero', async () => {
@@ -83,8 +91,9 @@ describe('DistanceTool', () => {
       to: { longitude: 0, latitude: 0 },
       units: 'kilometers'
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    expect(result.structuredContent?.distance).toBe(0);
+    expect(data.distance).toBe(0);
   });
 
   it('should round distance to 3 decimal places', async () => {
@@ -93,8 +102,9 @@ describe('DistanceTool', () => {
       to: { longitude: 0.001, latitude: 0.001 },
       units: 'kilometers'
     });
+    const data = structuredOf<DistanceOutput>(result);
 
-    const distance = result.structuredContent?.distance as number;
+    const distance = data.distance as number;
     const decimalPlaces = (distance.toString().split('.')[1] || '').length;
     expect(decimalPlaces).toBeLessThanOrEqual(3);
   });

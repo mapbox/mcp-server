@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { LengthTool } from '../../../src/tools/length-tool/LengthTool.js';
+import type { LengthOutput } from '../../../src/tools/length-tool/LengthTool.output.schema.js';
+import { structuredOf } from '../../utils/resultTestUtils.js';
 
 describe('LengthTool', () => {
   const tool = new LengthTool();
@@ -17,9 +19,9 @@ describe('LengthTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.length).toBeCloseTo(111, 0);
-    expect(result.structuredContent?.units).toBe('kilometers');
-    expect(result.structuredContent?.num_coordinates).toBe(2);
+    expect(structuredOf<LengthOutput>(result).length).toBeCloseTo(111, 0);
+    expect(structuredOf<LengthOutput>(result).units).toBe('kilometers');
+    expect(structuredOf<LengthOutput>(result).num_coordinates).toBe(2);
   });
 
   it('defaults to meters', async () => {
@@ -31,8 +33,8 @@ describe('LengthTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.units).toBe('meters');
-    expect(result.structuredContent?.length).toBeGreaterThan(0);
+    expect(structuredOf<LengthOutput>(result).units).toBe('meters');
+    expect(structuredOf<LengthOutput>(result).length).toBeGreaterThan(0);
   });
 
   it('measures in miles', async () => {
@@ -45,8 +47,8 @@ describe('LengthTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(result.structuredContent?.length).toBeCloseTo(347, 0);
-    expect(result.structuredContent?.units).toBe('miles');
+    expect(structuredOf<LengthOutput>(result).length).toBeCloseTo(347, 0);
+    expect(structuredOf<LengthOutput>(result).units).toBe('miles');
   });
 
   it('accumulates length for multi-segment line', async () => {
@@ -68,11 +70,11 @@ describe('LengthTool', () => {
     });
 
     // Two-hop path through the same points should equal single hop
-    expect(twoHops.structuredContent?.length).toBeCloseTo(
-      singleHop.structuredContent?.length as number,
+    expect(structuredOf<LengthOutput>(twoHops).length).toBeCloseTo(
+      structuredOf<LengthOutput>(singleHop).length as number,
       1
     );
-    expect(twoHops.structuredContent?.num_coordinates).toBe(3);
+    expect(structuredOf<LengthOutput>(twoHops).num_coordinates).toBe(3);
   });
 
   it('rounds to 3 decimal places', async () => {
@@ -85,7 +87,7 @@ describe('LengthTool', () => {
     });
 
     expect(result.isError).toBe(false);
-    const len = result.structuredContent?.length as number;
+    const len = structuredOf<LengthOutput>(result).length as number;
     const decimals = (len.toString().split('.')[1] || '').length;
     expect(decimals).toBeLessThanOrEqual(3);
   });

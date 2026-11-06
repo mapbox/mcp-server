@@ -2,12 +2,10 @@
 // Licensed under the MIT License.
 
 import { BaseResource } from '../BaseResource.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
   ReadResourceResult,
-  ServerNotification,
-  ServerRequest
-} from '@modelcontextprotocol/sdk/types.js';
+  ServerContext
+} from '@modelcontextprotocol/server';
 import { temporaryResourceManager } from '../../utils/temporaryResourceManager.js';
 import { getOwnerKeyFromToken, ownerKeyMatches } from '../../utils/jwtUtils.js';
 
@@ -22,10 +20,7 @@ export class TemporaryDataResource extends BaseResource {
     'Temporary storage for large tool responses. Data expires after TTL.';
   readonly mimeType = 'application/json';
 
-  async read(
-    uri: string,
-    extra?: RequestHandlerExtra<ServerRequest, ServerNotification>
-  ): Promise<ReadResourceResult> {
+  async read(uri: string, extra?: ServerContext): Promise<ReadResourceResult> {
     const notFound: ReadResourceResult = {
       contents: [
         {
@@ -68,7 +63,7 @@ export class TemporaryDataResource extends BaseResource {
     // shared MAPBOX_ACCESS_TOKEN in a multi-tenant deployment or all env-less
     // reads would resolve to that one token.
     const requesterToken =
-      (extra?.authInfo?.token as string | undefined) ??
+      (extra?.http?.authInfo?.token as string | undefined) ??
       process.env.MAPBOX_ACCESS_TOKEN;
     if (
       !ownerKeyMatches(resource.owner, getOwnerKeyFromToken(requesterToken))

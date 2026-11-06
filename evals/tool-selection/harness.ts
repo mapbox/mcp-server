@@ -19,9 +19,8 @@ import OpenAI from 'openai';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client } from '@modelcontextprotocol/client';
+import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER_ROOT = resolve(
@@ -238,7 +237,19 @@ export function loadCases(): EvalCase[] {
       throw new Error(`EVAL_MODES entries must be eager or deferred, got ${m}`);
     }
   }
-  return base.flatMap((c) =>
+  // EVAL_CASES=site-route,site-walksheds runs just those cases, for a
+  // cheap check of one change.
+  const only = (process.env.EVAL_CASES ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  for (const id of only) {
+    if (!base.some((c) => c.id === id)) {
+      throw new Error(`EVAL_CASES names unknown case ${id}`);
+    }
+  }
+  const picked = only.length ? base.filter((c) => only.includes(c.id)) : base;
+  return picked.flatMap((c) =>
     modes.map((mode) => ({
       id: `${c.id}__${mode}`,
       prompt: c.prompt,
@@ -280,6 +291,18 @@ function systemPrompt(
   return lines.join('\n');
 }
 
+// Looks like a real token on purpose: one that reads as fake ("eval-stub")
+// makes models leave a placeholder instead, which is what we're measuring.
+// It belongs to no account, and it's assembled here rather than written out
+// so secret scanning doesn't flag it as a Mapbox token.
+const STUB_PUBLIC_TOKEN = [
+  'pk',
+  Buffer.from(
+    JSON.stringify({ u: 'acme-coffee', a: 'cm3k9x2qp0b1l2qs8f7d4v6tn' })
+  ).toString('base64url'),
+  'Qm7vX2kLp9RzT4wN8yHc1A'
+].join('.');
+
 // Results that don't depend on the query. Everything else is stubbed per case
 // in cases.json: a canned answer about the wrong place makes Claude retry or
 // switch tools, which would be scored as a routing failure.
@@ -288,8 +311,17 @@ const COMMON_STUBS: Record<string, string> = {
   static_map_image_tool: 'Static map image generated (PNG).',
   places_map_display_v0: 'Map with pins displayed to the user.',
   write_file: 'File written.',
-  export_map_html_tool:
-    '<!doctype html><html><head><meta charset="utf-8"><title>Map</title></head><body><div id="map"></div><script>/* Mapbox GL JS map with the data and a public token inlined (eval stub) */</script></body></html>'
+  // Same text shape as the real tool, with a made-up token so the grader can
+  // tell whether the page embeds the token it was given.
+  list_public_tokens_tool: [
+    'Public tokens (1):',
+    `- "Default public token" (default): ${STUB_PUBLIC_TOKEN} (no URL restrictions)`,
+    '',
+    `Recommended: ${STUB_PUBLIC_TOKEN}`,
+    "The account's default public token. Pass site_url to look for a token restricted to where the page will run.",
+    '',
+    "Public (pk.) tokens are meant for client-side code, but anyone who copies one can use it, and the usage bills to this account. For a site you publish, use a token restricted to the site's URL; if none matches, ask the user to create one at https://account.mapbox.com/access-tokens/create (add the site's URL under URL restrictions) and use that instead. The default token is fine for local prototypes."
+  ].join('\n')
 };
 const UNSTUBBED = 'No results. (This tool returned nothing for this request.)';
 
@@ -712,6 +744,20 @@ function checkTokenAsk(
   return relevant ? { ok: true, why: 'no token request or placeholder' } : null;
 }
 
+// Whether the page the agent wrote uses the token list_public_tokens_tool
+// gave it, rather than one it made up or none at all.
+function checkTokenEmbedded(
+  transcript: RunOutput['transcript']
+): { ok: boolean; why: string } | null {
+  const writes = transcript.filter(
+    (turn) => turn.role === 'tool_call' && turn.name === 'write_file'
+  );
+  if (!writes.length) return null;
+  return writes.some((turn) => String(turn.content).includes(STUB_PUBLIC_TOKEN))
+    ? { ok: true, why: 'page uses the listed token' }
+    : { ok: false, why: 'page does not use the listed token' };
+}
+
 export async function gradeCase(
   c: EvalCase,
   run: Pick<RunOutput, 'tool_calls' | 'transcript'>
@@ -769,20 +815,23 @@ export async function gradeCase(
   // are only real ref mistakes.
   const refs = checkRefs(run.transcript);
   const token = checkTokenAsk(run.transcript);
+  const embedded = checkTokenEmbedded(run.transcript);
   return {
     grade: {
       pass,
       first_ok: firstOk ? 1 : 0,
       no_forbidden: forbidden.length ? 0 : 1,
       ref_ok: refs && !refs.ok ? 0 : 1,
-      no_token_ask: token && !token.ok ? 0 : 1
+      no_token_ask: token && !token.ok ? 0 : 1,
+      token_embedded: embedded && !embedded.ok ? 0 : 1
     },
     explanation: {
       pass: pass
         ? `ok: ${trajectory}`
         : `${problems.join('; ')} | ${trajectory}`,
       ref_ok: refs ? refs.why : 'no render_map_tool call',
-      no_token_ask: token ? token.why : 'no page written'
+      no_token_ask: token ? token.why : 'no page written',
+      token_embedded: embedded ? embedded.why : 'no page written'
     }
   };
 }

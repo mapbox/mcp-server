@@ -5,7 +5,7 @@ import { BasePrompt } from './BasePrompt.js';
 import type {
   PromptArgument,
   PromptMessage
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 
 /**
  * Prompt for getting turn-by-turn directions between two locations.
