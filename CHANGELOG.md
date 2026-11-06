@@ -2,7 +2,7 @@
 
 ### Bug Fixes
 
-- **`render_map_tool`: the summary chip no longer covers the zoom buttons after the map frame narrows (#PR, fixes #307).** #278 moved the zoom and layer buttons below the chip when it appears, but measured the chip only then. When a host narrowed the frame or switched display mode afterwards, the chip wrapped to more lines and covered the buttons again: at 200 px wide, a click on + landed on the chip. A `ResizeObserver` on the chip now re-places the buttons whenever its size changes. Browsers without `ResizeObserver` keep the old behavior.
+- **`render_map_tool`: the summary chip no longer covers the zoom buttons after the map frame narrows (#326, fixes #307).** #278 moved the zoom and layer buttons below the chip when it appears, but measured the chip only then. When a host narrowed the frame or switched display mode afterwards, the chip wrapped to more lines and covered the buttons again: at 200 px wide, a click on + landed on the chip. A `ResizeObserver` on the chip now re-places the buttons whenever its size changes. Browsers without `ResizeObserver` keep the old behavior.
 
 ## 0.17.0 - 2026-11-06
 
