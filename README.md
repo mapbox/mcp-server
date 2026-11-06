@@ -525,7 +525,7 @@ Gets ground elevation from Mapbox's terrain data ([Mapbox Terrain-DEM v1](https:
 - The highest and lowest points, and how far along the line they are
 - An elevation profile of up to 50 points
 
-The line can be a `path` of coordinates, or the `directions_ref` from a `directions_tool` result, which the tool turns back into the full route itself. The server reads the terrain tiles and decodes each pixel's height, so values aren't rounded to contour steps the way Tilequery's Terrain v2 contours are. Points along a line share tiles, and long lines are read at a coarser zoom so a call stays under 50 tile requests; `resolution_m` in the result says how coarse. Swings under 2 m don't count toward climb or descent, so DEM noise on flat ground doesn't add up. Heights are of the ground, not of buildings or bridges. The result includes a map ref with the line and its high and low points.
+The line can be a `path` of coordinates, or the `route_ref` from a `directions_tool` or `map_matching_tool` result, which the tool turns back into the full route itself. The server reads the terrain tiles and decodes each pixel's height, so values aren't rounded to contour steps the way Tilequery's Terrain v2 contours are. Points along a line share tiles, and long lines are read at a coarser zoom so a call stays under 50 tile requests; `resolution_m` in the result says how coarse. Swings under 2 m don't count toward climb or descent, so DEM noise on flat ground doesn't add up. Heights are of the ground, not of buildings or bridges. The result includes a map ref with the line and its high and low points.
 
 **Example Usage**: "How hilly is the bike route from the Ferry Building to Twin Peaks?" or "How high is Longs Peak?"
 

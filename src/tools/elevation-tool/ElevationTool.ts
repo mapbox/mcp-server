@@ -9,6 +9,8 @@ import type { MapAppMarker, MapAppPayload } from '../../utils/mapAppPayload.js';
 import { buildInlinePayloadRef } from '../../utils/inlinePayloadRef.js';
 import { renderHint } from '../../utils/storeMapPayload.js';
 import { directionsRequestFromRef } from '../../utils/directionsRef.js';
+import { mapMatchingRequestFromRef } from '../../utils/mapMatchingRef.js';
+import { resolveSelfFetchRef } from '../../utils/selfFetchRef.js';
 import { ElevationInputSchema } from './ElevationTool.input.schema.js';
 import {
   ElevationOutputSchema,
@@ -26,6 +28,9 @@ import {
   samplePath,
   type LngLat
 } from './terrain.js';
+
+const NOT_A_ROUTE_REF =
+  'route_ref is not a directions_tool or map_matching_tool ref. Pass the structuredContent.mapboxRender.ref from one of those results unchanged, or pass the line as path.';
 
 /** Most points sampled along a path; long paths get wider spacing. */
 const MAX_SAMPLES = 500;
@@ -63,8 +68,8 @@ export class ElevationTool extends MapboxApiBasedTool<
   name = 'elevation_tool';
   description =
     'Gets ground elevation from Mapbox terrain data. Give it places (`points`) for the height above sea level of each, ' +
-    'or a line (`path`, or `directions_ref` from a directions_tool result) for total climb and descent, the highest and lowest points, and an elevation profile. ' +
-    'Use it for questions like "how high is this town?", "how hilly is this bike route?" or "how much climbing is on this hike?". ' +
+    'or a line (`path`, or `route_ref` from a directions_tool or map_matching_tool result) for total climb and descent, the highest and lowest points, and an elevation profile. ' +
+    'Use it for questions like "how high is this town?", "how hilly is this bike route?", "how much climbing is on this trail run?" or, for a recorded GPS trace matched with map_matching_tool, "how much did I climb?". ' +
     'Elevations are of the ground (bare earth), not buildings or bridges. ' +
     'Long paths are read at a coarser resolution (see `resolution_m` in the result), which can undercount small hills.';
   annotations = {
@@ -87,11 +92,11 @@ export class ElevationTool extends MapboxApiBasedTool<
     input: z.infer<typeof ElevationInputSchema>,
     accessToken: string
   ): Promise<CallToolResult> {
-    const given = [input.points, input.path, input.directions_ref].filter(
+    const given = [input.points, input.path, input.route_ref].filter(
       (v) => v !== undefined
     ).length;
     if (given !== 1) {
-      return this.error('Pass exactly one of points, path or directions_ref.');
+      return this.error('Pass exactly one of points, path or route_ref.');
     }
 
     const apiEndpoint = MapboxApiBasedTool.mapboxApiEndpoint;
@@ -113,7 +118,7 @@ export class ElevationTool extends MapboxApiBasedTool<
         drawLine = true;
       } else {
         const route = await this.fetchRoute(
-          input.directions_ref as string,
+          input.route_ref as string,
           accessToken,
           apiEndpoint
         );
@@ -137,16 +142,42 @@ export class ElevationTool extends MapboxApiBasedTool<
     return { content: [{ type: 'text', text }], isError: true };
   }
 
-  /** The route's coordinates, or an error message for the model. */
+  /**
+   * The line behind a directions_tool or map_matching_tool ref, or an error
+   * message for the model. A trace with gaps matches in several pieces;
+   * they're joined in order.
+   */
   private async fetchRoute(
     ref: string,
     accessToken: string,
     apiEndpoint: string
   ): Promise<LngLat[] | string> {
-    const request = directionsRequestFromRef(ref, { accessToken, apiEndpoint });
-    if (!request) {
-      return 'directions_ref is not a directions_tool ref. Pass the structuredContent.mapboxRender.ref from a directions_tool result unchanged, or pass the line as path.';
+    const options = { accessToken, apiEndpoint };
+    const tool = resolveSelfFetchRef(ref)?.selfFetch?.[0]?.tool;
+    if (tool === 'map_matching') {
+      const url = mapMatchingRequestFromRef(ref, options);
+      if (!url) return NOT_A_ROUTE_REF;
+      const response = await this.httpRequest(url);
+      if (!response.ok) {
+        return `Map Matching API error: ${await this.getErrorMessage(response)}`;
+      }
+      const data = (await response.json()) as {
+        code?: string;
+        matchings?: Array<{ geometry?: { coordinates?: unknown } }>;
+      };
+      const coords = (data.matchings ?? []).flatMap((m) =>
+        Array.isArray(m.geometry?.coordinates)
+          ? (m.geometry.coordinates as LngLat[])
+          : []
+      );
+      if (coords.length < 2) {
+        return `The Map Matching API matched no line for that ref (code: ${data.code ?? 'unknown'}).`;
+      }
+      return coords;
     }
+
+    const request = directionsRequestFromRef(ref, options);
+    if (!request) return NOT_A_ROUTE_REF;
     const response = await this.httpRequest(request.url);
     if (!response.ok) {
       return `Directions API error: ${await this.getErrorMessage(response)}`;
@@ -323,7 +354,7 @@ export class ElevationTool extends MapboxApiBasedTool<
     const hint = drawLine
       ? renderHint(ref)
       : renderHint(ref) +
-        '\nTo show the route too, pass the directions ref alongside it in payload_refs.';
+        "\nTo show the route too, pass the route's ref alongside it in payload_refs.";
     return {
       content: [{ type: 'text', text: text + hint }],
       structuredContent: out,

@@ -176,7 +176,7 @@ describe('ElevationTool', () => {
     });
 
     const result = await new ElevationTool({ httpRequest }).run({
-      directions_ref: ref
+      route_ref: ref
     });
 
     expect(result.isError).toBe(false);
@@ -190,21 +190,104 @@ describe('ElevationTool', () => {
     expect(sc.path.climb_m).toBe(0);
     expect(sc.path.distance_m).toBeGreaterThan(1000);
     // The route itself isn't copied into the elevation map; the text says
-    // to pass the directions ref alongside.
+    // to pass the route's ref alongside.
     expect(resolveInlinePayloadRef(sc.mapboxRender.ref)?.layers).toEqual([]);
-    expect(textOf(result)).toContain('pass the directions ref alongside');
+    expect(textOf(result)).toContain("pass the route's ref alongside");
   });
 
-  it('rejects a ref that is not from directions_tool', async () => {
+  it('reads the line behind a map_matching_tool ref, joining matched pieces', async () => {
+    // A recorded run that matched in two pieces (a gap in the trace).
+    const pieces: LngLat[][] = [
+      [
+        [WEST + INSET, MID_LAT],
+        [WEST + 3 * INSET, MID_LAT]
+      ],
+      [
+        [WEST + 50 * INSET, MID_LAT],
+        [EAST - INSET, MID_LAT]
+      ]
+    ];
+    const png = terrainTile((x) => x);
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    mockHttpRequest.mockImplementation(async (url: string) =>
+      url.includes('/matching/v5/')
+        ? {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              code: 'Ok',
+              matchings: pieces.map((coordinates) => ({
+                geometry: { type: 'LineString', coordinates }
+              }))
+            })
+          }
+        : tileResponse(png)
+    );
+    const ref = buildSelfFetchRef('map_matching', {
+      coordinates: [pieces[0][0], pieces[1][1]].map(
+        ([longitude, latitude]) => ({
+          longitude,
+          latitude
+        })
+      ),
+      profile: 'walking',
+      timestamps: [1700000000, 1700000900]
+    });
+
+    const result = await new ElevationTool({ httpRequest }).run({
+      route_ref: ref
+    });
+
+    expect(result.isError).toBe(false);
+    const matchingUrl = new URL(mockHttpRequest.mock.calls[0][0] as string);
+    expect(matchingUrl.pathname).toContain('/matching/v5/mapbox/walking/');
+    expect(matchingUrl.searchParams.get('geometries')).toBe('geojson');
+    expect(matchingUrl.searchParams.get('overview')).toBe('full');
+    expect(matchingUrl.searchParams.get('timestamps')).toBe(
+      '1700000000;1700000900'
+    );
+    const sc = result.structuredContent as {
+      path: { distance_m: number; climb_m: number; end: { longitude: number } };
+    };
+    // Both pieces are read, so the line ends at the second piece's end.
+    expect(sc.path.end.longitude).toBeCloseTo(EAST - INSET, 6);
+    expect(sc.path.climb_m).toBeGreaterThan(0);
+    expect(textOf(result)).toContain("pass the route's ref alongside");
+  });
+
+  it('reports a map matching ref that matched nothing', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+    mockHttpRequest.mockImplementation(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 'NoMatch' })
+    }));
+    const result = await new ElevationTool({ httpRequest }).run({
+      route_ref: buildSelfFetchRef('map_matching', {
+        coordinates: [
+          { longitude: 0, latitude: 0 },
+          { longitude: 0.01, latitude: 0.01 }
+        ],
+        profile: 'walking'
+      })
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('matched no line');
+    expect(textOf(result)).toContain('NoMatch');
+  });
+
+  it('rejects a ref that is not a route', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest();
     const result = await new ElevationTool({ httpRequest }).run({
-      directions_ref: buildSelfFetchRef('isochrone', {
+      route_ref: buildSelfFetchRef('isochrone', {
         coordinates: { longitude: 0, latitude: 0 },
         contours_minutes: [5]
       })
     });
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('not a directions_tool ref');
+    expect(textOf(result)).toContain(
+      'not a directions_tool or map_matching_tool ref'
+    );
     expect(mockHttpRequest).not.toHaveBeenCalled();
   });
 
@@ -219,7 +302,7 @@ describe('ElevationTool', () => {
         ]
       }
     ]
-  ])('needs exactly one of points, path or directions_ref', async (input) => {
+  ])('needs exactly one of points, path or route_ref', async (input) => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest();
     const result = await new ElevationTool({ httpRequest }).run(input);
     expect(result.isError).toBe(true);
