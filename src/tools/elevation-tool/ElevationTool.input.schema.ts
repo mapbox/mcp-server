@@ -10,7 +10,7 @@ const coordinateSchema = z.object({
 
 /**
  * Input schema for ElevationTool. Exactly one of `points`, `path` or
- * `directions_ref` is required; the tool checks that itself so the
+ * `route_ref` is required; the tool checks that itself so the
  * published JSON schema stays a plain object.
  */
 export const ElevationInputSchema = z.object({
@@ -28,13 +28,13 @@ export const ElevationInputSchema = z.object({
     .max(1000)
     .optional()
     .describe(
-      'A line (hike, ride, run) as ordered coordinates, for climb, descent and an elevation profile along it. For a route from directions_tool, pass directions_ref instead.'
+      'A line (hike, ride, run) as ordered coordinates, for climb, descent and an elevation profile along it. For a route from directions_tool or a GPS trace matched with map_matching_tool, pass route_ref instead.'
     ),
-  directions_ref: z
+  route_ref: z
     .string()
     .optional()
     .describe(
-      'The structuredContent.mapboxRender.ref from a directions_tool result (mapbox://selffetch/directions?...), passed unchanged. The tool fetches the full route itself, so you never need to copy route geometry.'
+      'The structuredContent.mapboxRender.ref from a directions_tool result (a planned route) or a map_matching_tool result (a recorded run, ride or hike), passed unchanged. The tool fetches the full line itself, so you never need to copy route geometry.'
     )
 });
 
