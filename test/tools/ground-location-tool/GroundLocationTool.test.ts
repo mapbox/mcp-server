@@ -8,6 +8,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { GroundLocationTool } from '../../../src/tools/ground-location-tool/GroundLocationTool.js';
 import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { terrainTile } from '../elevation-tool/pngFixtures.js';
 
 const geocodeResponse = {
   features: [
@@ -67,6 +68,17 @@ function setupMockHttp(responses: Record<string, object>) {
   const mockFetch = vi.fn().mockImplementation((url: string) => {
     for (const [key, body] of Object.entries(responses)) {
       if (url.includes(key)) {
+        if (Buffer.isBuffer(body)) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            arrayBuffer: async () =>
+              body.buffer.slice(
+                body.byteOffset,
+                body.byteOffset + body.byteLength
+              )
+          });
+        }
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -103,8 +115,9 @@ describe('GroundLocationTool', () => {
     const text = (result.content[0] as { type: string; text: string }).text;
     expect(text).toContain('Mission District');
     expect(text).toContain('neighborhood context');
-    // geocode + isochrone called, no category search (no query)
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // geocode, isochrone, two Tilequery requests and one DEM tile; no
+    // category search (no query)
+    expect(mockFetch).toHaveBeenCalledTimes(5);
   });
 
   it('performs category search when query is provided', async () => {
@@ -377,5 +390,151 @@ describe('GroundLocationTool', () => {
       await import('../../../src/utils/selfFetchRef.js');
     const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
     expect(payload?.selfFetch?.[0]?.params).not.toHaveProperty('poi');
+  });
+
+  describe('the ground at the point', () => {
+    // Golden Gate Park: a park polygon with a meadow inside it, and Stow
+    // Lake 292 m away. Same shapes Tilequery returned for that point.
+    const parkInside = {
+      features: [
+        {
+          properties: {
+            tilequery: { distance: 0, layer: 'landuse' },
+            class: 'park',
+            type: 'park'
+          }
+        },
+        {
+          properties: {
+            tilequery: { distance: 0, layer: 'landuse' },
+            class: 'grass',
+            type: 'meadow'
+          }
+        }
+      ]
+    };
+    const lakeNearby = {
+      features: [
+        { properties: { tilequery: { distance: 291.6, layer: 'water' } } }
+      ]
+    };
+
+    it('reports land use, nearest water and elevation', async () => {
+      const { tool, mockFetch } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'isochrone/v1': isochroneResponse,
+        landuse_overlay: parkInside,
+        waterway: lakeNearby,
+        'mapbox-terrain-dem-v1': terrainTile(() => 18.04)
+      });
+
+      const result = await tool.run({
+        longitude: -122.4862,
+        latitude: 37.7694
+      });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toEqual({
+        land_use: [{ class: 'park' }, { class: 'grass', type: 'meadow' }],
+        on_water: false,
+        nearest_water_m: 292
+      });
+      expect(sc.elevation_m).toBeCloseTo(18, 0);
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('Land use: park, grass (meadow)');
+      expect(text).toContain('Nearest water: 292 m');
+      expect(text).toContain('Elevation: 18 m');
+      expect(sc.citations).toEqual(
+        expect.arrayContaining([
+          'Mapbox Tilequery API (Streets v8)',
+          'Mapbox Terrain-DEM'
+        ])
+      );
+
+      const [pip, near] = mockFetch.mock.calls
+        .map(([url]) => new URL(url as string))
+        .filter((u) => u.pathname.includes('/tilequery/'));
+      expect(pip.pathname).toBe(
+        '/v4/mapbox.mapbox-streets-v8/tilequery/-122.4862,37.7694.json'
+      );
+      expect(pip.searchParams.get('layers')).toBe(
+        'landuse,landuse_overlay,building,water'
+      );
+      expect(pip.searchParams.has('radius')).toBe(false);
+      expect(near.searchParams.get('layers')).toBe('water,waterway');
+      expect(near.searchParams.get('radius')).toBe('500');
+      expect(near.searchParams.get('limit')).toBe('1');
+    });
+
+    it('names a national park, and describes a building and water', async () => {
+      const { tool } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        landuse_overlay: {
+          features: [
+            {
+              properties: {
+                tilequery: { distance: 0, layer: 'landuse_overlay' },
+                class: 'national_park',
+                type: 'protected_area',
+                name: 'Yosemite National Park'
+              }
+            },
+            {
+              properties: {
+                tilequery: { distance: 0, layer: 'building' },
+                type: 'office',
+                height: 9.3,
+                underground: 'false'
+              }
+            },
+            { properties: { tilequery: { distance: 0, layer: 'water' } } }
+          ]
+        },
+        waterway: lakeNearby
+      });
+
+      const result = await tool.run({
+        longitude: -119.5885,
+        latitude: 37.7456
+      });
+
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toEqual({
+        land_use: [],
+        protected_areas: [
+          { class: 'national_park', name: 'Yosemite National Park' }
+        ],
+        building: { type: 'office', height_m: 9.3 },
+        on_water: true
+      });
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('Inside Yosemite National Park (national park)');
+      expect(text).toContain('Inside a building (office, 9 m tall)');
+      expect(text).toContain('On water');
+      expect(text).not.toContain('Nearest water');
+      expect(text).not.toContain('Land use:');
+    });
+
+    it('still answers when Tilequery and the DEM tile fail', async () => {
+      const { tool } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'isochrone/v1': isochroneResponse
+      });
+
+      const result = await tool.run({ longitude: -122.419, latitude: 37.759 });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toBeUndefined();
+      expect(sc.elevation_m).toBeUndefined();
+      expect(sc.citations).toEqual([
+        'Mapbox Geocoding API',
+        'Mapbox Isochrone API'
+      ]);
+      expect((result.content[0] as { text: string }).text).toContain(
+        'Mission District'
+      );
+    });
   });
 });

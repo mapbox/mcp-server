@@ -351,6 +351,7 @@ const HINTED_TOOLS = new Set([
   'directions_tool',
   'isochrone_tool',
   'ground_location_tool',
+  'elevation_tool',
   'map_matching_tool',
   'optimization_tool',
   'union_tool',

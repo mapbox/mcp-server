@@ -30,6 +30,33 @@ export const IsochroneSummarySchema = z.object({
   contour_areas_sqkm: z.array(z.number()).optional()
 });
 
+export const LandSchema = z.object({
+  land_use: z
+    .array(z.object({ class: z.string(), type: z.string().optional() }))
+    .describe(
+      'Land use polygons the point is inside, e.g. park, cemetery, school, hospital, residential, commercial_area, wood, grass. Empty when none is mapped there.'
+    ),
+  protected_areas: z
+    .array(z.object({ class: z.string(), name: z.string().optional() }))
+    .optional()
+    .describe('Protected areas the point is inside, e.g. a national_park'),
+  building: z
+    .object({
+      type: z.string().optional(),
+      height_m: z.number().optional(),
+      underground: z.boolean().optional()
+    })
+    .optional()
+    .describe('The building the point is inside, if any'),
+  on_water: z
+    .boolean()
+    .describe('Whether the point is on a lake, river or sea'),
+  nearest_water_m: z
+    .number()
+    .optional()
+    .describe('Distance to the nearest water within 500 m, if not on water')
+});
+
 import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
 
 export const GroundLocationOutputSchema = z
@@ -47,6 +74,13 @@ export const GroundLocationOutputSchema = z
     isochrone: IsochroneSummarySchema.optional().describe(
       'Travel-time reachability summary'
     ),
+    land: LandSchema.optional().describe(
+      'What the ground is at the point, from Mapbox Streets'
+    ),
+    elevation_m: z
+      .number()
+      .optional()
+      .describe('Ground elevation above sea level, from Mapbox Terrain-DEM'),
     citations: z
       .array(z.string())
       .describe('Mapbox APIs used to produce this grounded response'),
