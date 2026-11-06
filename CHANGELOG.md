@@ -2,18 +2,13 @@
 
 ### New Features
 
-- **`ground_location_tool`: land use, water and elevation at the point (#324).** "Is this spot in a park?" or "is this on the water?" had no answer: the tool named the neighborhood and nearby POIs, but not what the ground at the coordinate is. Folded in here rather than a new tool, so the model doesn't have two "what's here" tools to pick between.
-  - **Land:** a point-in-polygon Tilequery on Mapbox Streets v8 gives `land.land_use` (park, cemetery, school, residential, wood...), `land.protected_areas` (national parks, with names), and `land.building` (type, height). A second, 500 m radius query on `water,waterway` gives `land.on_water` or `land.nearest_water_m`.
-  - **Elevation:** `elevation_m` from one Terrain-DEM tile, read with `elevation_tool`'s decoder (#293).
-  - **Cost:** two Tilequery requests and one tile, in parallel with the existing calls. A failure leaves those fields out instead of failing the answer.
-  - **Evals:** new tool-selection cases for land use and elevation questions.
-- **`elevation_tool`: ground elevation at places, and climb and descent along a path or route (#293).** The server had no elevation at all, so "how hilly is this bike route?" or "how high is this town?" had no answer from Mapbox data. Part 4 of #289. A general `tilequery` tool stays in mcp-devkit-server, since raw tileset layers are a developer tool.
-  - **Inputs:** up to 25 `points`, a `path` of up to 1,000 coordinates, or the `route_ref` from a `directions_tool` or `map_matching_tool` result, which the tool turns back into the full line with `directionsRequestFromRef` (#276) or the new `mapMatchingRequestFromRef`, so a planned trail run or a recorded one both work, and the model never copies route geometry.
-  - **Data:** reads `mapbox.mapbox-terrain-dem-v1` raster tiles (`.pngraw`, terrain-RGB) and decodes each pixel's height, with bilinear interpolation between pixels. Tilequery can't read the DEM (it returns 422), and its Terrain v2 contours come in 10 m steps or coarser: 240 m near Twin Peaks against 249.5 m from the DEM, 10 m at Civic Center against 20.9 m. Longs Peak reads 4,346 m, its surveyed height. A small PNG decoder on Node's `zlib` handles the 8-bit RGB/RGBA tiles, so there's no new dependency.
-  - **Cost:** a path is sampled at up to 500 points, never closer than one DEM pixel. Samples share tiles, each tile is fetched once per call, and the zoom drops on long paths until the path needs at most 48 tiles. The result reports `zoom` and `resolution_m`. Ferry Building to Twin Peaks by bike: 1 tile request at 7.5 m resolution, 274 m of climb. San Francisco to Los Angeles: 1.3 s at about 120 m resolution, highest point 1,276 m near Tejon Pass.
-  - **Climb:** swings under 2 m don't count, so DEM noise on flat ground doesn't add up to phantom hills.
-  - **Result:** elevations, or distance, climb, descent, start, end, highest and lowest points and a profile of up to 50 points for a chart (12 in the text), plus a map ref with the line and ▲/▼ markers at the high and low points. For a directions ref, the text says to pass the route's ref alongside, rather than copying the route into this one.
-  - **Testing:** a PNG encoder in the tests covers every row filter, RGB and RGBA, and bad input (not a PNG, 16-bit, palette, truncated). Synthetic terrain tiles test point heights, interpolation, climb along a path, a directions ref, the zoom choice for a long route, the noise threshold, a refused token, and that `-0 m` never prints.
+- **`ground_location_tool`: land use, water, elevation and live traffic at the point, picked with `include` (#324).** "Is this spot in a park?", "is this on the water?" or "how bad is traffic at this address?" had no answer: the tool named the neighborhood and nearby POIs, but not what the spot itself is. Folded in here rather than new tools, so the model doesn't have more "what's here" tools to pick between, and new layers become new `include` values instead of new tools.
+  - **`include`:** `land`, `water`, `elevation` and `traffic`, each its own request, run in parallel with the existing calls. The model picks what the question needs; left out, it's `["land"]`. A failed request leaves its field out instead of failing the answer.
+  - **`land`:** a point-in-polygon Tilequery on Mapbox Streets v8 for land use (park, cemetery, school, residential, wood...), protected areas (national parks, with names) and the building the point is in (type, height). Streets park polygons have no names, so a city park is just "park".
+  - **`water`:** a 500 m radius Tilequery on `water,waterway`: on water, or the distance to the nearest water.
+  - **`elevation`:** one Terrain-DEM tile, read with `elevation_tool`'s decoder (#293).
+  - **`traffic`:** a 100 m radius Tilequery on Mapbox Traffic v1: live congestion (low, moderate, heavy, severe) per road class, at its worst, nearest first. The tiles have road classes but no street names, and quiet streets often have no data, so an empty list says no data rather than no traffic.
+  - **Evals:** new tool-selection cases for land use, water, elevation and traffic questions.
 
 ## 0.17.0 - 2026-11-06
 

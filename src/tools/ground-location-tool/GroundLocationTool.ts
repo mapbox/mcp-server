@@ -14,7 +14,7 @@ import { renderHint } from '../../utils/storeMapPayload.js';
 import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 import { buildReverseGeocodeUrl } from './buildReverseGeocodeUrl.js';
 import { buildCategorySearchRequestUrl } from '../category-search-tool/buildCategorySearchRequestUrl.js';
-import { landAtPoint } from './landAtPoint.js';
+import { landAt, waterNear, trafficNear } from './groundFacets.js';
 import { MAX_ZOOM, elevationsAt } from '../elevation-tool/terrain.js';
 
 type GroundingStrategy = 'neighborhood' | 'routing' | 'poi' | 'region';
@@ -80,8 +80,8 @@ export class GroundLocationTool extends MapboxApiBasedTool<
   name = 'ground_location_tool';
   description =
     'Answer questions about what is near a location, what neighborhood a coordinate is in, or what places are within walking/driving distance. Use this when given coordinates and asked about nearby places, neighborhood context, local discovery, or area summaries. It already includes reverse geocoding, so a separate reverse_geocode_tool call is not needed for the same coordinate. Pass the place category (e.g. "restaurant", "coffee", "park") as the query parameter to get nearby POIs in the same call. Returns place name, nearby POIs matching the query, and travel-time reachability — all sourced from live Mapbox data with citations. ' +
-    'It also says what the ground is at the point: land use (park, cemetery, school, residential, wood...), a national park or other protected area it is in, a building it is inside, whether it is on water and how far the nearest water is, and its elevation. ' +
-    'So use it for "is this spot in a park?" or "is this on the water?" too. For elevation along a path or route, use elevation_tool.';
+    'Use `include` for what the spot itself is: land use (is it in a park, a national park, a building?), water (on it, or how near), elevation, and live traffic on the roads around it. ' +
+    'So use it for "is this spot in a park?", "is this on the water?" or "how bad is traffic at this address?" too. For elevation along a path or route, use elevation_tool.';
   annotations = {
     title: 'Ground Location Tool',
     readOnlyHint: true,
@@ -248,6 +248,45 @@ export class GroundLocationTool extends MapboxApiBasedTool<
     };
   }
 
+  /**
+   * The `include` facets: what the spot itself is. Each is its own request,
+   * run in parallel; one that fails is left out rather than failing the
+   * whole answer.
+   */
+  private async groundFacets(
+    longitude: number,
+    latitude: number,
+    include: ReadonlyArray<'land' | 'water' | 'elevation' | 'traffic'>,
+    accessToken: string,
+    citations: string[]
+  ): Promise<
+    Pick<GroundLocationOutput, 'land' | 'water' | 'traffic' | 'elevation_m'>
+  > {
+    const options = {
+      httpRequest: this.httpRequest,
+      accessToken,
+      apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
+    };
+    const wants = new Set(include);
+    const [land, water, traffic, elevation] = await Promise.all([
+      wants.has('land') ? landAt(longitude, latitude, options) : undefined,
+      wants.has('water') ? waterNear(longitude, latitude, options) : undefined,
+      wants.has('traffic')
+        ? trafficNear(longitude, latitude, options)
+        : undefined,
+      wants.has('elevation')
+        ? elevationsAt([[longitude, latitude]], MAX_ZOOM, options).then(
+            ([height]) => Math.round(height * 10) / 10 || 0,
+            () => undefined
+          )
+        : undefined
+    ]);
+    if (land || water) citations.push('Mapbox Tilequery API (Streets v8)');
+    if (traffic) citations.push('Mapbox Tilequery API (Traffic v1)');
+    if (elevation !== undefined) citations.push('Mapbox Terrain-DEM');
+    return { land, water, traffic, elevation_m: elevation };
+  }
+
   /** "On the ground" lines: land use, protected area, building, water, elevation. */
   private formatGround(result: GroundLocationOutput): string[] {
     const lines: string[] = [];
@@ -279,11 +318,28 @@ export class GroundLocationTool extends MapboxApiBasedTool<
           `Inside a building${details.length ? ` (${details.join(', ')})` : ''}`
         );
       }
-      if (land.on_water) {
-        lines.push('On water');
-      } else if (land.nearest_water_m !== undefined) {
-        lines.push(`Nearest water: ${land.nearest_water_m} m`);
-      }
+    }
+    if (result.water) {
+      lines.push(
+        result.water.on_water
+          ? 'On water'
+          : result.water.nearest_water_m !== undefined
+            ? `Nearest water: ${result.water.nearest_water_m} m`
+            : 'No water within 500 m'
+      );
+    }
+    if (result.traffic) {
+      const { roads, radius_m } = result.traffic;
+      lines.push(
+        roads.length
+          ? `Live traffic within ${radius_m} m: ${roads
+              .map(
+                (r) =>
+                  `${r.congestion} on ${r.class.replace(/_/g, ' ')} (${r.distance_m} m)`
+              )
+              .join(', ')}`
+          : `No live traffic data within ${radius_m} m (common on quiet streets; it doesn't mean no traffic)`
+      );
     }
     if (result.elevation_m !== undefined) {
       lines.push(
@@ -364,7 +420,8 @@ export class GroundLocationTool extends MapboxApiBasedTool<
       profile,
       contours_minutes,
       limit,
-      language
+      language,
+      include = ['land']
     } = input;
 
     // Classify the grounding strategy via sampling (falls back gracefully if unsupported)
@@ -385,73 +442,47 @@ export class GroundLocationTool extends MapboxApiBasedTool<
           : 'neighborhood,locality,place';
 
     // Fan out requests in parallel, shaped by strategy
-    const [
-      geocodeResult,
-      poisResult,
-      isochroneResult,
-      landResult,
-      elevationResult
-    ] = await Promise.all([
-      this.reverseGeocode(
-        longitude,
-        latitude,
-        accessToken,
-        geocodeTypes,
-        language
-      ),
+    const [geocodeResult, poisResult, isochroneResult, ground] =
+      await Promise.all([
+        this.reverseGeocode(
+          longitude,
+          latitude,
+          accessToken,
+          geocodeTypes,
+          language
+        ),
 
-      // POIs: always fetch if query given; boost limit for poi-focused strategy
-      query || strategy === 'poi'
-        ? this.categorySearch(
-            query ?? 'place',
-            longitude,
-            latitude,
-            strategy === 'poi' ? Math.max(limit, 15) : limit,
-            accessToken,
-            language
-          ).then((pois) => {
-            if (pois?.length) citations.push('Mapbox Search API');
-            return pois;
-          })
-        : Promise.resolve(undefined),
+        // POIs: always fetch if query given; boost limit for poi-focused strategy
+        query || strategy === 'poi'
+          ? this.categorySearch(
+              query ?? 'place',
+              longitude,
+              latitude,
+              strategy === 'poi' ? Math.max(limit, 15) : limit,
+              accessToken,
+              language
+            ).then((pois) => {
+              if (pois?.length) citations.push('Mapbox Search API');
+              return pois;
+            })
+          : Promise.resolve(undefined),
 
-      // Isochrone: always for region/neighborhood strategies
-      strategy === 'region' || strategy === 'neighborhood'
-        ? this.isochrone(
-            longitude,
-            latitude,
-            profile,
-            contours_minutes,
-            accessToken
-          ).then((iso) => {
-            if (iso) citations.push('Mapbox Isochrone API');
-            return iso;
-          })
-        : Promise.resolve(undefined),
+        // Isochrone: always for region/neighborhood strategies
+        strategy === 'region' || strategy === 'neighborhood'
+          ? this.isochrone(
+              longitude,
+              latitude,
+              profile,
+              contours_minutes,
+              accessToken
+            ).then((iso) => {
+              if (iso) citations.push('Mapbox Isochrone API');
+              return iso;
+            })
+          : Promise.resolve(undefined),
 
-      landAtPoint(longitude, latitude, {
-        httpRequest: this.httpRequest,
-        accessToken,
-        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
-      }).then((land) => {
-        if (land) citations.push('Mapbox Tilequery API (Streets v8)');
-        return land;
-      }),
-
-      // One DEM tile. A failed tile leaves the elevation out rather than
-      // failing the whole answer.
-      elevationsAt([[longitude, latitude]], MAX_ZOOM, {
-        httpRequest: this.httpRequest,
-        accessToken,
-        apiEndpoint: MapboxApiBasedTool.mapboxApiEndpoint
-      }).then(
-        ([height]) => {
-          citations.push('Mapbox Terrain-DEM');
-          return Math.round(height * 10) / 10 || 0;
-        },
-        () => undefined
-      )
-    ]);
+        this.groundFacets(longitude, latitude, include, accessToken, citations)
+      ]);
 
     const result: GroundLocationOutput = {
       place: geocodeResult.place,
@@ -460,8 +491,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
       latitude,
       nearby_pois: poisResult ?? undefined,
       isochrone: isochroneResult ?? undefined,
-      land: landResult,
-      elevation_m: elevationResult,
+      ...ground,
       citations
     };
 

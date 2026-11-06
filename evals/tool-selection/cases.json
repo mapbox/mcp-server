@@ -390,5 +390,20 @@
       "directions_tool": "Cycling route: 8.4 km, about 38 min via Market St and Clarendon Ave.",
       "elevation_tool": "Elevation along 8.4 km (mapbox.mapbox-terrain-dem-v1, 500 samples, about 7.5 m resolution):\nClimb: 274 m, descent: 27 m\nStart: 3 m, end: 250 m\nHighest: 250 m at 8.4 km\nLowest: 2 m at 0.3 km"
     }
+  },
+  {
+    "id": "traffic-address",
+    "category": "land",
+    "prompt": "How bad is traffic right now around 1 Market St, San Francisco?",
+    "why": "Live traffic at an address: geocode it, then ground_location_tool with include traffic. Showing the traffic layer on a map is fine too, but the reply needs numbers, not just a picture.",
+    "expect": {
+      "any_of": ["ground_location_tool"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. 1 Market St, San Francisco, CA 94105 (37.7942, -122.3949)",
+      "ground_location_tool": "**Financial District** (neighborhood context · live Mapbox data)\nFinancial District, San Francisco, California, United States\n\nLive traffic within 100 m: moderate on primary (22 m), heavy on motorway link (64 m), low on street (80 m)\n\n*Sources: Mapbox Geocoding API, Mapbox Tilequery API (Traffic v1)*",
+      "directions_tool": "Driving route: 1.2 km, 6 min (typical 4 min) via The Embarcadero."
+    }
   }
 ]
