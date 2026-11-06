@@ -30,6 +30,61 @@ export const IsochroneSummarySchema = z.object({
   contour_areas_sqkm: z.array(z.number()).optional()
 });
 
+export const LandSchema = z.object({
+  land_use: z
+    .array(z.object({ class: z.string(), type: z.string().optional() }))
+    .describe(
+      'Land use polygons the point is inside, e.g. park, cemetery, school, hospital, residential, commercial_area, wood, grass. Empty when none is mapped there.'
+    ),
+  protected_areas: z
+    .array(z.object({ class: z.string(), name: z.string().optional() }))
+    .optional()
+    .describe('Protected areas the point is inside, e.g. a national_park'),
+  building: z
+    .object({
+      type: z.string().optional(),
+      height_m: z.number().optional(),
+      underground: z.boolean().optional()
+    })
+    .optional()
+    .describe('The building the point is inside, if any')
+});
+
+export const WaterSchema = z.object({
+  on_water: z
+    .boolean()
+    .describe('Whether the point is on a lake, river or sea'),
+  nearest_water_m: z
+    .number()
+    .optional()
+    .describe(
+      'Distance to the nearest water within 500 m, when not on water. Absent with on_water false: no water within 500 m.'
+    )
+});
+
+export const TrafficSchema = z.object({
+  radius_m: z.number().describe('How far around the point roads were read'),
+  roads: z
+    .array(
+      z.object({
+        class: z
+          .string()
+          .describe('Road class, e.g. motorway, primary, secondary, street'),
+        congestion: z
+          .string()
+          .describe('Live congestion: low, moderate, heavy or severe'),
+        distance_m: z.number()
+      })
+    )
+    .describe(
+      'One entry per road class, at its worst level, nearest first. Empty means no live traffic data nearby (common on quiet streets), not no traffic.'
+    ),
+  worst: z
+    .string()
+    .optional()
+    .describe('Worst congestion on any of those roads')
+});
+
 import { MapAppRefSchema } from '../../utils/storeMapPayload.js';
 
 export const GroundLocationOutputSchema = z
@@ -47,6 +102,21 @@ export const GroundLocationOutputSchema = z
     isochrone: IsochroneSummarySchema.optional().describe(
       'Travel-time reachability summary'
     ),
+    land: LandSchema.optional().describe(
+      'What the ground is at the point, from Mapbox Streets (include: land)'
+    ),
+    water: WaterSchema.optional().describe(
+      'On water, or distance to the nearest water (include: water)'
+    ),
+    traffic: TrafficSchema.optional().describe(
+      'Live traffic on nearby roads, from Mapbox Traffic (include: traffic)'
+    ),
+    elevation_m: z
+      .number()
+      .optional()
+      .describe(
+        'Ground elevation above sea level, from Mapbox Terrain-DEM (include: elevation)'
+      ),
     citations: z
       .array(z.string())
       .describe('Mapbox APIs used to produce this grounded response'),
