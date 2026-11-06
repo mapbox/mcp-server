@@ -2,6 +2,11 @@
 
 ### New Features
 
+- **`ground_location_tool`: land use, water and elevation at the point (#324).** "Is this spot in a park?" or "is this on the water?" had no answer: the tool named the neighborhood and nearby POIs, but not what the ground at the coordinate is. Folded in here rather than a new tool, so the model doesn't have two "what's here" tools to pick between.
+  - **Land:** a point-in-polygon Tilequery on Mapbox Streets v8 gives `land.land_use` (park, cemetery, school, residential, wood...), `land.protected_areas` (national parks, with names), and `land.building` (type, height). A second, 500 m radius query on `water,waterway` gives `land.on_water` or `land.nearest_water_m`.
+  - **Elevation:** `elevation_m` from one Terrain-DEM tile, read with `elevation_tool`'s decoder (#293).
+  - **Cost:** two Tilequery requests and one tile, in parallel with the existing calls. A failure leaves those fields out instead of failing the answer.
+  - **Evals:** new tool-selection cases for land use and elevation questions.
 - **`elevation_tool`: ground elevation at places, and climb and descent along a path or route (#293).** The server had no elevation at all, so "how hilly is this bike route?" or "how high is this town?" had no answer from Mapbox data. Part 4 of #289. A general `tilequery` tool stays in mcp-devkit-server, since raw tileset layers are a developer tool.
   - **Inputs:** up to 25 `points`, a `path` of up to 1,000 coordinates, or the `directions_ref` from a `directions_tool` result, which the tool turns back into the full route with `directionsRequestFromRef` (#276), so the model never copies route geometry.
   - **Data:** reads `mapbox.mapbox-terrain-dem-v1` raster tiles (`.pngraw`, terrain-RGB) and decodes each pixel's height, with bilinear interpolation between pixels. Tilequery can't read the DEM (it returns 422), and its Terrain v2 contours come in 10 m steps or coarser: 240 m near Twin Peaks against 249.5 m from the DEM, 10 m at Civic Center against 20.9 m. Longs Peak reads 4,346 m, its surveyed height. A small PNG decoder on Node's `zlib` handles the 8-bit RGB/RGBA tiles, so there's no new dependency.
