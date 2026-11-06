@@ -19,7 +19,7 @@ describe('decodePng', () => {
   it.each([
     [4 as const, 'RGBA'],
     [3 as const, 'RGB']
-  ])('undoes every row filter (%s channels, %s)', (channels) => {
+  ])('undoes every row filter (%s channels, %s)', (channels, _label) => {
     const pixels = noise(9 * 10 * channels, channels);
     const png = encodePng(9, 10, channels, pixels, {
       filters: [0, 1, 2, 3, 4]

@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import type { z } from 'zod';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { MapboxApiBasedTool } from '../MapboxApiBasedTool.js';
 import type { HttpRequest } from '../../utils/types.js';
 import type { MapAppMarker, MapAppPayload } from '../../utils/mapAppPayload.js';
