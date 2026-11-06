@@ -3,6 +3,7 @@
 
 // INSERT NEW TOOL IMPORT HERE
 import { ListPublicTokensTool } from './list-public-tokens-tool/ListPublicTokensTool.js';
+import { ElevationTool } from './elevation-tool/ElevationTool.js';
 import { FeedbackTool } from './feedback-tool/FeedbackTool.js';
 import { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
 import { PointsWithinPolygonTool } from './points-within-polygon-tool/PointsWithinPolygonTool.js';
@@ -44,6 +45,7 @@ import { httpRequest } from '../utils/httpPipeline.js';
 export const CORE_TOOLS = [
   // INSERT NEW TOOL INSTANCE HERE
   new ListPublicTokensTool({ httpRequest }),
+  new ElevationTool({ httpRequest }),
   new FeedbackTool({ httpRequest }),
   new GroundLocationTool({ httpRequest }),
   new PointsWithinPolygonTool(),
