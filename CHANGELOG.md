@@ -1,5 +1,12 @@
 ## Unreleased
 
+### Maintenance
+
+- **OpenTelemetry JS 3.x (#PR).** `@opentelemetry/sdk-trace-base` is deprecated in every 2.x release and removed in 3.0, and the ox-security scan flagged it on every PR touching `package.json` (#319). Moves the OpenTelemetry set to the 3.0 line: `sdk-trace` 3.0.0 in place of `sdk-trace-base`, `resources` 3.0.0, `sdk-node`, `instrumentation` and `exporter-trace-otlp-http` 0.300.0, `auto-instrumentations-node` 0.82.0 and `api` 1.10.0. 3.1.0 came out the day before, so this stays on 3.0.0 for now.
+  - **Code:** `ConsoleSpanExporter`, `ReadableSpan` and `SpanExporter` now come from `sdk-trace`. In the test, `BasicTracerProvider` is now `TracerProvider`, and `SimpleSpanProcessor` takes `{ exporter }`.
+  - **Node:** `engines` is now `>=22.15.0`, the 3.x minimum (it was `>=22`).
+  - **Checked:** the built server, both ESM and CommonJS, sends the same `config.load_env` and `tool.distance_tool` spans and the same metrics to a local OTLP endpoint as 0.17.0 does.
+
 ## 0.17.0 - 2026-11-06
 
 ## 0.17.0-dev.3 - 2026-11-05
