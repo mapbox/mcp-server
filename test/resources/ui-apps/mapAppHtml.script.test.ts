@@ -147,6 +147,9 @@ function loadScriptSandbox(options?: {
   const styleLayers: Record<string, Record<string, unknown>> = {};
   const controls: FakeElement[] = [];
   const topLeftCorner = fakeElement();
+  // Like a browser's ResizeObserver: the test calls resizeObserved() where
+  // the browser would report a new size for an observed element.
+  const resizeCallbacks: Array<{ target: unknown; cb: () => void }> = [];
   const fakeMapInstance = {
     // GL JS calls a control's onAdd right away and mounts what it returns.
     addControl: (control: { onAdd?: (map: unknown) => FakeElement }) => {
@@ -274,6 +277,12 @@ function loadScriptSandbox(options?: {
         };
       }
     },
+    ResizeObserver: class {
+      constructor(private cb: () => void) {}
+      observe(target: unknown) {
+        resizeCallbacks.push({ target, cb: this.cb });
+      }
+    },
     console,
     setTimeout,
     URLSearchParams,
@@ -365,6 +374,8 @@ function loadScriptSandbox(options?: {
     styleLayers,
     controls,
     topLeftCorner,
+    resizeObserved: (target: unknown) =>
+      resizeCallbacks.filter((r) => r.target === target).forEach((r) => r.cb()),
     legendEl: getElementById('legend') as unknown as {
       innerHTML?: string;
       style: Record<string, string>;
@@ -1133,6 +1144,21 @@ describe('mapAppHtml Satellite and Traffic toggles', () => {
 
     sendPayload(sandbox, { layers: [routeLayer] });
     expect(sandbox.topLeftCorner.style.top).toBe('');
+  });
+
+  it('keeps the controls below the chip when it wraps to more lines (#307)', () => {
+    const sandbox = loadScriptSandbox();
+    const summary = sandbox.summaryEl as unknown as { offsetHeight: number };
+    summary.offsetHeight = 34;
+    sendPayload(sandbox, {
+      summary: 'Driving route from San Francisco to Los Angeles · 616 km'
+    });
+    expect(sandbox.topLeftCorner.style.top).toBe('42px');
+
+    // The host narrows the frame and the chip wraps from two lines to four.
+    summary.offsetHeight = 79;
+    sandbox.resizeObserved(sandbox.summaryEl);
+    expect(sandbox.topLeftCorner.style.top).toBe('87px');
   });
 });
 

@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **`render_map_tool`: the summary chip no longer covers the zoom buttons after the map frame narrows (#326, fixes #307).** #278 moved the zoom and layer buttons below the chip when it appears, but measured the chip only then. When a host narrowed the frame or switched display mode afterwards, the chip wrapped to more lines and covered the buttons again: at 200 px wide, a click on + landed on the chip. A `ResizeObserver` on the chip now re-places the buttons whenever its size changes. Browsers without `ResizeObserver` keep the old behavior.
+
 ### Maintenance
 
 - **OpenTelemetry JS 3.x (#325).** `@opentelemetry/sdk-trace-base` is deprecated in every 2.x release and removed in 3.0, and the ox-security scan flagged it on every PR touching `package.json` (#319). Moves the OpenTelemetry set to the 3.0 line: `sdk-trace` 3.0.0 in place of `sdk-trace-base`, `resources` 3.0.0, `sdk-node`, `instrumentation` and `exporter-trace-otlp-http` 0.300.0, `auto-instrumentations-node` 0.82.0 and `api` 1.10.0. 3.1.0 came out the day before, so this stays on 3.0.0 for now.
