@@ -9,6 +9,7 @@ import { InlinePayloadResource } from './inline-payload/InlinePayloadResource.js
 import { ToolResponseResource } from './tool-response/ToolResponseResource.js';
 import { MapAppUIResource } from './ui-apps/MapAppUIResource.js';
 import { StaticMapViewerUIResource } from './ui-apps/StaticMapViewerUIResource.js';
+import { HomeUIResource } from './ui-apps/HomeUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { PlacePhotoResource } from './place-photo/PlacePhotoResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
@@ -25,6 +26,8 @@ export const ALL_RESOURCES = [
   new MapAppUIResource({ httpRequest }),
   // Full-width viewer for static_map_image_tool's image.
   new StaticMapViewerUIResource(),
+  // ChatGPT sidebar home page, targeted by mapbox_home_tool.
+  new HomeUIResource({ httpRequest }),
   // Photos for the map app's results carousel, which its CSP can't load directly.
   new PlacePhotoResource({ httpRequest }),
   new VersionResource()

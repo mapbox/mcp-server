@@ -1,5 +1,15 @@
 ## Unreleased
 
+### New Features
+
+- **ChatGPT sidebar app: `mapbox_home_tool` (#316).** Adds **Mapbox** to ChatGPT's sidebar through the [OpenAI MCP Extensions](https://developers.openai.com/plugins/build/extensions) global entrypoint (`_meta["openai/ui"].entrypoints`). It opens a fullscreen home page (`ui://mapbox/home/index.html`) that hands work to the chat rather than copying Mapbox Studio:
+  - **Start with ChatGPT:** starter tasks (route, nearby places, travel-time area, multi-stop trip) open a new chat with an editable, unsent draft (`ui/message` with `"openai/message": { target: "new", send: false }`). Drafts start with `@Mapbox`; set `MAPBOX_CHATGPT_PLUGIN_NAME` when the plugin has another name in ChatGPT.
+  - **Your styles:** the four most recently modified styles with Static Images thumbnails, or a default cover when the API can't render one. "Preview" opens a fullscreen, interactive map of the style (`/styles/{owner}/{id}`; GL JS loads only then). "Ask about it" opens a new chat with the style (or tileset) as a titled item after the plugin mention, plus the preview's current view.
+  - **Account pages:** `/styles`, `/tilesets` and `/tokens` list up to 100 entries each with a filter, refresh and "Open in Studio" links, and open from deep links (`hostContext["openai/deepLink"]`).
+  - **Read-only and app-only** (`_meta.ui.visibility: ["app"]`). The server fetches the lists with the caller's token; only `pk.` tokens are returned. Each list needs its own scope (`styles:list`, `tilesets:list`, `tokens:read`); a list that fails shows the missing scope and the others still load.
+- **"Explore map" quick action: `map_explorer_tool` (#316).** A quick action on the Mapbox sidebar entry opens the existing map app fullscreen with a place search box; each search runs the same Search Box self-fetch as `search_and_geocode_tool` results, biased toward the map center. App-only, so the model never sees it.
+- Both tools use a square Mapbox mark icon, since the sidebar would otherwise fall back to the wide server logo. `BaseTool` now passes `icons` and typed `_meta` (`ui.visibility`, `openai/ui` entrypoints and quick actions) through to `registerTool`. Hosts without the extension ignore the `openai/ui` metadata.
+
 ## 0.17.0 - 2026-11-06
 
 ## 0.17.0-dev.3 - 2026-11-05

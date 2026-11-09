@@ -6,12 +6,43 @@ import type {
   RegisteredTool,
   ToolAnnotations,
   CallToolResult,
+  Icon,
   ServerContext
 } from '@modelcontextprotocol/server';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { lenientOutputSchema } from './lenientOutputSchema.js';
 import type { ZodTypeAny } from 'zod';
 import type { z } from 'zod';
+
+export type ToolMeta = {
+  ui?: {
+    resourceUri?: string;
+    visibility?: Array<'model' | 'app'>;
+    csp?: {
+      connectDomains?: string[];
+      resourceDomains?: string[];
+      frameDomains?: string[];
+      workerDomains?: string[];
+    };
+  };
+  /**
+   * OpenAI MCP Extensions: lets users open the app from ChatGPT's sidebar
+   * (`global`) or a conversation's side panel (`thread`).
+   * https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#mcp-app-entrypoints
+   */
+  'openai/ui'?: {
+    entrypoints: Array<
+      { type: 'global'; quickAction?: QuickAction } | { type: 'thread' }
+    >;
+  };
+};
+
+/** A shortcut shown next to a global entrypoint that calls a tool. */
+export type QuickAction = {
+  title: string;
+  icons?: Icon[];
+  target: { type: 'tool'; name: string; arguments: Record<string, unknown> };
+};
 
 export abstract class BaseTool<
   InputSchema extends ZodTypeAny,
@@ -23,17 +54,8 @@ export abstract class BaseTool<
 
   readonly inputSchema: InputSchema;
   readonly outputSchema?: OutputSchema;
-  readonly meta?: {
-    ui?: {
-      resourceUri?: string;
-      csp?: {
-        connectDomains?: string[];
-        resourceDomains?: string[];
-        frameDomains?: string[];
-        workerDomains?: string[];
-      };
-    };
-  };
+  readonly meta?: ToolMeta;
+  readonly icons?: Icon[];
   /**
    * The most recently installed server. Used as a fallback when `run()` is
    * called directly rather than through a callback registered by `installTo()`.
@@ -80,17 +102,8 @@ export abstract class BaseTool<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       outputSchema?: any;
       annotations?: ToolAnnotations;
-      _meta?: {
-        ui?: {
-          resourceUri?: string;
-          csp?: {
-            connectDomains?: string[];
-            resourceDomains?: string[];
-            frameDomains?: string[];
-            workerDomains?: string[];
-          };
-        };
-      };
+      icons?: Icon[];
+      _meta?: ToolMeta;
     } = {
       title: this.annotations.title,
       description: this.description,
@@ -109,6 +122,9 @@ export abstract class BaseTool<
     // Add _meta for MCP Apps support if provided (includes CSP configuration)
     if (this.meta) {
       config._meta = this.meta;
+    }
+    if (this.icons) {
+      config.icons = this.icons;
     }
 
     return server.registerTool(
