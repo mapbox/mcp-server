@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.17.1-dev.1 - 2026-11-09
+
 ### Bug Fixes
 
 - **Big maps failed in ChatGPT with "cannot read resource outside its widget scope" (#327).** Isochrones for every store of a coffee chain, across three travel modes, made a map payload over 50 KB. Above that size `render_map_tool` leaves the payload out of `structuredContent` and only sends a `mapbox://temp/` ref, and ChatGPT only lets the widget read resources in its own `ui://` scope, so the map couldn't load it. `render_map_tool` now also puts a payload that big in the result's `_meta.ui.payload`, which hosts pass to the map but not to the model, and which the map already checks before the ref.
