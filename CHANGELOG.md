@@ -2,6 +2,7 @@
 
 ### Bug Fixes
 
+- **Big maps failed in ChatGPT with "cannot read resource outside its widget scope" (#327).** Isochrones for every store of a coffee chain, across three travel modes, made a map payload over 50 KB. Above that size `render_map_tool` leaves the payload out of `structuredContent` and only sends a `mapbox://temp/` ref, and ChatGPT only lets the widget read resources in its own `ui://` scope, so the map couldn't load it. `render_map_tool` now also puts a payload that big in the result's `_meta.ui.payload`, which hosts pass to the map but not to the model, and which the map already checks before the ref.
 - **`render_map_tool`: the summary chip no longer covers the zoom buttons after the map frame narrows (#326, fixes #307).** #278 moved the zoom and layer buttons below the chip when it appears, but measured the chip only then. When a host narrowed the frame or switched display mode afterwards, the chip wrapped to more lines and covered the buttons again: at 200 px wide, a click on + landed on the chip. A `ResizeObserver` on the chip now re-places the buttons whenever its size changes. Browsers without `ResizeObserver` keep the old behavior.
 
 ### Maintenance
