@@ -3,11 +3,11 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import {
-  BasicTracerProvider,
+  TracerProvider,
   SimpleSpanProcessor,
   type ReadableSpan,
   type SpanExporter
-} from '@opentelemetry/sdk-trace-base';
+} from '@opentelemetry/sdk-trace';
 import { ExportResultCode, type ExportResult } from '@opentelemetry/core';
 import { SpanKind } from '@opentelemetry/api';
 import { RedactingSpanExporter } from '../../src/utils/redactingSpanExporter.js';
@@ -43,8 +43,8 @@ function endedSpanWith(
   attributes: Record<string, string | number>
 ): ReadableSpan {
   const captured = new CapturingExporter();
-  const provider = new BasicTracerProvider({
-    spanProcessors: [new SimpleSpanProcessor(captured)]
+  const provider = new TracerProvider({
+    spanProcessors: [new SimpleSpanProcessor({ exporter: captured })]
   });
 
   const span = provider
