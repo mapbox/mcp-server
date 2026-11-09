@@ -464,10 +464,12 @@ export function renderHomeAppHtml(params: {
   }
 
   // A new chat with an editable draft; nothing is sent until the user does.
+  // The mention is its own part: once ChatGPT turns it into a chip, text in
+  // the same part after it is dropped.
   function startChat(prompt) {
     request('ui/message', {
       role: 'user',
-      content: [{ type: 'text', text: prompt }],
+      content: [{ type: 'text', text: MENTION }, { type: 'text', text: prompt }],
       _meta: { 'openai/message': { target: 'new', send: false } }
     }).catch(function() { toast("Couldn't open a new chat."); });
   }
@@ -668,7 +670,7 @@ export function renderHomeAppHtml(params: {
     var box = $('starters');
     if (box.children.length) return;
     STARTERS.forEach(function(s) {
-      var b = button('', 'starter', function() { startChat(MENTION + s.prompt); });
+      var b = button('', 'starter', function() { startChat(s.prompt); });
       var icon = el('span', 'starter-icon');
       icon.innerHTML = ICON_OPEN + (ICONS[s.icon] || '') + '</svg>';
       b.appendChild(icon);
