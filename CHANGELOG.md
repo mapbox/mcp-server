@@ -3,6 +3,14 @@
 ### Bug Fixes
 
 - **Big maps failed in ChatGPT with "cannot read resource outside its widget scope" (#327).** Isochrones for every store of a coffee chain, across three travel modes, made a map payload over 50 KB. Above that size `render_map_tool` leaves the payload out of `structuredContent` and only sends a `mapbox://temp/` ref, and ChatGPT only lets the widget read resources in its own `ui://` scope, so the map couldn't load it. `render_map_tool` now also puts a payload that big in the result's `_meta.ui.payload`, which hosts pass to the map but not to the model, and which the map already checks before the ref.
+- **`render_map_tool`: the summary chip no longer covers the zoom buttons after the map frame narrows (#326, fixes #307).** #278 moved the zoom and layer buttons below the chip when it appears, but measured the chip only then. When a host narrowed the frame or switched display mode afterwards, the chip wrapped to more lines and covered the buttons again: at 200 px wide, a click on + landed on the chip. A `ResizeObserver` on the chip now re-places the buttons whenever its size changes. Browsers without `ResizeObserver` keep the old behavior.
+
+### Maintenance
+
+- **OpenTelemetry JS 3.x (#325).** `@opentelemetry/sdk-trace-base` is deprecated in every 2.x release and removed in 3.0, and the ox-security scan flagged it on every PR touching `package.json` (#319). Moves the OpenTelemetry set to the 3.0 line: `sdk-trace` 3.0.0 in place of `sdk-trace-base`, `resources` 3.0.0, `sdk-node`, `instrumentation` and `exporter-trace-otlp-http` 0.300.0, `auto-instrumentations-node` 0.82.0 and `api` 1.10.0. 3.1.0 came out the day before, so this stays on 3.0.0 for now.
+  - **Code:** `ConsoleSpanExporter`, `ReadableSpan` and `SpanExporter` now come from `sdk-trace`. In the test, `BasicTracerProvider` is now `TracerProvider`, and `SimpleSpanProcessor` takes `{ exporter }`.
+  - **Node:** `engines` is now `>=22.15.0`, the 3.x minimum (it was `>=22`).
+  - **Checked:** the built server, both ESM and CommonJS, sends the same `config.load_env` and `tool.distance_tool` spans and the same metrics to a local OTLP endpoint as 0.17.0 does.
 
 ## 0.17.0 - 2026-11-06
 

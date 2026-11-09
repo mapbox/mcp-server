@@ -931,6 +931,13 @@ ${initialDataScript}
       ? (summaryEl.offsetHeight + 8) + 'px'
       : '';
   }
+  // The chip's height isn't fixed: it wraps to more lines when the host
+  // narrows the frame or switches display mode after it's shown, and then
+  // covered the zoom buttons again (#307). Follow its size, not just the
+  // moment it appears.
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(placeTopLeftControls).observe(summaryEl);
+  }
 
   // The payload's legend rows, and below them the traffic scale while
   // traffic is on.
