@@ -192,7 +192,10 @@ describe('homeAppHtml', () => {
     const message = sent.find((m) => m.method === 'ui/message');
     expect(message?.params).toEqual({
       role: 'user',
-      content: [{ type: 'text', text: `@Mapbox ${HOME_STARTERS[0].prompt}` }],
+      content: [
+        { type: 'text', text: '@Mapbox ' },
+        { type: 'text', text: HOME_STARTERS[0].prompt }
+      ],
       _meta: { 'openai/message': { target: 'new', send: false } }
     });
   });
@@ -203,7 +206,7 @@ describe('homeAppHtml', () => {
     const message = sent.find((m) => m.method === 'ui/message');
     expect(
       (message?.params as { content: Array<{ text: string }> }).content[0].text
-    ).toBe(`@MCP-dev ${HOME_STARTERS[1].prompt}`);
+    ).toBe('@MCP-dev ');
   });
 
   it('previews the most recently modified styles and asks about one in a new chat', () => {
