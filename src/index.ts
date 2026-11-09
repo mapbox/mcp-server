@@ -22,6 +22,8 @@ import {
 } from './tools/toolRegistry.js';
 import { getAllResources } from './resources/resourceRegistry.js';
 import { getAllPrompts, getPromptByName } from './prompts/promptRegistry.js';
+import { getSkillsForTools } from './skills/skillRegistry.js';
+import { installSkillsTo } from './skills/skillsExtension.js';
 import { completePromptArgument } from './completions/index.js';
 import { getVersionInfo } from './utils/versionUtils.js';
 import { buildServerInstructions } from './utils/serverInstructions.js';
@@ -89,6 +91,18 @@ const enabledResourceFallbackTools = filterTools(resourceFallbackTools, config);
 // Get all resources
 const allResources = getAllResources();
 
+const enabledToolNames = [
+  ...enabledCoreTools,
+  ...enabledElicitationTools,
+  ...enabledResourceFallbackTools
+].map((tool) => tool.name);
+
+// Skills whose tools are all enabled (MCP Skills extension, SEP-2640),
+// unless --disable-skills or DISABLE_SKILLS=true turned them off
+const enabledSkills = config.disableSkills
+  ? []
+  : getSkillsForTools(enabledToolNames);
+
 // Create an MCP server
 const server = new McpServer(
   {
@@ -110,13 +124,7 @@ const server = new McpServer(
     ]
   },
   {
-    instructions: buildServerInstructions(
-      [
-        ...enabledCoreTools,
-        ...enabledElicitationTools,
-        ...enabledResourceFallbackTools
-      ].map((tool) => tool.name)
-    ),
+    instructions: buildServerInstructions(enabledToolNames),
     capabilities: {
       tools: {
         listChanged: true // Advertise support for dynamic tool registration (ready for future capability-dependent tools)
@@ -283,6 +291,13 @@ async function main() {
       });
     });
   };
+
+  // Skills (MCP Skills extension, SEP-2640). Loading is async, so it
+  // happens here rather than with the other registrations, but still
+  // before connect(), which the extension requires.
+  if (enabledSkills.length > 0) {
+    await installSkillsTo(server, enabledSkills);
+  }
 
   // Start receiving messages on stdin and sending messages on stdout
   const transport = new StdioServerTransport();
