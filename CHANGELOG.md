@@ -2,7 +2,10 @@
 
 ### Bug Fixes
 
-- **`feedback_tool`: description now matches the Feedback API docs (#329).** The tool told the model each report "may be billed", and a duplicate result said a second report "would only add a charge". The [Feedback API](https://docs.mapbox.com/api/feedback/) is free during Public Preview; the $0.02 per item applies to Feedback Agent at General Availability. The description now says the report is filed under the user's own Mapbox account, where Mapbox reviews it, and the duplicate check is explained as avoiding a second report of the same problem. Adds `routing_issue`, the general routing category the API docs use, to the category list. The README says the same.
+- **`feedback_tool`: says where feedback goes, per the Feedback API docs (#329).** The Feedback API is how end users of a developer's app send feedback to that developer. Items land in the token owner's account (Feedback Agent, Feedback Explorer), not with Mapbox. The tool presented itself as reporting map problems to Mapbox, which "may fix the data".
+  - **Description:** now says it sends the user's feedback to the developer of the app or agent, filed under the token owner's account, and does not report to Mapbox. That's the case it's for: a developer who builds an app or agent on this server with their own token gets their users' feedback in Feedback Explorer. The confirmation prompt, the result text and the README say the same.
+  - **Billing:** the tool told the model each item "may be billed", and a duplicate result said a second one "would only add a charge". The API is free during Public Preview; the $0.02 per item applies to Feedback Agent at General Availability. The duplicate check is now explained as avoiding filing the same problem twice.
+  - **Categories:** adds `routing_issue`, the general routing category the API docs use.
 
 ## 0.17.1-dev.1 - 2026-11-09
 
