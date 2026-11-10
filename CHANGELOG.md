@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **`list_public_tokens_tool`: asks the model to copy the token exactly and check the copy (#PR).** A dashboard ChatGPT built for For Five failed with "invalid Mapbox access token": the tool returned the right token, but the model retyped it into the page and changed a character, which is easy with about 90 characters of base64. The result now says to copy the token exactly, never retyped, and, when the agent wrote it into a file and can run commands, to check the copy from that file: `grep` the `pk.` token out of the file and call `GET /tokens/v2`, which returns `TokenValid`, or `TokenInvalid` when a character changed. Checked against the live API with a valid token and one with a single character changed.
+
 ## 0.17.1-dev.1 - 2026-11-09
 
 ### Bug Fixes
