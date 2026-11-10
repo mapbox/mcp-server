@@ -1,5 +1,12 @@
 ## Unreleased
 
+### Features
+
+- **`report_tool`: send feedback about the MCP server to Mapbox (#330).** The model can pass on a bug, a wrong or confusing tool result, a missing capability or a suggestion to the team that builds the server. It uses `POST /user-feedback/v1/cli-feedback`, the undocumented Feedback API endpoint added for the Mapbox CLI's `mapbox report` (see its [spec](https://github.com/mapbox/mapbox-cli/blob/main/custom-openapi/report/openapi/report.yaml)), which files the report under Mapbox's own account with any valid token and no extra scope. It isn't for wrong map data: routing those reports to the data teams needs their agreement and a triage pipeline first.
+  - **Fields:** the text, a category (`bug`, `wrong_result`, `feature_request` or `other`) and an optional tool name. The endpoint requires a location, which feedback about the server doesn't have, so it sends 0, 0 as the CLI does.
+  - **Where it came from:** the server appends `— mapbox-mcp-server <version> via <client> <version>, about <tool>` to the text, so the team can tell these from the CLI's reports. The client comes from the server handling the call, which the hosted server needs, since one process serves many clients.
+  - **Confirmation:** like `feedback_tool`, it asks through elicitation when the client supports it and sends nothing if the user declines or the prompt fails. It sends its own id, so a retried POST doesn't make a second report.
+
 ### Bug Fixes
 
 - **`feedback_tool`: says where feedback goes, per the Feedback API docs (#329).** The Feedback API is how end users of a developer's app send feedback to that developer. Items land in the token owner's account (Feedback Agent, Feedback Explorer), not with Mapbox. The tool presented itself as reporting map problems to Mapbox, which "may fix the data".
