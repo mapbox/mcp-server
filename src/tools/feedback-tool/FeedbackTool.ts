@@ -23,6 +23,12 @@ type Confirmation = 'confirmed' | 'declined' | 'not-asked';
 const DUPLICATE_WINDOW_DAYS = 30;
 const DUPLICATE_RADIUS_METERS = 50;
 
+/**
+ * The Feedback API requires lat/lon. For feedback without a place, the
+ * Feedback API team asked us to send 0, 0 until location becomes optional.
+ */
+const NO_LOCATION = { latitude: 0, longitude: 0 };
+
 type DuplicateCheck =
   | { kind: 'duplicate'; item: FeedbackOutput }
   | { kind: 'none' }
@@ -45,8 +51,8 @@ export class FeedbackTool extends MapboxApiBasedTool<
     'Use it only when the user asks to send feedback, or agrees when you offer. ' +
     'Before calling it, show the user the exact feedback text, category and location you will send ' +
     'and get their go-ahead. ' +
-    'Take the coordinates from an earlier search, place or directions result rather than guessing; ' +
-    'for feedback about the app itself, use the place the user was looking at. ' +
+    'Take the coordinates from an earlier search, place or directions result rather than guessing, ' +
+    'and leave them out when the feedback is not about a place, such as most feedback about the app itself. ' +
     'Send one report per problem, and do not resend one that already succeeded. ' +
     "To avoid filing the same problem twice, the tool first checks the account's own " +
     `reports from the last ${DUPLICATE_WINDOW_DAYS} days and does not send if one with the same category ` +
@@ -83,14 +89,15 @@ export class FeedbackTool extends MapboxApiBasedTool<
     if (!server || !supportsElicitation) return 'not-asked';
 
     try {
-      const { longitude, latitude } = input.coordinates;
       const result = await server.server.elicitInput({
         mode: 'form',
         message:
           'Send this feedback?\n\n' +
           `"${input.feedback}"\n` +
           `Category: ${input.category}\n` +
-          `Location: ${latitude}, ${longitude}`,
+          (input.coordinates
+            ? `Location: ${input.coordinates.latitude}, ${input.coordinates.longitude}`
+            : 'Location: none'),
         requestedSchema: {
           type: 'object',
           properties: {
@@ -123,6 +130,10 @@ export class FeedbackTool extends MapboxApiBasedTool<
     input: FeedbackInput,
     accessToken: string
   ): Promise<DuplicateCheck> {
+    // Reports without a place are all at 0, 0, so distance can't tell them apart.
+    if (!input.coordinates) {
+      return { kind: 'unchecked', reason: 'the feedback has no location' };
+    }
     const url = new URL(
       'user-feedback/v1/feedback',
       MapboxApiBasedTool.mapboxApiEndpoint
@@ -215,12 +226,13 @@ export class FeedbackTool extends MapboxApiBasedTool<
     // The pipeline's RetryPolicy retries 5xx and 429 responses, POSTs
     // included. Picking the id here means a retry resends the same item
     // rather than a second one.
+    const { latitude, longitude } = input.coordinates ?? NO_LOCATION;
     const body = {
       id: randomUUID(),
       feedback: input.feedback,
       category: input.category,
-      lat: input.coordinates.latitude,
-      lon: input.coordinates.longitude
+      lat: latitude,
+      lon: longitude
     };
 
     const url = new URL(

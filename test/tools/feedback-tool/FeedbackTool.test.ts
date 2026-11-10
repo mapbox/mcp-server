@@ -157,6 +157,24 @@ describe('FeedbackTool', () => {
     });
   });
 
+  it('sends 0, 0 when the feedback has no location', async () => {
+    const { httpRequest, mockHttpRequest } = setupFeedbackApi();
+    const { coordinates: _omit, ...appFeedback } = input;
+
+    const result = await new FeedbackTool({ httpRequest }).run({
+      ...appFeedback,
+      feedback: 'The map takes a long time to load.',
+      category: 'application_issue'
+    });
+
+    expect(result.isError).toBe(false);
+    const [[, init]] = postCalls(mockHttpRequest);
+    expect(JSON.parse(init.body)).toMatchObject({ lat: 0, lon: 0 });
+    // Every report without a place is at 0, 0, so there's nothing to compare.
+    expect(listCalls(mockHttpRequest)).toHaveLength(0);
+    expect(textOf(result)).toContain('the feedback has no location');
+  });
+
   it('uses a new id for each call', async () => {
     const { httpRequest, mockHttpRequest } = setupFeedbackApi();
     const tool = new FeedbackTool({ httpRequest });
@@ -383,6 +401,19 @@ describe('FeedbackTool', () => {
       expect(request.message).toContain('37.7825, -122.4057');
       expect(postCalls(mockHttpRequest)).toHaveLength(1);
       expect(result.isError).toBe(false);
+    });
+
+    it('shows no location when the feedback has none', async () => {
+      const { httpRequest } = setupFeedbackApi();
+      const tool = new FeedbackTool({ httpRequest });
+      const mockServer = createMockServer({ elicitation: true });
+      tool.installTo(mockServer);
+      const { coordinates: _omit, ...appFeedback } = input;
+
+      await tool.run({ ...appFeedback, category: 'application_issue' });
+
+      const request = mockServer.server.elicitInput.mock.calls[0][0];
+      expect(request.message).toContain('Location: none');
     });
 
     it.each([

@@ -64,9 +64,11 @@ export const FeedbackInputSchema = z.object({
         '- traffic_issue / false_negative_traffic_issue / false_positive_traffic_issue: traffic shown wrong (missed congestion, or congestion that is not there)\n' +
         '- application_issue: anything about the app itself rather than the map data, such as a bug, a confusing screen or a suggestion'
     ),
-  coordinates: coordinateSchema.describe(
-    'Where the feedback is about: the place or the spot on the route, usually taken from an earlier search or directions result. For feedback about the app itself, the place the user was looking at. Do not guess.'
-  ),
+  coordinates: coordinateSchema
+    .optional()
+    .describe(
+      'Where the feedback is about: the place or the spot on the route, usually taken from an earlier search or directions result. Do not guess. Leave it out when the feedback is not about a place, such as most feedback about the app itself.'
+    ),
   send_anyway: z
     .boolean()
     .optional()
