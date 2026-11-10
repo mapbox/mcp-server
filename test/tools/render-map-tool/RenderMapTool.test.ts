@@ -172,6 +172,13 @@ describe('RenderMapTool', () => {
     };
     expect(sc.mapboxRender?.ref).toMatch(/^mapbox:\/\/temp\/map-payload-/);
     expect(sc.mapboxRender?.layers).toBeUndefined();
+    // ChatGPT won't let the widget read the mapbox://temp/ ref, so the
+    // payload rides in _meta, which the widget gets and the model doesn't.
+    const meta = result._meta as {
+      ui?: { payload?: { summary?: string; layers?: unknown[] } };
+    };
+    expect(meta.ui?.payload?.summary).toBe('Huge test');
+    expect(meta.ui?.payload?.layers).toHaveLength(1);
   });
 
   it('rejects coordinates that are not [lng, lat] pairs', async () => {

@@ -249,6 +249,13 @@ export class RenderMapTool extends BaseTool<
           toolContext.span.setStatus({ code: SpanStatusCode.OK });
           toolContext.span.end();
 
+          // A payload too big to inline is left out of structuredContent,
+          // which the model sees too. ChatGPT only lets the widget read
+          // resources inside its own ui:// scope, so the mapbox://temp/ ref
+          // fails there. Hand the widget the payload in _meta instead:
+          // hosts pass it to the app but not to the model.
+          const tooBigToInline = payloadBytes > MAX_INLINE_PAYLOAD_BYTES;
+
           return {
             content,
             structuredContent: {
@@ -258,6 +265,7 @@ export class RenderMapTool extends BaseTool<
               summary: payload.summary,
               mapboxRender
             },
+            ...(tooBigToInline ? { _meta: { ui: { payload } } } : {}),
             isError: false
           };
         } catch (error) {

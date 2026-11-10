@@ -1,7 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
+import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace';
 import type { ExportResult } from '@opentelemetry/core';
 import type { Attributes } from '@opentelemetry/api';
 import { redactToken } from './redactToken.js';
