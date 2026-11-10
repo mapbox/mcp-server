@@ -123,22 +123,6 @@ describe('ReportTool', () => {
     );
   });
 
-  it('sends the place for data quality feedback', async () => {
-    const { httpRequest, mockHttpRequest } = setupReportApi();
-
-    await new ReportTool({ httpRequest }).run({
-      feedback: 'Blue Bottle Coffee at 66 Mint St has closed.',
-      category: 'data_quality',
-      coordinates: { longitude: -122.4057, latitude: 37.7825 }
-    });
-
-    expect(sentBody(mockHttpRequest)).toMatchObject({
-      category: 'data_quality',
-      lat: 37.7825,
-      lon: -122.4057
-    });
-  });
-
   it('returns an error when the API rejects the report', async () => {
     const { httpRequest } = setupReportApi({
       status: 401,
@@ -163,12 +147,12 @@ describe('ReportTool', () => {
     });
   });
 
-  it('rejects an unknown category', async () => {
+  it('rejects a category it does not take, such as data_quality', async () => {
     const { httpRequest, mockHttpRequest } = setupReportApi();
 
     const result = await new ReportTool({ httpRequest }).run({
       ...input,
-      category: 'poi_closed'
+      category: 'data_quality'
     });
 
     expect(result.isError).toBe(true);

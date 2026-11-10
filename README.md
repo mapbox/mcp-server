@@ -535,13 +535,13 @@ Each report may be billed ($0.02 per item once the Feedback API leaves Public Pr
 
 #### Report tool
 
-Sends feedback about the Mapbox MCP server itself to the Mapbox team that builds it: a bug, a tool that gave a wrong or confusing result, a missing capability or a suggestion, or a Mapbox data quality problem. Unlike the feedback tool, the report is filed under Mapbox's own account, not yours, so it needs no extra token scope, and it can't be read back or withdrawn afterward. The data quality category takes an optional location; without one the report is sent at 0, 0.
+Sends feedback about the Mapbox MCP server itself to the Mapbox team that builds it: a bug, a tool that gave a wrong or confusing result, a missing capability or a suggestion. It's filed under Mapbox's own account, not yours, so it needs no extra token scope, and it can't be read back or withdrawn afterward. It isn't for reporting wrong map, place or routing data.
 
 The server adds its version, the client's name and version, and the tool the feedback is about to the end of the text. Nothing is sent without the user's go-ahead: clients that support elicitation show a confirmation prompt first, and the tool description asks the model to confirm in chat everywhere else.
 
 It uses the endpoint the Feedback API team added for the [Mapbox CLI](https://github.com/mapbox/mapbox-cli)'s `mapbox report` command. To leave the tool out, start the server with `--disable-tools report_tool`.
 
-**Example Usage**: "The directions tool sent me over a bridge that's been closed for months. Can you let the Mapbox team know?"
+**Example Usage**: "The map didn't draw any of my isochrones. Can you let the Mapbox MCP team know?"
 
 #### List public tokens tool
 

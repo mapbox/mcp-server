@@ -30,11 +30,9 @@ export class ReportTool extends MapboxApiBasedTool<
   name = 'report_tool';
   description =
     'Send feedback about the Mapbox MCP server to the Mapbox team that builds it: a bug, a tool that ' +
-    'failed or gave a wrong or confusing result, a missing capability or a suggestion, or a Mapbox data ' +
-    "quality problem the user noticed. It goes to Mapbox, not to the user's account, needs no special " +
-    'token scope, and cannot be read back or withdrawn afterward. ' +
-    'For a wrong place, road or route the user wants filed under their own Mapbox account, use feedback_tool; ' +
-    'if feedback_tool fails because the token lacks user-feedback:write, this tool can send it to Mapbox instead. ' +
+    'failed or gave a wrong or confusing result, a missing capability or a suggestion. It goes to Mapbox, ' +
+    "not to the user's account, needs no special token scope, and cannot be read back or withdrawn afterward. " +
+    'It is for feedback about this server, not for reporting wrong map, place or routing data. ' +
     'Use it only when the user asks to send feedback, or agrees when you offer. Before calling it, show the ' +
     'user the exact text you will send and get their go-ahead. Leave out personal details the user did not ' +
     'ask to share. The server adds its own version and the client name. Send one report per problem, and do ' +
@@ -72,10 +70,7 @@ export class ReportTool extends MapboxApiBasedTool<
           'Send this feedback to Mapbox?\n\n' +
           `"${input.feedback}"\n` +
           `Category: ${input.category}` +
-          (input.tool_name ? `\nTool: ${input.tool_name}` : '') +
-          (input.coordinates
-            ? `\nLocation: ${input.coordinates.latitude}, ${input.coordinates.longitude}`
-            : ''),
+          (input.tool_name ? `\nTool: ${input.tool_name}` : ''),
         requestedSchema: {
           type: 'object',
           properties: {
@@ -130,15 +125,16 @@ export class ReportTool extends MapboxApiBasedTool<
       };
     }
 
-    // The endpoint still requires lat/lon; feedback with no place sends 0, 0
-    // as the CLI does. Picking the id here means a retry of a 5xx or 429
-    // resends the same item rather than a second one.
+    // The endpoint still requires lat/lon, which feedback about the server
+    // doesn't have, so it sends 0, 0 as the CLI does. Picking the id here
+    // means a retry of a 5xx or 429 resends the same item rather than a
+    // second one.
     const body = {
       id: randomUUID(),
       feedback: input.feedback + this.signature(input),
       category: input.category,
-      lat: input.coordinates?.latitude ?? 0,
-      lon: input.coordinates?.longitude ?? 0
+      lat: 0,
+      lon: 0
     };
 
     const url = new URL(

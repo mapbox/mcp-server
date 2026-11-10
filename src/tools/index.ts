@@ -107,7 +107,7 @@ export const distance = new DistanceTool();
 /** Report a map, place or routing data problem to Mapbox */
 export const feedback = new FeedbackTool({ httpRequest });
 
-/** Send feedback about the MCP server, or a data problem, to Mapbox */
+/** Send feedback about the MCP server to Mapbox */
 export const report = new ReportTool({ httpRequest });
 
 /** Ground AI responses in live Mapbox location data */
