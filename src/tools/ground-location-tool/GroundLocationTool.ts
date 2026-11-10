@@ -421,7 +421,7 @@ export class GroundLocationTool extends MapboxApiBasedTool<
       contours_minutes,
       limit,
       language,
-      include = ['land']
+      include = []
     } = input;
 
     // Classify the grounding strategy via sampling (falls back gracefully if unsupported)

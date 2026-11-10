@@ -57,7 +57,7 @@ export const GroundLocationInputSchema = z.object({
         '"water" for whether it is on water and how far the nearest water is; ' +
         '"elevation" for height above sea level; ' +
         '"traffic" for live congestion on the roads around it. ' +
-        'Pick what the question needs, e.g. ["traffic"] for "how bad is traffic at this address?". Defaults to ["land"].'
+        'Pick what the question needs, e.g. ["traffic"] for "how bad is traffic at this address?". Leave out when the question is only about the area or nearby places.'
     )
 });
 

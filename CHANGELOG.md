@@ -3,11 +3,11 @@
 ### New Features
 
 - **`ground_location_tool`: land use, water, elevation and live traffic at the point, picked with `include` (#324).** "Is this spot in a park?", "is this on the water?" or "how bad is traffic at this address?" had no answer: the tool named the neighborhood and nearby POIs, but not what the spot itself is. Folded in here rather than new tools, so the model doesn't have more "what's here" tools to pick between, and new layers become new `include` values instead of new tools.
-  - **`include`:** `land`, `water`, `elevation` and `traffic`, each its own request, run in parallel with the existing calls. The model picks what the question needs; left out, it's `["land"]`. A failed request leaves its field out instead of failing the answer.
-  - **`land`:** a point-in-polygon Tilequery on Mapbox Streets v8 for land use (park, cemetery, school, residential, wood...), protected areas (national parks, with names) and the building the point is in (type, height). Streets park polygons have no names, so a city park is just "park".
+  - **`include`:** `land`, `water`, `elevation` and `traffic`, each its own request, run in parallel with the existing calls. The model picks what the question needs; left out, none are requested, so existing calls such as "coffee nearby" make no extra requests. A failed request, including a network error, leaves its field out instead of failing the answer.
+  - **`land`:** a point-in-polygon Tilequery on Mapbox Streets v8 for land use (park, cemetery, school, residential, wood...), protected areas (national parks, with names) and the building the point is in (type, height). Wetlands, which Streets keeps in the same overlay layer as national parks, are reported as land use. Streets park polygons have no names, so a city park is just "park".
   - **`water`:** a 500 m radius Tilequery on `water,waterway`: on water, or the distance to the nearest water.
   - **`elevation`:** one Terrain-DEM tile, read with `elevation_tool`'s decoder (#293).
-  - **`traffic`:** a 100 m radius Tilequery on Mapbox Traffic v1: live congestion (low, moderate, heavy, severe) per road class, at its worst, nearest first. The tiles have road classes but no street names, and quiet streets often have no data, so an empty list says no data rather than no traffic.
+  - **`traffic`:** a 100 m radius Tilequery on Mapbox Traffic v1: live congestion (low, moderate, heavy, severe) per road class, at its worst, with the distance to that worst segment, nearest first. The tiles have road classes but no street names, and quiet streets often have no data, so an empty list says no data rather than no traffic.
   - **Evals:** new tool-selection cases for land use, water, elevation and traffic questions.
 
 ## 0.17.0 - 2026-11-06

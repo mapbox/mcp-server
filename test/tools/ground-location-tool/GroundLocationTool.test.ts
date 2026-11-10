@@ -115,9 +115,9 @@ describe('GroundLocationTool', () => {
     const text = (result.content[0] as { type: string; text: string }).text;
     expect(text).toContain('Mission District');
     expect(text).toContain('neighborhood context');
-    // geocode, isochrone and the default land Tilequery; no category
-    // search (no query)
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    // geocode and isochrone only: no category search (no query) and no
+    // ground facets (no include)
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('performs category search when query is provided', async () => {
@@ -441,7 +441,7 @@ describe('GroundLocationTool', () => {
     const textOf = (result: { content: unknown[] }) =>
       (result.content[0] as { text: string }).text;
 
-    it('defaults to land: one point-in-polygon query on Streets', async () => {
+    it('asks for nothing about the ground when include is left out', async () => {
       const { tool, mockFetch } = setupMockHttp({
         'geocode/v6/reverse': geocodeResponse,
         'isochrone/v1': isochroneResponse,
@@ -451,6 +451,24 @@ describe('GroundLocationTool', () => {
       const result = await tool.run({
         longitude: -122.4862,
         latitude: 37.7694
+      });
+
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toBeUndefined();
+      expect(tilequeryUrls(mockFetch)).toEqual([]);
+    });
+
+    it('land: one point-in-polygon query on Streets', async () => {
+      const { tool, mockFetch } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'isochrone/v1': isochroneResponse,
+        'mapbox-streets-v8/tilequery': parkInside
+      });
+
+      const result = await tool.run({
+        longitude: -122.4862,
+        latitude: 37.7694,
+        include: ['land']
       });
 
       const sc = result.structuredContent as Record<string, unknown>;
@@ -495,13 +513,13 @@ describe('GroundLocationTool', () => {
       expect(sc.land).toBeUndefined();
       expect(sc.water).toEqual({ on_water: false, nearest_water_m: 292 });
       expect(sc.elevation_m).toBeCloseTo(18, 0);
-      // One entry per road class at its worst level, nearest first; an
-      // unknown congestion value is skipped.
+      // One entry per road class at its worst level and that segment's
+      // distance, nearest first; an unknown congestion value is skipped.
       expect(sc.traffic).toEqual({
         radius_m: 100,
         roads: [
           { class: 'street', congestion: 'low', distance_m: 19 },
-          { class: 'secondary', congestion: 'heavy', distance_m: 47 }
+          { class: 'secondary', congestion: 'heavy', distance_m: 60 }
         ],
         worst: 'heavy'
       });
@@ -509,7 +527,7 @@ describe('GroundLocationTool', () => {
       expect(text).toContain('Nearest water: 292 m');
       expect(text).toContain('Elevation: 18 m');
       expect(text).toContain(
-        'Live traffic within 100 m: low on street (19 m), heavy on secondary (47 m)'
+        'Live traffic within 100 m: low on street (19 m), heavy on secondary (60 m)'
       );
       expect(sc.citations).toEqual(
         expect.arrayContaining([
@@ -546,6 +564,61 @@ describe('GroundLocationTool', () => {
       expect(textOf(result)).toContain(
         "No live traffic data within 100 m (common on quiet streets; it doesn't mean no traffic)"
       );
+    });
+
+    it('reports a wetland as land use, not a protected area', async () => {
+      const { tool } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'layers=landuse': {
+          features: [
+            {
+              properties: {
+                tilequery: { distance: 0, layer: 'landuse_overlay' },
+                class: 'wetland',
+                type: 'marsh'
+              }
+            }
+          ]
+        }
+      });
+
+      const result = await tool.run({
+        longitude: -122.05,
+        latitude: 37.5,
+        include: ['land']
+      });
+
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toEqual({
+        land_use: [{ class: 'wetland', type: 'marsh' }]
+      });
+      expect(textOf(result)).toContain('Land use: wetland (marsh)');
+      expect(textOf(result)).not.toContain('Inside');
+    });
+
+    it('still answers when a facet request throws', async () => {
+      const { tool, mockFetch } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse
+      });
+      const answer = mockFetch.getMockImplementation()!;
+      mockFetch.mockImplementation((url: string) =>
+        url.includes('/tilequery/')
+          ? Promise.reject(new TypeError('fetch failed'))
+          : answer(url)
+      );
+
+      const result = await tool.run({
+        longitude: -122.419,
+        latitude: 37.759,
+        include: ['land', 'water', 'traffic']
+      });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as Record<string, unknown>;
+      for (const key of ['land', 'water', 'traffic']) {
+        expect(sc[key]).toBeUndefined();
+      }
+      expect(textOf(result)).toContain('Mission District');
     });
 
     it('names a national park, describes a building, and says on water', async () => {

@@ -34,7 +34,7 @@ export const LandSchema = z.object({
   land_use: z
     .array(z.object({ class: z.string(), type: z.string().optional() }))
     .describe(
-      'Land use polygons the point is inside, e.g. park, cemetery, school, hospital, residential, commercial_area, wood, grass. Empty when none is mapped there.'
+      'Land use polygons the point is inside, e.g. park, cemetery, school, hospital, residential, commercial_area, wood, grass, wetland. Empty when none is mapped there.'
     ),
   protected_areas: z
     .array(z.object({ class: z.string(), name: z.string().optional() }))
@@ -73,7 +73,9 @@ export const TrafficSchema = z.object({
         congestion: z
           .string()
           .describe('Live congestion: low, moderate, heavy or severe'),
-        distance_m: z.number()
+        distance_m: z
+          .number()
+          .describe('Distance to the nearest segment at that level')
       })
     )
     .describe(

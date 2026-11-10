@@ -36,7 +36,11 @@ interface FacetOptions {
   apiEndpoint: string;
 }
 
-/** Tilequery features at or near the point, or undefined if the request fails. */
+/**
+ * Tilequery features at or near the point, or undefined if the request
+ * fails, throws or returns a body that isn't JSON, so a facet never fails
+ * the whole answer.
+ */
 async function tilequery(
   tileset: string,
   longitude: number,
@@ -51,18 +55,24 @@ async function tilequery(
     url.searchParams.set(key, value);
   }
   url.searchParams.set('access_token', options.accessToken);
-  const response = await options.httpRequest(url.toString());
-  if (!response.ok) return undefined;
-  return (
-    ((await response.json()) as { features?: TilequeryFeature[] }).features ??
-    []
-  );
+  try {
+    const response = await options.httpRequest(url.toString());
+    if (!response.ok) return undefined;
+    return (
+      ((await response.json()) as { features?: TilequeryFeature[] }).features ??
+      []
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
  * What the ground is at the point, from one point-in-polygon query on
  * Mapbox Streets v8: land use (park, cemetery, school...), protected
  * areas (national parks, with names) and the building it's inside.
+ * Streets' landuse_overlay layer also holds wetlands, which are land use,
+ * not protected areas.
  */
 export async function landAt(
   longitude: number,
@@ -80,8 +90,15 @@ export async function landAt(
   const inLayer = (layer: string) =>
     inside.filter((f) => f.properties?.tilequery?.layer === layer);
 
+  const overlay = inLayer('landuse_overlay');
+  const isProtected = (f: TilequeryFeature) =>
+    f.properties?.class === 'national_park';
+
   const land: Land = {
-    land_use: inLayer('landuse').map((f) => ({
+    land_use: [
+      ...inLayer('landuse'),
+      ...overlay.filter((f) => !isProtected(f))
+    ].map((f) => ({
       class: f.properties?.class ?? 'unknown',
       ...(f.properties?.type && f.properties.type !== f.properties.class
         ? { type: f.properties.type }
@@ -89,7 +106,7 @@ export async function landAt(
     }))
   };
 
-  const protectedAreas = inLayer('landuse_overlay').map((f) => ({
+  const protectedAreas = overlay.filter(isProtected).map((f) => ({
     class: f.properties?.class ?? 'unknown',
     ...(f.properties?.name ? { name: f.properties.name } : {})
   }));
@@ -170,6 +187,7 @@ export async function trafficNear(
       });
     } else if (rank(congestion) > rank(seen.congestion)) {
       seen.congestion = congestion;
+      seen.distance_m = distance;
     }
   }
   const roads = [...byClass.values()].sort(
