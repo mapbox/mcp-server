@@ -44,6 +44,7 @@ export { MatrixTool } from './matrix-tool/MatrixTool.js';
 export { MidpointTool } from './midpoint-tool/MidpointTool.js';
 export { OptimizationTool } from './optimization-tool/OptimizationTool.js';
 export { FeedbackTool } from './feedback-tool/FeedbackTool.js';
+export { ReportTool } from './report-tool/ReportTool.js';
 export { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
 export { ResourceReaderTool } from './resource-reader-tool/ResourceReaderTool.js';
 export { ReverseGeocodeTool } from './reverse-geocode-tool/ReverseGeocodeTool.js';
@@ -52,6 +53,7 @@ export { SimplifyTool } from './simplify-tool/SimplifyTool.js';
 export { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
 // Import tool classes for instantiation
 import { FeedbackTool } from './feedback-tool/FeedbackTool.js';
+import { ReportTool } from './report-tool/ReportTool.js';
 import { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
 import { AreaTool } from './area-tool/AreaTool.js';
 import { BearingTool } from './bearing-tool/BearingTool.js';
@@ -104,6 +106,9 @@ export const distance = new DistanceTool();
 
 /** Report a map, place or routing data problem to Mapbox */
 export const feedback = new FeedbackTool({ httpRequest });
+
+/** Send feedback about the MCP server, or a data problem, to Mapbox */
+export const report = new ReportTool({ httpRequest });
 
 /** Ground AI responses in live Mapbox location data */
 export const groundLocation = new GroundLocationTool({ httpRequest });
