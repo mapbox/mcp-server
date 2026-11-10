@@ -34,16 +34,19 @@ export class FeedbackTool extends MapboxApiBasedTool<
 > {
   name = 'feedback_tool';
   description =
-    "Send the user's feedback about map, place or routing data to the developer of this app or agent, " +
-    'through the Mapbox Feedback API (Public Preview): for example a place that has closed, wrong ' +
-    'details or location for a place, a missing place, a closed road, or a route with an illegal turn. ' +
+    "Send the user's feedback about this app or agent to its developer, through the Mapbox Feedback API " +
+    '(Public Preview), so the developer can understand what users need and improve the product. ' +
+    'Feedback can be about anything in the product: for example a place that has closed or has wrong ' +
+    'details, a missing place, a closed road, a route with an illegal turn, a wrong travel time, or ' +
+    'something about the app itself. ' +
     'It is filed under the Mapbox account that owns the access token, in the same feed as that ' +
     "account's Feedback Agent reports, and the developer reviews it in Feedback Explorer. " +
     'It does not report the problem to Mapbox. ' +
-    'Use it only when the user asks to send feedback about the map data, or agrees when you offer. ' +
+    'Use it only when the user asks to send feedback, or agrees when you offer. ' +
     'Before calling it, show the user the exact feedback text, category and location you will send ' +
     'and get their go-ahead. ' +
-    'Take the coordinates from an earlier search, place or directions result rather than guessing. ' +
+    'Take the coordinates from an earlier search, place or directions result rather than guessing; ' +
+    'for feedback about the app itself, use the place the user was looking at. ' +
     'Send one report per problem, and do not resend one that already succeeded. ' +
     "To avoid filing the same problem twice, the tool first checks the account's own " +
     `reports from the last ${DUPLICATE_WINDOW_DAYS} days and does not send if one with the same category ` +
@@ -51,7 +54,7 @@ export class FeedbackTool extends MapboxApiBasedTool<
     'Only set send_anyway when the user says the earlier report is about a different problem. ' +
     'Returns the item id and its status (received).';
   annotations = {
-    title: 'Send Map Feedback to the Developer',
+    title: 'Send Feedback to the Developer',
     readOnlyHint: false,
     destructiveHint: false,
     idempotentHint: false,

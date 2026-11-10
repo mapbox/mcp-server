@@ -62,10 +62,10 @@ export const FeedbackInputSchema = z.object({
         '- eta_issue: the travel time was wrong\n' +
         '- road_closure_issue / road_incident_issue / speed_limit_issue: road data\n' +
         '- traffic_issue / false_negative_traffic_issue / false_positive_traffic_issue: traffic shown wrong (missed congestion, or congestion that is not there)\n' +
-        '- application_issue: a problem with this app, not the map data'
+        '- application_issue: anything about the app itself rather than the map data, such as a bug, a confusing screen or a suggestion'
     ),
   coordinates: coordinateSchema.describe(
-    'Where the problem is: the place or the spot on the route, usually taken from an earlier search or directions result. Do not guess.'
+    'Where the feedback is about: the place or the spot on the route, usually taken from an earlier search or directions result. For feedback about the app itself, the place the user was looking at. Do not guess.'
   ),
   send_anyway: z
     .boolean()

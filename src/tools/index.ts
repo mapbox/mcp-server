@@ -102,7 +102,7 @@ export const directions = new DirectionsTool({ httpRequest });
 /** Calculate distance between points */
 export const distance = new DistanceTool();
 
-/** Send map, place or routing feedback to the token owner's Feedback Explorer */
+/** Send a user's feedback about the app to its developer's Feedback Explorer */
 export const feedback = new FeedbackTool({ httpRequest });
 
 /** Ground AI responses in live Mapbox location data */

@@ -518,12 +518,13 @@ Finds the optimal route through multiple locations using the [Mapbox Optimizatio
 
 #### Feedback tool
 
-Sends a user's feedback about map, place or routing data to the developer of the app or agent, through the [Mapbox Feedback API](https://docs.mapbox.com/api/feedback/) (Public Preview). It's filed under the account that owns the access token, so when you build an app or agent on this server with your own token, your users' feedback lands in the same feed as your apps' Feedback Agent reports, and you review it in Feedback Explorer. It does not report problems to Mapbox. Feedback can be things like:
+Sends a user's feedback about the app or agent to its developer, through the [Mapbox Feedback API](https://docs.mapbox.com/api/feedback/) (Public Preview). It's filed under the account that owns the access token, so when you build an app or agent on this server with your own token, your users' feedback lands in the same feed as your apps' Feedback Agent reports, and you review it in Feedback Explorer. It does not report problems to Mapbox. Like [Feedback Agent](https://docs.mapbox.com/android/navigation/guides/feedback-agent/), it's for anything about your product that helps you understand what users need, for example:
 
 - A place that has closed, has wrong details, or sits on the wrong spot
 - A place or address that can't be found
 - A closed road, a wrong speed limit, or traffic shown wrong
 - A route with an illegal turn or entrance, or no route at all
+- Something about the app itself, such as a bug or a suggestion (`application_issue`)
 
 It sends the feedback text, a category and the location, and returns the item's id and status. Nothing is sent without the user's go-ahead: clients that support elicitation show a confirmation prompt first, and the tool description asks the model to confirm in chat everywhere else.
 
