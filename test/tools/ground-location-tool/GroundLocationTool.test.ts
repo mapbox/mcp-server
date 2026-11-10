@@ -8,6 +8,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setupHttpRequest } from '../../utils/httpPipelineUtils.js';
 import { GroundLocationTool } from '../../../src/tools/ground-location-tool/GroundLocationTool.js';
 import { tokenFor } from '../../utils/tokenTestUtils.js';
+import { terrainTile } from '../elevation-tool/pngFixtures.js';
 
 const geocodeResponse = {
   features: [
@@ -67,6 +68,17 @@ function setupMockHttp(responses: Record<string, object>) {
   const mockFetch = vi.fn().mockImplementation((url: string) => {
     for (const [key, body] of Object.entries(responses)) {
       if (url.includes(key)) {
+        if (Buffer.isBuffer(body)) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            arrayBuffer: async () =>
+              body.buffer.slice(
+                body.byteOffset,
+                body.byteOffset + body.byteLength
+              )
+          });
+        }
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -103,7 +115,8 @@ describe('GroundLocationTool', () => {
     const text = (result.content[0] as { type: string; text: string }).text;
     expect(text).toContain('Mission District');
     expect(text).toContain('neighborhood context');
-    // geocode + isochrone called, no category search (no query)
+    // geocode and isochrone only: no category search (no query) and no
+    // ground facets (no include)
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
@@ -377,5 +390,311 @@ describe('GroundLocationTool', () => {
       await import('../../../src/utils/selfFetchRef.js');
     const payload = resolveSelfFetchRef(sc.mapboxRender!.ref!);
     expect(payload?.selfFetch?.[0]?.params).not.toHaveProperty('poi');
+  });
+
+  describe('the ground at the point (include)', () => {
+    // Golden Gate Park: a park polygon with a meadow inside it, and Stow
+    // Lake 292 m away. Same shapes Tilequery returned for that point.
+    const parkInside = {
+      features: [
+        {
+          properties: {
+            tilequery: { distance: 0, layer: 'landuse' },
+            class: 'park',
+            type: 'park'
+          }
+        },
+        {
+          properties: {
+            tilequery: { distance: 0, layer: 'landuse' },
+            class: 'grass',
+            type: 'meadow'
+          }
+        }
+      ]
+    };
+    const lakeNearby = {
+      features: [
+        { properties: { tilequery: { distance: 291.6, layer: 'water' } } }
+      ]
+    };
+    // Market St: several segments per road class, at different levels.
+    const trafficNearby = {
+      features: [
+        ['street', 'low', 19.4],
+        ['secondary', 'moderate', 47.2],
+        ['secondary', 'heavy', 60.1],
+        ['street', 'low', 80],
+        ['motorway', 'unknown', 90]
+      ].map(([cls, congestion, distance]) => ({
+        properties: {
+          tilequery: { distance, layer: 'traffic' },
+          class: cls,
+          congestion
+        }
+      }))
+    };
+    const tilequeryUrls = (mockFetch: { mock: { calls: unknown[][] } }) =>
+      mockFetch.mock.calls
+        .map(([url]) => new URL(url as string))
+        .filter((u) => u.pathname.includes('/tilequery/'));
+    const textOf = (result: { content: unknown[] }) =>
+      (result.content[0] as { text: string }).text;
+
+    it('asks for nothing about the ground when include is left out', async () => {
+      const { tool, mockFetch } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'isochrone/v1': isochroneResponse,
+        'mapbox-streets-v8/tilequery': parkInside
+      });
+
+      const result = await tool.run({
+        longitude: -122.4862,
+        latitude: 37.7694
+      });
+
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toBeUndefined();
+      expect(tilequeryUrls(mockFetch)).toEqual([]);
+    });
+
+    it('land: one point-in-polygon query on Streets', async () => {
+      const { tool, mockFetch } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'isochrone/v1': isochroneResponse,
+        'mapbox-streets-v8/tilequery': parkInside
+      });
+
+      const result = await tool.run({
+        longitude: -122.4862,
+        latitude: 37.7694,
+        include: ['land']
+      });
+
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toEqual({
+        land_use: [{ class: 'park' }, { class: 'grass', type: 'meadow' }]
+      });
+      expect(sc.water).toBeUndefined();
+      expect(sc.traffic).toBeUndefined();
+      expect(sc.elevation_m).toBeUndefined();
+      expect(textOf(result)).toContain('Land use: park, grass (meadow)');
+      const [pip, ...rest] = tilequeryUrls(mockFetch);
+      expect(rest).toEqual([]);
+      expect(pip.pathname).toBe(
+        '/v4/mapbox.mapbox-streets-v8/tilequery/-122.4862,37.7694.json'
+      );
+      expect(pip.searchParams.get('layers')).toBe(
+        'landuse,landuse_overlay,building'
+      );
+      expect(pip.searchParams.has('radius')).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalledWith(
+        expect.stringContaining('terrain-dem')
+      );
+    });
+
+    it('reports only what include asks for', async () => {
+      const { tool, mockFetch } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'isochrone/v1': isochroneResponse,
+        'mapbox-traffic-v1/tilequery': trafficNearby,
+        'mapbox-streets-v8/tilequery': lakeNearby,
+        'mapbox-terrain-dem-v1': terrainTile(() => 18.04)
+      });
+
+      const result = await tool.run({
+        longitude: -122.4013,
+        latitude: 37.7887,
+        include: ['water', 'elevation', 'traffic']
+      });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toBeUndefined();
+      expect(sc.water).toEqual({ on_water: false, nearest_water_m: 292 });
+      expect(sc.elevation_m).toBeCloseTo(18, 0);
+      // One entry per road class at its worst level and that segment's
+      // distance, nearest first; an unknown congestion value is skipped.
+      expect(sc.traffic).toEqual({
+        radius_m: 100,
+        roads: [
+          { class: 'street', congestion: 'low', distance_m: 19 },
+          { class: 'secondary', congestion: 'heavy', distance_m: 60 }
+        ],
+        worst: 'heavy'
+      });
+      const text = textOf(result);
+      expect(text).toContain('Nearest water: 292 m');
+      expect(text).toContain('Elevation: 18 m');
+      expect(text).toContain(
+        'Live traffic within 100 m: low on street (19 m), heavy on secondary (60 m)'
+      );
+      expect(sc.citations).toEqual(
+        expect.arrayContaining([
+          'Mapbox Tilequery API (Streets v8)',
+          'Mapbox Tilequery API (Traffic v1)',
+          'Mapbox Terrain-DEM'
+        ])
+      );
+
+      const urls = tilequeryUrls(mockFetch);
+      const water = urls.find((u) => u.pathname.includes('streets'))!;
+      expect(water.searchParams.get('layers')).toBe('water,waterway');
+      expect(water.searchParams.get('radius')).toBe('500');
+      expect(water.searchParams.get('limit')).toBe('1');
+      const traffic = urls.find((u) => u.pathname.includes('traffic'))!;
+      expect(traffic.pathname).toBe(
+        '/v4/mapbox.mapbox-traffic-v1/tilequery/-122.4013,37.7887.json'
+      );
+      expect(traffic.searchParams.get('radius')).toBe('100');
+    });
+
+    it('says no traffic data is not no traffic', async () => {
+      const { tool } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'mapbox-traffic-v1/tilequery': { features: [] }
+      });
+      const result = await tool.run({
+        longitude: -122.4,
+        latitude: 37.7,
+        include: ['traffic']
+      });
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.traffic).toEqual({ radius_m: 100, roads: [] });
+      expect(textOf(result)).toContain(
+        "No live traffic data within 100 m (common on quiet streets; it doesn't mean no traffic)"
+      );
+    });
+
+    it('reports a wetland as land use, not a protected area', async () => {
+      const { tool } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'layers=landuse': {
+          features: [
+            {
+              properties: {
+                tilequery: { distance: 0, layer: 'landuse_overlay' },
+                class: 'wetland',
+                type: 'marsh'
+              }
+            }
+          ]
+        }
+      });
+
+      const result = await tool.run({
+        longitude: -122.05,
+        latitude: 37.5,
+        include: ['land']
+      });
+
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toEqual({
+        land_use: [{ class: 'wetland', type: 'marsh' }]
+      });
+      expect(textOf(result)).toContain('Land use: wetland (marsh)');
+      expect(textOf(result)).not.toContain('Inside');
+    });
+
+    it('still answers when a facet request throws', async () => {
+      const { tool, mockFetch } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse
+      });
+      const answer = mockFetch.getMockImplementation()!;
+      mockFetch.mockImplementation((url: string) =>
+        url.includes('/tilequery/')
+          ? Promise.reject(new TypeError('fetch failed'))
+          : answer(url)
+      );
+
+      const result = await tool.run({
+        longitude: -122.419,
+        latitude: 37.759,
+        include: ['land', 'water', 'traffic']
+      });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as Record<string, unknown>;
+      for (const key of ['land', 'water', 'traffic']) {
+        expect(sc[key]).toBeUndefined();
+      }
+      expect(textOf(result)).toContain('Mission District');
+    });
+
+    it('names a national park, describes a building, and says on water', async () => {
+      const { tool } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'layers=landuse': {
+          features: [
+            {
+              properties: {
+                tilequery: { distance: 0, layer: 'landuse_overlay' },
+                class: 'national_park',
+                type: 'protected_area',
+                name: 'Yosemite National Park'
+              }
+            },
+            {
+              properties: {
+                tilequery: { distance: 0, layer: 'building' },
+                type: 'office',
+                height: 9.3,
+                underground: 'false'
+              }
+            }
+          ]
+        },
+        'layers=water': {
+          features: [
+            { properties: { tilequery: { distance: 0, layer: 'water' } } }
+          ]
+        }
+      });
+
+      const result = await tool.run({
+        longitude: -119.5885,
+        latitude: 37.7456,
+        include: ['land', 'water']
+      });
+
+      const sc = result.structuredContent as Record<string, unknown>;
+      expect(sc.land).toEqual({
+        land_use: [],
+        protected_areas: [
+          { class: 'national_park', name: 'Yosemite National Park' }
+        ],
+        building: { type: 'office', height_m: 9.3 }
+      });
+      expect(sc.water).toEqual({ on_water: true });
+      const text = textOf(result);
+      expect(text).toContain('Inside Yosemite National Park (national park)');
+      expect(text).toContain('Inside a building (office, 9 m tall)');
+      expect(text).toContain('On water');
+      expect(text).not.toContain('Land use:');
+    });
+
+    it('still answers when every facet request fails', async () => {
+      const { tool } = setupMockHttp({
+        'geocode/v6/reverse': geocodeResponse,
+        'isochrone/v1': isochroneResponse
+      });
+
+      const result = await tool.run({
+        longitude: -122.419,
+        latitude: 37.759,
+        include: ['land', 'water', 'elevation', 'traffic']
+      });
+
+      expect(result.isError).toBe(false);
+      const sc = result.structuredContent as Record<string, unknown>;
+      for (const key of ['land', 'water', 'traffic', 'elevation_m']) {
+        expect(sc[key]).toBeUndefined();
+      }
+      expect(sc.citations).toEqual([
+        'Mapbox Geocoding API',
+        'Mapbox Isochrone API'
+      ]);
+      expect(textOf(result)).toContain('Mission District');
+    });
   });
 });
