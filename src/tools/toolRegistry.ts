@@ -5,6 +5,7 @@
 import { ListPublicTokensTool } from './list-public-tokens-tool/ListPublicTokensTool.js';
 import { ElevationTool } from './elevation-tool/ElevationTool.js';
 import { FeedbackTool } from './feedback-tool/FeedbackTool.js';
+import { ReportTool } from './report-tool/ReportTool.js';
 import { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
 import { PointsWithinPolygonTool } from './points-within-polygon-tool/PointsWithinPolygonTool.js';
 import { UnionTool } from './union-tool/UnionTool.js';
@@ -47,6 +48,7 @@ export const CORE_TOOLS = [
   new ListPublicTokensTool({ httpRequest }),
   new ElevationTool({ httpRequest }),
   new FeedbackTool({ httpRequest }),
+  new ReportTool({ httpRequest }),
   new GroundLocationTool({ httpRequest }),
   new PointsWithinPolygonTool(),
   new UnionTool(),

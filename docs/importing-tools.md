@@ -128,6 +128,7 @@ import {
   mapMatching,
   matrix,
   optimization,
+  report,
   reverseGeocode,
   searchAndGeocode,
   staticMapImage,
