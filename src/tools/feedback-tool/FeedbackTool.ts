@@ -34,15 +34,16 @@ export class FeedbackTool extends MapboxApiBasedTool<
 > {
   name = 'feedback_tool';
   description =
-    'Report a problem with Mapbox map, place or routing data to Mapbox through the Feedback API, ' +
+    'Report a problem with Mapbox map, place or routing data through the Mapbox Feedback API (Public Preview), ' +
     'for example a place that has closed, wrong details or location for a place, a missing place, ' +
-    'a closed road, or a route with an illegal turn. Mapbox reviews each report and may fix the data. ' +
+    'a closed road, or a route with an illegal turn. The report is filed as feedback under the ' +
+    "user's Mapbox account, where Mapbox reviews it and may fix the data. " +
     'Use it only when the user asks to report a problem, or agrees when you offer. ' +
     'Before calling it, show the user the exact feedback text, category and location you will send ' +
     'and get their go-ahead; the report goes to Mapbox under their account. ' +
     'Take the coordinates from an earlier search, place or directions result rather than guessing. ' +
     'Send one report per problem, and do not resend one that already succeeded. ' +
-    "Each report may be billed to the account, so before sending, the tool checks the account's own " +
+    "To avoid filing the same problem twice, the tool first checks the account's own " +
     `reports from the last ${DUPLICATE_WINDOW_DAYS} days and does not send if one with the same category ` +
     `within ${DUPLICATE_RADIUS_METERS} m is still awaiting review; it returns that report instead. ` +
     'Only set send_anyway when the user says the earlier report is about a different problem. ' +
@@ -181,7 +182,7 @@ export class FeedbackTool extends MapboxApiBasedTool<
             text:
               `Not sent: this account already reported a ${earlier.category} here ` +
               `(report ${earlier.id}, status: ${earlier.status}${earlier.created_at ? `, sent ${earlier.created_at}` : ''}): ` +
-              `"${earlier.feedback}". It is still awaiting review, so a second report would only add a charge. ` +
+              `"${earlier.feedback}". It is still awaiting review, so a second report would be a duplicate. ` +
               'If the user says this is a different problem, call again with send_anyway: true.'
           }
         ],

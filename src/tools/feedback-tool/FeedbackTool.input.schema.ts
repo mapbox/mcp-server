@@ -8,8 +8,10 @@ import { coordinateSchema } from '../../schemas/shared.js';
  * The Feedback Agent's default categories that a chat user can report on.
  * Leaves out the ones that only make sense inside a navigation app (voice
  * guidance, banners, rerouting, puck positioning, arrival, speed traps) and
- * `non_feedback`.
+ * `non_feedback`. `routing_issue` is the general routing category the
+ * Feedback API docs use in their examples.
  * Docs: https://docs.mapbox.com/ios/navigation/v2/guides/feedback-agent/#default-categories
+ * and https://docs.mapbox.com/api/feedback/
  */
 export const FEEDBACK_CATEGORIES = [
   'poi_closed',
@@ -18,6 +20,7 @@ export const FEEDBACK_CATEGORIES = [
   'poi_missing',
   'map_data_issue',
   'map_rendering_issue',
+  'routing_issue',
   'poor_routing_issue',
   'alternative_route_issue',
   'no_route',
@@ -53,6 +56,7 @@ export const FeedbackInputSchema = z.object({
         '- poi_location: the place is on the wrong spot\n' +
         '- poi_missing: a place, address or business could not be found\n' +
         '- map_data_issue / map_rendering_issue: wrong map features, or the map draws wrong\n' +
+        '- routing_issue: something else wrong with a route\n' +
         '- poor_routing_issue / alternative_route_issue / no_route: a bad, missing or no route\n' +
         '- illegal_turn / illegal_entrance / missing_expected_maneuver: a turn or entrance the route got wrong\n' +
         '- eta_issue: the travel time was wrong\n' +
