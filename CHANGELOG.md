@@ -2,7 +2,7 @@
 
 ### Bug Fixes
 
-- **`feedback_tool`: description now matches the Feedback API docs (#PR).** The tool told the model each report "may be billed", and a duplicate result said a second report "would only add a charge". The [Feedback API](https://docs.mapbox.com/api/feedback/) is free during Public Preview; the $0.02 per item applies to Feedback Agent at General Availability. The description now says the report is filed under the user's own Mapbox account, where Mapbox reviews it, and the duplicate check is explained as avoiding a second report of the same problem. Adds `routing_issue`, the general routing category the API docs use, to the category list. The README says the same.
+- **`feedback_tool`: description now matches the Feedback API docs (#329).** The tool told the model each report "may be billed", and a duplicate result said a second report "would only add a charge". The [Feedback API](https://docs.mapbox.com/api/feedback/) is free during Public Preview; the $0.02 per item applies to Feedback Agent at General Availability. The description now says the report is filed under the user's own Mapbox account, where Mapbox reviews it, and the duplicate check is explained as avoiding a second report of the same problem. Adds `routing_issue`, the general routing category the API docs use, to the category list. The README says the same.
 
 ## 0.17.1-dev.1 - 2026-11-09
 
