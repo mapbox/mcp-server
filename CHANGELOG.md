@@ -15,6 +15,14 @@
   - **Categories:** adds `routing_issue`, the general routing category the API docs use.
   - **Location:** `coordinates` is now optional, so feedback that isn't about a place, such as most feedback about the app, no longer needs a made-up location. The API still requires lat/lon, so the tool sends 0, 0, as the Feedback API team recommends until location becomes optional there. That feedback skips the duplicate check, since every report without a place sits at 0, 0.
 
+### Maintenance
+
+- **Security updates for dependencies (#331).** Clears the open Dependabot alerts on `zod` and `tmp` (via `patch-package`). `npm audit --omit=dev` now finds nothing.
+  - **`zod` 4.6.7:** fixes memory exhaustion when validating oversized constrained collections, which applies to every tool call's input.
+  - **`gaxios` override (`^7.3.1`):** `gcp-metadata` pins `gaxios` to 7.1.3, which pulls in `rimraf` and a `glob` and `minimatch` with moderate advisories. 7.3.1 is the same major without `rimraf`. It reaches us through OpenTelemetry's GCP resource detector.
+  - **Lockfile refresh:** everything else moved within its existing range. Prettier stays on 3.8, since 3.9 reformats union types across the code.
+  - **Left as is:** a moderate `minimatch` advisory in the `typescript-eslint` lint tooling, which is dev-only and never ships.
+
 ## 0.17.1-dev.1 - 2026-11-09
 
 ### Bug Fixes

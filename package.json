@@ -102,10 +102,11 @@
     "@turf/turf": "^7.3.1",
     "ipaddr.js": "^2.4.0",
     "patch-package": "^8.0.1",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "overrides": {
-    "brace-expansion": "^2.0.3"
+    "brace-expansion": "^2.0.3",
+    "gaxios": "^7.3.1"
   },
   "tshy": {
     "project": "./tsconfig.src.json",
