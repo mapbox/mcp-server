@@ -104,7 +104,7 @@ export const directions = new DirectionsTool({ httpRequest });
 /** Calculate distance between points */
 export const distance = new DistanceTool();
 
-/** Report a map, place or routing data problem to Mapbox */
+/** Send a user's feedback about the app to its developer's Feedback Explorer */
 export const feedback = new FeedbackTool({ httpRequest });
 
 /** Send feedback about the MCP server to Mapbox */

@@ -7,6 +7,14 @@
   - **Where it came from:** the server appends `— mapbox-mcp-server <version> via <client> <version>, about <tool>` to the text, so the team can tell these from the CLI's reports. The client comes from the server handling the call, which the hosted server needs, since one process serves many clients.
   - **Confirmation:** like `feedback_tool`, it asks through elicitation when the client supports it and sends nothing if the user declines or the prompt fails. It sends its own id, so a retried POST doesn't make a second report.
 
+### Bug Fixes
+
+- **`feedback_tool`: says where feedback goes, per the Feedback API docs (#329).** The Feedback API is how end users of a developer's app send feedback to that developer. Items land in the token owner's account (Feedback Agent, Feedback Explorer), not with Mapbox. The tool presented itself as reporting map problems to Mapbox, which "may fix the data".
+  - **Description:** now says it sends the user's feedback about the app or agent to its developer, filed under the token owner's account, and does not report to Mapbox. Like Feedback Agent, the feedback can be about anything in the product, map data or the app itself. That's the case it's for: a developer who builds an app or agent on this server with their own token gets their users' feedback in Feedback Explorer. The confirmation prompt, the result text and the README say the same.
+  - **Billing:** the tool told the model each item "may be billed", and a duplicate result said a second one "would only add a charge". The API is free during Public Preview; the $0.02 per item applies to Feedback Agent at General Availability. The duplicate check is now explained as avoiding filing the same problem twice.
+  - **Categories:** adds `routing_issue`, the general routing category the API docs use.
+  - **Location:** `coordinates` is now optional, so feedback that isn't about a place, such as most feedback about the app, no longer needs a made-up location. The API still requires lat/lon, so the tool sends 0, 0, as the Feedback API team recommends until location becomes optional there. That feedback skips the duplicate check, since every report without a place sits at 0, 0.
+
 ### Maintenance
 
 - **Security updates for dependencies (#331).** Clears the open Dependabot alerts on `zod` and `tmp` (via `patch-package`). `npm audit --omit=dev` now finds nothing.
