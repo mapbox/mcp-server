@@ -14,6 +14,7 @@
   - **Billing:** the tool told the model each item "may be billed", and a duplicate result said a second one "would only add a charge". The API is free during Public Preview; the $0.02 per item applies to Feedback Agent at General Availability. The duplicate check is now explained as avoiding filing the same problem twice.
   - **Categories:** adds `routing_issue`, the general routing category the API docs use.
   - **Location:** `coordinates` is now optional, so feedback that isn't about a place, such as most feedback about the app, no longer needs a made-up location. The API still requires lat/lon, so the tool sends 0, 0, as the Feedback API team recommends until location becomes optional there. That feedback skips the duplicate check, since every report without a place sits at 0, 0.
+- **`list_public_tokens_tool`: asks the model to copy the token exactly and check the copy (#332).** A dashboard ChatGPT built for For Five failed with "invalid Mapbox access token": the tool returned the right token, but the model retyped it into the page and changed a character, which is easy with about 90 characters of base64. The result now says to copy the token exactly, never retyped, and, when the agent wrote it into a file and can run commands, to check the copy from that file: `grep` the `pk.` token out of the file and call `GET /tokens/v2`, which returns `TokenValid`, or `TokenInvalid` when a character changed. Checked against the live API with a valid token and one with a single character changed.
 
 ### Maintenance
 
