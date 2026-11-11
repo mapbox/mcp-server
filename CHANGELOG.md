@@ -16,6 +16,14 @@
   - **Location:** `coordinates` is now optional, so feedback that isn't about a place, such as most feedback about the app, no longer needs a made-up location. The API still requires lat/lon, so the tool sends 0, 0, as the Feedback API team recommends until location becomes optional there. That feedback skips the duplicate check, since every report without a place sits at 0, 0.
 - **`list_public_tokens_tool`: asks the model to copy the token exactly and check the copy (#332).** A dashboard ChatGPT built for For Five failed with "invalid Mapbox access token": the tool returned the right token, but the model retyped it into the page and changed a character, which is easy with about 90 characters of base64. The result now says to copy the token exactly, never retyped, and, when the agent wrote it into a file and can run commands, to check the copy from that file: `grep` the `pk.` token out of the file and call `GET /tokens/v2`, which returns `TokenValid`, or `TokenInvalid` when a character changed. Checked against the live API with a valid token and one with a single character changed.
 
+### Maintenance
+
+- **Security updates for dependencies (#331).** Clears the open Dependabot alerts on `zod` and `tmp` (via `patch-package`). `npm audit --omit=dev` now finds nothing.
+  - **`zod` 4.6.7:** fixes memory exhaustion when validating oversized constrained collections, which applies to every tool call's input.
+  - **`gaxios` override (`^7.3.1`):** `gcp-metadata` pins `gaxios` to 7.1.3, which pulls in `rimraf` and a `glob` and `minimatch` with moderate advisories. 7.3.1 is the same major without `rimraf`. It reaches us through OpenTelemetry's GCP resource detector.
+  - **Lockfile refresh:** everything else moved within its existing range. Prettier stays on 3.8, since 3.9 reformats union types across the code.
+  - **Left as is:** a moderate `minimatch` advisory in the `typescript-eslint` lint tooling, which is dev-only and never ships.
+
 ## 0.17.1-dev.1 - 2026-11-09
 
 ### Bug Fixes
