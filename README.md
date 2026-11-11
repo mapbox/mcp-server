@@ -191,6 +191,14 @@ export CLIENT_NEEDS_RESOURCE_FALLBACK=true
 
 ## Tools
 
+### Tileset explorer (`tileset_explorer_tool`)
+
+Previews a Mapbox tileset's tiles on an interactive map. Pass a `tileset_id` (`username.id`, for example `mapbox.mapbox-streets-v8`, `mapbox.satellite` or one of your own; join several vector tilesets with commas). The tool returns the tileset's source layers, their fields and its zoom range, and the map draws every source layer in its own color over a blank background. The panel switches layers on and off, lists each layer's fields, shows tile boundaries, and puts a light or dark base map underneath. Click a feature to see its properties. Raster tilesets are drawn as they are.
+
+In ChatGPT the explorer opens as a tab next to the chat, and also from "+" → "More tools" → **Mapbox Tileset Explorer**, where it starts on Mapbox Streets. While open it shares the tileset, the view and the selected feature with the conversation, and in agent mode it registers two WebMCP tools, `load_tileset` and `read_tileset_view`, so the model switches tilesets and reads the features in view in the open explorer instead of opening another.
+
+The server reads the TileJSON with the caller's token and passes on only its metadata, never the tile URLs, which carry that token. The map loads tiles with the account's public token, so a private tileset shows only for its own account.
+
 ### Utility Tools
 
 #### Resource Reader Tool
