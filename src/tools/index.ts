@@ -109,7 +109,7 @@ export const distance = new DistanceTool();
 /** Ground elevation at points, or climb and descent along a path or route */
 export const elevation = new ElevationTool({ httpRequest });
 
-/** Report a map, place or routing data problem to Mapbox */
+/** Send a user's feedback about the app to its developer's Feedback Explorer */
 export const feedback = new FeedbackTool({ httpRequest });
 
 /** Send feedback about the MCP server to Mapbox */
