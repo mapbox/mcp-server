@@ -10,6 +10,7 @@ import { ToolResponseResource } from './tool-response/ToolResponseResource.js';
 import { MapAppUIResource } from './ui-apps/MapAppUIResource.js';
 import { StaticMapViewerUIResource } from './ui-apps/StaticMapViewerUIResource.js';
 import { TilesetExplorerUIResource } from './ui-apps/TilesetExplorerUIResource.js';
+import { MvtPreviewUIResource } from './ui-apps/MvtPreviewUIResource.js';
 import { VersionResource } from './version/VersionResource.js';
 import { PlacePhotoResource } from './place-photo/PlacePhotoResource.js';
 import { httpRequest } from '../utils/httpPipeline.js';
@@ -28,6 +29,8 @@ export const ALL_RESOURCES = [
   new StaticMapViewerUIResource(),
   // Tileset preview, targeted by tileset_explorer_tool.
   new TilesetExplorerUIResource({ httpRequest }),
+  // Viewer for .mvt and .pbf files, targeted by mvt_preview_tool.
+  new MvtPreviewUIResource({ httpRequest }),
   // Photos for the map app's results carousel, which its CSP can't load directly.
   new PlacePhotoResource({ httpRequest }),
   new VersionResource()

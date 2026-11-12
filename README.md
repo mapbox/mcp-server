@@ -199,6 +199,10 @@ In ChatGPT the explorer opens as a tab next to the chat, and also from "+" → "
 
 The server reads the TileJSON with the caller's token and passes on only its metadata, never the tile URLs, which carry that token. The map loads tiles with the account's public token, so a private tileset shows only for its own account.
 
+### Vector tile viewer (`mvt_preview_tool`)
+
+Opens a local Mapbox Vector Tile file (`.mvt` or `.pbf`, gzipped or not) in ChatGPT Desktop, as the viewer for that file type. The page reads the file through ChatGPT and decodes it in the browser; the server never receives it. Each layer is drawn in its own color, placed by the tile address in the file name (for example `14-9326-4739.mvt`) or one entered in the panel. The panel lists layers, feature counts and fields, and a click shows a feature's properties. The tool is app-only, so the model does not call it.
+
 ### Utility Tools
 
 #### Resource Reader Tool
