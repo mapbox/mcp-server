@@ -293,5 +293,117 @@
     "stubs": {
       "search_and_geocode_tool": "1. 410 Valencia St, San Francisco, CA 94103 (37.7655, -122.4218)\n2. 2001 Fillmore St, San Francisco, CA 94115 (37.7880, -122.4335)\n3. 1 Ferry Building, San Francisco, CA 94111 (37.7955, -122.3937)"
     }
+  },
+  {
+    "id": "land-park",
+    "category": "land",
+    "prompt": "Is 37.7694, -122.4862 inside a park?",
+    "why": "Land use at a point: ground_location_tool reads the Streets land use polygons. Reverse geocoding only names the area, and can't say whether the point is in a park.",
+    "expect": {
+      "any_of": ["ground_location_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "ground_location_tool": "**Outer Sunset** (neighborhood context · live Mapbox data)\nOuter Sunset, San Francisco, California, United States\n\nLand use: park, grass (meadow)\nNearest water: 292 m\nElevation: 45 m\n\nReachable by walking: 5 min, 10 min, 15 min\n\n*Sources: Mapbox Geocoding API, Mapbox Isochrone API, Mapbox Tilequery API (Streets v8), Mapbox Terrain-DEM*",
+      "reverse_geocode_tool": "Outer Sunset, San Francisco, California 94122, United States",
+      "category_search_tool": "1. Golden Gate Park (37.7694, -122.4862), 0 m\n2. Spreckels Lake (37.7704, -122.4955), 820 m"
+    }
+  },
+  {
+    "id": "land-water",
+    "category": "land",
+    "prompt": "I'm about to drop a meetup pin at 37.83, -122.42. Is that spot on land or in the water?",
+    "why": "Water at a point: ground_location_tool says on_water. No map asked for.",
+    "expect": {
+      "any_of": ["ground_location_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "ground_location_tool": "**San Francisco** (neighborhood context · live Mapbox data)\nSan Francisco, California, United States\n\nOn water\nElevation: 0 m\n\n*Sources: Mapbox Geocoding API, Mapbox Tilequery API (Streets v8), Mapbox Terrain-DEM*",
+      "reverse_geocode_tool": "San Francisco, California, United States"
+    }
+  },
+  {
+    "id": "elevation-point",
+    "category": "elevation",
+    "prompt": "How high above sea level is 37.7544, -122.4475?",
+    "why": "Elevation at one point: ground_location_tool includes it, and elevation_tool with points is also right.",
+    "needs_tools": ["elevation_tool"],
+    "expect": {
+      "any_of": ["ground_location_tool", "elevation_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "ground_location_tool": "**Twin Peaks** (neighborhood context · live Mapbox data)\nTwin Peaks, San Francisco, California, United States\n\nLand use: park\nNearest water: 182 m\nElevation: 250 m\n\n*Sources: Mapbox Geocoding API, Mapbox Tilequery API (Streets v8), Mapbox Terrain-DEM*",
+      "elevation_tool": "Ground elevation (mapbox.mapbox-terrain-dem-v1, about 7.5 m resolution):\n250 m at 37.75440, -122.44750",
+      "reverse_geocode_tool": "Twin Peaks, San Francisco, California 94131, United States"
+    }
+  },
+  {
+    "id": "elevation-summits",
+    "category": "elevation",
+    "prompt": "Which is higher: Mount Davidson or Twin Peaks in San Francisco? Use live map data, not memory.",
+    "why": "Elevation at several places: geocode both, then one elevation_tool call with points (or ground_location_tool for each).",
+    "needs_tools": ["elevation_tool"],
+    "expect": {
+      "any_of": ["elevation_tool", "ground_location_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Mount Davidson, San Francisco, CA (37.7383, -122.4542)\n2. Twin Peaks, San Francisco, CA (37.7544, -122.4475)",
+      "elevation_tool": "Ground elevation (mapbox.mapbox-terrain-dem-v1, about 7.5 m resolution):\n1. 282 m at 37.73830, -122.45420\n2. 250 m at 37.75440, -122.44750",
+      "ground_location_tool": "**Twin Peaks** (neighborhood context · live Mapbox data)\nTwin Peaks, San Francisco, California, United States\n\nLand use: park\nNearest water: 182 m\nElevation: 250 m\n\n*Sources: Mapbox Geocoding API, Mapbox Tilequery API (Streets v8), Mapbox Terrain-DEM*"
+    }
+  },
+  {
+    "id": "elevation-route",
+    "category": "elevation",
+    "prompt": "How much climbing is there biking from the Ferry Building to Twin Peaks in San Francisco?",
+    "why": "Climb along a route: directions_tool, then elevation_tool with the route's ref. No map asked for.",
+    "needs_tools": ["elevation_tool"],
+    "expect": {
+      "must": ["directions_tool", "elevation_tool"],
+      "must_not": [
+        "render_map_tool",
+        "static_map_image_tool",
+        "places_map_display_v0"
+      ]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. Ferry Building, 1 Ferry Building, San Francisco, CA (37.7955, -122.3937)\n2. Twin Peaks, San Francisco, CA (37.7544, -122.4475)",
+      "directions_tool": "Cycling route: 8.4 km, about 38 min via Market St and Clarendon Ave.",
+      "elevation_tool": "Elevation along 8.4 km (mapbox.mapbox-terrain-dem-v1, 500 samples, about 7.5 m resolution):\nClimb: 274 m, descent: 27 m\nStart: 3 m, end: 250 m\nHighest: 250 m at 8.4 km\nLowest: 2 m at 0.3 km"
+    }
+  },
+  {
+    "id": "traffic-address",
+    "category": "land",
+    "prompt": "How bad is traffic right now around 1 Market St, San Francisco?",
+    "why": "Live traffic at an address: geocode it, then ground_location_tool with include traffic. Showing the traffic layer on a map is fine too, but the reply needs numbers, not just a picture.",
+    "expect": {
+      "any_of": ["ground_location_tool"],
+      "must_not": ["static_map_image_tool", "places_map_display_v0"]
+    },
+    "stubs": {
+      "search_and_geocode_tool": "1. 1 Market St, San Francisco, CA 94105 (37.7942, -122.3949)",
+      "ground_location_tool": "**Financial District** (neighborhood context · live Mapbox data)\nFinancial District, San Francisco, California, United States\n\nLive traffic within 100 m: moderate on primary (22 m), heavy on motorway link (64 m), low on street (80 m)\n\n*Sources: Mapbox Geocoding API, Mapbox Tilequery API (Traffic v1)*",
+      "directions_tool": "Driving route: 1.2 km, 6 min (typical 4 min) via The Embarcadero."
+    }
   }
 ]
