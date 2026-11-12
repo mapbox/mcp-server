@@ -28,12 +28,10 @@ describe('tileFromFileName', () => {
 });
 
 describe('MvtPreviewTool', () => {
-  it('is an app-only file entrypoint for .mvt and .pbf', () => {
+  it('is a file entrypoint for .mvt and .pbf that the model can also call', () => {
     const tool = new MvtPreviewTool();
-    expect(tool.meta.ui).toMatchObject({
-      resourceUri: MVT_PREVIEW_URI,
-      visibility: ['app']
-    });
+    expect(tool.meta.ui).toMatchObject({ resourceUri: MVT_PREVIEW_URI });
+    expect(tool.meta.ui?.visibility).toBeUndefined();
     expect(tool.meta['openai/ui']).toEqual({
       entrypoints: [{ type: 'file', extensions: ['.mvt', '.pbf'] }]
     });
@@ -58,9 +56,26 @@ describe('MvtPreviewTool', () => {
     expect(textOf(result)).toContain('no tile address');
   });
 
-  it('rejects a call without the file', async () => {
-    const result = await new MvtPreviewTool().run({});
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('{ file: { name, resourceUri } }');
+  it('passes a local path from the model on to the page', async () => {
+    const path = '/Users/me/Downloads/streets-14-9326-4739.mvt';
+    const result = await new MvtPreviewTool().run({ path });
+    expect(result.isError).toBe(false);
+    expect(structuredOf(result)).toEqual({
+      mvtPreview: true,
+      path,
+      tile: { z: 14, x: 9326, y: 4739 }
+    });
+    expect(textOf(result)).toContain(
+      'Asked ChatGPT to open streets-14-9326-4739.mvt'
+    );
   });
+
+  it.each([{}, { path: 'tile.mvt' }, { path: '/Users/me/tile.geojson' }])(
+    'rejects %j',
+    async (input) => {
+      const result = await new MvtPreviewTool().run(input);
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain('absolute path of a local .mvt or .pbf');
+    }
+  );
 });

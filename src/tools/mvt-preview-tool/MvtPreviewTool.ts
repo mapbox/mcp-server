@@ -33,9 +33,11 @@ export function tileFromFileName(
  * `mvt_preview_tool` — the viewer ChatGPT opens for a `.mvt` or `.pbf` file
  * (OpenAI MCP Extensions file entrypoint).
  *
- * App-only: the host calls it with the file's name and an opaque resource URI.
- * The tool never sees the file; the page reads it through the host with
- * `resources/read` and decodes it.
+ * The host calls it with the file's name and an opaque resource URI; the page
+ * reads the file through the host with `resources/read` and decodes it. The
+ * model calls it with a local path instead, and the page asks the host to open
+ * that file (`openai/files/open`), which lands in the same viewer. The tool
+ * never reads the file.
  */
 export class MvtPreviewTool extends BaseTool<
   typeof MvtPreviewInputSchema,
@@ -43,7 +45,7 @@ export class MvtPreviewTool extends BaseTool<
 > {
   readonly name = 'mvt_preview_tool';
   readonly description =
-    'Open a Mapbox Vector Tile file (.mvt or .pbf) in the Mapbox tile viewer: its layers, fields and features on a map.';
+    "Open a local Mapbox Vector Tile file (.mvt or .pbf) in the Mapbox vector tile viewer next to the chat: each layer drawn in its own color on a map, with feature counts, fields and properties. Pass the file's absolute path. Use it whenever the user wants to preview, view or inspect a vector tile file, instead of decoding the tile yourself. ChatGPT desktop only.";
   readonly annotations = {
     title: 'Mapbox Vector Tile Viewer',
     readOnlyHint: true,
@@ -61,7 +63,6 @@ export class MvtPreviewTool extends BaseTool<
     this.meta = {
       ui: {
         resourceUri: MVT_PREVIEW_URI,
-        visibility: ['app'],
         csp: mapAppCsp(MapboxApiBasedTool.mapboxApiEndpoint)
       },
       'openai/ui': {
@@ -72,30 +73,36 @@ export class MvtPreviewTool extends BaseTool<
 
   async run(rawInput: unknown): Promise<CallToolResult> {
     const parsed = MvtPreviewInputSchema.safeParse(rawInput);
-    if (!parsed.success) {
+    const input = parsed.success ? parsed.data : undefined;
+    if (!input || (!input.file && !input.path)) {
+      const reason = parsed.success
+        ? ''
+        : ` ${parsed.error.issues[0]?.message}.`;
       return {
         content: [
           {
             type: 'text',
-            text: 'mvt_preview_tool needs the file the host opened: { file: { name, resourceUri } }.'
+            text: `mvt_preview_tool needs the absolute path of a local .mvt or .pbf file.${reason}`
           }
         ],
         isError: true
       };
     }
-    const { file } = parsed.data;
-    const tile = tileFromFileName(file.name);
-    const output: MvtPreviewOutput = { mvtPreview: true, file, tile };
+    const name = input.file
+      ? input.file.name
+      : (input.path as string).split('/').pop() || '';
+    const tile = tileFromFileName(name);
+    const output: MvtPreviewOutput = input.file
+      ? { mvtPreview: true, file: input.file, tile }
+      : { mvtPreview: true, path: input.path, tile };
     const where = tile
       ? ` as tile ${tile.z}/${tile.x}/${tile.y}`
       : ', with no tile address in its name';
+    const text = input.file
+      ? `Opened ${name} in the Mapbox vector tile viewer${where}.`
+      : `Asked ChatGPT to open ${name} in the Mapbox vector tile viewer${where}. It opens as a tab next to the chat; the layers and features are shown there, not returned here.`;
     return {
-      content: [
-        {
-          type: 'text',
-          text: `Opened ${file.name} in the Mapbox vector tile viewer${where}.`
-        }
-      ],
+      content: [{ type: 'text', text }],
       structuredContent: output,
       isError: false
     };

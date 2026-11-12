@@ -158,11 +158,16 @@ ${MVT_DECODER_JS}
       return;
     }
     if (msg.method === 'ui/notifications/tool-input' && msg.params) {
-      openHostFile(msg.params.arguments && msg.params.arguments.file, null);
+      var args = msg.params.arguments || {};
+      if (args.file) openHostFile(args.file, null);
+      else if (typeof args.path === 'string') openLocalPath(args.path);
     }
     if (msg.method === 'ui/notifications/tool-result' && msg.params) {
       var sc = msg.params.structuredContent;
-      if (sc && sc.mvtPreview === true) openHostFile(sc.file, sc.tile || null);
+      if (sc && sc.mvtPreview === true) {
+        if (sc.file) openHostFile(sc.file, sc.tile || null);
+        else if (typeof sc.path === 'string') openLocalPath(sc.path);
+      }
     }
     if (msg.method === 'ui/notifications/host-context-changed' && msg.params) applyHostContext(msg.params);
   });
@@ -190,16 +195,43 @@ ${MVT_DECODER_JS}
   if (darkQuery && darkQuery.matches && !hostTheme) root.setAttribute('data-theme', 'dark');
 
   var canUpdateModelContext = false;
-  request('ui/initialize', {
+  var canOpenFiles = false;
+  var initialized = request('ui/initialize', {
     protocolVersion: '2026-01-26',
     appCapabilities: {},
     appInfo: { name: 'Mapbox Vector Tile Viewer', version: '1.0.0' }
   }, 5000).then(function(result) {
-    canUpdateModelContext = !!(result && result.hostCapabilities && result.hostCapabilities.updateModelContext);
+    var caps = (result && result.hostCapabilities) || {};
+    canUpdateModelContext = !!caps.updateModelContext;
+    canOpenFiles = !!(caps.experimental && caps.experimental['openai/files']);
     applyHostContext(result && result.hostContext);
     notify('ui/notifications/initialized', {});
-    if (displayMode === 'inline') notify('ui/notifications/size-changed', { height: 560 });
+    if (displayMode === 'inline' && !openedPath) notify('ui/notifications/size-changed', { height: 560 });
   }, function() { notify('ui/notifications/initialized', {}); });
+
+  // The model gives a local path, which this page cannot read. The host can
+  // open it, and opens a .mvt in this same viewer through the file entrypoint.
+  var openedPath = '';
+  function openLocalPath(path) {
+    if (!path || path === openedPath) return;
+    openedPath = path;
+    $('file-name').textContent = path.split('/').pop();
+    $('file-meta').textContent = 'Opening it in the Mapbox vector tile viewer…';
+    showError('');
+    initialized.then(function() {
+      if (displayMode === 'inline') notify('ui/notifications/size-changed', { height: 160 });
+      // Tried even when not advertised: hosts may support it before they say so.
+      return request('openai/files/open', { path: path }, 15000);
+    }).then(function() {
+      $('file-meta').textContent = 'Opened as a tab next to the chat.';
+    }).catch(function(error) {
+      openedPath = '';
+      $('file-meta').textContent = '';
+      showError('The file could not be opened: ' + error.message + '.' +
+        (canOpenFiles ? '' : ' This host does not offer openai/files.') +
+        ' Copy it into the thread outputs and open it from there.');
+    });
+  }
 
   // --- Reading the file --------------------------------------------------------
   function showError(text) {

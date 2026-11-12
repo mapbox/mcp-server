@@ -3,13 +3,29 @@
 
 import { z } from 'zod';
 
-/** `FileInput` from the OpenAI MCP Extensions file entrypoint. */
+/**
+ * Either `file`, the `FileInput` the host passes when it opens a file through
+ * the OpenAI MCP Extensions file entrypoint, or `path`, when the model asks to
+ * open a local file.
+ */
 export const MvtPreviewInputSchema = z.object({
-  file: z.object({
-    name: z.string().min(1).describe('File name with its extension.'),
-    resourceUri: z
-      .string()
-      .min(1)
-      .describe('Opaque host URI the viewer reads the file through.')
-  })
+  file: z
+    .object({
+      name: z.string().min(1),
+      resourceUri: z.string().min(1)
+    })
+    .optional()
+    .describe('Set by the host when it opens a file. Leave unset.'),
+  path: z
+    .string()
+    .trim()
+    .max(4096)
+    .regex(
+      /^\/.*\.(mvt|pbf)$/i,
+      'Expected an absolute path ending in .mvt or .pbf'
+    )
+    .optional()
+    .describe(
+      'Absolute path of a local .mvt or .pbf file, for example /Users/me/Downloads/14-9326-4739.mvt.'
+    )
 });

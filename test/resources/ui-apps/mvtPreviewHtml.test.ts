@@ -22,4 +22,8 @@ describe('renderMvtPreviewHtml', () => {
     expect(script).toContain("request('resources/read'");
     expect(script).toContain("representation: 'blob'");
   });
+
+  it('asks the host to open a path from the model', () => {
+    expect(script).toContain("request('openai/files/open', { path: path }");
+  });
 });
