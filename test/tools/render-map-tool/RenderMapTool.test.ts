@@ -727,6 +727,14 @@ describe('RenderMapTool', () => {
     });
   });
 
+  // ChatGPT's "+" menu shows the tool's icon, else the wide server logo.
+  it('has a square icon for the entrypoint', () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    expect(tool.icons).toEqual([
+      expect.objectContaining({ mimeType: 'image/svg+xml', sizes: ['any'] })
+    ]);
+  });
+
   const chatGpt = {
     mcpReq: { _meta: { 'openai/userLocation': { city: 'Helsinki' } } }
   } as never;

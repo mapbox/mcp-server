@@ -77,6 +77,20 @@ export function renderMapAppHtml(params: {
   html, body { width: 100%; height: 100%; overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   #map { position: absolute; inset: 0; }
+  /* The map runs under the host's own controls, such as ChatGPT's title bar
+     on a phone; what sits on it stays inside the area the host leaves
+     uncovered (hostContext.safeAreaInsets). */
+  #frame {
+    position: absolute; pointer-events: none;
+    top: var(--safe-top, 0px); right: var(--safe-right, 0px);
+    bottom: var(--safe-bottom, 0px); left: var(--safe-left, 0px);
+  }
+  #frame > * { pointer-events: auto; }
+  #frame > #loading { pointer-events: none; }
+  #map .mapboxgl-ctrl-top-left { top: var(--safe-top, 0px); left: var(--safe-left, 0px); }
+  #map .mapboxgl-ctrl-top-right { top: var(--safe-top, 0px); right: var(--safe-right, 0px); }
+  #map .mapboxgl-ctrl-bottom-left { bottom: var(--safe-bottom, 0px); left: var(--safe-left, 0px); }
+  #map .mapboxgl-ctrl-bottom-right { bottom: var(--safe-bottom, 0px); right: var(--safe-right, 0px); }
   #summary {
     position: absolute; top: 12px; left: 12px; z-index: 10;
     background: var(--ui-surface); color: var(--ui-text);
@@ -213,6 +227,7 @@ export function renderMapAppHtml(params: {
 </head>
 <body>
 <div id="map"></div>
+<div id="frame">
 <div id="summary" style="display:none"></div>
 <div id="legends">
   <div id="legend" style="display:none"></div>
@@ -221,6 +236,7 @@ export function renderMapAppHtml(params: {
 <div id="carousel" style="display:none"></div>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
+</div>
 ${initialDataScript}
 
 <script>
@@ -326,9 +342,15 @@ ${initialDataScript}
       }, '*');
     } catch (_) {}
   }
+  // Inline, the map asks for 500px, or less where the host caps the height
+  // (hostContext.containerDimensions.maxHeight).
+  var INLINE_HEIGHT = 500;
+  var containerDimensions = null;
   function requestSizeToFit() {
     if (currentDisplayMode !== 'inline') return;
-    sendNotification('ui/notifications/size-changed', { height: 500 });
+    var max = containerDimensions && containerDimensions.maxHeight;
+    var height = typeof max === 'number' && max > 0 ? Math.min(INLINE_HEIGHT, max) : INLINE_HEIGHT;
+    sendNotification('ui/notifications/size-changed', { height: height });
   }
 
   window.addEventListener('message', function(event) {
@@ -347,13 +369,14 @@ ${initialDataScript}
     }
     if (message.method === 'ui/notifications/host-context-changed' &&
         message.params) {
-      // Partial updates: only the fields that changed are sent.
+      // Partial updates: only the fields that changed are sent. The display
+      // mode goes first, since the size request in applyHostContext uses it.
+      if (message.params.displayMode) currentDisplayMode = message.params.displayMode;
       applyHostContext(message.params);
       if ('openai/modelContext' in message.params) {
         onModelContextChanged(message.params['openai/modelContext']);
       }
       if (message.params.displayMode) {
-        currentDisplayMode = message.params.displayMode;
         if (map) setTimeout(function() { map.resize(); }, 100);
         shareMapContext();
       }
@@ -373,6 +396,11 @@ ${initialDataScript}
   // (--color-background-primary and so on) feed the --ui-* colors.
   function applyHostContext(ctx) {
     if (!ctx || typeof ctx !== 'object') return;
+    applySafeArea(ctx.safeAreaInsets);
+    if (ctx.containerDimensions && typeof ctx.containerDimensions === 'object') {
+      containerDimensions = ctx.containerDimensions;
+      requestSizeToFit();
+    }
     if (ctx.theme === 'light' || ctx.theme === 'dark') {
       hostTheme = ctx.theme;
       applyTheme(hostTheme);
@@ -388,6 +416,21 @@ ${initialDataScript}
     }
   }
   window.__applyHostContext = applyHostContext;
+
+  // In pixels, for layout done in script (control offsets, fit padding).
+  var safeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  function applySafeArea(insets) {
+    if (!insets || typeof insets !== 'object' || !rootEl || !rootEl.style ||
+        typeof rootEl.style.setProperty !== 'function') return;
+    ['top', 'right', 'bottom', 'left'].forEach(function(side) {
+      var value = insets[side];
+      if (typeof value === 'number' && isFinite(value) && value >= 0) {
+        safeInsets[side] = Math.round(value);
+        rootEl.style.setProperty('--safe-' + side, safeInsets[side] + 'px');
+      }
+    });
+    placeTopLeftControls();
+  }
 
   var darkQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-color-scheme: dark)')
@@ -410,10 +453,11 @@ ${initialDataScript}
   }).then(
     function(result) {
       hostAnswered = true;
-      if (result) applyHostContext(result.hostContext);
+      // Display mode first: the size request in applyHostContext depends on it.
       if (result && result.hostContext && result.hostContext.displayMode) {
         currentDisplayMode = result.hostContext.displayMode;
       }
+      if (result) applyHostContext(result.hostContext);
       canUpdateModelContext = !!(result && result.hostCapabilities &&
         result.hostCapabilities.updateModelContext);
       sendNotification('ui/notifications/initialized', {});
@@ -959,7 +1003,7 @@ ${MAP_APP_TOOLS_JS}
       : null;
     if (!corner) return;
     corner.style.top = summaryEl.style.display === 'block'
-      ? (summaryEl.offsetHeight + 8) + 'px'
+      ? (safeInsets.top + summaryEl.offsetHeight + 8) + 'px'
       : '';
   }
   // The chip's height isn't fixed: it wraps to more lines when the host
@@ -1161,7 +1205,12 @@ ${MAP_APP_TOOLS_JS}
     setTimeout(function() {
       map.resize();
       map.fitBounds(bounds, {
-        padding: { top: 70, bottom: bottomPadding(), left: 30, right: 30 },
+        padding: {
+          top: 70 + safeInsets.top,
+          bottom: bottomPadding() + safeInsets.bottom,
+          left: 30 + safeInsets.left,
+          right: 30 + safeInsets.right
+        },
         duration: 600
       });
     }, 60);

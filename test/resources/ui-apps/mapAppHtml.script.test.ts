@@ -1972,6 +1972,36 @@ describe('mapAppHtml search self-fetch', () => {
   });
 });
 
+describe('mapAppHtml host layout', () => {
+  // On a phone, ChatGPT's title bar covers the top of a fullscreen map.
+  it('keeps the page inside the safe area the host reports', () => {
+    const { rootEl, sendHostContext } = loadScriptSandbox();
+    sendHostContext({
+      safeAreaInsets: { top: 56, right: 0, bottom: 24.4, left: -3 }
+    });
+    expect(rootEl.cssVars['--safe-top']).toBe('56px');
+    expect(rootEl.cssVars['--safe-bottom']).toBe('24px');
+    // Not a usable inset.
+    expect(rootEl.cssVars['--safe-left']).toBeUndefined();
+  });
+
+  it("asks for no more inline height than the host's maximum", () => {
+    const { postMessageCalls, sendHostContext } = loadScriptSandbox({
+      hostContext: { displayMode: 'inline' }
+    });
+    const heights = () =>
+      postMessageCalls
+        .filter((m) => m.method === 'ui/notifications/size-changed')
+        .map((m) => (m.params as { height: number }).height);
+
+    sendHostContext({ containerDimensions: { width: 400, maxHeight: 320 } });
+    expect(heights().at(-1)).toBe(320);
+
+    sendHostContext({ containerDimensions: { width: 700, maxHeight: 900 } });
+    expect(heights().at(-1)).toBe(500);
+  });
+});
+
 describe('mapAppHtml explorer model context', () => {
   const explorerResult = {
     structuredContent: {

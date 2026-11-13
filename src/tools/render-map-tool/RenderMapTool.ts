@@ -4,10 +4,12 @@
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
 import type {
   CallToolResult,
+  Icon,
   ServerContext
 } from '@modelcontextprotocol/server';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
 import { BaseTool, type ToolMeta } from '../BaseTool.js';
+import { mapboxMarkIcon } from '../shared/mapboxMarkIcon.js';
 import { mapAppCsp } from '../../resources/ui-apps/mapAppCsp.js';
 import {
   RenderMapInputSchema,
@@ -119,6 +121,9 @@ export class RenderMapTool extends BaseTool<
     idempotentHint: true,
     openWorldHint: false
   };
+
+  // Shown in ChatGPT's "+" menu, where the wide server logo is unreadable.
+  readonly icons: Icon[] = [mapboxMarkIcon];
 
   readonly meta: ToolMeta;
 

@@ -6,6 +6,7 @@ import type {
   RegisteredTool,
   ToolAnnotations,
   CallToolResult,
+  Icon,
   ServerContext
 } from '@modelcontextprotocol/server';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -46,6 +47,7 @@ export abstract class BaseTool<
   readonly inputSchema: InputSchema;
   readonly outputSchema?: OutputSchema;
   readonly meta?: ToolMeta;
+  readonly icons?: Icon[];
   /**
    * The most recently installed server. Used as a fallback when `run()` is
    * called directly rather than through a callback registered by `installTo()`.
@@ -92,6 +94,7 @@ export abstract class BaseTool<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       outputSchema?: any;
       annotations?: ToolAnnotations;
+      icons?: Icon[];
       _meta?: ToolMeta;
     } = {
       title: this.annotations.title,
@@ -111,6 +114,9 @@ export abstract class BaseTool<
     // Add _meta for MCP Apps support if provided (includes CSP configuration)
     if (this.meta) {
       config._meta = this.meta;
+    }
+    if (this.icons) {
+      config.icons = this.icons;
     }
 
     return server.registerTool(
