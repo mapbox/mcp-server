@@ -162,6 +162,10 @@ Every geospatial tool in this server (directions, isochrone, search, and more) c
 
 If you need a guaranteed static image in clients without MCP Apps support, use `static_map_image_tool` instead — it returns a base64-encoded PNG/JPEG that every client can display.
 
+#### A map next to the chat in ChatGPT
+
+In ChatGPT, `render_map_tool` maps open as a tab next to the chat and stay open. You can also open an empty map from "+" → "More tools" → **Mapbox Map**. The map shares its view and the selected place (a pin, a search result, or a base map label such as a shop or a neighborhood) with the conversation, and in agent mode it registers WebMCP tools (`redraw_map`, `search_map`, `add_places`, `move_map`, `read_map`) so the model draws on the open map instead of opening another. Hosts without the [OpenAI MCP Extensions](https://developers.openai.com/plugins/build/extensions) ignore all of this.
+
 #### CLIENT_NEEDS_RESOURCE_FALLBACK
 
 **Resource Fallback Tools (Opt-In for Non-Compliant Clients)**

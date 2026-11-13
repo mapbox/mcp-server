@@ -7,11 +7,8 @@ import type {
   ServerContext
 } from '@modelcontextprotocol/server';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
-import { BaseTool } from '../BaseTool.js';
-import {
-  mapAppCsp,
-  type MapAppCsp
-} from '../../resources/ui-apps/mapAppCsp.js';
+import { BaseTool, type ToolMeta } from '../BaseTool.js';
+import { mapAppCsp } from '../../resources/ui-apps/mapAppCsp.js';
 import {
   RenderMapInputSchema,
   type RenderMapInput
@@ -54,6 +51,25 @@ import type { HttpRequest } from '../../utils/types.js';
  *      coordinate pairs as tool input — keeping latency in the
  *      hundreds-of-millseconds range instead of 20-30s.
  */
+// In ChatGPT the map stays open in a tab, so the next request decides between
+// one map and a pile of tabs. The model reads this right after drawing.
+const OPEN_MAP_HINT_CHATGPT =
+  'This map is now open in a tab next to the chat and stays open. For later ' +
+  'map requests in this conversation it provides these tools: redraw_map ' +
+  '(exactly the arguments of render_map_tool), search_map, add_places, ' +
+  'move_map and read_map. Use them to change this map: calling ' +
+  'render_map_tool again opens a duplicate tab.';
+
+/** ChatGPT tags every request with `openai/*` metadata. */
+function isChatGpt(extra?: ServerContext): boolean {
+  const meta = extra?.mcpReq?._meta;
+  return (
+    !!meta &&
+    typeof meta === 'object' &&
+    Object.keys(meta).some((key) => key.startsWith('openai/'))
+  );
+}
+
 export class RenderMapTool extends BaseTool<
   typeof RenderMapInputSchema,
   typeof RenderMapOutputSchema
@@ -62,6 +78,10 @@ export class RenderMapTool extends BaseTool<
   readonly description =
     'Display a live, interactive Mapbox GL JS map. ' +
     'Use this when someone wants to see a location, route, or dataset on a map. ' +
+    'In ChatGPT the map stays open next to the chat and provides its own tools ' +
+    '(redraw_map, which takes the same arguments as this tool, search_map, ' +
+    'add_places, move_map, read_map): use them to change that map, because ' +
+    'another call to this tool opens a second map. ' +
     'Preferred usage: any other Mapbox tool returns a `mapboxRender.ref` URI in ' +
     'its structuredContent — pass that ref via `payload_refs: ["..."]`. ' +
     'You can pass multiple refs to merge several datasets (e.g. a search ' +
@@ -90,14 +110,14 @@ export class RenderMapTool extends BaseTool<
     'number or address) instead.';
 
   readonly annotations = {
-    title: 'Render Map',
+    title: 'Mapbox Map',
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false
   };
 
-  readonly meta: { ui: { resourceUri: string; csp: MapAppCsp } };
+  readonly meta: ToolMeta;
 
   private readonly httpRequest: HttpRequest;
   private readonly apiEndpoint: () => string;
@@ -118,6 +138,13 @@ export class RenderMapTool extends BaseTool<
       ui: {
         resourceUri: 'ui://mapbox/map-app/index.html',
         csp: mapAppCsp(this.apiEndpoint())
+      },
+      'openai/ui': {
+        // Users open it with {} as a tab next to a chat.
+        entrypoints: [{ type: 'thread' }],
+        // A map the model draws opens there too, so it stays open across
+        // turns and later requests can draw on it.
+        preferredModelDisplayMode: 'fullscreen'
       }
     };
   }
@@ -137,10 +164,14 @@ export class RenderMapTool extends BaseTool<
         try {
           const input = RenderMapInputSchema.parse(rawInput);
 
-          const { payload, unresolvedRefs } = this.assemblePayload(
-            input,
-            owner
-          );
+          const assembled = this.assemblePayload(input, owner);
+          const { unresolvedRefs } = assembled;
+          // Nothing asked for at all: ChatGPT opening the map from its
+          // thread entrypoint, which calls with {}. Open an empty map.
+          const explorer = !assembled.payload && unresolvedRefs.length === 0;
+          const payload = explorer
+            ? { layers: [], markers: [] }
+            : assembled.payload;
 
           // A summary/legend alone counts as renderable, so without this a
           // call whose only data ref failed would still "succeed" and draw
@@ -202,14 +233,16 @@ export class RenderMapTool extends BaseTool<
               ? ' Updated the base map style.'
               : '';
 
-          const text =
-            `Rendered map with ${layerCount} layer${layerCount === 1 ? '' : 's'}` +
-            ` and ${markerCount} marker${markerCount === 1 ? '' : 's'}` +
-            (payload.summary ? ` — ${payload.summary}` : '') +
-            '.' +
-            baseMapConfigNote +
-            selfFetchNote +
-            staleNote;
+          const text = explorer
+            ? 'Opened an empty Mapbox map for the user to explore. ' +
+              'To show data on a map, pass `payload_refs` or inline `layers`/`markers`.'
+            : `Rendered map with ${layerCount} layer${layerCount === 1 ? '' : 's'}` +
+              ` and ${markerCount} marker${markerCount === 1 ? '' : 's'}` +
+              (payload.summary ? ` — ${payload.summary}` : '') +
+              '.' +
+              baseMapConfigNote +
+              selfFetchNote +
+              staleNote;
 
           // Claude Desktop strips structuredContent from MCP App iframe
           // postMessages and replaces large content[] payloads with
@@ -240,6 +273,11 @@ export class RenderMapTool extends BaseTool<
 
           const content: CallToolResult['content'] = [
             { type: 'text' as const, text },
+            // The map page's redraw_map relays only content[0], so this
+            // never reaches the model on a redraw.
+            ...(isChatGpt(extra)
+              ? [{ type: 'text' as const, text: OPEN_MAP_HINT_CHATGPT }]
+              : []),
             {
               type: 'text' as const,
               text: `[[MAPBOX_RENDER_REF]] ${mergedRef}`
@@ -263,6 +301,7 @@ export class RenderMapTool extends BaseTool<
               layer_count: layerCount,
               marker_count: markerCount,
               summary: payload.summary,
+              ...(explorer ? { explorer: true } : {}),
               mapboxRender
             },
             ...(tooBigToInline ? { _meta: { ui: { payload } } } : {}),

@@ -691,11 +691,70 @@ describe('RenderMapTool', () => {
     expect(text).toContain('Updated the base map style');
   });
 
-  it('still errors with nothing to render when baseMapConfig and everything else are absent', async () => {
+  // ChatGPT opens the thread entrypoint with {}.
+  it('opens an empty map for {}', async () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     const result = await tool.run({});
 
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      explorer: true,
+      layer_count: 0,
+      marker_count: 0,
+      mapboxRender: { layers: [], markers: [] }
+    });
+    // A model that calls it empty by mistake still learns what to pass.
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('payload_refs');
+  });
+
+  it('still errors when the only refs given cannot be resolved', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      payload_refs: ['mapbox://temp/does-not-exist']
+    });
+
     expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+  });
+
+  it('is a thread entrypoint that opens next to the chat', () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    expect(tool.annotations.title).toBe('Mapbox Map');
+    expect(tool.meta['openai/ui']).toEqual({
+      entrypoints: [{ type: 'thread' }],
+      preferredModelDisplayMode: 'fullscreen'
+    });
+  });
+
+  const chatGpt = {
+    mcpReq: { _meta: { 'openai/userLocation': { city: 'Helsinki' } } }
+  } as never;
+  const allText = (result: { content: unknown[] }) =>
+    result.content.map((c) => (c as { text: string }).text).join(' ');
+
+  // In ChatGPT the map stays open in a tab, so a second render_map_tool
+  // call piles up tabs.
+  it("in ChatGPT, names the open map's tools in the result", async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run(
+      { markers: [{ coordinates: [24.94, 60.17] }] },
+      chatGpt
+    );
+    const text = allText(result);
+    for (const name of ['redraw_map', 'search_map', 'add_places', 'move_map'])
+      expect(text).toContain(name);
+    expect(text).toContain('opens a duplicate tab');
+    // The tools are named directly, not left for the model to discover.
+    expect(text).not.toContain('look them up');
+  });
+
+  it('adds nothing about the open map elsewhere', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      markers: [{ coordinates: [24.94, 60.17] }]
+    });
+    expect(allText(result)).not.toContain('redraw_map');
   });
 
   it('carries baseMapConfig through when merged with a payload_ref', async () => {
@@ -788,5 +847,27 @@ describe('RenderMapTool', () => {
   it('tells the model it can show live traffic', () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     expect(tool.description).toContain('showTraffic: true');
+  });
+
+  describe('open map hint in ChatGPT', () => {
+    const run = (input: object) =>
+      new RenderMapTool({ httpRequest: vi.fn() }).run(input, {
+        http: { authInfo: { token: tokenFor('account-hint') } },
+        mcpReq: { _meta: { 'openai/userLocation': { city: 'Helsinki' } } }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+    const texts = (r: Awaited<ReturnType<typeof run>>) =>
+      (r.content as { type: string; text: string }[]).map((c) => c.text);
+
+    it('keeps the summary as the first text, which redraw_map relays', async () => {
+      const result = await run({ markers: [{ coordinates: [-77, 38] }] });
+      expect(texts(result)[0]).toMatch(/^Rendered map with/);
+      expect(texts(result)[0]).not.toContain('redraw_map');
+    });
+
+    it('names the tools for the empty map too', async () => {
+      const result = await run({});
+      expect(texts(result).some((t) => t.includes('redraw_map'))).toBe(true);
+    });
   });
 });
