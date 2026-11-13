@@ -25,11 +25,14 @@ export type ToolMeta = {
   };
   /**
    * OpenAI MCP Extensions: lets users open the app in a conversation's side
-   * panel (`thread`).
+   * panel (`thread`), or as the viewer for files with the given extensions
+   * (`file`).
    * https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#mcp-app-entrypoints
    */
   'openai/ui'?: {
-    entrypoints: Array<{ type: 'thread' }>;
+    entrypoints: Array<
+      { type: 'thread' } | { type: 'file'; extensions: string[] }
+    >;
     /** How a call from the model opens the app. In the SDK, not the spec. */
     preferredModelDisplayMode?: 'inline' | 'fullscreen';
   };

@@ -20,6 +20,11 @@ export function buildServerInstructions(
     'Otherwise use render_map_tool: it renders an interactive Mapbox GL JS map.',
     'When a tool result includes mapboxRender.ref, pass that ref unchanged in payload_refs (several refs can share one map). Never write or edit a ref by hand.'
   ];
+  if (enabledToolNames.includes('mvt_preview_tool')) {
+    lines.push(
+      'To preview, view or inspect a Mapbox Vector Tile file (.mvt or .pbf), call mvt_preview_tool with its absolute path. It opens the file in the Mapbox vector tile viewer. Do not decode the tile yourself or redraw it with render_map_tool.'
+    );
+  }
   if (enabledToolNames.includes('static_map_image_tool')) {
     lines.push(
       'Use static_map_image_tool only when the user explicitly asks for a static image file (PNG/JPEG), never as the default way to show a map.'

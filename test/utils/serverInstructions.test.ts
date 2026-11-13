@@ -37,6 +37,17 @@ describe('buildServerInstructions', () => {
     );
   });
 
+  // In Codex, "preview this tile" got the tile decoded with shell commands
+  // until the instructions named mvt_preview_tool.
+  it('routes .mvt files to mvt_preview_tool when it is enabled', () => {
+    expect(buildServerInstructions(getAllTools().map((t) => t.name))).toContain(
+      'call mvt_preview_tool with its absolute path'
+    );
+    expect(buildServerInstructions(['render_map_tool'])).not.toContain(
+      'mvt_preview_tool'
+    );
+  });
+
   it('omits the static image rule when that tool is disabled', () => {
     const text = buildServerInstructions(['render_map_tool', 'isochrone_tool']);
     expect(text).toContain('use render_map_tool');

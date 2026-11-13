@@ -81,7 +81,8 @@ describe('Tool Annotations', () => {
       'length_tool',
       'nearest_point_on_line_tool',
       'convex_tool',
-      'render_map_tool'
+      'render_map_tool',
+      'mvt_preview_tool'
     ];
     const apiTools = tools.filter((tool) => !offlineTools.includes(tool.name));
 
