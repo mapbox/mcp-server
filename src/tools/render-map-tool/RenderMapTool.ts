@@ -7,11 +7,8 @@ import type {
   ServerContext
 } from '@modelcontextprotocol/server';
 import { createLocalToolExecutionContext } from '../../utils/tracing.js';
-import { BaseTool } from '../BaseTool.js';
-import {
-  mapAppCsp,
-  type MapAppCsp
-} from '../../resources/ui-apps/mapAppCsp.js';
+import { BaseTool, type ToolMeta } from '../BaseTool.js';
+import { mapAppCsp } from '../../resources/ui-apps/mapAppCsp.js';
 import {
   RenderMapInputSchema,
   type RenderMapInput
@@ -54,14 +51,54 @@ import type { HttpRequest } from '../../utils/types.js';
  *      coordinate pairs as tool input — keeping latency in the
  *      hundreds-of-millseconds range instead of 20-30s.
  */
+const OPEN_MAP_HINT =
+  'A new map just opened. Before answering, call read_map on the open map ' +
+  'once, if that tool is available, so its tools are ready for follow-ups. ' +
+  'Where the host keeps this map open next to the chat, follow-up requests ' +
+  '(add a route, show more places, mark a place, move it) should change ' +
+  'this map instead of opening another: it registers its own app tools ' +
+  '(WebMCP) redraw_map, search_map, add_places, move_map and read_map. ' +
+  'redraw_map takes the same arguments as render_map_tool and draws on the ' +
+  'open map. Look them up among the tools of the open app and call them. ' +
+  'Call render_map_tool again only if those tools are not available.';
+
+// ChatGPT opens the map as a tab that stays open, so there the next call
+// decides between one map and a pile of tabs. Said firmly, because the softer
+// wording above still got a second render_map_tool call about half the time.
+const OPEN_MAP_HINT_CHATGPT =
+  'IMPORTANT: this map is now open in a tab next to the chat and stays open. ' +
+  'Before answering, call read_map on the open map once, if that tool is ' +
+  'available, so its tools are ready for follow-ups. ' +
+  'Every later map request in this conversation (a route, more places, a ' +
+  'marker, a different area, a style change) must update THIS map: call the ' +
+  "open map's own app tool redraw_map, which takes exactly the arguments of " +
+  'render_map_tool, or search_map / add_places / move_map. These are WebMCP ' +
+  'tools registered by the open app; look them up among its tools. Calling ' +
+  'render_map_tool again opens a duplicate tab, so do it only after you have ' +
+  'looked for those tools and they do not exist.';
+
+/** ChatGPT tags every request with `openai/*` metadata. */
+function isChatGpt(extra?: ServerContext): boolean {
+  const meta = extra?.mcpReq?._meta;
+  return (
+    !!meta &&
+    typeof meta === 'object' &&
+    Object.keys(meta).some((key) => key.startsWith('openai/'))
+  );
+}
+
 export class RenderMapTool extends BaseTool<
   typeof RenderMapInputSchema,
   typeof RenderMapOutputSchema
 > {
   readonly name = 'render_map_tool';
   readonly description =
-    'Display a live, interactive Mapbox GL JS map. ' +
-    'Use this when someone wants to see a location, route, or dataset on a map. ' +
+    'Open a live, interactive Mapbox GL JS map. Each call opens a NEW map, so ' +
+    'check first whether a Mapbox map is already open: an open map registers its ' +
+    'own app tools (redraw_map, search_map, add_places, move_map), and redraw_map ' +
+    'takes the same arguments as this tool and draws on the open map. Call this ' +
+    'tool when no map is open yet and someone wants to see a location, route, ' +
+    'or dataset on a map. ' +
     'Preferred usage: any other Mapbox tool returns a `mapboxRender.ref` URI in ' +
     'its structuredContent — pass that ref via `payload_refs: ["..."]`. ' +
     'You can pass multiple refs to merge several datasets (e.g. a search ' +
@@ -90,14 +127,14 @@ export class RenderMapTool extends BaseTool<
     'number or address) instead.';
 
   readonly annotations = {
-    title: 'Render Map',
+    title: 'Mapbox Map',
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false
   };
 
-  readonly meta: { ui: { resourceUri: string; csp: MapAppCsp } };
+  readonly meta: ToolMeta;
 
   private readonly httpRequest: HttpRequest;
   private readonly apiEndpoint: () => string;
@@ -118,6 +155,13 @@ export class RenderMapTool extends BaseTool<
       ui: {
         resourceUri: 'ui://mapbox/map-app/index.html',
         csp: mapAppCsp(this.apiEndpoint())
+      },
+      'openai/ui': {
+        // Users open it with {} as a tab next to a chat.
+        entrypoints: [{ type: 'thread' }],
+        // A map the model draws opens there too, so it stays open across
+        // turns and later requests can draw on it.
+        preferredModelDisplayMode: 'fullscreen'
       }
     };
   }
@@ -137,10 +181,14 @@ export class RenderMapTool extends BaseTool<
         try {
           const input = RenderMapInputSchema.parse(rawInput);
 
-          const { payload, unresolvedRefs } = this.assemblePayload(
-            input,
-            owner
-          );
+          const assembled = this.assemblePayload(input, owner);
+          const { unresolvedRefs } = assembled;
+          // Nothing asked for at all: ChatGPT opening the map from its
+          // thread entrypoint, which calls with {}. Open an empty map.
+          const explorer = !assembled.payload && unresolvedRefs.length === 0;
+          const payload = explorer
+            ? { layers: [], markers: [] }
+            : assembled.payload;
 
           // A summary/legend alone counts as renderable, so without this a
           // call whose only data ref failed would still "succeed" and draw
@@ -202,14 +250,16 @@ export class RenderMapTool extends BaseTool<
               ? ' Updated the base map style.'
               : '';
 
-          const text =
-            `Rendered map with ${layerCount} layer${layerCount === 1 ? '' : 's'}` +
-            ` and ${markerCount} marker${markerCount === 1 ? '' : 's'}` +
-            (payload.summary ? ` — ${payload.summary}` : '') +
-            '.' +
-            baseMapConfigNote +
-            selfFetchNote +
-            staleNote;
+          const text = explorer
+            ? 'Opened an empty Mapbox map for the user to explore. ' +
+              'To show data on a map, pass `payload_refs` or inline `layers`/`markers`.'
+            : `Rendered map with ${layerCount} layer${layerCount === 1 ? '' : 's'}` +
+              ` and ${markerCount} marker${markerCount === 1 ? '' : 's'}` +
+              (payload.summary ? ` — ${payload.summary}` : '') +
+              '.' +
+              baseMapConfigNote +
+              selfFetchNote +
+              staleNote;
 
           // Claude Desktop strips structuredContent from MCP App iframe
           // postMessages and replaces large content[] payloads with
@@ -240,6 +290,15 @@ export class RenderMapTool extends BaseTool<
 
           const content: CallToolResult['content'] = [
             { type: 'text' as const, text },
+            // The model reads this right after drawing, which is when it
+            // decides how to handle the next request. Hosts without app
+            // tools fall through to the last sentence. The map page's
+            // redraw_map relays only content[0], so this never reaches the
+            // model on a redraw.
+            {
+              type: 'text' as const,
+              text: isChatGpt(extra) ? OPEN_MAP_HINT_CHATGPT : OPEN_MAP_HINT
+            },
             {
               type: 'text' as const,
               text: `[[MAPBOX_RENDER_REF]] ${mergedRef}`
@@ -263,6 +322,7 @@ export class RenderMapTool extends BaseTool<
               layer_count: layerCount,
               marker_count: markerCount,
               summary: payload.summary,
+              ...(explorer ? { explorer: true } : {}),
               mapboxRender
             },
             ...(tooBigToInline ? { _meta: { ui: { payload } } } : {}),

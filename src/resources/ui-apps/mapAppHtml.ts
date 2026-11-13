@@ -236,6 +236,8 @@ ${initialDataScript}
   // <-> pin) and Place Details enrichment can find a marker by mapbox_id
   // without re-querying the map for it.
   var markersById = {};
+  // Named markers on the map, for the model (read_map).
+  var placesOnMap = [];
 
   var map = null;
   var mapLoaded = false;
@@ -344,9 +346,13 @@ ${initialDataScript}
         message.params) {
       // Partial updates: only the fields that changed are sent.
       applyHostContext(message.params);
+      if ('openai/modelContext' in message.params) {
+        onModelContextChanged(message.params['openai/modelContext']);
+      }
       if (message.params.displayMode) {
         currentDisplayMode = message.params.displayMode;
         if (map) setTimeout(function() { map.resize(); }, 100);
+        shareMapContext();
       }
     }
   });
@@ -402,7 +408,13 @@ ${initialDataScript}
     function(result) {
       hostAnswered = true;
       if (result) applyHostContext(result.hostContext);
+      if (result && result.hostContext && result.hostContext.displayMode) {
+        currentDisplayMode = result.hostContext.displayMode;
+      }
+      canUpdateModelContext = !!(result && result.hostCapabilities &&
+        result.hostCapabilities.updateModelContext);
       sendNotification('ui/notifications/initialized', {});
+      shareMapContext();
     },
     function() {
       hostAnswered = true;
@@ -457,6 +469,8 @@ ${initialDataScript}
     map = new mapboxgl.Map(mapOptions);
     map.addControl(new mapboxgl.NavigationControl(), 'top-left');
     map.addControl(new LayerToggleControl(), 'top-left');
+    map.on('moveend', scheduleShareMapContext);
+    addLabelInteractions();
     map.on('load', function() {
       mapLoaded = true;
       if (pendingPayload) {
@@ -465,6 +479,7 @@ ${initialDataScript}
       } else {
         consumeInitialData();
       }
+      shareMapContext();
     });
   }
   initMap();
@@ -483,6 +498,13 @@ ${initialDataScript}
   // structuredContent (e.g. Claude Desktop) never have inline data to find
   // here, so they fall through to the ref path exactly as before.
   function handleToolResult(result) {
+    // An empty map opened from the thread entrypoint stays open next to the
+    // chat, so it shares context like a fullscreen map.
+    if (result && result.structuredContent && result.structuredContent.explorer === true &&
+        !explorerMode) {
+      explorerMode = true;
+      shareMapContext();
+    }
     var payload = extractInlinePayload(result);
     if (payload) {
       stageRender(payload);
@@ -516,6 +538,419 @@ ${initialDataScript}
       return;
     }
     showError('Tool result did not contain a map payload.');
+  }
+
+  // --- Model context ---------------------------------------------------------
+  // A map that stays open next to a chat (an empty map opened from the
+  // thread entrypoint, or any map expanded into a tab) tells the model what the user is looking at, so "what's
+  // around here?" works without naming the place. The view is background
+  // context (structuredContent); a selected place is a chip the user can
+  // remove from the composer (content). An inline map shares nothing.
+  var explorerMode = false;
+  var webMcpTools = false;
+  var canUpdateModelContext = false;
+  var shareTimer = null;
+  var lastSharedContext = '';
+  var sharePending = false;
+  var ownContextUpdateId = null;
+  // A place whose chip the user removed, until they select another.
+  var dismissedPlaceKey = null;
+  var pinnedPlace = null;
+
+  function coord(n) { return Math.round(n * 1e5) / 1e5; }
+
+  function mapView() {
+    var center = map.getCenter();
+    var bounds = map.getBounds();
+    return {
+      center: { longitude: coord(center.lng), latitude: coord(center.lat) },
+      zoom: Math.round(map.getZoom() * 10) / 10,
+      bounds: {
+        west: coord(bounds.getWest()),
+        south: coord(bounds.getSouth()),
+        east: coord(bounds.getEast()),
+        north: coord(bounds.getNorth())
+      }
+    };
+  }
+
+  // The place the user picked last: a plain pin they clicked (pinnedPlace),
+  // or the active result card.
+  function selectedPlace() {
+    if (pinnedPlace) return pinnedPlace;
+    var entry = activePlaceId ? markersById[activePlaceId] : null;
+    if (!entry || !entry.name) return null;
+    var at = entry.marker.getLngLat();
+    return {
+      name: entry.name,
+      longitude: coord(at.lng),
+      latitude: coord(at.lat),
+      mapbox_id: activePlaceId
+    };
+  }
+
+  function placeKey(place) {
+    return place ? place.mapbox_id || (place.name + '@' + place.longitude + ',' + place.latitude) : null;
+  }
+
+  // A pin without a result card (add_places, a hand-composed marker) has no
+  // other way to be selected than a click.
+  function selectPinnedPlace(place) {
+    setSelectedLabel(null);
+    pinnedPlace = place;
+    dismissedPlaceKey = null;
+    shareMapContext();
+  }
+
+  function clearPinnedPlace() {
+    setSelectedLabel(null);
+    pinnedPlace = null;
+  }
+
+  // A label on the Standard base map (a point of interest, a place name, a
+  // landmark), selected like a pin so the user can ask about it. The base
+  // map has no mapbox_id for it, so the model gets its name, category and
+  // coordinates. Each featureset shows the selection its own way: poi has
+  // only a hide state, so the label is hidden and drawn again as a selected
+  // pin; place-labels and indoor-labels have a select state; landmark-icons
+  // has no state, so a pin goes on top. Road and water labels aren't in any
+  // featureset, so they can't be picked.
+  var selectedLabel = null;
+  var selectedLabelMarker = null;
+
+  function setLabelState(label, on) {
+    if (!map || label.show === 'pin') return;
+    var state = {};
+    state[label.show] = on;
+    try { map.setFeatureState(label.feature, state); } catch (_) { /* style switched */ }
+  }
+
+  function setSelectedLabel(label) {
+    if (selectedLabel) setLabelState(selectedLabel, false);
+    if (selectedLabelMarker) selectedLabelMarker.remove();
+    selectedLabel = label;
+    selectedLabelMarker = null;
+    if (!label || !map) return;
+    setLabelState(label, true);
+    if (label.show === 'select') return;
+    var place = label.place;
+    var el = buildPlaceElement(placeIcon(label.feature.properties.maki, place.category));
+    el.className += ' active';
+    var nameEl = document.createElement('span');
+    nameEl.className = 'marker-name';
+    nameEl.textContent = place.name;
+    el.appendChild(nameEl);
+    // A second click on the selected label lands on this pin: deselect it.
+    // Stopping the click keeps the hidden label under it from being picked
+    // again.
+    el.addEventListener('click', function(e) {
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+      deselectBaseMapLabel();
+    });
+    selectedLabelMarker = new mapboxgl.Marker({ element: el })
+      .setLngLat([place.longitude, place.latitude])
+      .addTo(map);
+  }
+
+  function labelCategory(props) {
+    var kind = typeof props.maki === 'string' && props.maki !== 'marker' ? props.maki
+      : [props.class, props.type].filter(function(v) { return typeof v === 'string' && v; })[0] || '';
+    return kind.replace(/[-_]/g, ' ');
+  }
+
+  function selectBaseMapLabel(featuresetId, show, feature) {
+    var props = (feature && feature.properties) || {};
+    var at = feature && feature.geometry && feature.geometry.coordinates;
+    if (typeof props.name !== 'string' || !props.name || !Array.isArray(at) ||
+        typeof at[0] !== 'number' || typeof at[1] !== 'number') return;
+    var place = { name: props.name, longitude: coord(at[0]), latitude: coord(at[1]) };
+    var category = labelCategory(props);
+    if (category) place.category = category;
+    // A second click on a label shown with its select state.
+    if (selectedLabel && selectedLabel.featuresetId === featuresetId &&
+        placeKey(selectedLabel.place) === placeKey(place)) {
+      deselectBaseMapLabel();
+      return;
+    }
+    selectPinnedPlace(place);
+    setSelectedLabel({ featuresetId: featuresetId, show: show, feature: feature, place: place });
+  }
+
+  function deselectBaseMapLabel() {
+    if (!selectedLabel) return;
+    clearPinnedPlace();
+    shareMapContext();
+  }
+
+  function addLabelInteractions() {
+    if (typeof map.addInteraction !== 'function') return;
+    // Declared here, not beside the selection state: the map can load, and
+    // call this, before the script reaches those lines.
+    var labels = [
+      { featuresetId: 'poi', show: 'hide' },
+      { featuresetId: 'place-labels', show: 'select' },
+      { featuresetId: 'landmark-icons', show: 'pin' },
+      { featuresetId: 'indoor-labels', show: 'select' }
+    ];
+    labels.forEach(function(label) {
+      var target = { featuresetId: label.featuresetId, importId: 'basemap' };
+      map.addInteraction('select-base-map-' + label.featuresetId, {
+        type: 'click', target: target,
+        handler: function(e) { selectBaseMapLabel(label.featuresetId, label.show, e.feature); }
+      });
+      map.addInteraction('base-map-' + label.featuresetId + '-pointer-in', {
+        type: 'mouseenter', target: target,
+        handler: function() { map.getCanvas().style.cursor = 'pointer'; }
+      });
+      map.addInteraction('base-map-' + label.featuresetId + '-pointer-out', {
+        type: 'mouseleave', target: target,
+        handler: function() { map.getCanvas().style.cursor = ''; }
+      });
+    });
+  }
+
+  function mapContext() {
+    var content = [];
+    var place = selectedPlace();
+    if (place && placeKey(place) === dismissedPlaceKey) place = null;
+    if (place) {
+      content.push({
+        type: 'text',
+        text: 'Place the user selected on the map: ' + place.name +
+          (place.category ? ', ' + place.category : '') +
+          ' (longitude ' + place.longitude + ', latitude ' + place.latitude + ')' +
+          (place.mapbox_id ? ', mapbox_id ' + place.mapbox_id : '') + '.',
+        _meta: { 'openai/title': place.name }
+      });
+    }
+    return {
+      content: content,
+      structuredContent: {
+        note: 'The Mapbox map the user has open next to this chat. "Here", "this area" or "the map" means this view.' +
+          (webMcpTools
+            ? ' This map registers its own app tools (WebMCP): redraw_map (same arguments as render_map_tool), search_map, add_places, move_map, read_map. Look them up among the tools of the open app and call them to change this map. Do not call render_map_tool for that: it would open another map and leave this one unchanged.'
+            : ''),
+        view: mapView()
+      }
+    };
+  }
+
+  // Each call replaces what this map shared before.
+  function shareMapContext() {
+    if (!canUpdateModelContext || !map || !mapLoaded) return;
+    var staysOpen = explorerMode || currentDisplayMode === 'fullscreen';
+    // Back inline: take back what this map shared.
+    if (!staysOpen && !lastSharedContext) return;
+    var context = staysOpen ? mapContext() : { content: [] };
+    var key = JSON.stringify(context);
+    if (key === lastSharedContext) return;
+    lastSharedContext = key;
+    sharePending = true;
+    sendRequest('ui/update-model-context', context, 10000).then(
+      function(result) {
+        sharePending = false;
+        var meta = result && result._meta && result._meta['openai/modelContext'];
+        ownContextUpdateId = meta ? meta.updateId : null;
+      },
+      function() { sharePending = false; lastSharedContext = ''; }
+    );
+  }
+
+  function scheduleShareMapContext() {
+    if (shareTimer) clearTimeout(shareTimer);
+    shareTimer = setTimeout(shareMapContext, 400);
+  }
+
+  // The host reports what is attached now. Anything but our own last update
+  // without the place in it means the place left the composer: the user
+  // removed it, or a sent message used it up.
+  function onModelContextChanged(state) {
+    if (sharePending) return;
+    if (state && state.updateId === ownContextUpdateId) return;
+    if (state && Array.isArray(state.content) && state.content.length > 0) return;
+    // ChatGPT sends the same null when the user removes the item and when
+    // a sent message uses it up, so the map keeps its selection either way.
+    dismissedPlaceKey = placeKey(selectedPlace());
+    lastSharedContext = '';
+  }
+
+  // --- WebMCP tools ----------------------------------------------------------
+  // ChatGPT Desktop lets the model call tools an open app registers, so a
+  // request like "show coffee shops on it" draws on this map instead of
+  // opening another one.
+  // https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#webmcp
+  function readMap() {
+    return JSON.stringify({
+      view: mapView(),
+      places: placesOnMap,
+      selectedPlace: selectedPlace()
+    });
+  }
+
+  function requireMap() {
+    if (!map || !mapLoaded) throw new Error('The map is not ready yet.');
+  }
+
+  function clearMap() {
+    errorEl.style.display = 'none';
+    stageRender({ layers: [], markers: [] });
+  }
+
+  function isLngLat(lng, lat) {
+    return typeof lng === 'number' && typeof lat === 'number' &&
+      lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
+  }
+
+  var MAP_TOOLS = [
+    {
+      name: 'read_map',
+      description: 'Read the open Mapbox map: its view (center, zoom, bounds), the places drawn on it and the place the user selected.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true },
+      execute: function() {
+        requireMap();
+        return readMap();
+      }
+    },
+    {
+      name: 'redraw_map',
+      description: 'Redraw the open Mapbox map with anything render_map_tool can draw: routes, isochrones, search results, GeoJSON layers, markers. Takes exactly the same arguments as render_map_tool (payload_refs from other Mapbox tools, inline layers and markers, summary, baseStyle, baseMapConfig, showTraffic) and draws on this map instead of opening another. Like render_map_tool it replaces what is on the map, so pass again whatever should stay (for example the route ref together with new markers).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          payload_refs: { type: 'array', items: { type: 'string' }, description: 'mapboxRender.ref values from other Mapbox tools.' },
+          layers: { type: 'array', items: { type: 'object' } },
+          markers: { type: 'array', items: { type: 'object' } },
+          summary: { type: 'string' }
+        },
+        additionalProperties: true
+      },
+      execute: function(input) {
+        requireMap();
+        var args = input && typeof input === 'object' ? input : {};
+        if (Object.keys(args).length === 0) {
+          throw new Error('Pass payload_refs or inline layers/markers, as for render_map_tool.');
+        }
+        // The server resolves refs and validates, exactly as for a call
+        // from the model; only where the result is drawn differs.
+        return sendRequest('tools/call', { name: 'render_map_tool', arguments: args }, 30000)
+          .then(function(result) {
+            var first = result && Array.isArray(result.content) ? result.content[0] : null;
+            var text = first && typeof first.text === 'string' ? first.text : '';
+            if (!result || result.isError) throw new Error(text || 'render_map_tool failed.');
+            errorEl.style.display = 'none';
+            handleToolResult(result);
+            return text + ' Drawn on the open map.';
+          });
+      }
+    },
+    {
+      name: 'search_map',
+      description: 'Search for places (a name, address or kind of place, such as "coffee") near the center of the open Mapbox map and draw the results on it. Use this instead of opening a new map when the user asks to show places on the map they already have open.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'What to search for.' },
+          clear: { type: 'boolean', description: 'Remove what is on the map first. Default false.' }
+        },
+        required: ['query'],
+        additionalProperties: false
+      },
+      execute: function(input) {
+        requireMap();
+        var q = input && typeof input.query === 'string' ? input.query.trim() : '';
+        if (!q) throw new Error('query is required.');
+        if (input.clear === true) clearMap();
+        var center = map.getCenter();
+        return selfFetchSearch({
+          q: q,
+          proximity: { longitude: center.lng, latitude: center.lat }
+        }).then(function(found) {
+          if (!found) throw new Error('No results for "' + q + '" near the map center.');
+          return readMap();
+        });
+      }
+    },
+    {
+      name: 'add_places',
+      description: 'Draw pins on the open Mapbox map at known coordinates and fit the view to them. Use this instead of opening a new map when the user asks to mark places on the map they already have open.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          places: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 50,
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                longitude: { type: 'number' },
+                latitude: { type: 'number' }
+              },
+              required: ['name', 'longitude', 'latitude'],
+              additionalProperties: false
+            }
+          },
+          clear: { type: 'boolean', description: 'Remove what is on the map first. Default false.' }
+        },
+        required: ['places'],
+        additionalProperties: false
+      },
+      execute: function(input) {
+        requireMap();
+        var places = input && Array.isArray(input.places) ? input.places.slice(0, 50) : [];
+        var markers = places.map(function(p) {
+          if (!p || !isLngLat(p.longitude, p.latitude)) {
+            throw new Error('Each place needs a longitude (-180 to 180) and a latitude (-90 to 90).');
+          }
+          var name = typeof p.name === 'string' ? p.name : '';
+          return { coordinates: [p.longitude, p.latitude], name: name, popup: name };
+        });
+        if (markers.length === 0) throw new Error('places is required.');
+        if (input.clear === true) clearMap();
+        mergeAdditionalPayload({ layers: [], markers: markers });
+        return readMap();
+      }
+    },
+    {
+      name: 'move_map',
+      description: 'Move the open Mapbox map to a location.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          longitude: { type: 'number' },
+          latitude: { type: 'number' },
+          zoom: { type: 'number', minimum: 0, maximum: 22, description: 'Default 12.' }
+        },
+        required: ['longitude', 'latitude'],
+        additionalProperties: false
+      },
+      execute: function(input) {
+        requireMap();
+        if (!input || !isLngLat(input.longitude, input.latitude)) {
+          throw new Error('longitude (-180 to 180) and latitude (-90 to 90) are required.');
+        }
+        var zoom = typeof input.zoom === 'number' ? Math.max(0, Math.min(22, input.zoom)) : 12;
+        map.flyTo({ center: [input.longitude, input.latitude], zoom: zoom, duration: 600 });
+        return JSON.stringify({
+          center: { longitude: input.longitude, latitude: input.latitude },
+          zoom: zoom
+        });
+      }
+    }
+  ];
+
+  if (document.modelContext && typeof document.modelContext.registerTool === 'function') {
+    webMcpTools = true;
+    MAP_TOOLS.forEach(function(tool) {
+      var run = tool.execute;
+      // A promise either way, so a thrown error reaches the model as a rejection.
+      tool.execute = function(input) {
+        return Promise.resolve(input).then(run);
+      };
+      try { document.modelContext.registerTool(tool); } catch (_) { /* already registered */ }
+    });
   }
 
   function readResourceExpiryMessage(rr) {
@@ -618,6 +1053,8 @@ ${initialDataScript}
     // night mode) when the Satellite button switches style.
     currentBaseMapConfig = null;
     markersById = {};
+    placesOnMap = [];
+    clearPinnedPlace();
     carouselEl.style.display = 'none';
     legendsEl.style.bottom = '';
     clearPanel();
@@ -992,12 +1429,21 @@ ${initialDataScript}
     if (m.popup && !m.id) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
     marker.addTo(map);
     trackedMarkers.push(marker);
+    if (m.name) {
+      var place = { name: m.name, longitude: m.coordinates[0], latitude: m.coordinates[1] };
+      if (m.id) place.mapbox_id = m.id;
+      placesOnMap.push(place);
+      var pinEl = !m.id && typeof marker.getElement === 'function' ? marker.getElement() : null;
+      if (pinEl && typeof pinEl.addEventListener === 'function') {
+        pinEl.addEventListener('click', function() { selectPinnedPlace(place); });
+      }
+    }
     // Tagged by buildSearchMiniPayload with the result's mapbox_id so the
     // carousel and Place Details enrichment can look the marker back up
     // later without walking trackedMarkers.
     if (m.id) {
       var badgeEl = typeof marker.getElement === 'function' ? marker.getElement() : null;
-      markersById[m.id] = { marker: marker, el: badgeEl, color: color };
+      markersById[m.id] = { marker: marker, el: badgeEl, color: color, name: m.name };
       if (badgeEl && m.name) {
         var nameEl = document.createElement('span');
         nameEl.className = 'marker-name';
@@ -2064,6 +2510,13 @@ ${initialDataScript}
         setActiveClass(pin.el, true);
         pin.el.style.zIndex = '2';
       }
+      clearPinnedPlace();
+      dismissedPlaceKey = null;
+      shareMapContext();
+    } else if (pinnedPlace) {
+      // Back to the card that was already active.
+      clearPinnedPlace();
+      shareMapContext();
     }
     if (opts.scrollCard && typeof row.li.scrollIntoView === 'function') {
       row.li.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -2490,13 +2943,14 @@ ${initialDataScript}
     return params.proximityFromResults ? undefined : params.proximity;
   }
 
+  // Resolves to how many results were drawn.
   function selfFetchSearch(params) {
     if (!TOKEN || !isSafeSearchParams(params)) {
       showError('Could not fetch search results: missing token or invalid parameters.');
-      return;
+      return Promise.resolve(0);
     }
     var url = buildSearchAndGeocodeApiUrl(params, TOKEN, API_ENDPOINT);
-    fetch(url)
+    return fetch(url)
       .then(function(res) {
         if (!res.ok) {
           return res
@@ -2524,14 +2978,16 @@ ${initialDataScript}
         var mini = buildSearchMiniPayload(fc, params.q, searchCenter(params));
         if (!mini) {
           showError('Search API returned no results.');
-          return;
+          return 0;
         }
         mergeAdditionalPayload(mini);
+        return mini.markers.filter(function(m) { return m.style === 'place'; }).length;
       })
       .catch(function(err) {
         showError(
           'Could not fetch search results: ' + (err && err.message ? err.message : err)
         );
+        return 0;
       });
   }
 

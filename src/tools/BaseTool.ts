@@ -13,6 +13,28 @@ import { lenientOutputSchema } from './lenientOutputSchema.js';
 import type { ZodTypeAny } from 'zod';
 import type { z } from 'zod';
 
+export type ToolMeta = {
+  ui?: {
+    resourceUri?: string;
+    csp?: {
+      connectDomains?: string[];
+      resourceDomains?: string[];
+      frameDomains?: string[];
+      workerDomains?: string[];
+    };
+  };
+  /**
+   * OpenAI MCP Extensions: lets users open the app in a conversation's side
+   * panel (`thread`).
+   * https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#mcp-app-entrypoints
+   */
+  'openai/ui'?: {
+    entrypoints: Array<{ type: 'thread' }>;
+    /** How a call from the model opens the app. In the SDK, not the spec. */
+    preferredModelDisplayMode?: 'inline' | 'fullscreen';
+  };
+};
+
 export abstract class BaseTool<
   InputSchema extends ZodTypeAny,
   OutputSchema extends ZodTypeAny = ZodTypeAny
@@ -23,17 +45,7 @@ export abstract class BaseTool<
 
   readonly inputSchema: InputSchema;
   readonly outputSchema?: OutputSchema;
-  readonly meta?: {
-    ui?: {
-      resourceUri?: string;
-      csp?: {
-        connectDomains?: string[];
-        resourceDomains?: string[];
-        frameDomains?: string[];
-        workerDomains?: string[];
-      };
-    };
-  };
+  readonly meta?: ToolMeta;
   /**
    * The most recently installed server. Used as a fallback when `run()` is
    * called directly rather than through a callback registered by `installTo()`.
@@ -80,17 +92,7 @@ export abstract class BaseTool<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       outputSchema?: any;
       annotations?: ToolAnnotations;
-      _meta?: {
-        ui?: {
-          resourceUri?: string;
-          csp?: {
-            connectDomains?: string[];
-            resourceDomains?: string[];
-            frameDomains?: string[];
-            workerDomains?: string[];
-          };
-        };
-      };
+      _meta?: ToolMeta;
     } = {
       title: this.annotations.title,
       description: this.description,

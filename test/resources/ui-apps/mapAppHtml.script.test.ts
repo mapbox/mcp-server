@@ -1,7 +1,7 @@
 // Copyright (c) Mapbox, Inc.
 // Licensed under the MIT License.
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { renderMapAppHtml } from '../../../src/resources/ui-apps/mapAppHtml.js';
@@ -31,6 +31,14 @@ const mockPoiId = (suffix: string) => {
  * bridge doesn't support at all), while a ref-only result (Claude
  * Desktop, which strips structuredContent) still falls back to it.
  */
+type WebMcpTool = {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  annotations?: { readOnlyHint?: boolean };
+  execute: (input: unknown) => Promise<string>;
+};
+
 function loadScriptSandbox(options?: {
   initialData?: unknown;
   /** A page opened directly (export_map_html_tool), not inside a host. */
@@ -39,6 +47,10 @@ function loadScriptSandbox(options?: {
   noHost?: boolean;
   /** hostContext the host answers ui/initialize with. */
   hostContext?: Record<string, unknown>;
+  /** hostCapabilities the host answers ui/initialize with. */
+  hostCapabilities?: Record<string, unknown>;
+  /** The host exposes WebMCP (document.modelContext). */
+  webMcp?: boolean;
   /** The system's prefers-color-scheme: dark, when set. */
   systemDark?: boolean;
 }) {
@@ -88,11 +100,14 @@ function loadScriptSandbox(options?: {
       get firstChild() {
         return children[0];
       },
+      value: '',
+      focus: () => {},
       addEventListener: (type: string, cb: (e?: unknown) => void) => {
         (listeners[type] ??= []).push(cb);
       },
       __fireClick: () => (listeners.click ?? []).forEach((cb) => cb({})),
-      __fire: (type: string) => (listeners[type] ?? []).forEach((cb) => cb({}))
+      __fire: (type: string, event?: unknown) =>
+        (listeners[type] ?? []).forEach((cb) => cb(event ?? {}))
     };
     return el;
   }
@@ -107,9 +122,11 @@ function loadScriptSandbox(options?: {
     appendChild: (child: FakeElement) => FakeElement;
     removeChild: (child: FakeElement) => FakeElement;
     readonly firstChild: FakeElement | undefined;
+    value: string;
+    focus: () => void;
     addEventListener: (type: string, cb: (e?: unknown) => void) => void;
     __fireClick: () => void;
-    __fire: (type: string) => void;
+    __fire: (type: string, event?: unknown) => void;
     scrollLeft?: number;
     clientWidth?: number;
     offsetLeft?: number;
@@ -150,7 +167,27 @@ function loadScriptSandbox(options?: {
   // Like a browser's ResizeObserver: the test calls resizeObserved() where
   // the browser would report a new size for an observed element.
   const resizeCallbacks: Array<{ target: unknown; cb: () => void }> = [];
+  const mapHandlers: Record<string, Array<() => void>> = {};
+  const markerElements: FakeElement[] = [];
+  const webMcpTools: Record<string, WebMcpTool> = {};
+  const flyToCalls: Array<Record<string, unknown>> = [];
+  const mapView = { lng: 24.94, lat: 60.17, zoom: 12.04 };
+  const interactions: Record<
+    string,
+    { handler: (e: { feature: unknown }) => void }
+  > = {};
+  const featureStates: Array<{ feature: unknown; state: unknown }> = [];
   const fakeMapInstance = {
+    addInteraction: (
+      id: string,
+      options: { handler: (e: { feature: unknown }) => void }
+    ) => {
+      interactions[id] = options;
+    },
+    setFeatureState: (feature: unknown, state: unknown) => {
+      featureStates.push({ feature, state });
+    },
+    getCanvas: () => ({ style: {} }),
     // GL JS calls a control's onAdd right away and mounts what it returns.
     addControl: (control: { onAdd?: (map: unknown) => FakeElement }) => {
       if (control && typeof control.onAdd === 'function') {
@@ -163,6 +200,7 @@ function loadScriptSandbox(options?: {
     }),
     on: (event: string, cb: () => void) => {
       if (event === 'load') cb();
+      else (mapHandlers[event] ??= []).push(cb);
     },
     // Mirrors GL JS's setStyle(...) followed by a 'style.load' event once
     // the new style is ready -- fired synchronously here since the test
@@ -195,8 +233,18 @@ function loadScriptSandbox(options?: {
     ) => {
       fitBoundsCalls.push(opts);
     },
-    flyTo: () => {},
-    resize: () => {}
+    flyTo: (opts: Record<string, unknown>) => {
+      flyToCalls.push(opts);
+    },
+    resize: () => {},
+    getCenter: () => ({ lng: mapView.lng, lat: mapView.lat }),
+    getZoom: () => mapView.zoom,
+    getBounds: () => ({
+      getWest: () => mapView.lng - 0.1,
+      getSouth: () => mapView.lat - 0.05,
+      getEast: () => mapView.lng + 0.1,
+      getNorth: () => mapView.lat + 0.05
+    })
   };
 
   // Every `new mapboxgl.Marker()` call below returns this same shared
@@ -209,8 +257,11 @@ function loadScriptSandbox(options?: {
     setPopup: () => fakeMarkerInstance,
     getLngLat: () => ({ lng: 1, lat: 2 }),
     getElement: () => lastMarkerElement,
-    remove: () => {}
+    remove: () => {
+      markerRemoveCount.count++;
+    }
   };
+  const markerRemoveCount = { count: 0 };
   // The element passed to the most recent `new mapboxgl.Marker()`, which
   // getElement() returns: the script reads it right after constructing.
   let lastMarkerElement: unknown;
@@ -254,7 +305,15 @@ function loadScriptSandbox(options?: {
     document: {
       getElementById: getElementById,
       createElement: () => fakeElement(),
-      documentElement: rootEl
+      documentElement: rootEl,
+      body: { classList: { add: () => {} } },
+      ...(options?.webMcp && {
+        modelContext: {
+          registerTool: (tool: WebMcpTool) => {
+            webMcpTools[tool.name] = tool;
+          }
+        }
+      })
     },
     mapboxgl: {
       accessToken: '',
@@ -265,7 +324,9 @@ function loadScriptSandbox(options?: {
       NavigationControl: function NavigationControl() {},
       Marker: function Marker(options?: Record<string, unknown>) {
         markerConstructorCalls.push(options ?? {});
-        lastMarkerElement = options?.element;
+        // GL JS builds a default pin's element itself.
+        lastMarkerElement = options?.element ?? fakeElement();
+        markerElements.push(lastMarkerElement as FakeElement);
         return fakeMarkerInstance;
       },
       Popup: function Popup() {
@@ -285,6 +346,7 @@ function loadScriptSandbox(options?: {
     },
     console,
     setTimeout,
+    clearTimeout,
     URLSearchParams,
     atob,
     fetch: (url: string, init?: unknown) => fetchImpl(url, init)
@@ -325,7 +387,12 @@ function loadScriptSandbox(options?: {
     postToApp({
       jsonrpc: '2.0',
       id: initId,
-      result: options?.hostContext ? { hostContext: options.hostContext } : {}
+      result: {
+        ...(options?.hostContext && { hostContext: options.hostContext }),
+        ...(options?.hostCapabilities && {
+          hostCapabilities: options.hostCapabilities
+        })
+      }
     });
   }
 
@@ -365,6 +432,29 @@ function loadScriptSandbox(options?: {
       });
     },
     postMessageCalls,
+    /** Moves the map and fires 'moveend', as a pan or zoom would. */
+    moveMap: (view: Partial<typeof mapView>) => {
+      Object.assign(mapView, view);
+      (mapHandlers.moveend ?? []).forEach((cb) => cb());
+    },
+    webMcpTools,
+    flyToCalls,
+    /** Clicks a point of interest on the Standard base map. */
+    clickBaseMapPoi: (feature: unknown) =>
+      interactions['select-base-map-poi'].handler({ feature }),
+    /** Clicks a label of the given Standard featureset. */
+    clickBaseMapLabel: (featuresetId: string, feature: unknown) =>
+      interactions['select-base-map-' + featuresetId].handler({ feature }),
+    featureStates,
+    markerRemoveCount,
+    /** Each marker's element, in the order the markers were created. */
+    markerElements,
+    /** Answers a request the app sent to the host. */
+    respond: (id: unknown, result: unknown) => {
+      postToApp({ jsonrpc: '2.0', id, result });
+    },
+    selectPlace: (sandbox.window as { __selectPlace?: (id: string) => void })
+      .__selectPlace as (id: string) => void,
     map: fakeMapInstance,
     marker: fakeMarkerInstance,
     mapConstructorCalls,
@@ -1879,6 +1969,595 @@ describe('mapAppHtml search self-fetch', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(errorEl?.textContent).toContain('Could not fetch search results');
+  });
+});
+
+describe('mapAppHtml explorer model context', () => {
+  const explorerResult = {
+    structuredContent: {
+      explorer: true,
+      mapboxRender: { layers: [], markers: [] }
+    }
+  };
+  const canShare = { hostCapabilities: { updateModelContext: { text: {} } } };
+
+  type SharedContext = {
+    content: Array<{ text: string; _meta?: Record<string, unknown> }>;
+    structuredContent: {
+      view: {
+        center: { longitude: number; latitude: number };
+        zoom: number;
+        bounds: Record<string, number>;
+      };
+    };
+  };
+  const sharedContexts = (calls: Array<Record<string, unknown>>) =>
+    calls
+      .filter((m) => m.method === 'ui/update-model-context')
+      .map((m) => m.params as SharedContext);
+
+  // The app reads hostCapabilities in a promise callback.
+  const settle = async () => {
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shares the view as background context when the explorer opens', async () => {
+    const { sendToolResult, postMessageCalls } = loadScriptSandbox(canShare);
+    await settle();
+    sendToolResult(explorerResult);
+
+    const shared = sharedContexts(postMessageCalls);
+    expect(shared).toHaveLength(1);
+    // Nothing in content, so no chip in the composer.
+    expect(shared[0].content).toEqual([]);
+    expect(shared[0].structuredContent.view).toEqual({
+      center: { longitude: 24.94, latitude: 60.17 },
+      zoom: 12,
+      bounds: { west: 24.84, south: 60.12, east: 25.04, north: 60.22 }
+    });
+  });
+
+  it('shares the new view once the map stops moving', async () => {
+    vi.useFakeTimers();
+    const { sendToolResult, postMessageCalls, moveMap } =
+      loadScriptSandbox(canShare);
+    await settle();
+    sendToolResult(explorerResult);
+
+    moveMap({ lng: 2.35 });
+    moveMap({ lng: 2.35, lat: 48.86 });
+    expect(sharedContexts(postMessageCalls)).toHaveLength(1);
+    vi.advanceTimersByTime(400);
+
+    const shared = sharedContexts(postMessageCalls);
+    expect(shared).toHaveLength(2);
+    expect(shared[1].structuredContent.view.center).toEqual({
+      longitude: 2.35,
+      latitude: 48.86
+    });
+
+    // A move that ends on the same view isn't sent again.
+    moveMap({});
+    vi.advanceTimersByTime(400);
+    expect(sharedContexts(postMessageCalls)).toHaveLength(2);
+  });
+
+  it('stays quiet outside the explorer and on hosts without model context', async () => {
+    const plain = loadScriptSandbox(canShare);
+    await settle();
+    plain.sendToolResult({
+      structuredContent: { mapboxRender: { layers: [], markers: [] } }
+    });
+    expect(sharedContexts(plain.postMessageCalls)).toHaveLength(0);
+
+    const noCapability = loadScriptSandbox();
+    await settle();
+    noCapability.sendToolResult(explorerResult);
+    expect(sharedContexts(noCapability.postMessageCalls)).toHaveLength(0);
+  });
+
+  it('shares from a map expanded into a tab, and takes it back when inline again', async () => {
+    const { sendToolResult, postMessageCalls, sendHostContext } =
+      loadScriptSandbox({ ...canShare, webMcp: true });
+    await settle();
+    sendToolResult({
+      structuredContent: { mapboxRender: { layers: [], markers: [] } }
+    });
+    expect(sharedContexts(postMessageCalls)).toHaveLength(0);
+
+    sendHostContext({ displayMode: 'fullscreen' });
+    let shared = sharedContexts(postMessageCalls);
+    expect(shared).toHaveLength(1);
+    expect(shared[0].structuredContent.view.center).toEqual({
+      longitude: 24.94,
+      latitude: 60.17
+    });
+    // Points the model at the open map's tools.
+    expect(JSON.stringify(shared[0].structuredContent)).toContain('search_map');
+
+    sendHostContext({ displayMode: 'inline' });
+    shared = sharedContexts(postMessageCalls);
+    expect(shared).toHaveLength(2);
+    expect(shared[1]).toEqual({ content: [] });
+  });
+
+  it('adds the selected place as a titled item, until the user removes it', async () => {
+    vi.useFakeTimers();
+    const sandbox = loadScriptSandbox(canShare);
+    const { sendToolResult, postMessageCalls, sendHostContext, selectPlace } =
+      sandbox;
+    // Answers the latest update the way ChatGPT does, with its updateId.
+    const acknowledge = async (updateId: string) => {
+      const call = [...postMessageCalls]
+        .reverse()
+        .find((m) => m.method === 'ui/update-model-context');
+      sandbox.respond(call?.id, {
+        _meta: { 'openai/modelContext': { updateId } }
+      });
+      await settle();
+    };
+    const last = () => sharedContexts(postMessageCalls).slice(-1)[0];
+    await settle();
+    sendToolResult({
+      structuredContent: {
+        explorer: true,
+        mapboxRender: {
+          layers: [],
+          markers: [
+            { id: 'id-1', name: 'Café Regatta', coordinates: [24.91, 60.18] },
+            { id: 'id-2', name: 'Löyly', coordinates: [24.93, 60.15] }
+          ]
+        }
+      }
+    });
+    await acknowledge('update-1');
+
+    selectPlace('id-1');
+    expect(last().content).toHaveLength(1);
+    expect(last().content[0]._meta).toEqual({ 'openai/title': 'Café Regatta' });
+    expect(last().content[0].text).toContain('mapbox_id id-1');
+    await acknowledge('update-2');
+
+    // The host echoing our own update isn't a removal.
+    sendHostContext({
+      'openai/modelContext': { updateId: 'update-2', content: [{}] }
+    });
+    sandbox.moveMap({ lng: 24.95 });
+    vi.advanceTimersByTime(400);
+    expect(last().content).toHaveLength(1);
+    await acknowledge('update-3');
+
+    // The user removed the chip: later updates leave the place out.
+    sendHostContext({
+      'openai/modelContext': { updateId: 'host-1', content: [] }
+    });
+    sandbox.moveMap({ lng: 24.96 });
+    vi.advanceTimersByTime(400);
+    expect(last().content).toEqual([]);
+    await acknowledge('update-4');
+
+    selectPlace('id-2');
+    expect(last().content[0]._meta).toEqual({ 'openai/title': 'Löyly' });
+  });
+});
+
+describe('mapAppHtml WebMCP tools', () => {
+  const emptyMap = {
+    structuredContent: { mapboxRender: { layers: [], markers: [] } }
+  };
+
+  it('registers nothing on a host without document.modelContext', () => {
+    expect(loadScriptSandbox().webMcpTools).toEqual({});
+  });
+
+  it('registers the map tools, with only read_map read-only', () => {
+    const { webMcpTools } = loadScriptSandbox({ webMcp: true });
+    expect(Object.keys(webMcpTools).sort()).toEqual([
+      'add_places',
+      'move_map',
+      'read_map',
+      'redraw_map',
+      'search_map'
+    ]);
+    expect(webMcpTools.read_map.annotations).toEqual({ readOnlyHint: true });
+    expect(webMcpTools.add_places.annotations).toBeUndefined();
+  });
+
+  it('add_places draws pins on the open map and read_map lists them', async () => {
+    const { webMcpTools, sendToolResult, markerConstructorCalls } =
+      loadScriptSandbox({ webMcp: true });
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          layers: [],
+          markers: [{ name: 'Helsinki', coordinates: [24.94, 60.17] }]
+        }
+      }
+    });
+    const before = markerConstructorCalls.length;
+
+    const added = JSON.parse(
+      await webMcpTools.add_places.execute({
+        places: [{ name: 'Löyly', longitude: 24.93, latitude: 60.15 }]
+      })
+    );
+    // Added to what was there, not a fresh map.
+    expect(markerConstructorCalls.length).toBe(before + 1);
+    expect(added.places).toEqual([
+      { name: 'Helsinki', longitude: 24.94, latitude: 60.17 },
+      { name: 'Löyly', longitude: 24.93, latitude: 60.15 }
+    ]);
+
+    const cleared = JSON.parse(
+      await webMcpTools.add_places.execute({
+        places: [{ name: 'Espoo', longitude: 24.66, latitude: 60.21 }],
+        clear: true
+      })
+    );
+    expect(cleared.places).toEqual([
+      { name: 'Espoo', longitude: 24.66, latitude: 60.21 }
+    ]);
+    expect(JSON.parse(await webMcpTools.read_map.execute({}))).toEqual(cleared);
+  });
+
+  it('redraw_map has the server render and draws the result on the open map', async () => {
+    const sandbox = loadScriptSandbox({ webMcp: true });
+    const { webMcpTools, sendToolResult, postMessageCalls } = sandbox;
+    sendToolResult({
+      structuredContent: {
+        mapboxRender: {
+          layers: [],
+          markers: [{ name: 'Helsinki', coordinates: [24.94, 60.17] }]
+        }
+      }
+    });
+
+    const args = { payload_refs: ['mapbox://inline/route'], summary: 'Route' };
+    const pending = webMcpTools.redraw_map.execute(args);
+    await Promise.resolve();
+    const call = postMessageCalls.find((m) => m.method === 'tools/call');
+    // Same arguments, passed through to the server tool.
+    expect(call?.params).toEqual({ name: 'render_map_tool', arguments: args });
+
+    sandbox.respond(call?.id, {
+      content: [
+        { type: 'text', text: 'Rendered map with 0 layers and 1 marker.' }
+      ],
+      structuredContent: {
+        mapboxRender: {
+          summary: 'Route',
+          layers: [],
+          markers: [{ name: 'Airport', coordinates: [24.96, 60.32] }]
+        }
+      }
+    });
+    expect(await pending).toContain('Drawn on the open map');
+    // Replaces what was there, as render_map_tool does.
+    expect(JSON.parse(await webMcpTools.read_map.execute({})).places).toEqual([
+      { name: 'Airport', longitude: 24.96, latitude: 60.32 }
+    ]);
+    expect(sandbox.summaryEl?.textContent).toBe('Route');
+  });
+
+  it('redraw_map passes a server error on to the model', async () => {
+    const sandbox = loadScriptSandbox({ webMcp: true });
+    const { webMcpTools, sendToolResult, postMessageCalls } = sandbox;
+    sendToolResult(emptyMap);
+
+    await expect(webMcpTools.redraw_map.execute({})).rejects.toThrow(
+      /payload_refs/
+    );
+
+    const pending = webMcpTools.redraw_map.execute({ payload_refs: ['x'] });
+    await Promise.resolve();
+    const call = postMessageCalls.find((m) => m.method === 'tools/call');
+    sandbox.respond(call?.id, {
+      isError: true,
+      content: [
+        { type: 'text', text: 'RenderMapTool: none of the refs resolved' }
+      ]
+    });
+    await expect(pending).rejects.toThrow(/none of the refs resolved/);
+  });
+
+  // "Is it open now?" after clicking a pin the model added: the model read
+  // the map and found nothing selected.
+  it('a click on a pin without a result card selects that place', async () => {
+    const sandbox = loadScriptSandbox({
+      webMcp: true,
+      hostCapabilities: { updateModelContext: { text: {} } },
+      hostContext: { displayMode: 'fullscreen' }
+    });
+    const { webMcpTools, sendToolResult, markerElements, postMessageCalls } =
+      sandbox;
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    sendToolResult(emptyMap);
+    await webMcpTools.add_places.execute({
+      places: [
+        { name: 'Oodi Café', longitude: 24.938, latitude: 60.174 },
+        { name: 'Kiasma Café', longitude: 24.937, latitude: 60.172 }
+      ]
+    });
+    expect(
+      JSON.parse(await webMcpTools.read_map.execute({})).selectedPlace
+    ).toBeNull();
+
+    markerElements[markerElements.length - 1].__fire('click');
+
+    expect(
+      JSON.parse(await webMcpTools.read_map.execute({})).selectedPlace
+    ).toEqual({ name: 'Kiasma Café', longitude: 24.937, latitude: 60.172 });
+    // And it reaches the composer as a titled item, with no mapbox_id.
+    const shared = postMessageCalls
+      .filter((m) => m.method === 'ui/update-model-context')
+      .map(
+        (m) => m.params as { content: Array<{ text: string; _meta: unknown }> }
+      );
+    const item = shared[shared.length - 1].content[0];
+    expect(item._meta).toEqual({ 'openai/title': 'Kiasma Café' });
+    expect(item.text).not.toContain('mapbox_id');
+  });
+
+  // Standard's poi featureset has only a hide state, so a select state
+  // showed nothing.
+  it('a click on a base map POI hides it under a selected pin, and another click moves it', async () => {
+    const sandbox = loadScriptSandbox({
+      webMcp: true,
+      hostCapabilities: { updateModelContext: { text: {} } },
+      hostContext: { displayMode: 'fullscreen' }
+    });
+    const { webMcpTools, sendToolResult, markerElements, featureStates } =
+      sandbox;
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    sendToolResult(emptyMap);
+    const poi = (name: string, maki: string, at: [number, number]) => ({
+      properties: { name, maki, class: 'food_and_drink' },
+      geometry: { type: 'Point', coordinates: at }
+    });
+    const cafe = poi('Café Regatta', 'cafe', [24.9, 60.18]);
+    const museum = poi('Ateneum', 'museum', [24.944, 60.17]);
+
+    sandbox.clickBaseMapPoi(cafe);
+
+    expect(featureStates).toEqual([{ feature: cafe, state: { hide: true } }]);
+    const pin = markerElements[markerElements.length - 1];
+    expect(pin.className).toBe('marker-badge place active');
+    expect(pin.children[0].textContent).toBe('Café Regatta');
+    expect(
+      JSON.parse(await webMcpTools.read_map.execute({})).selectedPlace
+    ).toEqual({
+      name: 'Café Regatta',
+      longitude: 24.9,
+      latitude: 60.18,
+      category: 'cafe'
+    });
+
+    const removedBefore = sandbox.markerRemoveCount.count;
+    sandbox.clickBaseMapPoi(museum);
+
+    expect(featureStates.slice(1)).toEqual([
+      { feature: cafe, state: { hide: false } },
+      { feature: museum, state: { hide: true } }
+    ]);
+    expect(sandbox.markerRemoveCount.count).toBe(removedBefore + 1);
+    expect(
+      markerElements[markerElements.length - 1].children[0].textContent
+    ).toBe('Ateneum');
+  });
+
+  it('a click on the selected POI deselects it and takes it out of the context', async () => {
+    const sandbox = loadScriptSandbox({
+      webMcp: true,
+      hostCapabilities: { updateModelContext: { text: {} } },
+      hostContext: { displayMode: 'fullscreen' }
+    });
+    const { webMcpTools, sendToolResult, markerElements, featureStates } =
+      sandbox;
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    sendToolResult(emptyMap);
+    const cafe = {
+      properties: { name: 'Café Regatta', maki: 'cafe' },
+      geometry: { type: 'Point', coordinates: [24.9, 60.18] }
+    };
+    sandbox.clickBaseMapPoi(cafe);
+    const removedBefore = sandbox.markerRemoveCount.count;
+    let stopped = false;
+
+    markerElements[markerElements.length - 1].__fire('click', {
+      stopPropagation: () => {
+        stopped = true;
+      }
+    });
+
+    expect(stopped).toBe(true);
+    expect(featureStates[featureStates.length - 1]).toEqual({
+      feature: cafe,
+      state: { hide: false }
+    });
+    expect(sandbox.markerRemoveCount.count).toBe(removedBefore + 1);
+    expect(
+      JSON.parse(await webMcpTools.read_map.execute({})).selectedPlace
+    ).toBeNull();
+    const shared = sandbox.postMessageCalls.filter(
+      (m) => m.method === 'ui/update-model-context'
+    );
+    expect(
+      (shared[shared.length - 1].params as { content: unknown[] }).content
+    ).toEqual([]);
+  });
+
+  it('a place name is shown with its select state, and a second click deselects it', async () => {
+    const sandbox = loadScriptSandbox({
+      webMcp: true,
+      hostCapabilities: { updateModelContext: { text: {} } },
+      hostContext: { displayMode: 'fullscreen' }
+    });
+    const { webMcpTools, sendToolResult, featureStates } = sandbox;
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    sendToolResult(emptyMap);
+    const markersBefore = sandbox.markerElements.length;
+    const kallio = {
+      properties: { name: 'Kallio', class: 'settlement_subdivision' },
+      geometry: { type: 'Point', coordinates: [24.95, 60.184] }
+    };
+
+    sandbox.clickBaseMapLabel('place-labels', kallio);
+
+    expect(featureStates).toEqual([
+      { feature: kallio, state: { select: true } }
+    ]);
+    // The label itself shows the selection, so no pin goes on top.
+    expect(sandbox.markerElements.length).toBe(markersBefore);
+    expect(
+      JSON.parse(await webMcpTools.read_map.execute({})).selectedPlace
+    ).toEqual({
+      name: 'Kallio',
+      longitude: 24.95,
+      latitude: 60.184,
+      category: 'settlement subdivision'
+    });
+
+    sandbox.clickBaseMapLabel('place-labels', kallio);
+
+    expect(featureStates[featureStates.length - 1]).toEqual({
+      feature: kallio,
+      state: { select: false }
+    });
+    expect(
+      JSON.parse(await webMcpTools.read_map.execute({})).selectedPlace
+    ).toBeNull();
+  });
+
+  // ChatGPT sends null both when the user removes the item and when a sent
+  // message uses it up, so the selection must survive it.
+  it('keeps the POI selected on the map when the host clears the context', async () => {
+    const sandbox = loadScriptSandbox({
+      webMcp: true,
+      hostCapabilities: { updateModelContext: { text: {} } },
+      hostContext: { displayMode: 'fullscreen' }
+    });
+    const { webMcpTools, sendToolResult, featureStates, postMessageCalls } =
+      sandbox;
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    sendToolResult(emptyMap);
+    const cafe = {
+      properties: { name: 'Café Regatta', maki: 'cafe' },
+      geometry: { type: 'Point', coordinates: [24.9, 60.18] }
+    };
+    sandbox.clickBaseMapPoi(cafe);
+    const share = [...postMessageCalls]
+      .reverse()
+      .find((m) => m.method === 'ui/update-model-context');
+    sandbox.respond(share?.id, {
+      _meta: { 'openai/modelContext': { updateId: 'update-1' } }
+    });
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    const statesBefore = featureStates.length;
+    sandbox.sendHostContext({ 'openai/modelContext': null });
+
+    expect(featureStates.length).toBe(statesBefore);
+    expect(
+      JSON.parse(await webMcpTools.read_map.execute({})).selectedPlace
+    ).toMatchObject({ name: 'Café Regatta' });
+    // Not attached again: the next shared context leaves it out.
+    sandbox.moveMap({ lng: 24.95 });
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    const shared = postMessageCalls.filter(
+      (m) => m.method === 'ui/update-model-context'
+    );
+    expect(
+      (shared[shared.length - 1].params as { content: unknown[] }).content
+    ).toEqual([]);
+  });
+
+  it('add_places rejects coordinates that are out of range', async () => {
+    const { webMcpTools, sendToolResult } = loadScriptSandbox({ webMcp: true });
+    sendToolResult(emptyMap);
+    await expect(
+      webMcpTools.add_places.execute({
+        places: [{ name: 'Swapped', longitude: 60.17, latitude: 124.94 }]
+      })
+    ).rejects.toThrow(/latitude/);
+    await expect(webMcpTools.add_places.execute({})).rejects.toThrow(
+      /places is required/
+    );
+  });
+
+  it('search_map searches near the map center and returns the results', async () => {
+    const { webMcpTools, sendToolResult, setFetchImpl } = loadScriptSandbox({
+      webMcp: true
+    });
+    const fetchSpy = vi.fn(async (_url: string) => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Café Regatta', mapbox_id: 'id-1' },
+            geometry: { type: 'Point', coordinates: [24.91, 60.18] }
+          }
+        ]
+      })
+    }));
+    setFetchImpl(fetchSpy);
+    sendToolResult(emptyMap);
+
+    const result = JSON.parse(
+      await webMcpTools.search_map.execute({ query: ' coffee ' })
+    );
+    const url = new URL(String(fetchSpy.mock.calls[0][0]));
+    expect(url.searchParams.get('q')).toBe('coffee');
+    expect(url.searchParams.get('proximity')).toBe('24.94,60.17');
+    expect(result.places).toContainEqual({
+      name: 'Café Regatta',
+      longitude: 24.91,
+      latitude: 60.18,
+      mapbox_id: 'id-1'
+    });
+  });
+
+  it('search_map fails when the search finds nothing', async () => {
+    const { webMcpTools, sendToolResult, setFetchImpl } = loadScriptSandbox({
+      webMcp: true
+    });
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ type: 'FeatureCollection', features: [] })
+    }));
+    sendToolResult(emptyMap);
+
+    await expect(
+      webMcpTools.search_map.execute({ query: 'nothing here' })
+    ).rejects.toThrow(/No results for "nothing here"/);
+    await expect(webMcpTools.search_map.execute({})).rejects.toThrow(
+      /query is required/
+    );
+  });
+
+  it('move_map flies to the location, clamping the zoom', async () => {
+    const { webMcpTools, sendToolResult, flyToCalls } = loadScriptSandbox({
+      webMcp: true
+    });
+    sendToolResult(emptyMap);
+    const before = flyToCalls.length;
+
+    await webMcpTools.move_map.execute({
+      longitude: 2.35,
+      latitude: 48.86,
+      zoom: 40
+    });
+    expect(flyToCalls.slice(before)).toEqual([
+      { center: [2.35, 48.86], zoom: 22, duration: 600 }
+    ]);
+    await expect(
+      webMcpTools.move_map.execute({ longitude: 200, latitude: 0 })
+    ).rejects.toThrow(/longitude/);
   });
 });
 

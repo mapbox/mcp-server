@@ -691,11 +691,68 @@ describe('RenderMapTool', () => {
     expect(text).toContain('Updated the base map style');
   });
 
-  it('still errors with nothing to render when baseMapConfig and everything else are absent', async () => {
+  // ChatGPT opens the thread entrypoint with {}.
+  it('opens an empty map for {}', async () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     const result = await tool.run({});
 
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      explorer: true,
+      layer_count: 0,
+      marker_count: 0,
+      mapboxRender: { layers: [], markers: [] }
+    });
+    // A model that calls it empty by mistake still learns what to pass.
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('payload_refs');
+  });
+
+  it('still errors when the only refs given cannot be resolved', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      payload_refs: ['mapbox://temp/does-not-exist']
+    });
+
     expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+  });
+
+  it('is a thread entrypoint that opens next to the chat', () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    expect(tool.annotations.title).toBe('Mapbox Map');
+    expect(tool.meta['openai/ui']).toEqual({
+      entrypoints: [{ type: 'thread' }],
+      preferredModelDisplayMode: 'fullscreen'
+    });
+  });
+
+  it('points the model at the open map for follow-ups', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run({
+      markers: [{ coordinates: [24.94, 60.17] }]
+    });
+    const texts = result.content.map((c) => (c as { text: string }).text);
+    expect(texts.join(' ')).toContain('search_map');
+    expect(texts.join(' ')).toContain('if those tools are not available');
+  });
+
+  it('is firm about it in ChatGPT, where the map stays open in a tab', async () => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run(
+      { markers: [{ coordinates: [24.94, 60.17] }] },
+      {
+        mcpReq: { _meta: { 'openai/userLocation': { city: 'Helsinki' } } }
+      } as never
+    );
+    const text = result.content
+      .map((c) => (c as { text: string }).text)
+      .join(' ');
+    expect(text).toContain('must update THIS map');
+    expect(text).toContain('call read_map on the open map once');
+    expect(text).toContain('redraw_map');
+    // Still a way out for a chat where the model gets no app tools.
+    expect(text).toContain('they do not exist');
   });
 
   it('carries baseMapConfig through when merged with a payload_ref', async () => {
@@ -788,5 +845,35 @@ describe('RenderMapTool', () => {
   it('tells the model it can show live traffic', () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     expect(tool.description).toContain('showTraffic: true');
+  });
+
+  describe('open map hint', () => {
+    const run = (input: object) =>
+      new RenderMapTool({ httpRequest: vi.fn() }).run(
+        input,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { http: { authInfo: { token: tokenFor('account-hint') } } } as any
+      );
+    const texts = (r: Awaited<ReturnType<typeof run>>) =>
+      (r.content as { type: string; text: string }[]).map((c) => c.text);
+
+    it('asks the model to call read_map once, if available, and keeps the reuse guidance', async () => {
+      const result = await run({ markers: [{ coordinates: [-77, 38] }] });
+      const hint = texts(result).find((t) => t.includes('read_map'));
+      expect(hint).toContain('call read_map on the open map once');
+      expect(hint).toContain('if that tool is available');
+      expect(hint).toContain('instead of opening another');
+    });
+
+    it('keeps the summary as the first text, which redraw_map relays', async () => {
+      const result = await run({ markers: [{ coordinates: [-77, 38] }] });
+      expect(texts(result)[0]).toMatch(/^Rendered map with/);
+      expect(texts(result)[0]).not.toContain('read_map');
+    });
+
+    it('asks the same for the empty explorer', async () => {
+      const result = await run({});
+      expect(texts(result).some((t) => t.includes('call read_map'))).toBe(true);
+    });
   });
 });

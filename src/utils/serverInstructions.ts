@@ -16,8 +16,9 @@ export function buildServerInstructions(
 ): string | undefined {
   if (!enabledToolNames.includes('render_map_tool')) return undefined;
   const lines = [
-    'To show anything on a map, use render_map_tool: it renders an interactive Mapbox GL JS map inline.',
-    'When a tool result includes mapboxRender.ref, pass that ref unchanged in render_map_tool payload_refs (several refs can share one map). Never write or edit a ref by hand.'
+    'To show anything on a map, first check whether a Mapbox map is already open in this conversation: an open map registers its own app tools (redraw_map, search_map, add_places, move_map, read_map). If they exist, update that map with them. redraw_map takes the same arguments as render_map_tool; render_map_tool would open a second map and leave the open one unchanged.',
+    'Otherwise use render_map_tool: it renders an interactive Mapbox GL JS map.',
+    'When a tool result includes mapboxRender.ref, pass that ref unchanged in payload_refs (several refs can share one map). Never write or edit a ref by hand.'
   ];
   if (enabledToolNames.includes('static_map_image_tool')) {
     lines.push(
