@@ -2,6 +2,9 @@
 // Licensed under the MIT License.
 
 import type { MapAppPayload } from '../../utils/mapAppPayload.js';
+import { MAP_APP_SELECTION_JS } from './mapAppSelectionJs.js';
+import { MAP_APP_MODEL_CONTEXT_JS } from './mapAppModelContextJs.js';
+import { MAP_APP_TOOLS_JS } from './mapAppToolsJs.js';
 
 /**
  * Render the generic Mapbox MCP App HTML — served by the MCP Apps resource
@@ -74,6 +77,20 @@ export function renderMapAppHtml(params: {
   html, body { width: 100%; height: 100%; overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   #map { position: absolute; inset: 0; }
+  /* The map runs under the host's own controls, such as ChatGPT's title bar
+     on a phone; what sits on it stays inside the area the host leaves
+     uncovered (hostContext.safeAreaInsets). */
+  #frame {
+    position: absolute; pointer-events: none;
+    top: var(--safe-top, 0px); right: var(--safe-right, 0px);
+    bottom: var(--safe-bottom, 0px); left: var(--safe-left, 0px);
+  }
+  #frame > * { pointer-events: auto; }
+  #frame > #loading { pointer-events: none; }
+  #map .mapboxgl-ctrl-top-left { top: var(--safe-top, 0px); left: var(--safe-left, 0px); }
+  #map .mapboxgl-ctrl-top-right { top: var(--safe-top, 0px); right: var(--safe-right, 0px); }
+  #map .mapboxgl-ctrl-bottom-left { bottom: var(--safe-bottom, 0px); left: var(--safe-left, 0px); }
+  #map .mapboxgl-ctrl-bottom-right { bottom: var(--safe-bottom, 0px); right: var(--safe-right, 0px); }
   #summary {
     position: absolute; top: 12px; left: 12px; z-index: 10;
     background: var(--ui-surface); color: var(--ui-text);
@@ -210,6 +227,7 @@ export function renderMapAppHtml(params: {
 </head>
 <body>
 <div id="map"></div>
+<div id="frame">
 <div id="summary" style="display:none"></div>
 <div id="legends">
   <div id="legend" style="display:none"></div>
@@ -218,6 +236,7 @@ export function renderMapAppHtml(params: {
 <div id="carousel" style="display:none"></div>
 <div id="loading">Loading…</div>
 <div id="error" style="display:none"></div>
+</div>
 ${initialDataScript}
 
 <script>
@@ -236,6 +255,8 @@ ${initialDataScript}
   // <-> pin) and Place Details enrichment can find a marker by mapbox_id
   // without re-querying the map for it.
   var markersById = {};
+  // Named markers on the map, for the model (read_map).
+  var placesOnMap = [];
 
   var map = null;
   var mapLoaded = false;
@@ -321,9 +342,15 @@ ${initialDataScript}
       }, '*');
     } catch (_) {}
   }
+  // Inline, the map asks for 500px, or less where the host caps the height
+  // (hostContext.containerDimensions.maxHeight).
+  var INLINE_HEIGHT = 500;
+  var containerDimensions = null;
   function requestSizeToFit() {
     if (currentDisplayMode !== 'inline') return;
-    sendNotification('ui/notifications/size-changed', { height: 500 });
+    var max = containerDimensions && containerDimensions.maxHeight;
+    var height = typeof max === 'number' && max > 0 ? Math.min(INLINE_HEIGHT, max) : INLINE_HEIGHT;
+    sendNotification('ui/notifications/size-changed', { height: height });
   }
 
   window.addEventListener('message', function(event) {
@@ -342,11 +369,16 @@ ${initialDataScript}
     }
     if (message.method === 'ui/notifications/host-context-changed' &&
         message.params) {
-      // Partial updates: only the fields that changed are sent.
+      // Partial updates: only the fields that changed are sent. The display
+      // mode goes first, since the size request in applyHostContext uses it.
+      if (message.params.displayMode) currentDisplayMode = message.params.displayMode;
       applyHostContext(message.params);
+      if ('openai/modelContext' in message.params) {
+        onModelContextChanged(message.params['openai/modelContext']);
+      }
       if (message.params.displayMode) {
-        currentDisplayMode = message.params.displayMode;
         if (map) setTimeout(function() { map.resize(); }, 100);
+        shareMapContext();
       }
     }
   });
@@ -364,6 +396,11 @@ ${initialDataScript}
   // (--color-background-primary and so on) feed the --ui-* colors.
   function applyHostContext(ctx) {
     if (!ctx || typeof ctx !== 'object') return;
+    applySafeArea(ctx.safeAreaInsets);
+    if (ctx.containerDimensions && typeof ctx.containerDimensions === 'object') {
+      containerDimensions = ctx.containerDimensions;
+      requestSizeToFit();
+    }
     if (ctx.theme === 'light' || ctx.theme === 'dark') {
       hostTheme = ctx.theme;
       applyTheme(hostTheme);
@@ -379,6 +416,21 @@ ${initialDataScript}
     }
   }
   window.__applyHostContext = applyHostContext;
+
+  // In pixels, for layout done in script (control offsets, fit padding).
+  var safeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  function applySafeArea(insets) {
+    if (!insets || typeof insets !== 'object' || !rootEl || !rootEl.style ||
+        typeof rootEl.style.setProperty !== 'function') return;
+    ['top', 'right', 'bottom', 'left'].forEach(function(side) {
+      var value = insets[side];
+      if (typeof value === 'number' && isFinite(value) && value >= 0) {
+        safeInsets[side] = Math.round(value);
+        rootEl.style.setProperty('--safe-' + side, safeInsets[side] + 'px');
+      }
+    });
+    placeTopLeftControls();
+  }
 
   var darkQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-color-scheme: dark)')
@@ -401,8 +453,15 @@ ${initialDataScript}
   }).then(
     function(result) {
       hostAnswered = true;
+      // Display mode first: the size request in applyHostContext depends on it.
+      if (result && result.hostContext && result.hostContext.displayMode) {
+        currentDisplayMode = result.hostContext.displayMode;
+      }
       if (result) applyHostContext(result.hostContext);
+      canUpdateModelContext = !!(result && result.hostCapabilities &&
+        result.hostCapabilities.updateModelContext);
       sendNotification('ui/notifications/initialized', {});
+      shareMapContext();
     },
     function() {
       hostAnswered = true;
@@ -457,6 +516,8 @@ ${initialDataScript}
     map = new mapboxgl.Map(mapOptions);
     map.addControl(new mapboxgl.NavigationControl(), 'top-left');
     map.addControl(new LayerToggleControl(), 'top-left');
+    map.on('moveend', scheduleShareMapContext);
+    addLabelInteractions();
     map.on('load', function() {
       mapLoaded = true;
       if (pendingPayload) {
@@ -465,6 +526,7 @@ ${initialDataScript}
       } else {
         consumeInitialData();
       }
+      shareMapContext();
     });
   }
   initMap();
@@ -483,6 +545,13 @@ ${initialDataScript}
   // structuredContent (e.g. Claude Desktop) never have inline data to find
   // here, so they fall through to the ref path exactly as before.
   function handleToolResult(result) {
+    // An empty map opened from the thread entrypoint stays open next to the
+    // chat, so it shares context like a fullscreen map.
+    if (result && result.structuredContent && result.structuredContent.explorer === true &&
+        !explorerMode) {
+      explorerMode = true;
+      shareMapContext();
+    }
     var payload = extractInlinePayload(result);
     if (payload) {
       stageRender(payload);
@@ -517,6 +586,10 @@ ${initialDataScript}
     }
     showError('Tool result did not contain a map payload.');
   }
+
+${MAP_APP_SELECTION_JS}
+${MAP_APP_MODEL_CONTEXT_JS}
+${MAP_APP_TOOLS_JS}
 
   function readResourceExpiryMessage(rr) {
     if (!rr || !Array.isArray(rr.contents) || rr.contents.length === 0) return null;
@@ -618,6 +691,8 @@ ${initialDataScript}
     // night mode) when the Satellite button switches style.
     currentBaseMapConfig = null;
     markersById = {};
+    placesOnMap = [];
+    clearPinnedPlace();
     carouselEl.style.display = 'none';
     legendsEl.style.bottom = '';
     clearPanel();
@@ -928,7 +1003,7 @@ ${initialDataScript}
       : null;
     if (!corner) return;
     corner.style.top = summaryEl.style.display === 'block'
-      ? (summaryEl.offsetHeight + 8) + 'px'
+      ? (safeInsets.top + summaryEl.offsetHeight + 8) + 'px'
       : '';
   }
   // The chip's height isn't fixed: it wraps to more lines when the host
@@ -992,12 +1067,21 @@ ${initialDataScript}
     if (m.popup && !m.id) marker.setPopup(new mapboxgl.Popup().setText(m.popup));
     marker.addTo(map);
     trackedMarkers.push(marker);
+    if (m.name) {
+      var place = { name: m.name, longitude: m.coordinates[0], latitude: m.coordinates[1] };
+      if (m.id) place.mapbox_id = m.id;
+      placesOnMap.push(place);
+      var pinEl = !m.id && typeof marker.getElement === 'function' ? marker.getElement() : null;
+      if (pinEl && typeof pinEl.addEventListener === 'function') {
+        pinEl.addEventListener('click', function() { selectPinnedPlace(place); });
+      }
+    }
     // Tagged by buildSearchMiniPayload with the result's mapbox_id so the
     // carousel and Place Details enrichment can look the marker back up
     // later without walking trackedMarkers.
     if (m.id) {
       var badgeEl = typeof marker.getElement === 'function' ? marker.getElement() : null;
-      markersById[m.id] = { marker: marker, el: badgeEl, color: color };
+      markersById[m.id] = { marker: marker, el: badgeEl, color: color, name: m.name };
       if (badgeEl && m.name) {
         var nameEl = document.createElement('span');
         nameEl.className = 'marker-name';
@@ -1121,7 +1205,12 @@ ${initialDataScript}
     setTimeout(function() {
       map.resize();
       map.fitBounds(bounds, {
-        padding: { top: 70, bottom: bottomPadding(), left: 30, right: 30 },
+        padding: {
+          top: 70 + safeInsets.top,
+          bottom: bottomPadding() + safeInsets.bottom,
+          left: 30 + safeInsets.left,
+          right: 30 + safeInsets.right
+        },
         duration: 600
       });
     }, 60);
@@ -2064,6 +2153,13 @@ ${initialDataScript}
         setActiveClass(pin.el, true);
         pin.el.style.zIndex = '2';
       }
+      clearPinnedPlace();
+      dismissedPlaceKey = null;
+      shareMapContext();
+    } else if (pinnedPlace) {
+      // Back to the card that was already active.
+      clearPinnedPlace();
+      shareMapContext();
     }
     if (opts.scrollCard && typeof row.li.scrollIntoView === 'function') {
       row.li.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -2490,13 +2586,14 @@ ${initialDataScript}
     return params.proximityFromResults ? undefined : params.proximity;
   }
 
+  // Resolves to how many results were drawn.
   function selfFetchSearch(params) {
     if (!TOKEN || !isSafeSearchParams(params)) {
       showError('Could not fetch search results: missing token or invalid parameters.');
-      return;
+      return Promise.resolve(0);
     }
     var url = buildSearchAndGeocodeApiUrl(params, TOKEN, API_ENDPOINT);
-    fetch(url)
+    return fetch(url)
       .then(function(res) {
         if (!res.ok) {
           return res
@@ -2524,14 +2621,16 @@ ${initialDataScript}
         var mini = buildSearchMiniPayload(fc, params.q, searchCenter(params));
         if (!mini) {
           showError('Search API returned no results.');
-          return;
+          return 0;
         }
         mergeAdditionalPayload(mini);
+        return mini.markers.filter(function(m) { return m.style === 'place'; }).length;
       })
       .catch(function(err) {
         showError(
           'Could not fetch search results: ' + (err && err.message ? err.message : err)
         );
+        return 0;
       });
   }
 
