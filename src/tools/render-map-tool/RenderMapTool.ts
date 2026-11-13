@@ -52,10 +52,13 @@ import type { HttpRequest } from '../../utils/types.js';
  *      hundreds-of-millseconds range instead of 20-30s.
  */
 // In ChatGPT the map stays open in a tab, so the next request decides between
-// one map and a pile of tabs. The model reads this right after drawing.
+// one map and a pile of tabs. The model reads this right after drawing. Only
+// ChatGPT Desktop gives the model the map's tools (WebMCP), and the server
+// can't tell Desktop from the web, so the tools are named for Desktop.
 const OPEN_MAP_HINT_CHATGPT =
-  'This map is now open in a tab next to the chat and stays open. For later ' +
-  'map requests in this conversation it provides these tools: redraw_map ' +
+  'This map is now open in a tab next to the chat and stays open. In ChatGPT ' +
+  'Desktop, for later map requests in this conversation it provides these ' +
+  'tools: redraw_map ' +
   '(exactly the arguments of render_map_tool), search_map, add_places, ' +
   'move_map and read_map. Use them to change this map: calling ' +
   'render_map_tool again opens a duplicate tab.';
@@ -78,7 +81,7 @@ export class RenderMapTool extends BaseTool<
   readonly description =
     'Display a live, interactive Mapbox GL JS map. ' +
     'Use this when someone wants to see a location, route, or dataset on a map. ' +
-    'In ChatGPT the map stays open next to the chat and provides its own tools ' +
+    'In ChatGPT Desktop the map stays open next to the chat and provides its own tools ' +
     '(redraw_map, which takes the same arguments as this tool, search_map, ' +
     'add_places, move_map, read_map): use them to change that map, because ' +
     'another call to this tool opens a second map. ' +

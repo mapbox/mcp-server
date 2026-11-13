@@ -24,7 +24,7 @@ export const MapAppRefSchema = z
     ref: z
       .string()
       .describe(
-        'Server-side payload reference. Pass to `render_map_tool` via `payload_refs: ["<this ref>"]` to display the data on a live Mapbox GL JS map, or, in ChatGPT, to the `redraw_map` tool of the open Mapbox map.'
+        'Server-side payload reference. Pass to `render_map_tool` via `payload_refs: ["<this ref>"]` to display the data on a live Mapbox GL JS map, or, in ChatGPT Desktop, to the `redraw_map` tool of the open Mapbox map.'
       )
   })
   .describe(
@@ -107,7 +107,7 @@ export function renderHint(ref: string): string {
     `   render_map_tool({ "payload_refs": ["${ref}"] })\n` +
     // In ChatGPT the map stays open next to the chat; a second
     // render_map_tool call would open a second one beside it.
-    `In ChatGPT, if a Mapbox map is already open next to the chat, call its redraw_map tool with the same arguments instead, so that map is updated.`
+    `In ChatGPT Desktop, if a Mapbox map is already open next to the chat, call its redraw_map tool with the same arguments instead, so that map is updated.`
   );
 }
 

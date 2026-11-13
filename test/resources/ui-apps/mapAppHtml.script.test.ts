@@ -2076,8 +2076,11 @@ describe('mapAppHtml explorer model context', () => {
       longitude: 24.94,
       latitude: 60.17
     });
-    // Points the model at the open map's tools.
-    expect(JSON.stringify(shared[0].structuredContent)).toContain('search_map');
+    // Names no tools: ChatGPT on the web registers them but doesn't give
+    // them to the model.
+    expect(JSON.stringify(shared[0].structuredContent)).not.toContain(
+      'search_map'
+    );
 
     sendHostContext({ displayMode: 'inline' });
     shared = sharedContexts(postMessageCalls);

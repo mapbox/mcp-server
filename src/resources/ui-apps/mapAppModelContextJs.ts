@@ -56,10 +56,9 @@ export const MAP_APP_MODEL_CONTEXT_JS = `
     return {
       content: content,
       structuredContent: {
-        note: 'The Mapbox map the user has open next to this chat. "Here", "this area" or "the map" means this view.' +
-          (webMcpTools
-            ? ' This map provides these tools: redraw_map (same arguments as render_map_tool), search_map, add_places, move_map, read_map. Use them to change this map: render_map_tool would open another map and leave this one unchanged.'
-            : ''),
+        // No word on the map's own tools: ChatGPT on the web offers
+        // document.modelContext but doesn't give its tools to the model.
+        note: 'The Mapbox map the user has open next to this chat. "Here", "this area" or "the map" means this view.',
         view: mapView()
       }
     };

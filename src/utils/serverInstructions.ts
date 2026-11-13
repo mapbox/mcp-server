@@ -18,7 +18,7 @@ export function buildServerInstructions(
   const lines = [
     'To show anything on a map, use render_map_tool: it renders an interactive Mapbox GL JS map inline.',
     'When a tool result includes mapboxRender.ref, pass that ref unchanged in render_map_tool payload_refs (several refs can share one map). Never write or edit a ref by hand.',
-    'In ChatGPT, a Mapbox map stays open next to the chat and provides these tools: redraw_map (same arguments as render_map_tool), search_map, add_places, move_map, read_map. Use them to change the open map ("show coffee shops on it", "add the route"): render_map_tool would open a second map.'
+    'In ChatGPT Desktop, a Mapbox map stays open next to the chat and provides these tools: redraw_map (same arguments as render_map_tool), search_map, add_places, move_map, read_map. Use them to change the open map ("show coffee shops on it", "add the route"): render_map_tool would open a second map.'
   ];
   if (enabledToolNames.includes('static_map_image_tool')) {
     lines.push(

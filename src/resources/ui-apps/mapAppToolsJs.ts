@@ -13,8 +13,6 @@ export const MAP_APP_TOOLS_JS = `
   // request like "show coffee shops on it" draws on this map instead of
   // opening another one.
   // https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#webmcp
-  var webMcpTools = false;
-
   function readMap() {
     return JSON.stringify({
       view: mapView(),
@@ -178,7 +176,6 @@ export const MAP_APP_TOOLS_JS = `
   ];
 
   if (document.modelContext && typeof document.modelContext.registerTool === 'function') {
-    webMcpTools = true;
     MAP_TOOLS.forEach(function(tool) {
       var run = tool.execute;
       // A promise either way, so a thrown error reaches the model as a rejection.
