@@ -78,13 +78,28 @@ function checkPackCore(packageJson, packedFiles, publishedFiles, options = {}) {
   };
 }
 
+/**
+ * Read the file list from `npm pack --json` output. Lifecycle scripts can
+ * print to stdout first (npm 10 prints "pre-commit script created."), so
+ * the JSON starts at the first line that begins with "[".
+ * @param {string} output - stdout of `npm pack --dry-run --json`
+ * @returns {string[]} Paths of the files in the package
+ */
+function parsePackOutput(output) {
+  const start = output.search(/^\[/m);
+  if (start === -1) {
+    throw new Error(`No JSON in npm pack output:\n${output}`);
+  }
+  return JSON.parse(output.slice(start))[0].files.map((file) => file.path);
+}
+
 function packFiles(args, cwd) {
   const output = execFileSync(
     'npm',
     ['pack', '--dry-run', '--json', '--ignore-scripts', ...args],
     { cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] }
   );
-  return JSON.parse(output)[0].files.map((file) => file.path);
+  return parsePackOutput(output);
 }
 
 function publishedFileList(packageJson, cwd) {
@@ -157,7 +172,7 @@ function checkPack() {
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { checkPackCore, entryPoints };
+  module.exports = { checkPackCore, entryPoints, parsePackOutput };
 }
 
 // Run if called directly

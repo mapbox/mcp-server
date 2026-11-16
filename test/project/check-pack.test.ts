@@ -4,7 +4,11 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 // Import the pure functions from the pack check script
-const { checkPackCore, entryPoints } = require('../../scripts/check-pack.cjs');
+const {
+  checkPackCore,
+  entryPoints,
+  parsePackOutput
+} = require('../../scripts/check-pack.cjs');
 
 const packageJson = {
   name: '@mapbox/test-server',
@@ -138,5 +142,33 @@ describe('check-pack.cjs - checkPackCore', () => {
     expect(result.ok).toBe(true);
     expect(result.added).toEqual([]);
     expect(result.removed).toEqual([]);
+  });
+});
+
+describe('check-pack.cjs - parsePackOutput', () => {
+  const json = JSON.stringify(
+    [{ files: [{ path: 'package.json' }, { path: 'dist/esm/index.js' }] }],
+    null,
+    2
+  );
+
+  it('reads the file list from npm pack --json', () => {
+    expect(parsePackOutput(json)).toEqual([
+      'package.json',
+      'dist/esm/index.js'
+    ]);
+  });
+
+  it('skips lines a lifecycle script printed before the JSON', () => {
+    expect(parsePackOutput(`pre-commit script created.\n${json}`)).toEqual([
+      'package.json',
+      'dist/esm/index.js'
+    ]);
+  });
+
+  it('says what npm printed when there is no JSON', () => {
+    expect(() => parsePackOutput('pre-commit script created.\n')).toThrow(
+      /No JSON in npm pack output/
+    );
   });
 });
