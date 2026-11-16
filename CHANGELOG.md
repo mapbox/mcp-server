@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.18.1-dev.2 - 2026-11-16
+
 ### Bug Fixes
 
 - **`matrix_tool` and `map_matching_tool`: fewer failed calls (#340).** The Claude directory showed 6.8% of `matrix_tool` calls and 15.1% of `map_matching_tool` calls failing. The hosted server's logs for the last 30 days had 1,181 errors in 21,716 `matrix_tool` calls and 16 in 320 `map_matching_tool` calls. Each cause below was reproduced against the live APIs.
