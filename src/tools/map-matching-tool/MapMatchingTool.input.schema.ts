@@ -29,17 +29,17 @@ export const MapMatchingInputSchema = z.object({
     .optional()
     .describe(
       'Array of Unix timestamps (in seconds) corresponding to each coordinate. ' +
-        'If provided, must have the same length as coordinates array. ' +
+        'If provided, must have the same length as coordinates array and be in ascending order. ' +
         'Used to improve matching accuracy based on speed.'
     ),
   radiuses: z
-    .array(z.number().min(0))
+    .array(z.number().positive())
     .optional()
     .describe(
-      'Array of maximum distances (in meters) each coordinate can snap to the road network. ' +
+      'Array of maximum distances (in meters, greater than 0; the documented range is up to 50) each coordinate can snap to the road network. ' +
         'If provided, must have the same length as coordinates array. ' +
-        'Default is unlimited. Use smaller values (5-25m) for high-quality GPS, ' +
-        'larger values (50-100m) for noisy GPS traces.'
+        'Default is 5 meters. Use smaller values (1-10m) for clean GPS traces, ' +
+        'larger values (20-50m) for noisy GPS traces.'
     ),
   annotations: z
     .array(z.enum(['speed', 'distance', 'duration', 'congestion']))

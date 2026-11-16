@@ -1,5 +1,13 @@
 ## Unreleased
 
+### Bug Fixes
+
+- **`matrix_tool` and `map_matching_tool`: fewer failed calls (#340).** The Claude directory showed 6.8% of `matrix_tool` calls and 15.1% of `map_matching_tool` calls failing. Each cause below was reproduced against the live APIs.
+  - **Unroutable points broke `matrix_tool`:** when a coordinate can't be snapped to the road network (in the water, or with latitude and longitude swapped), the Matrix API returns 200 with `null` in `sources` and `destinations`. The output schema didn't allow `null`, and the tool returned the response anyway, so the MCP SDK rejected it with an output validation error. `null` waypoints are now allowed, and the result says which coordinates couldn't be snapped. A response that still fails the schema now comes back as a tool error, as `map_matching_tool` does since #230.
+  - **`matrix_tool` refused valid requests:** with both `sources` and `destinations` set, it required every coordinate to be used. The API has no such rule (4 coordinates with `sources=0&destinations=1;2` returns a 1×2 matrix). The real limit is at least two matrix elements, which is what the tool checks now.
+  - **`map_matching_tool` was used for routing:** models called it with a few points kilometers apart, which gets `NoMatch` or `All coordinates are too far away from each other`. The description now says it's for dense GPS traces and to use `directions_tool` between places, and those errors say the same.
+  - **`map_matching_tool` inputs:** the radius description said the default is unlimited. It's 5 meters, with a documented range up to 50. A radius of 0, which the API refuses, is now rejected, and so are timestamps that aren't in ascending order, which the API answers with `NoMatch`.
+
 ## 0.18.1-dev.1 - 2026-11-16
 
 ## 0.18.0 - 2026-11-11
