@@ -4,6 +4,8 @@
 
 - **Declare dependencies npm was only hoisting (#337).** `@opentelemetry/core`, whose types the redacting span exporter uses, and `@types/geojson` were imported but never declared, and only resolved because npm hoists them from `@opentelemetry/sdk-trace` and Turf. pnpm, which the MCP monorepo will use, can't resolve undeclared packages. Also types the `setupHttpRequest` test helper's mock so its return type can be named under pnpm. No change under npm.
 
+## 0.18.1-dev.1 - 2026-11-16
+
 ## 0.18.0 - 2026-11-11
 
 ### Features
