@@ -708,6 +708,21 @@ describe('RenderMapTool', () => {
     expect(text).toContain('payload_refs');
   });
 
+  // Only the empty call opens the empty map: arguments that draw nothing
+  // are a mistake the model should hear about.
+  it.each([
+    ['a camera alone', { camera: { center: [2.35, 48.85], zoom: 12 } }],
+    ['empty payload_refs', { payload_refs: [] }]
+  ])('still errors for %s', async (_name, input) => {
+    const tool = new RenderMapTool({ httpRequest: vi.fn() });
+    const result = await tool.run(input);
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    const text = (result.content[0] as { type: 'text'; text: string }).text;
+    expect(text).toContain('nothing to render');
+  });
+
   it('still errors when the only refs given cannot be resolved', async () => {
     const tool = new RenderMapTool({ httpRequest: vi.fn() });
     const result = await tool.run({
@@ -753,6 +768,10 @@ describe('RenderMapTool', () => {
     for (const name of ['redraw_map', 'search_map', 'add_places', 'move_map'])
       expect(text).toContain(name);
     expect(text).toContain('opens a duplicate tab');
+    // The server can't see where the map is shown or whether the tools
+    // exist, so the hint leaves the model a way to draw a new map.
+    expect(text).toContain('If this map is open in a tab next to the chat');
+    expect(text).toContain('When they are not, call render_map_tool again');
     // The tools are named directly, not left for the model to discover.
     expect(text).not.toContain('look them up');
   });

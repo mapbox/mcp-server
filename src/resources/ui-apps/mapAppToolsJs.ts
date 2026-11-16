@@ -95,10 +95,13 @@ export const MAP_APP_TOOLS_JS = `
         var q = input && typeof input.query === 'string' ? input.query.trim() : '';
         if (!q) throw new Error('query is required.');
         if (input.clear === true) clearMap();
+        // A failed search leaves its error on the map; this one starts clean.
+        errorEl.style.display = 'none';
         var center = map.getCenter();
         return selfFetchSearch({
           q: q,
-          proximity: { longitude: center.lng, latitude: center.lat }
+          proximity: { longitude: center.lng, latitude: center.lat },
+          proximityFromResults: true
         }).then(function(found) {
           if (!found) throw new Error('No results for "' + q + '" near the map center.');
           return readMap();

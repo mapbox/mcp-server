@@ -277,6 +277,7 @@ function loadScriptSandbox(options?: {
   // a marker's popup without needing per-marker identity (fakeMarkerInstance
   // is shared across every `new mapboxgl.Marker()` call).
   let lastPopupText: string | undefined;
+  const popupTexts: string[] = [];
 
   // <html>: the theme lands in its data-theme attribute and its style.
   const rootEl = {
@@ -333,6 +334,7 @@ function loadScriptSandbox(options?: {
         return {
           setText: (text: string) => {
             lastPopupText = text;
+            popupTexts.push(text);
             return {};
           }
         };
@@ -423,6 +425,7 @@ function loadScriptSandbox(options?: {
       fetchImpl = impl;
     },
     getLastPopupText: () => lastPopupText,
+    popupTexts,
     rootEl,
     sendHostContext: (params: Record<string, unknown>) => {
       postToApp({
@@ -2508,6 +2511,40 @@ describe('mapAppHtml WebMCP tools', () => {
     ).toEqual([]);
   });
 
+  it('applies a host clear that arrives while a share is still in flight', async () => {
+    const sandbox = loadScriptSandbox({
+      webMcp: true,
+      hostCapabilities: { updateModelContext: { text: {} } },
+      hostContext: { displayMode: 'fullscreen' }
+    });
+    const { sendToolResult, postMessageCalls } = sandbox;
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    sendToolResult(emptyMap);
+    sandbox.clickBaseMapPoi({
+      properties: { name: 'Café Regatta', maki: 'cafe' },
+      geometry: { type: 'Point', coordinates: [24.9, 60.18] }
+    });
+    const share = [...postMessageCalls]
+      .reverse()
+      .find((m) => m.method === 'ui/update-model-context');
+
+    // The host clears the context before it answers the pending share.
+    sandbox.sendHostContext({ 'openai/modelContext': null });
+    sandbox.respond(share?.id, {
+      _meta: { 'openai/modelContext': { updateId: 'update-1' } }
+    });
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    sandbox.moveMap({ lng: 24.95 });
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    const shared = postMessageCalls.filter(
+      (m) => m.method === 'ui/update-model-context'
+    );
+    expect(
+      (shared[shared.length - 1].params as { content: unknown[] }).content
+    ).toEqual([]);
+  });
+
   it('add_places rejects coordinates that are out of range', async () => {
     const { webMcpTools, sendToolResult } = loadScriptSandbox({ webMcp: true });
     sendToolResult(emptyMap);
@@ -2571,6 +2608,88 @@ describe('mapAppHtml WebMCP tools', () => {
     await expect(webMcpTools.search_map.execute({})).rejects.toThrow(
       /query is required/
     );
+  });
+
+  it('search_map draws only the results, without a search center pin', async () => {
+    const { webMcpTools, sendToolResult, setFetchImpl, popupTexts } =
+      loadScriptSandbox({ webMcp: true });
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Café Regatta', mapbox_id: 'id-1' },
+            geometry: { type: 'Point', coordinates: [24.91, 60.18] }
+          }
+        ]
+      })
+    }));
+    sendToolResult(emptyMap);
+    popupTexts.length = 0;
+
+    await webMcpTools.search_map.execute({ query: 'coffee' });
+    expect(popupTexts).not.toContain('Search center');
+  });
+
+  it('search_map draws nothing and keeps the view when the search finds nothing', async () => {
+    const {
+      webMcpTools,
+      sendToolResult,
+      setFetchImpl,
+      popupTexts,
+      markerConstructorCalls,
+      fitBoundsCalls,
+      flyToCalls
+    } = loadScriptSandbox({ webMcp: true });
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ type: 'FeatureCollection', features: [] })
+    }));
+    sendToolResult(emptyMap);
+    popupTexts.length = 0;
+    const markersBefore = markerConstructorCalls.length;
+    const fitsBefore = fitBoundsCalls.length;
+    const flightsBefore = flyToCalls.length;
+
+    await expect(
+      webMcpTools.search_map.execute({ query: 'nothing here' })
+    ).rejects.toThrow(/No results/);
+    expect(popupTexts).not.toContain('Search center');
+    expect(markerConstructorCalls.length).toBe(markersBefore);
+    expect(fitBoundsCalls.length).toBe(fitsBefore);
+    expect(flyToCalls.length).toBe(flightsBefore);
+  });
+
+  it('search_map clears the error a failed search left on the map', async () => {
+    const { webMcpTools, sendToolResult, setFetchImpl, errorEl } =
+      loadScriptSandbox({ webMcp: true });
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({ type: 'FeatureCollection', features: [] })
+    }));
+    sendToolResult(emptyMap);
+    await expect(
+      webMcpTools.search_map.execute({ query: 'nothing here' })
+    ).rejects.toThrow(/No results/);
+    expect(errorEl?.style.display).toBe('block');
+
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Café Regatta', mapbox_id: 'id-1' },
+            geometry: { type: 'Point', coordinates: [24.91, 60.18] }
+          }
+        ]
+      })
+    }));
+    await webMcpTools.search_map.execute({ query: 'coffee' });
+    expect(errorEl?.style.display).toBe('none');
   });
 
   it('move_map flies to the location, clamping the zoom', async () => {

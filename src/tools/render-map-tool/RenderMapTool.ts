@@ -56,14 +56,16 @@ import type { HttpRequest } from '../../utils/types.js';
 // In ChatGPT the map stays open in a tab, so the next request decides between
 // one map and a pile of tabs. The model reads this right after drawing. Only
 // ChatGPT Desktop gives the model the map's tools (WebMCP), and the server
-// can't tell Desktop from the web, so the tools are named for Desktop.
+// can't tell Desktop from the web or a phone, or a tab from an inline map,
+// so every claim here is conditional.
 const OPEN_MAP_HINT_CHATGPT =
-  'This map is now open in a tab next to the chat and stays open. In ChatGPT ' +
-  'Desktop, for later map requests in this conversation it provides these ' +
-  'tools: redraw_map ' +
+  'If this map is open in a tab next to the chat, it stays open. In ChatGPT ' +
+  'Desktop it then provides these tools for later map requests in this ' +
+  'conversation: redraw_map ' +
   '(exactly the arguments of render_map_tool), search_map, add_places, ' +
-  'move_map and read_map. Use them to change this map: calling ' +
-  'render_map_tool again opens a duplicate tab.';
+  'move_map and read_map. When they are available, use them to change this ' +
+  'map: calling render_map_tool again opens a duplicate tab. When they are ' +
+  'not, call render_map_tool again.';
 
 /** ChatGPT tags every request with `openai/*` metadata. */
 function isChatGpt(extra?: ServerContext): boolean {
@@ -175,8 +177,13 @@ export class RenderMapTool extends BaseTool<
           const assembled = this.assemblePayload(input, owner);
           const { unresolvedRefs } = assembled;
           // Nothing asked for at all: ChatGPT opening the map from its
-          // thread entrypoint, which calls with {}. Open an empty map.
-          const explorer = !assembled.payload && unresolvedRefs.length === 0;
+          // thread entrypoint, which calls with {}. Open an empty map. The
+          // raw input decides: a call with arguments that draw nothing
+          // (a camera alone, empty payload_refs) is still an error.
+          const explorer =
+            rawInput == null ||
+            (typeof rawInput === 'object' &&
+              Object.keys(rawInput).length === 0);
           const payload = explorer
             ? { layers: [], markers: [] }
             : assembled.payload;

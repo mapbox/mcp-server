@@ -20,6 +20,7 @@ export const MAP_APP_MODEL_CONTEXT_JS = `
   var shareTimer = null;
   var lastSharedContext = '';
   var sharePending = false;
+  var clearedWhilePending = false;
   var ownContextUpdateId = null;
   // A place whose chip left the composer, until the user selects another.
   var dismissedPlaceKey = null;
@@ -80,8 +81,13 @@ export const MAP_APP_MODEL_CONTEXT_JS = `
         sharePending = false;
         var meta = result && result._meta && result._meta['openai/modelContext'];
         ownContextUpdateId = meta ? meta.updateId : null;
+        applyPendingClear();
       },
-      function() { sharePending = false; lastSharedContext = ''; }
+      function() {
+        sharePending = false;
+        lastSharedContext = '';
+        applyPendingClear();
+      }
     );
   }
 
@@ -94,9 +100,24 @@ export const MAP_APP_MODEL_CONTEXT_JS = `
   // without the place in it means the place left the composer: the user
   // removed it, or a sent message used it up.
   function onModelContextChanged(state) {
-    if (sharePending) return;
+    if (sharePending) {
+      // Our own update's id is unknown until the request settles, so only a
+      // null (never our echo) is remembered.
+      if (!state) clearedWhilePending = true;
+      return;
+    }
     if (state && state.updateId === ownContextUpdateId) return;
     if (state && Array.isArray(state.content) && state.content.length > 0) return;
+    dropSharedPlace();
+  }
+
+  function applyPendingClear() {
+    if (!clearedWhilePending) return;
+    clearedWhilePending = false;
+    dropSharedPlace();
+  }
+
+  function dropSharedPlace() {
     // ChatGPT sends the same null when the user removes the item and when
     // a sent message uses it up, so the map keeps its selection either way.
     dismissedPlaceKey = placeKey(selectedPlace());
