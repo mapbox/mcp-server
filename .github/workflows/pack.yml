@@ -13,6 +13,9 @@ on:
       - main
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+permissions:
+  contents: read
+
 jobs:
   check-pack:
     runs-on: ubuntu-latest
