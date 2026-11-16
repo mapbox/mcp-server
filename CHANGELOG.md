@@ -9,6 +9,8 @@
   - **Pointing the model at the open map:** the server instructions, the `render_map_tool` description and the render hint data tools append name these tools, each saying it applies in ChatGPT Desktop, since ChatGPT on the web registers the tools but doesn't offer them to the model. In ChatGPT, the result of a call that opens a map names them too. The map's shared context doesn't name them. Other clients get the same instructions as before plus that one line.
   - **Layout in the host:** the map keeps its controls, labels and cards inside the area the host leaves uncovered (`hostContext.safeAreaInsets`), such as below ChatGPT's title bar on a phone, while the map itself runs underneath. Inline, it asks for no more height than the host allows (`containerDimensions.maxHeight`). `render_map_tool` has a square Mapbox mark icon for the entrypoint, since the wide server logo is unreadable in ChatGPT's "+" menu; `BaseTool` now passes `icons` through to `registerTool`.
 
+## 0.18.1-dev.1 - 2026-11-16
+
 ## 0.18.0 - 2026-11-11
 
 ### Features
