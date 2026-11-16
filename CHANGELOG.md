@@ -4,6 +4,8 @@
 
 - **CI checks what `npm pack` would publish (#338).** A new `Check npm Package` workflow runs `npm run check:pack` after the build. It fails when an `exports`, `bin`, `main` or `types` target isn't in the package, or when a file in the latest published version is gone, and lists added files. Add the `pack-files-removed` label for a removal on purpose. This guards publishing while the MCP monorepo moves packages around.
 
+## 0.18.1-dev.1 - 2026-11-16
+
 ## 0.18.0 - 2026-11-11
 
 ### Features
