@@ -20,7 +20,9 @@ export class MatrixTool extends MapboxApiBasedTool<
 > {
   name = 'matrix_tool';
   description =
-    'Calculates travel times and distances between multiple points using Mapbox Matrix API.';
+    'Calculates travel times and distances between multiple points using Mapbox Matrix API. ' +
+    'Put all the points in one call (up to 25, 10 for driving-traffic) rather than one call ' +
+    'per pair: the API allows 60 requests per minute (30 for driving-traffic).';
   annotations = {
     title: 'Matrix Tool',
     readOnlyHint: true,
@@ -220,7 +222,13 @@ export class MatrixTool extends MapboxApiBasedTool<
       input.destinations && input.destinations !== 'all'
         ? input.destinations.split(';').length
         : input.coordinates.length;
-    if (sourceCount * destinationCount < 2) {
+    // A single source-destination pair is one matrix element, which the API
+    // refuses. Ask for a 1x2 matrix (the source to itself and to the
+    // destination) and return only the requested pair.
+    const singlePair =
+      sourceCount * destinationCount === 1 &&
+      input.sources !== input.destinations;
+    if (sourceCount * destinationCount < 2 && !singlePair) {
       return {
         content: [
           {
@@ -257,7 +265,12 @@ export class MatrixTool extends MapboxApiBasedTool<
     }
 
     // Add destinations parameter if specified
-    if (input.destinations) {
+    if (singlePair) {
+      queryParams.append(
+        'destinations',
+        `${input.sources};${input.destinations}`
+      );
+    } else if (input.destinations) {
       queryParams.append('destinations', input.destinations);
     }
 
@@ -278,7 +291,11 @@ export class MatrixTool extends MapboxApiBasedTool<
         content: [
           {
             type: 'text',
-            text: `Matrix API error: ${errorMessage}`
+            text:
+              `Matrix API error: ${errorMessage}` +
+              (response.status === 429
+                ? ' The Matrix API allows 60 requests per minute (30 for driving-traffic). Put all the points in one call (up to 25) instead of one call per pair, or wait a minute and retry.'
+                : '')
           }
         ],
         isError: true
@@ -307,7 +324,9 @@ export class MatrixTool extends MapboxApiBasedTool<
         isError: true
       };
     }
-    const validatedData: MatrixResponse = parsed.data;
+    const validatedData: MatrixResponse = singlePair
+      ? pickSecondDestination(parsed.data)
+      : parsed.data;
 
     // A coordinate the API can't snap to the road network (in the water,
     // or with latitude and longitude swapped) comes back as a null waypoint.
@@ -331,4 +350,18 @@ export class MatrixTool extends MapboxApiBasedTool<
       isError: false
     };
   }
+}
+
+// Keep only the second destination of a 1x2 matrix (see singlePair above).
+function pickSecondDestination(data: MatrixResponse): MatrixResponse {
+  return {
+    ...data,
+    destinations: data.destinations.slice(1, 2),
+    ...(data.durations && {
+      durations: data.durations.map((row) => row.slice(1, 2))
+    }),
+    ...(data.distances && {
+      distances: data.distances.map((row) => row.slice(1, 2))
+    })
+  };
 }

@@ -277,6 +277,29 @@ describe('MapMatchingTool', () => {
     });
   });
 
+  it('accepts matchings without geometry when overview is false', async () => {
+    const { geometry: _geometry, ...matching } =
+      sampleMapMatchingResponse.matchings[0];
+    const { httpRequest } = setupHttpRequest({
+      json: async () => ({
+        ...sampleMapMatchingResponse,
+        matchings: [matching]
+      })
+    });
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      profile: 'driving',
+      overview: 'false'
+    });
+
+    expect(result.isError).toBe(false);
+  });
+
   it('supports different routing profiles', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => sampleMapMatchingResponse

@@ -33,10 +33,10 @@ export const MapMatchingInputSchema = z.object({
         'Used to improve matching accuracy based on speed.'
     ),
   radiuses: z
-    .array(z.number().positive())
+    .array(z.number().positive().max(50))
     .optional()
     .describe(
-      'Array of maximum distances (in meters, greater than 0; the documented range is up to 50) each coordinate can snap to the road network. ' +
+      'Array of maximum distances (in meters, greater than 0 and up to 50) each coordinate can snap to the road network. ' +
         'If provided, must have the same length as coordinates array. ' +
         'Default is 5 meters. Use smaller values (1-10m) for clean GPS traces, ' +
         'larger values (20-50m) for noisy GPS traces.'

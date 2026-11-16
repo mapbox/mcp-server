@@ -800,7 +800,7 @@ describe('MatrixTool', () => {
       expect(resultWithSuccess2.isError).toBe(false);
     });
 
-    it('rejects sources and destinations that give a single matrix element', async () => {
+    it('rejects a source that is also its only destination', async () => {
       const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
@@ -813,7 +813,7 @@ describe('MatrixTool', () => {
         ],
         profile: 'mapbox/driving',
         sources: '1',
-        destinations: '2'
+        destinations: '1'
       });
       expect(result.isError).toBe(true);
       expect(mockHttpRequest).not.toHaveBeenCalled();
@@ -828,7 +828,7 @@ describe('MatrixTool', () => {
           ],
           profile: 'mapbox/driving',
           sources: '1',
-          destinations: '2'
+          destinations: '1'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
@@ -840,6 +840,72 @@ describe('MatrixTool', () => {
           'The sources and destinations must give at least two matrix elements'
         );
       }
+    });
+
+    it('asks for a 1x2 matrix for a single pair and returns only that pair', async () => {
+      const response = {
+        code: 'Ok',
+        durations: [[0, 1510.9]],
+        distances: [[0, 9100.4]],
+        sources: [sampleMatrixResponse.sources[0]],
+        destinations: [
+          sampleMatrixResponse.destinations[0],
+          sampleMatrixResponse.destinations[2]
+        ]
+      };
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
+        json: () => Promise.resolve(response)
+      });
+      const tool = new MatrixTool({ httpRequest });
+      const result = await tool.run({
+        coordinates: [
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -122.48, latitude: 37.73 }
+        ],
+        profile: 'mapbox/driving',
+        annotations: 'duration,distance',
+        sources: '0',
+        destinations: '2'
+      });
+
+      const url = mockHttpRequest.mock.calls[0][0];
+      expect(url).toContain('sources=0');
+      expect(url).toContain('destinations=0%3B2');
+      expect(result.isError).toBe(false);
+      expect(result.structuredContent).toEqual({
+        code: 'Ok',
+        durations: [[1510.9]],
+        distances: [[9100.4]],
+        sources: [sampleMatrixResponse.sources[0]],
+        destinations: [sampleMatrixResponse.destinations[2]]
+      });
+    });
+
+    it('explains the rate limit on a 429', async () => {
+      const { httpRequest } = setupHttpRequest({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        text: async () => JSON.stringify({ message: 'Too Many Requests' })
+      });
+      const tool = new MatrixTool({ httpRequest });
+      const result = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'mapbox/driving'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('60 requests per minute')
+      });
     });
 
     it('accepts sources and destinations that leave some coordinates unused', async () => {
