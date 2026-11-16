@@ -15,8 +15,10 @@ export const MatrixResponseSchema = z.object({
   code: z.string(),
   durations: z.array(z.array(z.number().nullable())).optional(),
   distances: z.array(z.array(z.number().nullable())).optional(),
-  sources: z.array(MatrixWaypointSchema),
-  destinations: z.array(MatrixWaypointSchema),
+  // A waypoint is null when its coordinate can't be snapped to the road
+  // network (for example, a point in the water).
+  sources: z.array(MatrixWaypointSchema.nullable()),
+  destinations: z.array(MatrixWaypointSchema.nullable()),
   message: z.string().optional() // Present in error responses
 });
 

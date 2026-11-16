@@ -20,7 +20,9 @@ export class MatrixTool extends MapboxApiBasedTool<
 > {
   name = 'matrix_tool';
   description =
-    'Calculates travel times and distances between multiple points using Mapbox Matrix API.';
+    'Calculates travel times and distances between multiple points using Mapbox Matrix API. ' +
+    'Put all the points in one call (up to 25, 10 for driving-traffic) rather than one call ' +
+    'per pair: the API allows 60 requests per minute (30 for driving-traffic).';
   annotations = {
     title: 'Matrix Tool',
     readOnlyHint: true,
@@ -211,34 +213,31 @@ export class MatrixTool extends MapboxApiBasedTool<
       };
     }
 
-    // Validate that when specifying both sources and destinations, all coordinates are used
-    if (
-      input.sources &&
-      input.sources !== 'all' &&
-      input.destinations &&
-      input.destinations !== 'all'
-    ) {
-      // Get all unique coordinate indices that are used
-      const sourcesIndices = input.sources
-        .split(';')
-        .map((idx) => parseInt(idx, 10));
-      const destinationsIndices = input.destinations
-        .split(';')
-        .map((idx) => parseInt(idx, 10));
-      const usedIndices = new Set([...sourcesIndices, ...destinationsIndices]);
-
-      // Check if all coordinate indices are used
-      if (usedIndices.size < input.coordinates.length) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'When specifying both sources and destinations, all coordinates must be used as either a source or destination.'
-            }
-          ],
-          isError: true
-        };
-      }
+    // The API needs at least two matrix elements (sources x destinations).
+    const sourceCount =
+      input.sources && input.sources !== 'all'
+        ? input.sources.split(';').length
+        : input.coordinates.length;
+    const destinationCount =
+      input.destinations && input.destinations !== 'all'
+        ? input.destinations.split(';').length
+        : input.coordinates.length;
+    // A single source-destination pair is one matrix element, which the API
+    // refuses. Ask for a 1x2 matrix (the source to itself and to the
+    // destination) and return only the requested pair.
+    const singlePair =
+      sourceCount * destinationCount === 1 &&
+      input.sources !== input.destinations;
+    if (sourceCount * destinationCount < 2 && !singlePair) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'The sources and destinations must give at least two matrix elements (sources x destinations). Add another source or destination index.'
+          }
+        ],
+        isError: true
+      };
     }
 
     // Format coordinates for API request
@@ -266,7 +265,12 @@ export class MatrixTool extends MapboxApiBasedTool<
     }
 
     // Add destinations parameter if specified
-    if (input.destinations) {
+    if (singlePair) {
+      queryParams.append(
+        'destinations',
+        `${input.sources};${input.destinations}`
+      );
+    } else if (input.destinations) {
       queryParams.append('destinations', input.destinations);
     }
 
@@ -287,7 +291,11 @@ export class MatrixTool extends MapboxApiBasedTool<
         content: [
           {
             type: 'text',
-            text: `Matrix API error: ${errorMessage}`
+            text:
+              `Matrix API error: ${errorMessage}` +
+              (response.status === 429
+                ? ' The Matrix API allows 60 requests per minute (30 for driving-traffic). Put all the points in one call (up to 25) instead of one call per pair, or wait a minute and retry.'
+                : '')
           }
         ],
         isError: true
@@ -297,20 +305,63 @@ export class MatrixTool extends MapboxApiBasedTool<
     // Return the matrix data
     const data = await response.json();
 
-    // Validate the response data against our schema
-    let validatedData: MatrixResponse;
-    try {
-      validatedData = MatrixResponseSchema.parse(data);
-    } catch (error) {
-      // If validation fails, fall back to the original data
-      this.log('warning', `MatrixTool: Response validation failed: ${error}`);
-      validatedData = data as MatrixResponse;
+    // Validate the response data against our schema. Never return
+    // schema-violating structuredContent: the MCP SDK rejects it with an
+    // output validation error.
+    const parsed = MatrixResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      this.log(
+        'warning',
+        `MatrixTool: Response validation failed: ${parsed.error.message}`
+      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Matrix API returned a response that didn't match the expected format: ${parsed.error.message}`
+          }
+        ],
+        isError: true
+      };
     }
+    const validatedData: MatrixResponse = singlePair
+      ? pickSecondDestination(parsed.data)
+      : parsed.data;
+
+    // A coordinate the API can't snap to the road network (in the water,
+    // or with latitude and longitude swapped) comes back as a null waypoint.
+    const unroutable = input.coordinates
+      .map((_, idx) => idx)
+      .filter(
+        (idx) =>
+          validatedData.sources[idx] === null ||
+          validatedData.destinations[idx] === null
+      );
+    const note =
+      unroutable.length > 0 && !input.sources && !input.destinations
+        ? `\n\nNote: coordinates at index ${unroutable.join(', ')} could not be snapped to the road network, so their travel times are null. Check that they are on land and in longitude,latitude order.`
+        : '';
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(validatedData, null, 2) }],
+      content: [
+        { type: 'text', text: JSON.stringify(validatedData, null, 2) + note }
+      ],
       structuredContent: validatedData,
       isError: false
     };
   }
+}
+
+// Keep only the second destination of a 1x2 matrix (see singlePair above).
+function pickSecondDestination(data: MatrixResponse): MatrixResponse {
+  return {
+    ...data,
+    destinations: data.destinations.slice(1, 2),
+    ...(data.durations && {
+      durations: data.durations.map((row) => row.slice(1, 2))
+    }),
+    ...(data.distances && {
+      distances: data.distances.map((row) => row.slice(1, 2))
+    })
+  };
 }
