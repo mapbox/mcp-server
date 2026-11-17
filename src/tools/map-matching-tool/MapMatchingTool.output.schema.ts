@@ -27,7 +27,8 @@ const MatchingSchema = z.object({
   confidence: z.number().min(0).max(1),
   distance: z.number(),
   duration: z.number(),
-  geometry: z.union([GeoJSONLineStringSchema, z.string()]),
+  // Omitted when the request sets overview=false.
+  geometry: z.union([GeoJSONLineStringSchema, z.string()]).optional(),
   legs: z
     .array(
       z.object({

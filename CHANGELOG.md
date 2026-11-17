@@ -4,6 +4,21 @@
 
 - **CI checks what `npm pack` would publish (#338).** A new `Check npm Package` workflow runs `npm run check:pack` after the build. It fails when an `exports`, `bin`, `main` or `types` target isn't in the package, or when a file in the latest published version is gone, and lists added files. Add the `pack-files-removed` label for a removal on purpose. This guards publishing while the MCP monorepo moves packages around.
 
+## 0.18.1 - 2026-11-17
+
+## 0.18.1-dev.2 - 2026-11-16
+
+### Bug Fixes
+
+- **`matrix_tool` and `map_matching_tool`: fewer failed calls (#340).** The Claude directory showed 6.8% of `matrix_tool` calls and 15.1% of `map_matching_tool` calls failing. The hosted server's logs for the last 30 days had 1,181 errors in 21,716 `matrix_tool` calls and 16 in 320 `map_matching_tool` calls. Each cause below was reproduced against the live APIs.
+  - **A single pair failed `matrix_tool` (944 of the 1,181 errors):** asking for one source and one destination is a single matrix element, which the API refuses with a 422. The tool now asks for a 1×2 matrix (the source to itself and to the destination), the API's minimum, and returns only the requested pair.
+  - **Rate limits (215 errors):** the Matrix API allows 60 requests per minute (30 for `driving-traffic`), and the pipeline's retries only cover a few seconds. The description and the 429 error now tell the model to put all the points in one call instead of one call per pair.
+  - **`matrix_tool` refused valid requests (9 errors):** with both `sources` and `destinations` set, it required every coordinate to be used. The API has no such rule (4 coordinates with `sources=0&destinations=1;2` returns a 1×2 matrix), so the check is gone.
+  - **Unroutable points broke `matrix_tool`:** when a coordinate can't be snapped to the road network (in the water, or with latitude and longitude swapped), the Matrix API returns 200 with `null` in `sources` and `destinations`. The output schema didn't allow `null`, and the tool returned the response anyway, so the MCP SDK rejected it with an output validation error. `null` waypoints are now allowed, and the result says which coordinates couldn't be snapped. A response that still fails the schema now comes back as a tool error, as `map_matching_tool` does since #230.
+  - **`overview=false` broke `map_matching_tool` (10 of the 16 errors):** the API leaves out each matching's `geometry` then, and the output schema required it. It's optional now.
+  - **`map_matching_tool` was used for routing:** models call it with a few points kilometers apart, which gets `NoMatch` or `All coordinates are too far away from each other`. The description now says it's for dense GPS traces and to use `directions_tool` between places, and those errors say the same.
+  - **`map_matching_tool` inputs:** the radius description said the default is unlimited. It's 5 meters, and the API refuses values outside 0 to 50, so the schema now takes more than 0 and up to 50. Timestamps that aren't in ascending order, which the API answers with `NoMatch`, are now rejected.
+
 ## 0.18.1-dev.1 - 2026-11-16
 
 ## 0.18.0 - 2026-11-11
