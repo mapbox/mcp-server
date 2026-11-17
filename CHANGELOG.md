@@ -3,6 +3,7 @@
 ### Maintenance
 
 - **CI checks what `npm pack` would publish (#338).** A new `Check npm Package` workflow runs `npm run check:pack` after the build. It fails when an `exports`, `bin`, `main` or `types` target isn't in the package, or when a file in the latest published version is gone, and lists added files. Add the `pack-files-removed` label for a removal on purpose. This guards publishing while the MCP monorepo moves packages around.
+- **Declare dependencies npm was only hoisting (#337).** `@opentelemetry/core`, whose types the redacting span exporter uses, and `@types/geojson` were imported but never declared, and only resolved because npm hoists them from `@opentelemetry/sdk-trace` and Turf. pnpm, which the MCP monorepo will use, can't resolve undeclared packages. Also types the `setupHttpRequest` test helper's mock so its return type can be named under pnpm. No change under npm.
 
 ## 0.18.1 - 2026-11-17
 
