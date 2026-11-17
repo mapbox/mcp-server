@@ -98,6 +98,15 @@ describe('ListPublicTokensTool', () => {
       'account.mapbox.com/access-tokens/create'
     );
     expect(textOf(result)).toContain('Recommended: pk.default.sig');
+    // Models retype long tokens; the text asks them to copy it exactly and
+    // check the copy from the file they wrote it into.
+    expect(textOf(result)).toContain('never retyped');
+    expect(textOf(result)).toContain(
+      "grep -o 'pk\\.[A-Za-z0-9._-]*' index.html"
+    );
+    expect(textOf(result)).toContain(
+      'https://api.mapbox.com/tokens/v2?access_token=$TOKEN'
+    );
   });
 
   it('recommends a token restricted to the site_url', async () => {

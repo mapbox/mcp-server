@@ -16,16 +16,22 @@ import { buildSelfFetchRef } from '../../utils/selfFetchRef.js';
 
 // Docs: https://docs.mapbox.com/api/navigation/map-matching/
 
+const SPARSE_POINTS_HINT =
+  ' Map matching needs a dense GPS trace with points seconds or tens of meters apart.' +
+  ' To get a route between a few places, use directions_tool instead.';
+
 export class MapMatchingTool extends MapboxApiBasedTool<
   typeof MapMatchingInputSchema,
   typeof MapMatchingOutputSchema
 > {
   name = 'map_matching_tool';
   description =
-    'Snap GPS traces to roads using Mapbox Map Matching API. Takes noisy/inaccurate ' +
-    'coordinate sequences (2-100 points) and returns clean routes aligned with actual ' +
-    'roads, bike paths, or walkways. Useful for analyzing recorded trips, cleaning ' +
-    'fleet tracking data, or processing fitness activity traces. Returns confidence ' +
+    'Snap a recorded GPS trace to roads using Mapbox Map Matching API. Takes a dense, ' +
+    'noisy coordinate sequence (2-100 points, recorded seconds or tens of meters apart) ' +
+    'and returns a clean route aligned with actual roads, bike paths, or walkways. ' +
+    'Useful for analyzing recorded trips, cleaning fleet tracking data, or processing ' +
+    'fitness activity traces. Not for routing between a few places or addresses: points ' +
+    'kilometers apart fail to match, so use directions_tool for that. Returns confidence ' +
     'scores, matched geometry, and optional traffic/speed annotations.';
   annotations = {
     title: 'Map Matching Tool',
@@ -62,6 +68,25 @@ export class MapMatchingTool extends MapboxApiBasedTool<
       };
     }
 
+    // The API needs timestamps in ascending order, and returns NoMatch when
+    // they aren't.
+    if (
+      input.timestamps &&
+      input.timestamps.some(
+        (t, idx) => idx > 0 && t <= input.timestamps![idx - 1]
+      )
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'The timestamps must be in strictly ascending order, one per coordinate in the order the points were recorded.'
+          }
+        ],
+        isError: true
+      };
+    }
+
     // Validate radiuses array length matches coordinates
     if (input.radiuses && input.radiuses.length !== input.coordinates.length) {
       return {
@@ -89,7 +114,9 @@ export class MapMatchingTool extends MapboxApiBasedTool<
         content: [
           {
             type: 'text',
-            text: `Map Matching API error: ${errorMessage}`
+            text:
+              `Map Matching API error: ${errorMessage}` +
+              (/too far away/i.test(errorMessage) ? SPARSE_POINTS_HINT : '')
           }
         ],
         isError: true
@@ -107,7 +134,10 @@ export class MapMatchingTool extends MapboxApiBasedTool<
         content: [
           {
             type: 'text',
-            text: `Map Matching API could not match the trace (code: ${data.code}). Try adjusting the coordinates or radiuses.`
+            text:
+              `Map Matching API could not match the trace (code: ${data.code}). ` +
+              'Try larger radiuses (up to 50 meters) for a noisy trace.' +
+              SPARSE_POINTS_HINT
           }
         ],
         isError: true

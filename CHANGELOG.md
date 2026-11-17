@@ -1,5 +1,22 @@
 ## Unreleased
 
+## 0.18.1-dev.2 - 2026-11-16
+
+### Bug Fixes
+
+- **`matrix_tool` and `map_matching_tool`: fewer failed calls (#340).** The Claude directory showed 6.8% of `matrix_tool` calls and 15.1% of `map_matching_tool` calls failing. The hosted server's logs for the last 30 days had 1,181 errors in 21,716 `matrix_tool` calls and 16 in 320 `map_matching_tool` calls. Each cause below was reproduced against the live APIs.
+  - **A single pair failed `matrix_tool` (944 of the 1,181 errors):** asking for one source and one destination is a single matrix element, which the API refuses with a 422. The tool now asks for a 1×2 matrix (the source to itself and to the destination), the API's minimum, and returns only the requested pair.
+  - **Rate limits (215 errors):** the Matrix API allows 60 requests per minute (30 for `driving-traffic`), and the pipeline's retries only cover a few seconds. The description and the 429 error now tell the model to put all the points in one call instead of one call per pair.
+  - **`matrix_tool` refused valid requests (9 errors):** with both `sources` and `destinations` set, it required every coordinate to be used. The API has no such rule (4 coordinates with `sources=0&destinations=1;2` returns a 1×2 matrix), so the check is gone.
+  - **Unroutable points broke `matrix_tool`:** when a coordinate can't be snapped to the road network (in the water, or with latitude and longitude swapped), the Matrix API returns 200 with `null` in `sources` and `destinations`. The output schema didn't allow `null`, and the tool returned the response anyway, so the MCP SDK rejected it with an output validation error. `null` waypoints are now allowed, and the result says which coordinates couldn't be snapped. A response that still fails the schema now comes back as a tool error, as `map_matching_tool` does since #230.
+  - **`overview=false` broke `map_matching_tool` (10 of the 16 errors):** the API leaves out each matching's `geometry` then, and the output schema required it. It's optional now.
+  - **`map_matching_tool` was used for routing:** models call it with a few points kilometers apart, which gets `NoMatch` or `All coordinates are too far away from each other`. The description now says it's for dense GPS traces and to use `directions_tool` between places, and those errors say the same.
+  - **`map_matching_tool` inputs:** the radius description said the default is unlimited. It's 5 meters, and the API refuses values outside 0 to 50, so the schema now takes more than 0 and up to 50. Timestamps that aren't in ascending order, which the API answers with `NoMatch`, are now rejected.
+
+## 0.18.1-dev.1 - 2026-11-16
+
+## 0.18.0 - 2026-11-11
+
 ### Features
 
 - **`report_tool`: send feedback about the MCP server to Mapbox (#330).** The model can pass on a bug, a wrong or confusing tool result, a missing capability or a suggestion to the team that builds the server. It uses `POST /user-feedback/v1/cli-feedback`, the undocumented Feedback API endpoint added for the Mapbox CLI's `mapbox report` (see its [spec](https://github.com/mapbox/mapbox-cli/blob/main/custom-openapi/report/openapi/report.yaml)), which files the report under Mapbox's own account with any valid token and no extra scope. It isn't for wrong map data: routing those reports to the data teams needs their agreement and a triage pipeline first.
@@ -28,6 +45,15 @@
   - **Billing:** the tool told the model each item "may be billed", and a duplicate result said a second one "would only add a charge". The API is free during Public Preview; the $0.02 per item applies to Feedback Agent at General Availability. The duplicate check is now explained as avoiding filing the same problem twice.
   - **Categories:** adds `routing_issue`, the general routing category the API docs use.
   - **Location:** `coordinates` is now optional, so feedback that isn't about a place, such as most feedback about the app, no longer needs a made-up location. The API still requires lat/lon, so the tool sends 0, 0, as the Feedback API team recommends until location becomes optional there. That feedback skips the duplicate check, since every report without a place sits at 0, 0.
+- **`list_public_tokens_tool`: asks the model to copy the token exactly and check the copy (#332).** A dashboard ChatGPT built for For Five failed with "invalid Mapbox access token": the tool returned the right token, but the model retyped it into the page and changed a character, which is easy with about 90 characters of base64. The result now says to copy the token exactly, never retyped, and, when the agent wrote it into a file and can run commands, to check the copy from that file: `grep` the `pk.` token out of the file and call `GET /tokens/v2`, which returns `TokenValid`, or `TokenInvalid` when a character changed. Checked against the live API with a valid token and one with a single character changed.
+
+### Maintenance
+
+- **Security updates for dependencies (#331).** Clears the open Dependabot alerts on `zod` and `tmp` (via `patch-package`). `npm audit --omit=dev` now finds nothing.
+  - **`zod` 4.6.7:** fixes memory exhaustion when validating oversized constrained collections, which applies to every tool call's input.
+  - **`gaxios` override (`^7.3.1`):** `gcp-metadata` pins `gaxios` to 7.1.3, which pulls in `rimraf` and a `glob` and `minimatch` with moderate advisories. 7.3.1 is the same major without `rimraf`. It reaches us through OpenTelemetry's GCP resource detector.
+  - **Lockfile refresh:** everything else moved within its existing range. Prettier stays on 3.8, since 3.9 reformats union types across the code.
+  - **Left as is:** a moderate `minimatch` advisory in the `typescript-eslint` lint tooling, which is dev-only and never ships.
 
 ## 0.17.1-dev.1 - 2026-11-09
 

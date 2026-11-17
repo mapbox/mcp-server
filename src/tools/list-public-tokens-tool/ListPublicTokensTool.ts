@@ -25,6 +25,20 @@ const GUIDANCE =
   `if none matches, ask the user to create one at ${CREATE_TOKEN_URL} (add the site's URL under URL ` +
   'restrictions) and use that instead. The default token is fine for local prototypes.';
 
+/**
+ * Models often retype a long token instead of copying it, and one changed
+ * character makes it invalid (seen in a ChatGPT-built dashboard whose map
+ * failed with "invalid Mapbox access token"). Agents that write files can
+ * usually run commands, so this asks them to check the copy from the file.
+ */
+const COPY_CHECK =
+  'Copy the token exactly as shown, never retyped: it is long, and one changed character makes ' +
+  'Mapbox reject it with "invalid Mapbox access token". If you write it into a file and can run ' +
+  'commands, check the copy from the file instead of retyping it, for example:\n' +
+  "TOKEN=$(grep -o 'pk\\.[A-Za-z0-9._-]*' index.html | head -1); " +
+  'curl -s "https://api.mapbox.com/tokens/v2?access_token=$TOKEN"\n' +
+  '"code":"TokenValid" means the copy is right; "TokenInvalid" means a character changed, so copy it again.';
+
 /** What the Tokens API returns for each token; only pk entries are kept. */
 interface ApiToken {
   usage?: string;
@@ -243,7 +257,7 @@ export class ListPublicTokensTool extends MapboxApiBasedTool<
         ? `Public tokens (${output.tokens.length}):\n${lines.join('\n')}`
         : undefined,
       output.recommended
-        ? `Recommended: ${output.recommended.token}\n${output.recommended.reason}`
+        ? `Recommended: ${output.recommended.token}\n${output.recommended.reason}\n\n${COPY_CHECK}`
         : output.tokens.length > 0
           ? 'Every public token on this account is restricted to other URLs, so none is recommended.'
           : 'This account has no public tokens.',
