@@ -800,7 +800,7 @@ describe('MatrixTool', () => {
       expect(resultWithSuccess2.isError).toBe(false);
     });
 
-    it('rejects sources and destinations with unused coordinates', async () => {
+    it('rejects a source that is also its only destination', async () => {
       const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
@@ -813,12 +813,12 @@ describe('MatrixTool', () => {
         ],
         profile: 'mapbox/driving',
         sources: '1',
-        destinations: '2'
+        destinations: '1'
       });
       expect(result.isError).toBe(true);
       expect(mockHttpRequest).not.toHaveBeenCalled();
 
-      // Test direct error message for unused coordinates
+      // Test direct error message for a single-element matrix
       const unusedCoordsResult = await tool['execute'](
         {
           coordinates: [
@@ -828,7 +828,7 @@ describe('MatrixTool', () => {
           ],
           profile: 'mapbox/driving',
           sources: '1',
-          destinations: '2'
+          destinations: '1'
         },
         'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
       );
@@ -837,12 +837,78 @@ describe('MatrixTool', () => {
       expect(unusedCoordsResult.content[0].type).toBe('text');
       if (unusedCoordsResult.content[0].type === 'text') {
         expect(unusedCoordsResult.content[0].text).toContain(
-          'When specifying both sources and destinations, all coordinates must be used as either a source or destination.'
+          'The sources and destinations must give at least two matrix elements'
         );
       }
     });
 
-    it('accepts sources and destinations with single indices when all coordinates are used', async () => {
+    it('asks for a 1x2 matrix for a single pair and returns only that pair', async () => {
+      const response = {
+        code: 'Ok',
+        durations: [[0, 1510.9]],
+        distances: [[0, 9100.4]],
+        sources: [sampleMatrixResponse.sources[0]],
+        destinations: [
+          sampleMatrixResponse.destinations[0],
+          sampleMatrixResponse.destinations[2]
+        ]
+      };
+      const { httpRequest, mockHttpRequest } = setupHttpRequest({
+        json: () => Promise.resolve(response)
+      });
+      const tool = new MatrixTool({ httpRequest });
+      const result = await tool.run({
+        coordinates: [
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -122.48, latitude: 37.73 }
+        ],
+        profile: 'mapbox/driving',
+        annotations: 'duration,distance',
+        sources: '0',
+        destinations: '2'
+      });
+
+      const url = mockHttpRequest.mock.calls[0][0];
+      expect(url).toContain('sources=0');
+      expect(url).toContain('destinations=0%3B2');
+      expect(result.isError).toBe(false);
+      expect(result.structuredContent).toEqual({
+        code: 'Ok',
+        durations: [[1510.9]],
+        distances: [[9100.4]],
+        sources: [sampleMatrixResponse.sources[0]],
+        destinations: [sampleMatrixResponse.destinations[2]]
+      });
+    });
+
+    it('explains the rate limit on a 429', async () => {
+      const { httpRequest } = setupHttpRequest({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        text: async () => JSON.stringify({ message: 'Too Many Requests' })
+      });
+      const tool = new MatrixTool({ httpRequest });
+      const result = await tool['execute'](
+        {
+          coordinates: [
+            { longitude: -122.42, latitude: 37.78 },
+            { longitude: -122.45, latitude: 37.91 }
+          ],
+          profile: 'mapbox/driving'
+        },
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature'
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('60 requests per minute')
+      });
+    });
+
+    it('accepts sources and destinations that leave some coordinates unused', async () => {
       const { httpRequest, mockHttpRequest } = setupHttpRequest({
         json: () => Promise.resolve(sampleMatrixResponse)
       });
@@ -850,15 +916,76 @@ describe('MatrixTool', () => {
       await tool.run({
         coordinates: [
           { longitude: -122.42, latitude: 37.78 },
-          { longitude: -122.45, latitude: 37.91 }
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -122.48, latitude: 37.73 },
+          { longitude: -122.4, latitude: 37.79 }
         ],
         profile: 'mapbox/driving',
         sources: '0',
-        destinations: '1'
+        destinations: '1;2'
       });
       const url = mockHttpRequest.mock.calls[0][0];
       expect(url).toContain('sources=0');
-      expect(url).toContain('destinations=1');
+      expect(url).toContain('destinations=1%3B2');
+    });
+
+    it('returns null waypoints for unroutable coordinates with a note', async () => {
+      const response = {
+        code: 'Ok',
+        durations: [
+          [0, 2391.7, null],
+          [2470.9, 0, null],
+          [null, null, null]
+        ],
+        sources: [
+          sampleMatrixResponse.sources[0],
+          sampleMatrixResponse.sources[1],
+          null
+        ],
+        destinations: [
+          sampleMatrixResponse.destinations[0],
+          sampleMatrixResponse.destinations[1],
+          null
+        ]
+      };
+      const { httpRequest } = setupHttpRequest({
+        json: () => Promise.resolve(response)
+      });
+      const tool = new MatrixTool({ httpRequest });
+      const result = await tool.run({
+        coordinates: [
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 },
+          { longitude: -140, latitude: 30 }
+        ],
+        profile: 'mapbox/driving'
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.structuredContent).toEqual(response);
+      expect(result.content[0].type).toBe('text');
+      if (result.content[0].type === 'text') {
+        expect(result.content[0].text).toContain(
+          'coordinates at index 2 could not be snapped to the road network'
+        );
+      }
+    });
+
+    it('returns an error instead of a response that fails the output schema', async () => {
+      const { httpRequest } = setupHttpRequest({
+        json: () => Promise.resolve({ code: 'Ok', durations: [[0, 1]] })
+      });
+      const tool = new MatrixTool({ httpRequest });
+      const result = await tool.run({
+        coordinates: [
+          { longitude: -122.42, latitude: 37.78 },
+          { longitude: -122.45, latitude: 37.91 }
+        ],
+        profile: 'mapbox/driving'
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toBeUndefined();
     });
 
     it('accepts both annotations orders', async () => {

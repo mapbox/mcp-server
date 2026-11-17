@@ -211,6 +211,95 @@ describe('MapMatchingTool', () => {
     });
   });
 
+  it('returns error when timestamps are not ascending', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      profile: 'driving',
+      timestamps: [1700000000, 1700000000]
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockHttpRequest).not.toHaveBeenCalled();
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('strictly ascending order')
+    });
+  });
+
+  it('rejects a radius of 0, which the API refuses', async () => {
+    const { httpRequest, mockHttpRequest } = setupHttpRequest();
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      profile: 'driving',
+      radiuses: [0, 0]
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockHttpRequest).not.toHaveBeenCalled();
+  });
+
+  it('points to directions_tool when the points are too far apart', async () => {
+    const { httpRequest } = setupHttpRequest({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      text: async () =>
+        JSON.stringify({
+          code: 'InvalidInput',
+          message: 'All coordinates are too far away from each other'
+        })
+    });
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.42, latitude: 37.78 },
+        { longitude: -118.24, latitude: 34.05 }
+      ],
+      profile: 'driving'
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('use directions_tool instead')
+    });
+  });
+
+  it('accepts matchings without geometry when overview is false', async () => {
+    const { geometry: _geometry, ...matching } =
+      sampleMapMatchingResponse.matchings[0];
+    const { httpRequest } = setupHttpRequest({
+      json: async () => ({
+        ...sampleMapMatchingResponse,
+        matchings: [matching]
+      })
+    });
+
+    const tool = new MapMatchingTool({ httpRequest });
+    const result = await tool.run({
+      coordinates: [
+        { longitude: -122.4194, latitude: 37.7749 },
+        { longitude: -122.4195, latitude: 37.775 }
+      ],
+      profile: 'driving',
+      overview: 'false'
+    });
+
+    expect(result.isError).toBe(false);
+  });
+
   it('supports different routing profiles', async () => {
     const { httpRequest, mockHttpRequest } = setupHttpRequest({
       json: async () => sampleMapMatchingResponse
@@ -247,7 +336,7 @@ describe('MapMatchingTool', () => {
     expect(result.structuredContent).toBeUndefined();
     expect(result.content[0]).toMatchObject({
       type: 'text',
-      text: expect.stringContaining('NoMatch')
+      text: expect.stringMatching(/NoMatch.*directions_tool/)
     });
   });
 
