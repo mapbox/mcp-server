@@ -1,0 +1,40 @@
+name: Check npm Package
+
+# Checks what `npm pack` would publish: every entry point is in the package,
+# and no file from the latest published version is gone. Add the
+# `pack-files-removed` label to a PR that removes files on purpose.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  check-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '23'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile typescript
+        run: npm run build
+
+      - name: Check npm package contents
+        env:
+          PACK_ALLOW_REMOVED: ${{ contains(github.event.pull_request.labels.*.name, 'pack-files-removed') }}
+        run: npm run check:pack
