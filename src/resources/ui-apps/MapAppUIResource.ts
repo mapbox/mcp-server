@@ -69,6 +69,12 @@ export class MapAppUIResource extends BaseResource {
             ui: {
               csp: mapAppCsp(this.apiEndpoint()),
               preferredSize: { width: 1000, height: 600 }
+            },
+            // ChatGPT: the map opens as a tab next to the chat, where it
+            // stays open across turns, rather than inline.
+            'openai/ui': {
+              preferredDisplayMode: 'fullscreen',
+              availableDisplayModes: ['inline', 'fullscreen']
             }
           }
         }

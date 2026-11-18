@@ -19,6 +19,13 @@ describe('buildServerInstructions', () => {
     );
   });
 
+  // "Show coffee shops on it" opened a second map next to the open one.
+  it('sends changes to an open map to its own tools', () => {
+    const text = buildServerInstructions(['render_map_tool']);
+    expect(text).toContain('search_map');
+    expect(text).toContain('render_map_tool would open a second map');
+  });
+
   // Agents building a site with a map asked the user for a token instead
   // of knowing the server could provide one (#281).
   it('points page building at list_public_tokens_tool when it is enabled', () => {
