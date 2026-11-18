@@ -6,7 +6,7 @@ import type { Mock } from 'vitest';
 import { HttpPipeline, UserAgentPolicy } from '../../src/utils/httpPipeline.js';
 
 export function setupHttpRequest(overrides?: Partial<Response>) {
-  const mockHttpRequest = vi.fn();
+  const mockHttpRequest: Mock = vi.fn();
   mockHttpRequest.mockResolvedValue({
     ok: true,
     status: 200,
