@@ -84,7 +84,6 @@ Follow the authentication flow described in Section 3.
 ### 2.4 Cursor
 
 1. Create an `mcp.json` file in either:
-
    - Project local: `.cursor/mcp.json`
    - Global: `~/.cursor/mcp.json`
 

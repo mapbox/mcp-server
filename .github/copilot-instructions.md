@@ -19,7 +19,7 @@ This document defines responsible use of GitHub Copilot in this repository. Copi
 
 ### 3. Quality Standards
 
-- All Copilot code must comply with standards in **CLAUDE.md** and **docs/engineering_standards.md**
+- All Copilot code must comply with standards in **CLAUDE.md** and **servers/mcp-server/docs/engineering_standards.md**
 - Pre-commit hooks will enforce linting, formatting, and TypeScript strictness
 - If Copilot suggests patterns inconsistent with the codebase, reject and write manually
 
@@ -46,8 +46,8 @@ This document defines responsible use of GitHub Copilot in this repository. Copi
 
 Copilot learns patterns from existing code. This codebase has strong conventions:
 
-- Dependency injection for testability (see src/tools/)
-- HttpPipeline for all HTTP requests (see src/utils/httpPipeline.ts)
+- Dependency injection for testability (see servers/mcp-server/src/tools/)
+- HttpPipeline for all HTTP requests (see servers/mcp-server/src/utils/httpPipeline.ts)
 - Consistent tool structure extending MapboxApiBasedTool
 
 Let Copilot learn these patterns rather than explicitly re-teaching them.

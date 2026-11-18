@@ -60,7 +60,6 @@ It connects to the Mapbox MCP server, which exposes Mapbox's functionality as to
    ```
 
 2. Update the path to your node and the MCP server in the script:
-
    - If you want to use NPM version:
 
      ```python

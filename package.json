@@ -1,182 +1,30 @@
 {
-  "name": "@mapbox/mcp-server",
-  "version": "0.18.1",
-  "description": "Mapbox MCP server.",
-  "mcpName": "io.github.mapbox/mcp-server",
-  "main": "./dist/commonjs/index.js",
-  "module": "./dist/esm/index.js",
+  "name": "mapbox-mcp",
+  "private": true,
   "type": "module",
-  "bin": {
-    "mcp-server": "dist/esm/index.js"
+  "packageManager": "pnpm@12.4.0",
+  "engines": {
+    "node": ">=22.15.0"
   },
   "scripts": {
-    "build": "npm run prepare && tshy && npm run generate-version && node scripts/add-shebang.cjs",
-    "changelog:prepare-release": "node scripts/prepare-changelog-release.cjs",
-    "check:pack": "node scripts/check-pack.cjs",
-    "format": "prettier --check \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
-    "format:fix": "prettier --write \"./src/**/*.{ts,tsx,js,json,md}\" \"./test/**/*.{ts,tsx,js,json,md}\" \"./examples/**/*.{ts,tsx,js,json,md}\"",
-    "generate-version": "node scripts/build-helpers.cjs generate-version",
-    "inspect:build": "npm run build && npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" node dist/esm/index.js",
-    "inspect:dev": "npx @modelcontextprotocol/inspector -e MAPBOX_ACCESS_TOKEN=\"$MAPBOX_ACCESS_TOKEN\" npx -y tsx src/index.ts",
-    "dev:http": "npx -y tsx scripts/dev-http-server.ts",
-    "typecheck": "tsc -p tsconfig.test.json",
-    "lint": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint \"./src/**/*.{ts,tsx}\" \"./test/**/*.{ts,tsx}\" \"./examples/**/*.{ts,tsx}\" --fix",
-    "postinstall": "patch-package || (cd ../../.. && node ./node_modules/patch-package/index.js --patch-dir ./node_modules/@mapbox/mcp-server/patches) || true",
-    "prepare": "node -e \"try { require('fs').accessSync('.husky/setup-hooks.js'); require('child_process').execSync('husky && node .husky/setup-hooks.js', {stdio:'inherit'}) } catch { }\"",
-    "spellcheck": "cspell \"*.md\" \"src/**/*.ts\" \"test/**/*.ts\" \"examples/**/*.ts\"",
-    "sync-manifest": "node scripts/sync-manifest-version.cjs",
-    "test": "vitest",
-    "tracing:jaeger:start": "docker run --rm -d --name jaeger -p 16686:16686 -p 14250:14250 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest",
-    "tracing:jaeger:stop": "docker stop jaeger",
-    "tracing:verify": "node -e \"console.log('🔍 Verifying tracing setup with Jaeger...\\n1. Copy .env.example to .env and add your MAPBOX_ACCESS_TOKEN\\n2. Start Jaeger: npm run tracing:jaeger:start\\n3. Run server: npm run inspect:build\\n4. Check traces at: http://localhost:16686')\"",
-    "eval:tools": "tsx evals/tool-selection/run-eval.mjs",
-    "eval:tools:report": "node evals/tool-selection/build-report-lite.mjs .claude/hillclimb/tool-selection",
-    "eval:tools:openai": "EVAL_PROVIDER=openai tsx evals/tool-selection/run-eval.mjs --flow .claude/hillclimb/tool-selection-openai",
-    "eval:tools:report:openai": "node evals/tool-selection/build-report-lite.mjs .claude/hillclimb/tool-selection-openai"
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
+    "prepare": "node -e \"try { require('fs').accessSync('.husky/setup-hooks.js'); require('child_process').execSync('husky && node .husky/setup-hooks.js', {stdio:'inherit'}) } catch { }\""
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx}": "eslint --fix",
-    "*.{js,jsx,ts,tsx,md,html,css}": "prettier --write"
-  },
-  "license": "MIT",
-  "homepage": "https://github.com/mapbox/mcp-server#readme",
-  "devDependencies": {
-    "@anthropic-ai/sdk": "^0.133.0",
-    "@eslint/js": "^9.27.0",
-    "@modelcontextprotocol/client": "^2.4.0",
-    "@modelcontextprotocol/node": "^2.1.2",
-    "@types/geojson": "^7946.0.16",
-    "@types/node": "^22.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.58.2",
-    "@typescript-eslint/parser": "^8.58.2",
-    "@vitest/coverage-istanbul": "^4.1.4",
-    "cspell": "^9.2.1",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-n": "^17.21.3",
-    "eslint-plugin-prettier": "^5.5.4",
-    "eslint-plugin-unused-imports": "^4.2.0",
-    "globals": "^16.3.0",
-    "husky": "^9.0.0",
-    "lint-staged": "^16.1.0",
-    "openai": "^7.32.0",
-    "plop": "^4.0.1",
-    "prettier": "^3.0.0",
-    "tshy": "^4.1.1",
-    "tsx": "^4.23.15",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2",
-    "vitest": "^4.1.4"
+    "*.{js,md}": "prettier --write"
   },
   "prettier": {
     "singleQuote": true,
     "trailingComma": "none",
     "endOfLine": "lf"
   },
-  "engines": {
-    "node": ">=22.15.0"
-  },
-  "files": [
-    "dist",
-    "patches"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mapbox/mcp-server.git"
-  },
-  "keywords": [
-    "mapbox",
-    "mcp"
-  ],
-  "dependencies": {
-    "@modelcontextprotocol/core": "^2.4.0",
-    "@modelcontextprotocol/ext-apps": "^2.0.3",
-    "@modelcontextprotocol/server": "^2.4.0",
-    "@opentelemetry/api": "^1.10.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.82.0",
-    "@opentelemetry/core": "^3.0.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.300.0",
-    "@opentelemetry/instrumentation": "^0.300.0",
-    "@opentelemetry/resources": "^3.0.0",
-    "@opentelemetry/sdk-node": "^0.300.0",
-    "@opentelemetry/sdk-trace": "^3.0.0",
-    "@opentelemetry/semantic-conventions": "^1.40.0",
-    "@turf/turf": "^7.3.1",
-    "ipaddr.js": "^2.4.0",
-    "patch-package": "^8.0.1",
-    "zod": "^4.6.7"
-  },
-  "overrides": {
-    "brace-expansion": "^2.0.3",
-    "gaxios": "^7.3.1"
-  },
-  "tshy": {
-    "project": "./tsconfig.src.json",
-    "exports": {
-      ".": "./src/index.ts",
-      "./tools": "./src/tools/index.ts",
-      "./resources": "./src/resources/index.ts",
-      "./prompts": "./src/prompts/index.ts",
-      "./utils": "./src/utils/index.ts"
-    },
-    "dialects": [
-      "esm",
-      "commonjs"
-    ],
-    "selfLink": false
-  },
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/esm/index.d.ts",
-        "default": "./dist/esm/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/index.d.ts",
-        "default": "./dist/commonjs/index.js"
-      }
-    },
-    "./tools": {
-      "import": {
-        "types": "./dist/esm/tools/index.d.ts",
-        "default": "./dist/esm/tools/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/tools/index.d.ts",
-        "default": "./dist/commonjs/tools/index.js"
-      }
-    },
-    "./resources": {
-      "import": {
-        "types": "./dist/esm/resources/index.d.ts",
-        "default": "./dist/esm/resources/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/resources/index.d.ts",
-        "default": "./dist/commonjs/resources/index.js"
-      }
-    },
-    "./prompts": {
-      "import": {
-        "types": "./dist/esm/prompts/index.d.ts",
-        "default": "./dist/esm/prompts/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/prompts/index.d.ts",
-        "default": "./dist/commonjs/prompts/index.js"
-      }
-    },
-    "./utils": {
-      "import": {
-        "types": "./dist/esm/utils/index.d.ts",
-        "default": "./dist/esm/utils/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/utils/index.d.ts",
-        "default": "./dist/commonjs/utils/index.js"
-      }
-    }
-  },
-  "types": "./dist/commonjs/index.d.ts"
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "lint-staged": "^16.1.0",
+    "prettier": "^3.0.0"
+  }
 }

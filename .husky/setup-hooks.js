@@ -9,9 +9,9 @@ execSync('git config core.hooksPath .husky');
 writeFileSync(
   '.husky/pre-commit',
   `#!/usr/bin/env sh
-npm run sync-manifest
-git add manifest.json
-npx lint-staged`
+pnpm --filter @mapbox/mcp-server run sync-manifest
+git add servers/mcp-server/manifest.json
+pnpm exec lint-staged`
 );
 
 // Cross-platform way to make the file executable

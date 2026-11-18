@@ -11,12 +11,14 @@ This is an MCP (Model Context Protocol) server that provides AI applications wit
 - **Runtime**: Node.js 22+ LTS
 - **Language**: TypeScript (strict mode)
 - **Testing**: Vitest
-- **Package Manager**: npm
+- **Package Manager**: pnpm (workspace)
 
 ## Project Structure
 
+The repo is a pnpm workspace. The server is the `@mapbox/mcp-server` package in `servers/mcp-server/`:
+
 ```
-src/
+servers/mcp-server/src/
 ├── index.ts                    # Main MCP server entry point
 ├── config/toolConfig.ts        # Tool configuration parser
 ├── tools/                      # MCP tool implementations
@@ -29,7 +31,7 @@ src/
     ├── httpPipeline.ts         # HTTP policy pipeline system
     └── tracing.ts              # OpenTelemetry instrumentation
 
-test/                           # Mirrors src/ structure
+servers/mcp-server/test/        # Mirrors src/ structure
 ```
 
 ## Critical Patterns
@@ -37,15 +39,15 @@ test/                           # Mirrors src/ structure
 ### HTTP Request Architecture
 
 - **Never patch global.fetch** - use `HttpPipeline` with dependency injection
-- All HTTP requests flow through the pipeline system (src/utils/httpPipeline.ts:21)
-- Tools receive `httpRequest` via constructor (src/tools/toolRegistry.ts:22-29)
+- All HTTP requests flow through the pipeline system (servers/mcp-server/src/utils/httpPipeline.ts:21)
+- Tools receive `httpRequest` via constructor (servers/mcp-server/src/tools/toolRegistry.ts:22-29)
 
 ### Tool Development
 
-- Extend `MapboxApiBasedTool` base class (src/tools/MapboxApiBasedTool.ts:16)
+- Extend `MapboxApiBasedTool` base class (servers/mcp-server/src/tools/MapboxApiBasedTool.ts:16)
 - Accept `httpRequest` parameter in constructor for testability
-- Register in `ALL_TOOLS` array (src/tools/toolRegistry.ts:18)
-- Use `npx plop create-tool` for scaffolding new tools
+- Register in `ALL_TOOLS` array (servers/mcp-server/src/tools/toolRegistry.ts:18)
+- Use `pnpm exec plop create-tool` (from `servers/mcp-server`) for scaffolding new tools
 
 ### Testing
 
@@ -57,12 +59,13 @@ test/                           # Mirrors src/ structure
 ## Essential Commands
 
 ```bash
-npm install              # Install dependencies
-npm test                 # Run tests
-npm run build            # Compile TypeScript
-npm run lint             # Check code quality (auto-fixed by pre-commit hooks)
-npm run inspect:build    # Test with MCP inspector
-npx plop create-tool     # Scaffold a new tool
+pnpm install             # Install dependencies (from the repo root)
+cd servers/mcp-server
+pnpm test                # Run tests
+pnpm run build           # Compile TypeScript
+pnpm run lint            # Check code quality (auto-fixed by pre-commit hooks)
+pnpm run inspect:build   # Test with MCP inspector
+pnpm exec plop create-tool  # Scaffold a new tool
 ```
 
 ## Common Pitfalls to Avoid
@@ -76,18 +79,18 @@ npx plop create-tool     # Scaffold a new tool
 ## Documentation
 
 - **CLAUDE.md** - Detailed standards and patterns for Claude Code users
-- **docs/engineering_standards.md** - Complete engineering guidelines
-- **docs/tracing.md** - OpenTelemetry setup
-- **README.md** - User-facing documentation and integration guides
+- **servers/mcp-server/docs/engineering_standards.md** - Complete engineering guidelines
+- **servers/mcp-server/docs/tracing.md** - OpenTelemetry setup
+- **servers/mcp-server/README.md** - User-facing documentation and integration guides
 
 ## Factual Errors to Watch For
 
 When analyzing or modifying this codebase:
 
 - The HTTP pipeline class is `HttpPipeline`, not `PolicyPipeline`
-- The HTTP pipeline file is `src/utils/httpPipeline.ts`, not `fetchRequest.ts`
+- The HTTP pipeline file is `servers/mcp-server/src/utils/httpPipeline.ts`, not `fetchRequest.ts`
 - Base tool class uses `httpRequest` parameter, not `fetch`
 
 ---
 
-For detailed code quality standards, testing requirements, and collaboration guidelines, see docs/engineering_standards.md.
+For detailed code quality standards, testing requirements, and collaboration guidelines, see servers/mcp-server/docs/engineering_standards.md.

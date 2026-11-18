@@ -14,9 +14,9 @@
 
 ## Checklist
 
-- [ ] Tests added or updated (`npm test` passes)
-- [ ] Lint passes (`npm run lint`)
-- [ ] `CHANGELOG.md` updated under `Unreleased`
+- [ ] Tests added or updated (`pnpm test` passes)
+- [ ] Lint passes (`pnpm run lint`)
+- [ ] `servers/mcp-server/CHANGELOG.md` updated under `Unreleased`
 - [ ] Documentation updated if needed (README, JSDoc)
 
 ---
