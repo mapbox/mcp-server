@@ -1,0 +1,17 @@
+packages:
+  - 'servers/*'
+
+# Dependencies allowed to run install scripts. esbuild (for tsx and vitest)
+# needs its binary; protobufjs's script is optional.
+allowBuilds:
+  esbuild: true
+  protobufjs: false
+
+overrides:
+  brace-expansion: ^2.0.3
+  gaxios: ^7.3.1
+
+# Running a script never installs. pnpm's default installs first, and a
+# filtered run (pnpm --filter <pkg> run ...) then drops the root's
+# devDependencies, which the git hooks need.
+verifyDepsBeforeRun: warn

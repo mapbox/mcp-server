@@ -54,7 +54,6 @@ docker build -t mapbox-mcp-server .
 1. Navigate to the Model Context Protocol section
    ![Navigate to MCP section](images/claude-mcp-section.png)
 1. Modify claude_desktop_config.json to add new server, for example:
-
    - Using NPM package
      ```json
      {

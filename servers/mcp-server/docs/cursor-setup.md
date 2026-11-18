@@ -28,7 +28,6 @@ docker build -t mapbox-mcp-server .
 
 1. Go to Cursor Settings/ MCP Tools and click on "Add Custom MCP".
 2. Add either of the following MCP config:
-
    - NPM version
      ```json
      {
@@ -74,7 +73,6 @@ docker build -t mapbox-mcp-server .
        }
      }
      ```
-
    3. Click "Save" to apply the configuration.
 
 ## MCP-UI Support

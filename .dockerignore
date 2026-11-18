@@ -1,7 +1,7 @@
-node_modules
+**/node_modules
 npm-debug.log
-dist
-coverage
+**/dist
+**/coverage
 .git
 .github
 .husky

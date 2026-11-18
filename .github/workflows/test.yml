@@ -15,19 +15,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # The pnpm version comes from packageManager in package.json.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "23"
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Compile typescript
-        run: npm run build
+        run: pnpm -r build
 
       - name: Typecheck src and tests
-        run: npm run typecheck
+        run: pnpm -r typecheck
 
       - name: Run tests
-        run: npm test
+        run: pnpm -r test

@@ -7,12 +7,14 @@ An MCP (Model Context Protocol) server that provides AI agents with geospatial i
 - **Runtime**: Node.js 22+ LTS
 - **Language**: TypeScript (strict mode)
 - **Testing**: Vitest
-- **Package Manager**: npm
+- **Package Manager**: pnpm (workspace)
 
 ## Project Structure
 
+The repo is a pnpm workspace. The server is the `@mapbox/mcp-server` package in `servers/mcp-server/`:
+
 ```
-src/
+servers/mcp-server/src/
 ├── index.ts                    # Main MCP server entry point
 ├── config/toolConfig.ts        # Tool configuration parser
 ├── tools/                      # MCP tool implementations
@@ -27,26 +29,26 @@ src/
     ├── tracing.ts              # OpenTelemetry instrumentation
     └── versionUtils.ts         # Version info utilities
 
-test/                           # Mirrors src/ structure
+servers/mcp-server/test/        # Mirrors src/ structure
 ```
 
 ## Key Patterns
 
 ### Tool Architecture
 
-- All Mapbox API tools extend `MapboxApiBasedTool` (src/tools/MapboxApiBasedTool.ts:16)
-- Tools receive `httpRequest` via dependency injection (src/tools/toolRegistry.ts:22-29)
-- Register new tools in `ALL_TOOLS` array (src/tools/toolRegistry.ts:18)
+- All Mapbox API tools extend `MapboxApiBasedTool` (servers/mcp-server/src/tools/MapboxApiBasedTool.ts:16)
+- Tools receive `httpRequest` via dependency injection (servers/mcp-server/src/tools/toolRegistry.ts:22-29)
+- Register new tools in `ALL_TOOLS` array (servers/mcp-server/src/tools/toolRegistry.ts:18)
 
 ### HTTP Pipeline System
 
 - **Never patch global.fetch** - use `HttpPipeline` with dependency injection instead
-- Pipeline applies policies (User-Agent, Retry, etc.) to all HTTP requests (src/utils/httpPipeline.ts:21)
-- Default pipeline exported as `httpRequest` (src/utils/httpPipeline.ts)
+- Pipeline applies policies (User-Agent, Retry, etc.) to all HTTP requests (servers/mcp-server/src/utils/httpPipeline.ts:21)
+- Default pipeline exported as `httpRequest` (servers/mcp-server/src/utils/httpPipeline.ts)
 
 ### Resource System
 
-- Static reference data exposed as MCP resources (src/resources/)
+- Static reference data exposed as MCP resources (servers/mcp-server/src/resources/)
 - Resources use URI pattern: `mapbox://resource-name`
 - Example: category list at `mapbox://categories` or `mapbox://categories/{language}`
 
@@ -55,24 +57,26 @@ test/                           # Mirrors src/ structure
 ### Development
 
 ```bash
-npm install              # Install dependencies
-npm test                 # Run tests with Vitest
-npm run build            # Compile TypeScript
-npm run inspect:build    # Test with MCP inspector
+pnpm install             # Install dependencies (from the repo root)
+cd servers/mcp-server
+pnpm test                # Run tests with Vitest
+pnpm run build           # Compile TypeScript
+pnpm run inspect:build   # Test with MCP inspector
 ```
 
 ### Creating a New Tool
 
 ```bash
+# From servers/mcp-server.
 # Interactive mode (requires TTY - use in terminal):
-npx plop create-tool
+pnpm exec plop create-tool
 
 # Non-interactive mode (for AI agents, CI, or scripts):
-npx plop create-tool "ToolName" "tool_name_tool"
+pnpm exec plop create-tool "ToolName" "tool_name_tool"
 
 # Example:
-npx plop create-tool "Search" "search_tool"
-# Creates SearchTool in src/tools/search-tool/ with schemas and tests
+pnpm exec plop create-tool "Search" "search_tool"
+# Creates SearchTool in servers/mcp-server/src/tools/search-tool/ with schemas and tests
 ```
 
 **Note**: When running from AI agents or non-TTY environments (like Claude Code), always use non-interactive mode with command-line arguments to avoid readline errors.
@@ -86,14 +90,14 @@ npx plop create-tool "Search" "search_tool"
 
 When creating pull requests:
 
-- **Always update CHANGELOG.md** - Document what changed, why, and any breaking changes
+- **Always update servers/mcp-server/CHANGELOG.md** - Document what changed, why, and any breaking changes
 - Follow the existing changelog format (check recent entries for examples)
 - Add your entry under the "Unreleased" section at the top
 - Include the PR number and a brief description of the change
 
 ### Release Process
 
-When preparing a new release:
+Releases go through the `mcp-server-publisher` workflow with `package_path` set to `servers/mcp-server`, which runs these steps for you. By hand, from `servers/mcp-server`:
 
 ```bash
 # 1. Bump version in package.json
@@ -105,11 +109,8 @@ npm run sync-manifest
 # 3. Prepare CHANGELOG (replaces "Unreleased" with version and date)
 npm run changelog:prepare-release <new-version>
 
-# 4. Update package-lock.json
-npm install
-
-# 5. Review changes, then commit and tag
-git add package.json package-lock.json manifest.json server.json CHANGELOG.md
+# 4. Review changes, then commit and tag
+git add package.json manifest.json server.json CHANGELOG.md
 git commit -m "Release v<new-version>"
 git tag v<new-version>
 git push && git push --tags
@@ -132,10 +133,10 @@ The `changelog:prepare-release` script automatically:
 
 ## Documentation
 
-- **Detailed Standards**: See docs/engineering_standards.md for complete guidelines
-- **Tracing Setup**: See docs/tracing.md for OpenTelemetry configuration
-- **Integration Guides**: See docs/ for Claude Desktop, VS Code, Cursor, and Goose setup
-- **Direct Imports**: See docs/importing-tools.md for using tools/resources/prompts in your own applications
+- **Detailed Standards**: See servers/mcp-server/docs/engineering_standards.md for complete guidelines
+- **Tracing Setup**: See servers/mcp-server/docs/tracing.md for OpenTelemetry configuration
+- **Integration Guides**: See servers/mcp-server/docs/ for Claude Desktop, VS Code, Cursor, and Goose setup
+- **Direct Imports**: See servers/mcp-server/docs/importing-tools.md for using tools/resources/prompts in your own applications
 
 ## Package Exports
 

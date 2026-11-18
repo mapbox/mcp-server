@@ -7,16 +7,18 @@ Thank you for your interest in contributing! Please read this guide before submi
 ```bash
 git clone https://github.com/mapbox/mcp-server.git
 cd mcp-server
-npm install
-npm test
+pnpm install
+pnpm --filter @mapbox/mcp-server test
 ```
+
+The repo is a [pnpm](https://pnpm.io) workspace, and the server is the `@mapbox/mcp-server` package in `servers/mcp-server/`. The commands below run from that folder.
 
 A Mapbox access token with appropriate scopes is required for most tools. Set `MAPBOX_ACCESS_TOKEN` in your environment.
 
 ## Pull Requests
 
 - Keep PRs small and focused on a single change
-- **Always update `CHANGELOG.md`** — add your entry under the `Unreleased` section with the PR number
+- **Always update `servers/mcp-server/CHANGELOG.md`** — add your entry under the `Unreleased` section with the PR number
 - All CI checks must pass before merging (lint, format, tests)
 - At least one maintainer approval is required
 
@@ -26,12 +28,12 @@ We do not accept PRs that add listings, badges, or manifest files for third-part
 
 ## Standards & Guidelines
 
-| Document                                                             | Contents                                                                   |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| [docs/engineering_standards.md](./docs/engineering_standards.md)     | Complete code quality, testing, documentation, and collaboration standards |
-| [CLAUDE.md](./CLAUDE.md)                                             | Patterns and workflows for contributors using Claude Code                  |
-| [AGENTS.md](./AGENTS.md)                                             | Guide for other AI coding assistants (Cursor, Continue, Aider, etc.)       |
-| [.github/copilot-instructions.md](./.github/copilot-instructions.md) | GitHub Copilot guidelines                                                  |
+| Document                                                                       | Contents                                                                   |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| [engineering_standards.md](./servers/mcp-server/docs/engineering_standards.md) | Complete code quality, testing, documentation, and collaboration standards |
+| [CLAUDE.md](./CLAUDE.md)                                                       | Patterns and workflows for contributors using Claude Code                  |
+| [AGENTS.md](./AGENTS.md)                                                       | Guide for other AI coding assistants (Cursor, Continue, Aider, etc.)       |
+| [.github/copilot-instructions.md](./.github/copilot-instructions.md)           | GitHub Copilot guidelines                                                  |
 
 ## Quick Reference
 
@@ -39,18 +41,18 @@ We do not accept PRs that add listings, badges, or manifest files for third-part
 
 ```bash
 # Interactive (requires a TTY):
-npx plop create-tool
+pnpm exec plop create-tool
 
 # Non-interactive (for AI agents and CI):
-npx plop create-tool "ToolName" "tool_name_tool"
+pnpm exec plop create-tool "ToolName" "tool_name_tool"
 ```
 
 ### Before Committing
 
 ```bash
-npm test            # All tests must pass
-npm run lint        # ESLint (auto-fixed by pre-commit hook)
-npm run format      # Prettier (auto-fixed by pre-commit hook)
+pnpm test           # All tests must pass
+pnpm run lint       # ESLint (auto-fixed by pre-commit hook)
+pnpm run format     # Prettier (auto-fixed by pre-commit hook)
 ```
 
 ### Changelog Format

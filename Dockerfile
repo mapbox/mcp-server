@@ -1,3 +1,25 @@
+# Builds @mapbox/mcp-server from servers/mcp-server, with the repo root as
+# the build context: docker build -t mapbox-mcp-server .
+FROM node:22-slim AS build
+
+# pnpm at the packageManager version in package.json.
+RUN corepack enable
+
+WORKDIR /repo
+
+# Install dependencies - completely skip install scripts during Docker build
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY servers/mcp-server/package.json servers/mcp-server/
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @mapbox/mcp-server...
+
+# Copy the server and build it. Without dist/version.json (git isn't in the
+# image), the server reads its version from package.json.
+COPY servers/mcp-server servers/mcp-server
+RUN pnpm --filter @mapbox/mcp-server exec tshy
+
+# Production dependencies and the build, without workspace symlinks
+RUN pnpm --filter @mapbox/mcp-server deploy --prod --legacy --ignore-scripts /app
+
 FROM node:22-slim
 
 # Remove gnutls from the runtime image. libgnutls30 is only depended on by apt,
@@ -7,23 +29,8 @@ RUN dpkg --remove --force-depends libgnutls30
 # Upgrade npm to fix CVE-2026-33750 (brace-expansion < 2.0.3 bundled in npm 10.x)
 RUN npm install -g npm@11.16.0
 
-# Create app directory
 WORKDIR /app
-
-# Copy package.json and package-lock.json
-COPY package*.json ./
-
-# Install dependencies - completely skip prepare scripts during Docker build
-RUN npm install --ignore-scripts
-
-# Copy the rest of the application
-COPY . .
-
-# Create an empty version.json before the build to prevent errors
-RUN mkdir -p dist && echo '{"sha":"unknown","tag":"unknown","branch":"docker","version":"0.0.1"}' > dist/version.json
-
-# Build the application, overriding the git commands to avoid errors
-RUN npx tshy
+COPY --from=build /app ./
 
 # Command to run the server
 CMD ["node", "dist/esm/index.js"]
