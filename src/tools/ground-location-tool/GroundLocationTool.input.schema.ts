@@ -47,7 +47,18 @@ export const GroundLocationInputSchema = z.object({
     .optional()
     .default(10)
     .describe('Maximum number of nearby POIs to return (1-25)'),
-  language: languageSchema.optional()
+  language: languageSchema.optional(),
+  include: z
+    .array(z.enum(['land', 'water', 'elevation', 'traffic']))
+    .optional()
+    .describe(
+      'What to report about the spot itself, each one extra request: ' +
+        '"land" for land use (park, cemetery, school, residential...), a national park or other protected area, and the building it is in; ' +
+        '"water" for whether it is on water and how far the nearest water is; ' +
+        '"elevation" for height above sea level; ' +
+        '"traffic" for live congestion on the roads around it. ' +
+        'Pick what the question needs, e.g. ["traffic"] for "how bad is traffic at this address?". Leave out when the question is only about the area or nearby places.'
+    )
 });
 
 export type GroundLocationInput = z.infer<typeof GroundLocationInputSchema>;

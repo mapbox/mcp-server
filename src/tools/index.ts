@@ -43,6 +43,7 @@ export { MapMatchingTool } from './map-matching-tool/MapMatchingTool.js';
 export { MatrixTool } from './matrix-tool/MatrixTool.js';
 export { MidpointTool } from './midpoint-tool/MidpointTool.js';
 export { OptimizationTool } from './optimization-tool/OptimizationTool.js';
+export { ElevationTool } from './elevation-tool/ElevationTool.js';
 export { FeedbackTool } from './feedback-tool/FeedbackTool.js';
 export { ReportTool } from './report-tool/ReportTool.js';
 export { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
@@ -52,6 +53,7 @@ export { SearchAndGeocodeTool } from './search-and-geocode-tool/SearchAndGeocode
 export { SimplifyTool } from './simplify-tool/SimplifyTool.js';
 export { StaticMapImageTool } from './static-map-image-tool/StaticMapImageTool.js';
 // Import tool classes for instantiation
+import { ElevationTool } from './elevation-tool/ElevationTool.js';
 import { FeedbackTool } from './feedback-tool/FeedbackTool.js';
 import { ReportTool } from './report-tool/ReportTool.js';
 import { GroundLocationTool } from './ground-location-tool/GroundLocationTool.js';
@@ -103,6 +105,9 @@ export const directions = new DirectionsTool({ httpRequest });
 
 /** Calculate distance between points */
 export const distance = new DistanceTool();
+
+/** Ground elevation at points, or climb and descent along a path or route */
+export const elevation = new ElevationTool({ httpRequest });
 
 /** Send a user's feedback about the app to its developer's Feedback Explorer */
 export const feedback = new FeedbackTool({ httpRequest });

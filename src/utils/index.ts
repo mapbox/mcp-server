@@ -69,6 +69,8 @@ export { buildServerInstructions } from './serverInstructions.js';
 // Directions API URL for the full route.
 export { directionsRequestFromRef } from './directionsRef.js';
 export type { DirectionsRefRequest } from './directionsRef.js';
+// mapMatchingRequestFromRef does the same for a map_matching_tool ref.
+export { mapMatchingRequestFromRef } from './mapMatchingRef.js';
 export { resolveSelfFetchRef, isSelfFetchRef } from './selfFetchRef.js';
 // The Directions URL builder directions_tool and the map preview use, for
 // apps that build their own request from a ref's params.
