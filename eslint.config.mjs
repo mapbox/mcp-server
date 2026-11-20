@@ -7,6 +7,8 @@ import prettierPluginRecommended from 'eslint-plugin-prettier/recommended';
 import unusedImports from 'eslint-plugin-unused-imports';
 
 export default defineConfig(
+  // Generated from mapbox/mapbox-agent-skills (scripts/fetch-agent-skills.mjs)
+  { ignores: ['src/skills/agentSkills.generated.ts'] },
   eslint.configs.recommended,
   tseslint.configs.recommended,
   prettierPluginRecommended,

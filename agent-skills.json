@@ -1,0 +1,25 @@
+{
+  "repo": "mapbox/mapbox-agent-skills",
+  "ref": "b993fef50efedf4cb1ed51d18b412cc7368a5403",
+  "skills": {
+    "mapbox-map-display": ["render_map_tool"],
+    "mapbox-reachability-analysis": [
+      "isochrone_tool",
+      "bbox_tool",
+      "category_search_tool",
+      "points_within_polygon_tool",
+      "render_map_tool"
+    ],
+    "mapbox-location-grounding": [
+      "reverse_geocode_tool",
+      "category_search_tool",
+      "directions_tool",
+      "isochrone_tool"
+    ],
+    "mapbox-search-patterns": [
+      "search_and_geocode_tool",
+      "category_search_tool",
+      "reverse_geocode_tool"
+    ]
+  }
+}

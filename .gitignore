@@ -178,3 +178,6 @@ PR_DESCRIPTION.md
 /test/**/*.d.ts
 /test/**/*.d.cts
 /test/**/*.d.mts
+
+# Generated from mapbox/mapbox-agent-skills by scripts/fetch-agent-skills.mjs
+/src/skills/agentSkills.generated.ts

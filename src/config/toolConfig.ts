@@ -6,6 +6,8 @@ import type { ToolInstance } from '../tools/toolRegistry.js';
 export interface ToolConfig {
   enabledTools?: string[];
   disabledTools?: string[];
+  /** Don't serve skills, e.g. when a plugin already ships its own copies. */
+  disableSkills?: boolean;
 }
 
 export function parseToolConfigFromArgs(): ToolConfig {
@@ -25,7 +27,13 @@ export function parseToolConfigFromArgs(): ToolConfig {
       if (value) {
         config.disabledTools = value.split(',').map((t) => t.trim());
       }
+    } else if (arg === '--disable-skills') {
+      config.disableSkills = true;
     }
+  }
+
+  if (process.env.DISABLE_SKILLS === 'true') {
+    config.disableSkills = true;
   }
 
   return config;
